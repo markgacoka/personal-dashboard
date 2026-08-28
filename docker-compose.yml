@@ -24,7 +24,7 @@ services:
     env_file:
       - /var/www/app/.env
     volumes:
-      - /var/www/app/garmin-session.json:/app/garmin-session.json
+      - /var/www/app/garmin-session:/data/garmin-session
     networks:
       - web
     labels:

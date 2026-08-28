@@ -10,6 +10,7 @@ COPY api/src/ ./src/
 COPY public/ ./public/
 
 ENV PUBLIC_DIR=/app/public
+ENV SESSION_DIR=/data/garmin-session
 ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production

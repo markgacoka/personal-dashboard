@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
+import authRoutes from './routes/auth.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
@@ -38,6 +39,7 @@ fastify.setErrorHandler((err, req, reply) => {
   reply.status(err.statusCode || 500).send({ error: err.message })
 })
 
+await fastify.register(authRoutes)
 await fastify.register(athleteRoutes)
 await fastify.register(activitiesRoutes)
 await fastify.register(statsRoutes)

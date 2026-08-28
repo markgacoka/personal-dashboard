@@ -1,4 +1,5 @@
-import { GarminConnect } from 'garmin-connect'
+import pkg from 'garmin-connect'
+const { GarminConnect } = pkg
 import { existsSync } from 'fs'
 
 const SESSION_FILE = process.env.SESSION_FILE || './garmin-session.json'

@@ -38,7 +38,9 @@ jobs:
           tar czf deploy.tar.gz \
             --exclude='.git' \
             --exclude='.github' \
-            public/
+            --exclude='api/node_modules' \
+            public/ \
+            api/
 
       - name: Ship to VPS
         run: |
@@ -62,8 +64,18 @@ jobs:
           tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}" --strip-components=1
           rm /tmp/deploy-${SHA}.tar.gz
 
+          # Link shared .env into release
+          ln -sf "${DEPLOY_PATH}/.env" "${RELEASE_DIR}/api/.env"
+
+          # Install API dependencies
+          cd "${RELEASE_DIR}/api" && npm ci --omit=dev && cd -
+
           ln -sfn "${RELEASE_DIR}" "${DEPLOY_PATH}/current"
           sudo nginx -s reload
+
+          # Restart API (start on first deploy)
+          pm2 restart dashboard-api 2>/dev/null \
+            || pm2 start "${DEPLOY_PATH}/current/api/ecosystem.config.cjs" --env production
 
           echo "Deployed ${SHORT} → ${DEPLOY_PATH}/current"
 

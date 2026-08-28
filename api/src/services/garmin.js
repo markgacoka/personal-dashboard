@@ -56,6 +56,9 @@ export async function completeMFA(code) {
   if (!_mfaState) throw new Error('No pending MFA session — call /auth/garmin/init first')
   const { gc, html } = _mfaState
 
+  // Log a snippet to diagnose form structure
+  console.log('MFA_HTML_SNIPPET:', html.substring(0, 3000))
+
   const csrfMatch = html.match(/name="_csrf"\s+value="([^"]+)"/)
   const actionMatch = html.match(/<form[^>]+action="([^"]+)"/)
   if (!csrfMatch || !actionMatch) throw new Error('Could not parse MFA form fields')

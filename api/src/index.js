@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
-import { loadTokens } from './services/garmin.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
@@ -14,8 +13,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = process.env.PUBLIC_DIR || resolve(__dirname, '../../public')
 
 const fastify = Fastify({ logger: true })
-
-loadTokens()
 
 await fastify.register(cors, {
   origin: process.env.CORS_ORIGIN || 'https://gacoka.com',

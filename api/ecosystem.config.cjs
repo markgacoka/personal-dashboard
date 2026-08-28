@@ -7,7 +7,7 @@ module.exports = {
     env_production: {
       NODE_ENV: 'production',
       PORT: 3000,
-      TOKENS_FILE: '/var/www/app/tokens.json',
+      SESSION_FILE: '/var/www/app/garmin-session.json',
     },
     max_restarts: 5,
     restart_delay: 3000,

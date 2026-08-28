@@ -1,16 +1,24 @@
-import { stravaGet } from '../services/strava.js'
+import { garmin } from '../services/garmin.js'
 
 export default async function activitiesRoutes(fastify) {
+  // GET /api/activities?start=0&limit=30&type=running
   fastify.get('/api/activities', async (req) => {
-    const { page = 1, per_page = 30, before, after, type } = req.query
-    return stravaGet('/athlete/activities', { page, per_page, before, after, type })
+    const { start = 0, limit = 30, type } = req.query
+    return garmin((gc) => gc.getActivities(Number(start), Number(limit), type))
   })
 
+  // GET /api/activities/recent — last 10
   fastify.get('/api/activities/recent', async () => {
-    return stravaGet('/athlete/activities', { per_page: 10 })
+    return garmin((gc) => gc.getActivities(0, 10))
   })
 
+  // GET /api/activities/:id — single activity with full detail
   fastify.get('/api/activities/:id', async (req) => {
-    return stravaGet(`/activities/${req.params.id}`)
+    return garmin((gc) => gc.getActivity({ activityId: req.params.id }))
+  })
+
+  // GET /api/activities/:id/splits — lap/split data
+  fastify.get('/api/activities/:id/splits', async (req) => {
+    return garmin((gc) => gc.getActivitySplits({ activityId: req.params.id }))
   })
 }

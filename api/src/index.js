@@ -23,7 +23,6 @@ await fastify.register(cors, {
 await fastify.register(fastifyStatic, {
   root: publicDir,
   prefix: '/',
-  decorateReply: false,
 })
 
 fastify.get('/health', async () => ({ ok: true }))

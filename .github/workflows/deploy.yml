@@ -51,23 +51,23 @@ jobs:
         run: |
           SHA="${{ github.sha }}"
           SHORT="${SHA:0:7}"
+          DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
+          RELEASE_DIR="${DEPLOY_PATH}/releases/${SHORT}"
 
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" bash -s << EOF
-            set -euo pipefail
+            "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" bash << EOF
+          set -euo pipefail
 
-            RELEASE_DIR="${{ env.DEPLOY_PATH }}/releases/\${SHORT}"
-            mkdir -p "\${RELEASE_DIR}"
-            tar xzf /tmp/deploy-${SHA}.tar.gz -C "\${RELEASE_DIR}" --strip-components=1
-            rm /tmp/deploy-${SHA}.tar.gz
+          mkdir -p "${RELEASE_DIR}"
+          tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}" --strip-components=1
+          rm /tmp/deploy-${SHA}.tar.gz
 
-            ln -sfn "\${RELEASE_DIR}" "${{ env.DEPLOY_PATH }}/current"
-            sudo nginx -s reload
+          ln -sfn "${RELEASE_DIR}" "${DEPLOY_PATH}/current"
+          sudo nginx -s reload
 
-            echo "Deployed \${SHORT} → ${{ env.DEPLOY_PATH }}/current"
+          echo "Deployed ${SHORT} → ${DEPLOY_PATH}/current"
 
-            # Keep last 5 releases
-            ls -1dt "${{ env.DEPLOY_PATH }}/releases"/*/ 2>/dev/null | tail -n +6 | xargs rm -rf || true
+          ls -1dt "${DEPLOY_PATH}/releases"/*/ 2>/dev/null | tail -n +6 | xargs rm -rf || true
           EOF
 
       - name: Health check

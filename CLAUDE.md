@@ -17,8 +17,9 @@ Personal dashboard at gacoka.com. Planned features:
 ## Deploy Path
 
 ```
-public/        ← web root (nginx serves this)
-api/           ← Fastify API (PM2 process: dashboard-api)
+public/        ← static files (nginx root: /var/www/app/current/public)
+api/           ← Fastify API on port 3000 (PM2 process: dashboard-api)
+nginx/         ← nginx site config (deployed to /etc/nginx/sites-available/)
 ```
 
 On deploy: both `public/` and `api/` are archived, shipped to VPS, unpacked to `/var/www/app/releases/<sha>`, npm deps installed, symlinked to `/var/www/app/current`, PM2 restarted, nginx reloaded.

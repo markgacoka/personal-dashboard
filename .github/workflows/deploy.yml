@@ -22,7 +22,7 @@ jobs:
   deploy:
     name: Deploy → gacoka.com
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +31,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ env.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "${{ env.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Create archive
         run: |
@@ -40,7 +40,8 @@ jobs:
             --exclude='.github' \
             --exclude='api/node_modules' \
             public/ \
-            api/
+            api/ \
+            nginx/
 
       - name: Ship to VPS
         run: |
@@ -61,21 +62,27 @@ jobs:
           set -euo pipefail
 
           mkdir -p "${RELEASE_DIR}"
-          tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}" --strip-components=1
+          tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}"
           rm /tmp/deploy-${SHA}.tar.gz
 
-          # Link shared .env into release
+          # Link shared .env into release so the API picks it up
           ln -sf "${DEPLOY_PATH}/.env" "${RELEASE_DIR}/api/.env"
 
           # Install API dependencies
           cd "${RELEASE_DIR}/api" && npm ci --omit=dev && cd -
 
+          # Swap symlink
           ln -sfn "${RELEASE_DIR}" "${DEPLOY_PATH}/current"
+
+          # Install nginx config and reload
+          sudo cp "${DEPLOY_PATH}/current/nginx/gacoka.com" /etc/nginx/sites-available/gacoka.com
+          sudo nginx -t
           sudo nginx -s reload
 
-          # Restart API (start on first deploy)
+          # Restart API process (start on first deploy)
           pm2 restart dashboard-api 2>/dev/null \
             || pm2 start "${DEPLOY_PATH}/current/api/ecosystem.config.cjs" --env production
+          pm2 save
 
           echo "Deployed ${SHORT} → ${DEPLOY_PATH}/current"
 
@@ -84,14 +91,13 @@ jobs:
 
       - name: Health check
         run: |
-          sleep 3
-          for i in 1 2 3; do
+          for i in 1 2 3 4 5; do
             STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ env.HEALTHCHECK_URL }}" 2>/dev/null || echo "000")
-            [ "$STATUS" = "200" ] && echo "✅ ${{ env.HEALTHCHECK_URL }} → HTTP $STATUS" && exit 0
-            echo "Attempt $i: HTTP $STATUS — retrying..."
-            sleep 5
+            [ "$STATUS" = "200" ] && echo "${{ env.HEALTHCHECK_URL }} → HTTP $STATUS" && exit 0
+            echo "Attempt $i: HTTP $STATUS — retrying in 10s..."
+            sleep 10
           done
-          echo "::error::Health check failed"
+          echo "::error::Health check failed after 5 attempts"
           exit 1
 
       - name: Cleanup SSH

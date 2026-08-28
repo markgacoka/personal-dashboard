@@ -4,10 +4,6 @@ global:
 
 log:
   level: INFO
-  filePath: /var/log/traefik/traefik.log
-
-accessLog:
-  filePath: /var/log/traefik/access.log
 
 api:
   dashboard: false
@@ -28,11 +24,11 @@ certificatesResolvers:
   letsencrypt:
     acme:
       email: markgacoka@gmail.com
-      storage: /var/www/app/acme.json
+      storage: /acme.json
       httpChallenge:
         entryPoint: web
 
 providers:
-  file:
-    filename: /var/www/app/traefik-dynamic.yml
-    watch: true
+  docker:
+    exposedByDefault: false
+    network: web

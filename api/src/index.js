@@ -10,8 +10,8 @@ import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// api/src/index.js → ../../public resolves to the repo root public/
-const publicDir = resolve(__dirname, '../../public')
+// Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
+const publicDir = process.env.PUBLIC_DIR || resolve(__dirname, '../../public')
 
 const fastify = Fastify({ logger: true })
 

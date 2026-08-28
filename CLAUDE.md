@@ -9,28 +9,23 @@ Personal dashboard at gacoka.com. Planned features:
 
 ## Stack
 
-- `public/` — static HTML/CSS frontend (served by Fastify)
-- `api/` — Node.js 20 + Fastify, port 3000, PM2 process `dashboard-api`
-- `traefik/` — Traefik v3 reverse proxy (handles HTTPS, routes all traffic to port 3000)
+- `public/` — static HTML/CSS frontend (served by the Fastify container)
+- `api/` — Node.js 20 + Fastify, containerised
+- `traefik/` — Traefik v3 static config (HTTPS + Docker routing)
+- `docker-compose.yml` — two services: traefik + api
 - VPS at 89.116.157.98, deployed via GitHub Actions on merge to `main`
 
 ## Deploy Path
 
-```
-public/        ← frontend static files (Fastify serves these)
-api/           ← Fastify API + static file server
-traefik/       ← Traefik dynamic routing config (deployed each push)
-```
+On push to `main`: source is archived, shipped to VPS, unpacked to
+`/var/www/app/releases/<sha>`, symlinked to `/var/www/app/current`,
+then `docker compose up -d --build` rebuilds and restarts the api container.
+Traefik container stays running across deploys (only restarts if its config changes).
 
-On deploy: archive shipped to VPS, unpacked to `/var/www/app/releases/<sha>`,
-npm deps installed, symlinked to `/var/www/app/current`, PM2 restarted,
-`traefik/dynamic.yml` copied to `/var/www/app/traefik-dynamic.yml` (Traefik
-reloads automatically via file watcher).
-
-Persistent files on VPS (not in releases):
+Persistent files on VPS (outside releases, never in git):
 - `/var/www/app/.env` — GARMIN_USERNAME, GARMIN_PASSWORD, etc.
-- `/var/www/app/acme.json` — Traefik Let's Encrypt certificate store (chmod 600)
-- `/var/www/app/traefik-dynamic.yml` — updated each deploy
+- `/var/www/app/acme.json` — Traefik Let's Encrypt store (chmod 600)
+- `/var/www/app/garmin-session.json` — Garmin OAuth session cache
 
 ## Branch Rules
 

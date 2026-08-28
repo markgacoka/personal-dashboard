@@ -1,0 +1,87 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VPS_HOST: 89.116.157.98
+  VPS_USER: gacoka
+  DEPLOY_PATH: /var/www/app
+  HEALTHCHECK_URL: https://gacoka.com/health
+
+jobs:
+  deploy:
+    name: Deploy → gacoka.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ env.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Create archive
+        run: |
+          tar czf deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            public/
+
+      - name: Ship to VPS
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            deploy.tar.gz \
+            "${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/tmp/deploy-${{ github.sha }}.tar.gz"
+
+      - name: Deploy
+        run: |
+          SHA="${{ github.sha }}"
+          SHORT="${SHA:0:7}"
+
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" bash -s << EOF
+            set -euo pipefail
+
+            RELEASE_DIR="${{ env.DEPLOY_PATH }}/releases/\${SHORT}"
+            mkdir -p "\${RELEASE_DIR}"
+            tar xzf /tmp/deploy-${SHA}.tar.gz -C "\${RELEASE_DIR}" --strip-components=1
+            rm /tmp/deploy-${SHA}.tar.gz
+
+            ln -sfn "\${RELEASE_DIR}" "${{ env.DEPLOY_PATH }}/current"
+            sudo nginx -s reload
+
+            echo "Deployed \${SHORT} → ${{ env.DEPLOY_PATH }}/current"
+
+            # Keep last 5 releases
+            ls -1dt "${{ env.DEPLOY_PATH }}/releases"/*/ 2>/dev/null | tail -n +6 | xargs rm -rf || true
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 3
+          for i in 1 2 3; do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${{ env.HEALTHCHECK_URL }}" 2>/dev/null || echo "000")
+            [ "$STATUS" = "200" ] && echo "✅ ${{ env.HEALTHCHECK_URL }} → HTTP $STATUS" && exit 0
+            echo "Attempt $i: HTTP $STATUS — retrying..."
+            sleep 5
+          done
+          echo "::error::Health check failed"
+          exit 1
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

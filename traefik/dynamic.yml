@@ -1,0 +1,15 @@
+http:
+  routers:
+    app:
+      rule: "Host(`gacoka.com`) || Host(`www.gacoka.com`)"
+      entryPoints:
+        - websecure
+      service: app
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    app:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3000"

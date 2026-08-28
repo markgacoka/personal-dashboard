@@ -3,30 +3,34 @@
 ## What This Is
 
 Personal dashboard at gacoka.com. Planned features:
-- Training metrics visualization (Garmin / Strava integration)
+- Training metrics visualization (Garmin Connect integration)
 - Flight log
 - Personal to-do
 
 ## Stack
 
-- `public/` — static HTML/CSS frontend served by nginx
-- `api/` — Node.js 20 + Fastify backend, runs on port 3000 via PM2
-- Served by nginx on VPS at 89.116.157.98 (nginx proxies `/api/` and `/auth/` to port 3000)
-- Deployed via GitHub Actions on merge to `main`
+- `public/` — static HTML/CSS frontend (served by Fastify)
+- `api/` — Node.js 20 + Fastify, port 3000, PM2 process `dashboard-api`
+- `traefik/` — Traefik v3 reverse proxy (handles HTTPS, routes all traffic to port 3000)
+- VPS at 89.116.157.98, deployed via GitHub Actions on merge to `main`
 
 ## Deploy Path
 
 ```
-public/        ← static files (nginx root: /var/www/app/current/public)
-api/           ← Fastify API on port 3000 (PM2 process: dashboard-api)
-nginx/         ← nginx site config (deployed to /etc/nginx/sites-available/)
+public/        ← frontend static files (Fastify serves these)
+api/           ← Fastify API + static file server
+traefik/       ← Traefik dynamic routing config (deployed each push)
 ```
 
-On deploy: both `public/` and `api/` are archived, shipped to VPS, unpacked to `/var/www/app/releases/<sha>`, npm deps installed, symlinked to `/var/www/app/current`, PM2 restarted, nginx reloaded.
+On deploy: archive shipped to VPS, unpacked to `/var/www/app/releases/<sha>`,
+npm deps installed, symlinked to `/var/www/app/current`, PM2 restarted,
+`traefik/dynamic.yml` copied to `/var/www/app/traefik-dynamic.yml` (Traefik
+reloads automatically via file watcher).
 
 Persistent files on VPS (not in releases):
-- `/var/www/app/.env` — env vars (STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, etc.)
-- `/var/www/app/tokens.json` — Strava OAuth tokens (written by /auth/strava/callback)
+- `/var/www/app/.env` — GARMIN_USERNAME, GARMIN_PASSWORD, etc.
+- `/var/www/app/acme.json` — Traefik Let's Encrypt certificate store (chmod 600)
+- `/var/www/app/traefik-dynamic.yml` — updated each deploy
 
 ## Branch Rules
 

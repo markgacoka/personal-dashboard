@@ -41,12 +41,13 @@ jobs:
             --exclude='api/node_modules' \
             public/ \
             api/ \
-            nginx/
+            traefik/
 
       - name: Ship to VPS
         run: |
           scp -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=30 \
             deploy.tar.gz \
             "${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/tmp/deploy-${{ github.sha }}.tar.gz"
 
@@ -57,7 +58,7 @@ jobs:
           DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
           RELEASE_DIR="${DEPLOY_PATH}/releases/${SHORT}"
 
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
             "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" bash << EOF
           set -euo pipefail
 
@@ -65,21 +66,19 @@ jobs:
           tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}"
           rm /tmp/deploy-${SHA}.tar.gz
 
-          # Link shared .env into release so the API picks it up
+          # Link shared .env into the api release
           ln -sf "${DEPLOY_PATH}/.env" "${RELEASE_DIR}/api/.env"
 
           # Install API dependencies
           cd "${RELEASE_DIR}/api" && npm ci --omit=dev && cd -
 
-          # Swap symlink
+          # Swap symlink atomically
           ln -sfn "${RELEASE_DIR}" "${DEPLOY_PATH}/current"
 
-          # Install nginx config and reload
-          sudo cp "${DEPLOY_PATH}/current/nginx/gacoka.com" /etc/nginx/sites-available/gacoka.com
-          sudo nginx -t
-          sudo nginx -s reload
+          # Update Traefik dynamic routing config (file watcher reloads it automatically)
+          cp "${DEPLOY_PATH}/current/traefik/dynamic.yml" "${DEPLOY_PATH}/traefik-dynamic.yml"
 
-          # Restart API process (start on first deploy)
+          # Restart API process
           pm2 restart dashboard-api 2>/dev/null \
             || pm2 start "${DEPLOY_PATH}/current/api/ecosystem.config.cjs" --env production
           pm2 save

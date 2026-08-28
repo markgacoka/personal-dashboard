@@ -1,5 +1,5 @@
 import { GarminConnect } from 'garmin-connect'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { existsSync } from 'fs'
 
 const SESSION_FILE = process.env.SESSION_FILE || './garmin-session.json'
 let _client = null
@@ -11,11 +11,11 @@ async function buildClient() {
   })
   if (existsSync(SESSION_FILE)) {
     try {
-      gc.importSession(JSON.parse(readFileSync(SESSION_FILE, 'utf-8')))
+      await gc.loadTokenByFile(SESSION_FILE)
     } catch {}
   }
   await gc.login()
-  writeFileSync(SESSION_FILE, JSON.stringify(gc.exportSession()))
+  await gc.exportTokenToFile(SESSION_FILE)
   return gc
 }
 
@@ -24,13 +24,12 @@ async function getClient() {
   return _client
 }
 
-// Wraps a Garmin API call with one automatic re-login on auth failure
 export async function garmin(fn) {
   try {
     return await fn(await getClient())
   } catch (err) {
-    const msg = err?.message ?? ''
-    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('auth')) {
+    const msg = String(err?.message ?? err)
+    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('expired')) {
       _client = null
       return await fn(await getClient())
     }

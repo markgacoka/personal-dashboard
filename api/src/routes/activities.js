@@ -17,8 +17,8 @@ export default async function activitiesRoutes(fastify) {
     return garmin((gc) => gc.getActivity({ activityId: req.params.id }))
   })
 
-  // GET /api/activities/:id/splits — lap/split data
+  // GET /api/activities/:id/splits — lap/split data (downloads original FIT data)
   fastify.get('/api/activities/:id/splits', async (req) => {
-    return garmin((gc) => gc.getActivitySplits({ activityId: req.params.id }))
+    return garmin((gc) => gc.downloadOriginalActivityData({ activityId: req.params.id }))
   })
 }

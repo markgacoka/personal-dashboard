@@ -35,9 +35,9 @@ function filterFrom(activities, since) {
 }
 
 export default async function statsRoutes(fastify) {
-  // Garmin all-time user stats
+  // Garmin user profile with all-time stats
   fastify.get('/api/stats', async () => {
-    return garmin((gc) => gc.getUserSummary())
+    return garmin((gc) => gc.getUserProfile())
   })
 
   fastify.get('/api/stats/weekly', async () => {
@@ -58,7 +58,7 @@ export default async function statsRoutes(fastify) {
   fastify.get('/api/stats/daily', async (req) => {
     const date = req.query.date ?? new Date().toISOString().slice(0, 10)
     const [steps, hr, sleep] = await Promise.all([
-      garmin((gc) => gc.getDailySteps(new Date(date), new Date(date))),
+      garmin((gc) => gc.getSteps(new Date(date))),
       garmin((gc) => gc.getHeartRate(new Date(date))),
       garmin((gc) => gc.getSleepData(new Date(date))),
     ])

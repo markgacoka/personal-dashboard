@@ -70,58 +70,50 @@ async function main() {
       els => els.map(el => ({ tag: el.tagName, id: el.id, type: el.getAttribute('type'), class: el.className.substring(0, 60) })))
     console.log('Buttons found:', JSON.stringify(buttons))
 
-    // Fill credentials
+    // Fill credentials using Playwright's native fill (triggers proper input events)
     await page.fill('#username', USERNAME)
     await page.fill('#password', PASSWORD)
     await debug(page, 'after-fill')
 
-    // Submit — try button selectors in order of specificity, then fall back to Enter
-    const submitted = await page.evaluate(() => {
-      const candidates = [
-        document.querySelector('#login-btn-signin'),
-        document.querySelector('button[data-ga]'),
-        document.querySelector('[type="submit"]'),
-        document.querySelector('button'),
-      ].filter(Boolean)
-      if (candidates[0]) { candidates[0].click(); return candidates[0].id || candidates[0].tagName }
-      return null
-    })
-    console.log('Clicked:', submitted)
+    // Use page.click() — synthesizes real pointer/mouse events that jQuery handlers respond to
+    await page.click('#login-btn-signin')
+    console.log('Clicked #login-btn-signin')
 
-    if (!submitted) {
-      // Fallback: press Enter in the password field
-      await page.press('#password', 'Enter')
-      console.log('Pressed Enter as fallback')
-    }
+    // Wait for the AJAX POST response that login.js makes after button click
+    await page.waitForResponse(
+      r => r.url().includes('/sso') && r.request().method() === 'POST',
+      { timeout: 20000 }
+    ).catch(() => console.log('No POST response detected — checking DOM'))
 
-    // Wait for navigation away from the login form, OR MFA page appearing
-    await Promise.race([
-      page.waitForURL(url => !url.includes('/sso/signin') || url.includes('ticket='), { timeout: 20000 }),
-      page.waitForSelector('input[name="verificationCode"], #mfa-verification-code', { timeout: 20000 }),
-    ]).catch(() => console.log('No redirect/MFA detected in 20s — checking current state'))
-
+    // Give the DOM time to update with the response
+    await page.waitForTimeout(2000)
     await debug(page, 'after-submit')
 
-    // Handle MFA if present
-    const mfaInput = await page.$('input[name="verificationCode"], #mfa-verification-code')
-    if (mfaInput) {
-      console.log('MFA page detected — polling Gmail...')
+    // Detect which state we're in by inspecting the DOM
+    const pageState = await page.evaluate(() => {
+      const title = document.title
+      const hasMfaInput = !!document.querySelector('input[name="verificationCode"], #mfa-verification-code')
+      const hasLoginDefault = !!document.querySelector('#login-state-default')
+      const bodyText = document.body.innerText.substring(0, 500)
+      return { title, hasMfaInput, hasLoginDefault, bodyText }
+    })
+    console.log('Page state:', JSON.stringify(pageState))
+
+    if (pageState.hasMfaInput) {
+      console.log('MFA input found — polling Gmail...')
       const code = await fetchGarminCode()
       console.log('Code:', code)
-      await mfaInput.fill(code)
-      await debug(page, 'after-code-fill')
 
-      // Click the MFA submit
-      const mfaSubmitted = await page.evaluate(() => {
-        const btn = document.querySelector('#mfa-verification-code-submit') ||
-                    document.querySelector('[type="submit"]')
-        if (btn) { btn.click(); return btn.id || btn.tagName }
-        return null
-      })
-      console.log('MFA submit clicked:', mfaSubmitted)
+      // Fill and submit MFA
+      await page.fill('input[name="verificationCode"], #mfa-verification-code', code)
+      await page.click('#mfa-verification-code-submit')
+      console.log('MFA submitted')
 
-      await page.waitForURL(url => url.includes('ticket=') || url.includes('connect.garmin.com'), { timeout: 30000 })
-        .catch(() => {})
+      await page.waitForResponse(
+        r => r.url().includes('/sso') && r.request().method() === 'POST',
+        { timeout: 20000 }
+      ).catch(() => {})
+      await page.waitForTimeout(2000)
       await debug(page, 'after-mfa')
     }
 

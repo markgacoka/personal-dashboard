@@ -7,7 +7,7 @@ RUN npx playwright install chromium --with-deps
 
 # Install only what the auth script needs (no dev tools, no build step)
 COPY api/package.json api/package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm install playwright
 
 COPY api/src/services/gmail.js ./src/services/gmail.js
 COPY api/scripts/garmin-auth.js ./scripts/garmin-auth.js

@@ -3,7 +3,6 @@ import { ImapFlow } from 'imapflow'
 const INITIAL_DELAY_MS = 15_000
 const POLL_INTERVAL_MS = 10_000
 const POLL_TIMEOUT_MS = 3 * 60 * 1000
-const CODE_RE = /\b(\d{6})\b/
 
 function makeClient() {
   const pass = process.env.GMAIL_APP_PASSWORD
@@ -38,8 +37,11 @@ async function checkInbox(client) {
           continue
         }
 
-        const text = msg.source.toString()
-        const match = CODE_RE.exec(text)
+        // Strip quoted-printable soft line breaks, then find the code displayed in the HTML body.
+        // Garmin emails render the code as ">NNNNNN</strong>" — this avoids false matches
+        // on CSS colors like #000000 which appear earlier in the email.
+        const text = msg.source.toString().replace(/=\n/g, '')
+        const match = text.match(/>(\d{6})</)
         if (match) return match[1]
       }
     }

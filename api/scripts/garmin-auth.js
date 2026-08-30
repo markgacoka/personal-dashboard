@@ -3,14 +3,21 @@
  * Uses Playwright's DOM APIs (real Chromium navigation) for the SSO login.
  * After getting the SSO ticket, garmin-connect handles the OAuth exchange.
  *
+ * The SIGNIN_URL uses service=https://sso.garmin.com/sso/embed (the embedded widget URL)
+ * which is the same service URL the garmin-connect library uses internally. This ensures
+ * the CAS ticket we capture is valid for the OAuth preauthorized endpoint.
+ *
  * Run:  docker compose --profile auth run --rm garmin-auth
  */
 
 import 'dotenv/config'
-import { chromium } from 'playwright'
+import { chromium } from 'playwright-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import pkg from 'garmin-connect'
 import { mkdirSync, existsSync, writeFileSync } from 'fs'
 import { fetchGarminCode } from '../src/services/gmail.js'
+
+chromium.use(StealthPlugin())
 
 const { GarminConnect } = pkg
 
@@ -23,13 +30,16 @@ if (!USERNAME || !PASSWORD) {
   process.exit(1)
 }
 
-const SIGNIN_URL = `https://sso.garmin.com/sso/signin?clientId=GarminConnect&locale=en&service=${encodeURIComponent('https://connect.garmin.com/modern/')}`
+const SSO_EMBED = 'https://sso.garmin.com/sso/embed'
+
+// Use the embedded widget service URL — this matches what garmin-connect library uses
+// internally, so the CAS ticket will be valid for the OAuth preauthorized endpoint.
+const SIGNIN_URL = `https://sso.garmin.com/sso/signin?id=gauth-widget&embedWidget=true&clientId=GarminConnect&locale=en&gauthHost=${encodeURIComponent(SSO_EMBED)}&service=${encodeURIComponent(SSO_EMBED)}&source=${encodeURIComponent(SSO_EMBED)}&redirectAfterAccountLoginUrl=${encodeURIComponent(SSO_EMBED)}&redirectAfterAccountCreationUrl=${encodeURIComponent(SSO_EMBED)}`
 
 async function debug(page, label) {
   const url = page.url()
   const title = await page.title()
   console.log(`[${label}] url=${url} title="${title}"`)
-  // Save screenshot to shared volume so we can inspect it
   const path = `${SESSION_DIR}/debug-${label.replace(/\s/g, '-')}.png`
   await page.screenshot({ path }).catch(() => {})
 }
@@ -45,16 +55,15 @@ async function main() {
   })
   const page = await context.newPage()
 
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
-  })
-
   let ticket = null
 
-  // Capture ticket from any response URL
   page.on('response', response => {
-    const match = response.url().match(/[?&]ticket=([^&\s]+)/)
-    if (match) ticket = match[1]
+    const url = response.url()
+    const match = url.match(/[?&]ticket=([^&\s]+)/)
+    if (match && !ticket) {
+      ticket = match[1]
+      console.log('TICKET CAPTURED from:', url.substring(0, 150))
+    }
   })
 
   try {
@@ -63,64 +72,62 @@ async function main() {
     await page.waitForLoadState('domcontentloaded')
     await debug(page, 'after-load')
 
-    // Log all visible input names to find the right selectors
     const inputs = await page.$$eval('input', els => els.map(el => ({ name: el.name, id: el.id, type: el.type })))
     console.log('Inputs found:', JSON.stringify(inputs))
-    const buttons = await page.$$eval('button, [type="submit"], [id*="sign"], [id*="login"], [id*="submit"]',
-      els => els.map(el => ({ tag: el.tagName, id: el.id, type: el.getAttribute('type'), class: el.className.substring(0, 60) })))
-    console.log('Buttons found:', JSON.stringify(buttons))
 
-    // Fill credentials using Playwright's native fill (triggers proper input events)
     await page.fill('#username', USERNAME)
     await page.fill('#password', PASSWORD)
     await debug(page, 'after-fill')
 
-    // Use page.click() — synthesizes real pointer/mouse events that jQuery handlers respond to
     await page.click('#login-btn-signin')
     console.log('Clicked #login-btn-signin')
 
-    // Wait for the AJAX POST response that login.js makes after button click
     await page.waitForResponse(
       r => r.url().includes('/sso') && r.request().method() === 'POST',
       { timeout: 20000 }
-    ).catch(() => console.log('No POST response detected — checking DOM'))
+    ).catch(() => {})
 
-    // Give the DOM time to update with the response
     await page.waitForTimeout(2000)
     await debug(page, 'after-submit')
 
-    // Detect which state we're in by inspecting the DOM
-    const pageState = await page.evaluate(() => {
-      const title = document.title
-      const hasMfaInput = !!document.querySelector('input[name="verificationCode"], #mfa-verification-code')
-      const hasLoginDefault = !!document.querySelector('#login-state-default')
-      const bodyText = document.body.innerText.substring(0, 500)
-      return { title, hasMfaInput, hasLoginDefault, bodyText }
-    })
+    const pageState = await page.evaluate(() => ({
+      title: document.title,
+      hasMfaInput: !!document.querySelector('#mfa-code, input[name="mfa-code"]'),
+      bodyText: document.body.innerText.substring(0, 500),
+    }))
     console.log('Page state:', JSON.stringify(pageState))
 
-    if (pageState.hasMfaInput) {
-      console.log('MFA input found — polling Gmail...')
+    const onMfaPage = page.url().includes('/verifyMFA') || pageState.hasMfaInput
+    if (onMfaPage) {
+      console.log('MFA required — polling Gmail...')
       const code = await fetchGarminCode()
       console.log('Code:', code)
 
-      // Fill and submit MFA
-      await page.fill('input[name="verificationCode"], #mfa-verification-code', code)
+      await page.fill('#mfa-code', code)
       await page.click('#mfa-verification-code-submit')
       console.log('MFA submitted')
 
-      await page.waitForResponse(
-        r => r.url().includes('/sso') && r.request().method() === 'POST',
-        { timeout: 20000 }
-      ).catch(() => {})
-      await page.waitForTimeout(2000)
+      // Wait for the ticket to appear (either in redirect URL or current page URL)
+      await new Promise(resolve => {
+        const check = setInterval(() => { if (ticket) { clearInterval(check); resolve() } }, 100)
+        setTimeout(() => { clearInterval(check); resolve() }, 20000)
+      })
+
+      await page.waitForTimeout(1000)
       await debug(page, 'after-mfa')
+    } else if (ticket) {
+      console.log('Already have ticket from login redirect (no MFA needed)')
     }
 
-    // Final ticket extraction
+    // Also check current page URL and HTML for ticket
     if (!ticket) {
       const currentUrl = page.url()
       const match = currentUrl.match(/[?&]ticket=([^&\s]+)/)
+      if (match) ticket = match[1]
+    }
+    if (!ticket) {
+      const html = await page.content()
+      const match = html.match(/ticket=([^"&\s]+)/)
       if (match) ticket = match[1]
     }
 
@@ -129,14 +136,27 @@ async function main() {
       writeFileSync(`${SESSION_DIR}/debug-final.html`, content)
       throw new Error(`No ticket found. URL: ${page.url()} — HTML saved to ${SESSION_DIR}/debug-final.html`)
     }
+
+    console.log('Ticket:', ticket.substring(0, 30) + '...')
   } finally {
     await browser.close()
   }
 
-  console.log('Ticket obtained — exchanging for OAuth tokens...')
+  console.log('Exchanging ticket for OAuth tokens...')
   const gc = new GarminConnect({ username: USERNAME, password: PASSWORD })
+
+  gc.client.client.interceptors.response.use(
+    r => r,
+    err => {
+      console.log('OAuth ERROR:', err.response?.status, err.config?.url)
+      console.log('  Body:', JSON.stringify(err.response?.data || err.message))
+      return Promise.reject(err)
+    }
+  )
+
   await gc.client.fetchOauthConsumer()
   const oauth1 = await gc.client.getOauth1Token(ticket)
+  console.log('OAuth1 token keys:', Object.keys(oauth1.token || {}))
   await gc.client.exchange(oauth1)
   await gc.exportTokenToFile(SESSION_DIR)
 

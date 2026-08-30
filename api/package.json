@@ -11,6 +11,7 @@
     "@fastify/static": "^7.0.4",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
-    "garmin-connect": "^1.6.2"
+    "garmin-connect": "^1.6.2",
+    "imapflow": "^1.7.6"
   }
 }

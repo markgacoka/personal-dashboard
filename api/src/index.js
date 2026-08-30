@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
+import { autoMFA } from './services/garmin.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -51,3 +52,12 @@ fastify.setNotFoundHandler((req, reply) => {
 const port = parseInt(process.env.PORT || '3000', 10)
 const host = process.env.HOST || '127.0.0.1'
 await fastify.listen({ port, host })
+
+// Authenticate with Garmin after the server is up — non-blocking
+if (process.env.GMAIL_APP_PASSWORD) {
+  autoMFA()
+    .then(r => fastify.log.info({ garmin: r }, 'Garmin startup auth complete'))
+    .catch(e => fastify.log.error({ err: e.message }, 'Garmin startup auth failed — call /auth/garmin/auto to retry'))
+} else {
+  fastify.log.warn('GMAIL_APP_PASSWORD not set — skipping Garmin startup auth')
+}

@@ -1,7 +1,13 @@
-import { initMFA, completeMFA } from '../services/garmin.js'
+import { initMFA, completeMFA, autoMFA } from '../services/garmin.js'
 
 export default async function authRoutes(fastify) {
-  // Step 1: triggers Garmin login → sends MFA email
+  // Fully automated: triggers login, reads code from Gmail, completes MFA
+  fastify.get('/auth/garmin/auto', async (req, reply) => {
+    const result = await autoMFA()
+    reply.send(result)
+  })
+
+  // Manual step 1: triggers Garmin login → sends MFA email
   fastify.get('/auth/garmin/init', async (req, reply) => {
     const result = await initMFA()
     if (result.needsMfa) {
@@ -11,11 +17,18 @@ export default async function authRoutes(fastify) {
     }
   })
 
-  // Step 2: complete auth with the code from email
+  // Manual step 2: complete auth with the code from email
   fastify.post('/auth/garmin/mfa', async (req, reply) => {
     const { code } = req.body ?? {}
     if (!code) return reply.status(400).send({ error: 'Missing code in request body' })
-    const result = await completeMFA(String(code))
-    reply.send(result)
+    try {
+      const result = await completeMFA(String(code))
+      reply.send(result)
+    } catch (err) {
+      const body = { error: err.message }
+      if (err.htmlExcerpt) body.htmlExcerpt = err.htmlExcerpt
+      if (err.mfaResultExcerpt) body.mfaResultExcerpt = err.mfaResultExcerpt
+      reply.status(500).send(body)
+    }
   })
 }

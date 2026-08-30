@@ -17,14 +17,13 @@ function makeClient() {
   })
 }
 
-async function checkInbox(client, since) {
-  const lock = await client.getMailboxLock('INBOX')
+async function checkFolder(client, folder, since) {
+  const lock = await client.getMailboxLock(folder)
   try {
     const uids = await client.search({ from: 'garmin.com', since }, { uid: true })
-    console.log(`Gmail IMAP: found ${uids.length} Garmin message(s) since ${since.toISOString()}`)
+    console.log(`Gmail IMAP [${folder}]: found ${uids.length} Garmin message(s)`)
     if (!uids.length) return null
 
-    // Check most recent first
     for (const uid of [...uids].reverse()) {
       for await (const msg of client.fetch(uid, { source: true }, { uid: true })) {
         const text = msg.source.toString()
@@ -50,8 +49,12 @@ export async function fetchGarminCode() {
     const client = makeClient()
     try {
       await client.connect()
-      const code = await checkInbox(client, since)
-      if (code) return code
+      // Search All Mail (covers Inbox + Promotions/Updates tabs + other categories)
+      // and Spam separately, since Garmin emails may be filtered
+      for (const folder of ['[Gmail]/All Mail', '[Gmail]/Spam']) {
+        const code = await checkFolder(client, folder, since).catch(() => null)
+        if (code) return code
+      }
     } finally {
       await client.logout().catch(() => {})
     }

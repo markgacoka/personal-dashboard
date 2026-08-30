@@ -35,3 +35,20 @@ services:
       - "traefik.http.services.app.loadbalancer.server.port=3000"
     depends_on:
       - traefik
+
+  # Run on demand to (re-)authenticate with Garmin via headless Chromium.
+  # Chromium's real TLS fingerprint bypasses Cloudflare's bot detection on Garmin's SSO.
+  # Tokens are saved to the shared garmin-session volume and reused by the api service.
+  #
+  # Usage:  docker compose --profile auth run --rm garmin-auth
+  garmin-auth:
+    profiles: ["auth"]
+    build:
+      context: .
+      dockerfile: api/Dockerfile.auth
+    env_file:
+      - /var/www/app/.env
+    volumes:
+      - /var/www/app/garmin-session:/data/garmin-session
+    networks:
+      - web

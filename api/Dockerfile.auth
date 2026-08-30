@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+
+WORKDIR /app
+
+# Install Chromium and its dependencies via Playwright's own installer
+RUN npx playwright install chromium --with-deps
+
+# Install only what the auth script needs (no dev tools, no build step)
+COPY api/package.json api/package-lock.json* ./
+RUN npm ci --omit=dev
+
+COPY api/src/services/gmail.js ./src/services/gmail.js
+COPY api/scripts/garmin-auth.js ./scripts/garmin-auth.js
+
+ENV SESSION_DIR=/data/garmin-session
+ENV NODE_ENV=production
+
+CMD ["node", "scripts/garmin-auth.js"]

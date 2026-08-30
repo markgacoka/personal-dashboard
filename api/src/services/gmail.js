@@ -1,8 +1,8 @@
 import { ImapFlow } from 'imapflow'
 
-const INITIAL_DELAY_MS = 15_000  // wait 15s before first poll (Garmin email latency)
+const INITIAL_DELAY_MS = 15_000
 const POLL_INTERVAL_MS = 10_000
-const POLL_TIMEOUT_MS = 3 * 60 * 1000  // 3 minutes total
+const POLL_TIMEOUT_MS = 3 * 60 * 1000
 const CODE_RE = /\b(\d{6})\b/
 
 function makeClient() {
@@ -17,15 +17,27 @@ function makeClient() {
   })
 }
 
-async function checkFolder(client, folder, since) {
-  const lock = await client.getMailboxLock(folder)
+async function checkInbox(client) {
+  const lock = await client.getMailboxLock('INBOX')
   try {
-    const uids = await client.search({ from: 'garmin.com', since }, { uid: true })
-    console.log(`Gmail IMAP [${folder}]: found ${uids.length} Garmin message(s)`)
+    // Search by subject — more reliable than `from` in Gmail IMAP
+    const uids = await client.search({ subject: 'Security Passcode' }, { uid: true })
+    console.log(`Gmail IMAP: found ${uids.length} "Security Passcode" message(s) in INBOX`)
     if (!uids.length) return null
 
+    // Check most recent first (highest UID = most recent in IMAP)
     for (const uid of [...uids].reverse()) {
-      for await (const msg of client.fetch(uid, { source: true }, { uid: true })) {
+      for await (const msg of client.fetch(uid, { envelope: true, source: true }, { uid: true })) {
+        const receivedDate = msg.envelope?.date
+        const ageMs = receivedDate ? Date.now() - new Date(receivedDate).getTime() : 0
+        console.log(`  uid=${uid} age=${Math.round(ageMs / 1000)}s`)
+
+        // Only use codes from emails received in the last 25 minutes
+        if (receivedDate && ageMs > 25 * 60 * 1000) {
+          console.log('  Skipping — too old')
+          continue
+        }
+
         const text = msg.source.toString()
         const match = CODE_RE.exec(text)
         if (match) return match[1]
@@ -38,23 +50,17 @@ async function checkFolder(client, folder, since) {
 }
 
 export async function fetchGarminCode() {
-  // Use a lookback that covers the time since the init call started
-  const since = new Date(Date.now() - 5 * 60 * 1000)
   const deadline = Date.now() + POLL_TIMEOUT_MS
 
-  // Give Garmin time to send the email before first attempt
+  // Give Garmin time to send the email before first check
   await new Promise(r => setTimeout(r, INITIAL_DELAY_MS))
 
   while (Date.now() < deadline) {
     const client = makeClient()
     try {
       await client.connect()
-      // Search All Mail (covers Inbox + Promotions/Updates tabs + other categories)
-      // and Spam separately, since Garmin emails may be filtered
-      for (const folder of ['[Gmail]/All Mail', '[Gmail]/Spam']) {
-        const code = await checkFolder(client, folder, since).catch(() => null)
-        if (code) return code
-      }
+      const code = await checkInbox(client)
+      if (code) return code
     } finally {
       await client.logout().catch(() => {})
     }

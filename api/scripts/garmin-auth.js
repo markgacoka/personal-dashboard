@@ -9,7 +9,7 @@
 import 'dotenv/config'
 import { chromium } from 'playwright'
 import pkg from 'garmin-connect'
-import { mkdirSync, existsSync } from 'fs'
+import { mkdirSync, existsSync, writeFileSync } from 'fs'
 import { fetchGarminCode } from '../src/services/gmail.js'
 
 const { GarminConnect } = pkg
@@ -23,8 +23,16 @@ if (!USERNAME || !PASSWORD) {
   process.exit(1)
 }
 
-// Non-embed URL — redirects to connect.garmin.com/modern/?ticket=... after auth
 const SIGNIN_URL = `https://sso.garmin.com/sso/signin?clientId=GarminConnect&locale=en&service=${encodeURIComponent('https://connect.garmin.com/modern/')}`
+
+async function debug(page, label) {
+  const url = page.url()
+  const title = await page.title()
+  console.log(`[${label}] url=${url} title="${title}"`)
+  // Save screenshot to shared volume so we can inspect it
+  const path = `${SESSION_DIR}/debug-${label.replace(/\s/g, '-')}.png`
+  await page.screenshot({ path }).catch(() => {})
+}
 
 async function main() {
   if (!existsSync(SESSION_DIR)) mkdirSync(SESSION_DIR, { recursive: true })
@@ -43,40 +51,81 @@ async function main() {
 
   let ticket = null
 
-  // Capture the SSO ticket from any redirect response
+  // Capture ticket from any response URL
   page.on('response', response => {
     const match = response.url().match(/[?&]ticket=([^&\s]+)/)
     if (match) ticket = match[1]
   })
 
   try {
-    console.log('Navigating to Garmin SSO...')
-    await page.goto(SIGNIN_URL, { waitUntil: 'networkidle', timeout: 30000 })
+    console.log('Loading signin page...')
+    await page.goto(SIGNIN_URL, { timeout: 30000 })
+    await page.waitForLoadState('domcontentloaded')
+    await debug(page, 'after-load')
 
-    // Fill login form
-    await page.waitForSelector('input[name="username"], #username', { timeout: 15000 })
-    await page.fill('input[name="username"], #username', USERNAME)
-    await page.fill('input[name="password"], #password', PASSWORD)
-    await page.click('[type="submit"]')
+    // Log all visible input names to find the right selectors
+    const inputs = await page.$$eval('input', els => els.map(el => ({ name: el.name, id: el.id, type: el.type })))
+    console.log('Inputs found:', JSON.stringify(inputs))
+    const buttons = await page.$$eval('button, [type="submit"], [id*="sign"], [id*="login"], [id*="submit"]',
+      els => els.map(el => ({ tag: el.tagName, id: el.id, type: el.getAttribute('type'), class: el.className.substring(0, 60) })))
+    console.log('Buttons found:', JSON.stringify(buttons))
 
-    console.log('Credentials submitted — waiting for response...')
-    await page.waitForLoadState('networkidle', { timeout: 15000 })
+    // Fill credentials
+    await page.fill('#username', USERNAME)
+    await page.fill('#password', PASSWORD)
+    await debug(page, 'after-fill')
 
-    // Check if we landed on the MFA page
-    const mfaInput = await page.$('input[name="verificationCode"], #mfa-verification-code')
-    if (mfaInput) {
-      console.log('MFA required — polling Gmail for code (up to 3 min)...')
-      const code = await fetchGarminCode()
-      console.log('Code found:', code)
+    // Submit — try button selectors in order of specificity, then fall back to Enter
+    const submitted = await page.evaluate(() => {
+      const candidates = [
+        document.querySelector('#login-btn-signin'),
+        document.querySelector('button[data-ga]'),
+        document.querySelector('[type="submit"]'),
+        document.querySelector('button'),
+      ].filter(Boolean)
+      if (candidates[0]) { candidates[0].click(); return candidates[0].id || candidates[0].tagName }
+      return null
+    })
+    console.log('Clicked:', submitted)
 
-      await mfaInput.fill(code)
-      await page.click('#mfa-verification-code-submit, [type="submit"]')
-      console.log('MFA submitted — waiting for redirect...')
-      await page.waitForLoadState('networkidle', { timeout: 30000 })
+    if (!submitted) {
+      // Fallback: press Enter in the password field
+      await page.press('#password', 'Enter')
+      console.log('Pressed Enter as fallback')
     }
 
-    // Ticket might already be captured via the response listener.
-    // Also check the current URL.
+    // Wait for navigation away from the login form, OR MFA page appearing
+    await Promise.race([
+      page.waitForURL(url => !url.includes('/sso/signin') || url.includes('ticket='), { timeout: 20000 }),
+      page.waitForSelector('input[name="verificationCode"], #mfa-verification-code', { timeout: 20000 }),
+    ]).catch(() => console.log('No redirect/MFA detected in 20s — checking current state'))
+
+    await debug(page, 'after-submit')
+
+    // Handle MFA if present
+    const mfaInput = await page.$('input[name="verificationCode"], #mfa-verification-code')
+    if (mfaInput) {
+      console.log('MFA page detected — polling Gmail...')
+      const code = await fetchGarminCode()
+      console.log('Code:', code)
+      await mfaInput.fill(code)
+      await debug(page, 'after-code-fill')
+
+      // Click the MFA submit
+      const mfaSubmitted = await page.evaluate(() => {
+        const btn = document.querySelector('#mfa-verification-code-submit') ||
+                    document.querySelector('[type="submit"]')
+        if (btn) { btn.click(); return btn.id || btn.tagName }
+        return null
+      })
+      console.log('MFA submit clicked:', mfaSubmitted)
+
+      await page.waitForURL(url => url.includes('ticket=') || url.includes('connect.garmin.com'), { timeout: 30000 })
+        .catch(() => {})
+      await debug(page, 'after-mfa')
+    }
+
+    // Final ticket extraction
     if (!ticket) {
       const currentUrl = page.url()
       const match = currentUrl.match(/[?&]ticket=([^&\s]+)/)
@@ -84,14 +133,15 @@ async function main() {
     }
 
     if (!ticket) {
-      const body = await page.content()
-      throw new Error(`No SSO ticket found. Current URL: ${page.url()}\nPage snippet: ${body.substring(0, 2000)}`)
+      const content = await page.content()
+      writeFileSync(`${SESSION_DIR}/debug-final.html`, content)
+      throw new Error(`No ticket found. URL: ${page.url()} — HTML saved to ${SESSION_DIR}/debug-final.html`)
     }
   } finally {
     await browser.close()
   }
 
-  console.log('SSO ticket obtained — exchanging for OAuth tokens...')
+  console.log('Ticket obtained — exchanging for OAuth tokens...')
   const gc = new GarminConnect({ username: USERNAME, password: PASSWORD })
   await gc.client.fetchOauthConsumer()
   const oauth1 = await gc.client.getOauth1Token(ticket)

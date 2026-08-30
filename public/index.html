@@ -3,28 +3,674 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>gacoka.com</title>
+  <title>Gacoka</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111;
+      --border: #1e1e1e;
+      --text: #f0f0f0;
+      --muted: #666;
+      --dim: #3a3a3a;
+      --accent: #c8ff00;
+      --run: #4ade80;
+      --bike: #facc15;
+      --swim: #38bdf8;
+      --row: #f472b6;
+      --other: #a78bfa;
+    }
+
     body {
-      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── Layout ─────────────────────────────────── */
+    .shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .avatar-placeholder {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--dim);
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #0a0a0a;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 18px;
+      flex-shrink: 0;
     }
 
-    h1 {
-      color: #f5f5f5;
-      font-size: clamp(2rem, 8vw, 5rem);
-      font-weight: 300;
+    .header-text { flex: 1; min-width: 0; }
+
+    .header-name {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 1px;
+    }
+
+    .header-date {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    /* ── Section labels ──────────────────────────── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Grid ─────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .grid-wide { grid-column: 1 / -1; }
+
+    @media (min-width: 640px) {
+      .grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (min-width: 860px) {
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 280px;
+        gap: 24px;
+        align-items: start;
+      }
+      .main-grid .left { min-width: 0; }
+    }
+
+    /* ── Cards ─────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    /* ── Sport tiles ────────────────────────────────── */
+    .sport-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .sport-tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sport-tile::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .sport-tile[data-sport="run"]::before   { background: var(--run); }
+    .sport-tile[data-sport="bike"]::before  { background: var(--bike); }
+    .sport-tile[data-sport="swim"]::before  { background: var(--swim); }
+    .sport-tile[data-sport="row"]::before   { background: var(--row); }
+    .sport-tile[data-sport="other"]::before { background: var(--other); }
+
+    .sport-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+
+    .sport-name {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .sport-primary {
+      font-size: 22px;
+      font-weight: 700;
       letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .sport-secondary {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .sport-sessions {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    /* ── Activities list ────────────────────────────── */
+    .activity-list { list-style: none; }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-icon {
+      font-size: 18px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .activity-body { flex: 1; min-width: 0; }
+
+    .activity-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .activity-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .activity-stats {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .activity-dist {
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .activity-time {
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Wellness card ──────────────────────────────── */
+    .wellness-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .wellness-row:last-child { border-bottom: none; }
+
+    .wellness-label {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .wellness-value {
+      font-size: 15px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .progress-bar {
+      width: 80px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+      transition: width 0.6s ease;
+    }
+
+    /* ── Skeleton loader ────────────────────────────── */
+    .skel {
+      background: linear-gradient(90deg, var(--border) 25%, #2a2a2a 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Empty state ────────────────────────────────── */
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 20px 0;
+      text-align: center;
+    }
+
+    .error-note {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 8px 0;
     }
   </style>
 </head>
 <body>
-  <h1>Hello</h1>
+<div class="shell">
+
+  <!-- Header -->
+  <header>
+    <div id="avatar" class="avatar-placeholder">G</div>
+    <div class="header-text">
+      <div class="header-name" id="header-name">Gacoka Mbui</div>
+      <div class="header-meta" id="header-meta">Training dashboard</div>
+    </div>
+    <div class="header-date" id="header-date"></div>
+  </header>
+
+  <div class="main-grid">
+    <div class="left">
+
+      <!-- Weekly volume -->
+      <div class="section-label">This week</div>
+      <div id="weekly-sports" class="sport-grid">
+        <!-- rendered by JS -->
+        <div class="sport-tile">
+          <div class="sport-icon skel" style="width:28px;height:28px;border-radius:6px;margin-bottom:8px"></div>
+          <div class="skel" style="width:60px;height:10px;margin-bottom:8px"></div>
+          <div class="skel" style="width:80px;height:22px;margin-bottom:4px"></div>
+          <div class="skel" style="width:50px;height:10px"></div>
+        </div>
+      </div>
+
+      <!-- Recent activities -->
+      <div class="section-label">Recent activities</div>
+      <div class="card">
+        <ul id="activity-list" class="activity-list">
+          <li class="activity-item">
+            <div class="activity-icon skel"></div>
+            <div class="activity-body">
+              <div class="skel" style="width:140px;height:13px;margin-bottom:4px"></div>
+              <div class="skel" style="width:80px;height:11px"></div>
+            </div>
+            <div class="activity-stats">
+              <div class="skel" style="width:40px;height:13px;margin-bottom:4px"></div>
+              <div class="skel" style="width:30px;height:11px"></div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Sidebar: Today -->
+    <div class="right">
+      <div class="section-label">Today</div>
+      <div class="card">
+        <div id="wellness-content">
+          <div class="wellness-row">
+            <div class="skel" style="width:80px;height:12px"></div>
+            <div class="skel" style="width:50px;height:15px"></div>
+          </div>
+          <div class="wellness-row">
+            <div class="skel" style="width:80px;height:12px"></div>
+            <div class="skel" style="width:50px;height:15px"></div>
+          </div>
+          <div class="wellness-row">
+            <div class="skel" style="width:80px;height:12px"></div>
+            <div class="skel" style="width:50px;height:15px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Helpers ───────────────────────────────────────────
+function fmtDist(meters) {
+  if (!meters) return null
+  const km = meters / 1000
+  return km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`
+}
+
+function fmtDur(seconds) {
+  if (!seconds) return null
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}`
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function fmtPace(meters, seconds) {
+  if (!meters || !seconds) return null
+  const secPerKm = seconds / (meters / 1000)
+  const m = Math.floor(secPerKm / 60)
+  const s = Math.floor(secPerKm % 60)
+  return `${m}:${String(s).padStart(2, '0')}/km`
+}
+
+function relativeDate(localStr) {
+  // localStr: "2026-08-29 14:58:40"
+  const d = new Date(localStr.replace(' ', 'T'))
+  const now = new Date()
+  const daysDiff = Math.floor((now - d) / 86400000)
+  if (daysDiff === 0) return 'Today'
+  if (daysDiff === 1) return 'Yesterday'
+  if (daysDiff < 7) {
+    return d.toLocaleDateString('en-US', { weekday: 'short' })
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function sportMeta(typeKey) {
+  const map = {
+    running:              { icon: '🏃', label: 'Run',      sport: 'run' },
+    trail_running:        { icon: '⛰️',  label: 'Trail',    sport: 'run' },
+    treadmill_running:    { icon: '🏃', label: 'Treadmill', sport: 'run' },
+    virtual_run:          { icon: '🏃', label: 'Run',      sport: 'run' },
+    cycling:              { icon: '🚴', label: 'Ride',     sport: 'bike' },
+    road_biking:          { icon: '🚴', label: 'Ride',     sport: 'bike' },
+    mountain_biking:      { icon: '🚵', label: 'MTB',      sport: 'bike' },
+    indoor_cycling:       { icon: '🚴', label: 'Spin',     sport: 'bike' },
+    virtual_ride:         { icon: '🚴', label: 'Ride',     sport: 'bike' },
+    open_water_swimming:  { icon: '🏊', label: 'OWS',      sport: 'swim' },
+    swimming:             { icon: '🏊', label: 'Swim',     sport: 'swim' },
+    pool_swimming:        { icon: '🏊', label: 'Swim',     sport: 'swim' },
+    indoor_rowing:        { icon: '🚣', label: 'Row',      sport: 'row' },
+    strength_training:    { icon: '🏋️', label: 'Strength', sport: 'other' },
+    yoga:                 { icon: '🧘', label: 'Yoga',     sport: 'other' },
+    walking:              { icon: '🚶', label: 'Walk',     sport: 'other' },
+    hiking:               { icon: '🥾', label: 'Hike',     sport: 'other' },
+  }
+  return map[typeKey] ?? { icon: '●', label: typeKey?.replace(/_/g, ' ') ?? 'Activity', sport: 'other' }
+}
+
+// Group activity types into display sport buckets for weekly tiles
+function groupSports(bySport) {
+  const buckets = {}
+  for (const [key, data] of Object.entries(bySport)) {
+    const { label, sport } = sportMeta(key)
+    // Use the sport key for color, but keep the label from the dominant sub-type
+    if (!buckets[sport]) {
+      buckets[sport] = { sport, label, count: 0, distance_m: 0, moving_time_s: 0 }
+    }
+    buckets[sport].count += data.count
+    buckets[sport].distance_m += data.distance_m
+    buckets[sport].moving_time_s += data.moving_time_s
+    // Keep track of original types for better label selection
+    if (!buckets[sport].types) buckets[sport].types = []
+    buckets[sport].types.push({ key, label, ...data })
+  }
+  return buckets
+}
+
+function sportDisplayLabel(bucket) {
+  if (bucket.sport === 'run') return 'Running'
+  if (bucket.sport === 'bike') return 'Cycling'
+  if (bucket.sport === 'swim') return 'Swimming'
+  if (bucket.sport === 'row') return 'Rowing'
+  // For "other" show the most common type
+  if (bucket.types?.length === 1) return bucket.types[0].label
+  return 'Other'
+}
+
+function sportDisplayIcon(bucket) {
+  const icons = { run: '🏃', bike: '🚴', swim: '🏊', row: '🚣', other: '●' }
+  return icons[bucket.sport] ?? '●'
+}
+
+// ── Render weekly sports ───────────────────────────────
+async function loadWeekly() {
+  const data = await fetch('/api/stats/weekly').then(r => r.json())
+  const container = document.getElementById('weekly-sports')
+
+  const bySport = data.by_sport ?? {}
+  const buckets = groupSports(bySport)
+
+  if (Object.keys(buckets).length === 0) {
+    container.innerHTML = '<div class="empty">No activities this week</div>'
+    return
+  }
+
+  container.innerHTML = Object.values(buckets).map(b => {
+    const dist = b.distance_m > 100 ? fmtDist(b.distance_m) : null
+    const dur = b.moving_time_s > 60 ? fmtDur(b.moving_time_s) : null
+
+    return `
+      <div class="sport-tile" data-sport="${b.sport}">
+        <div class="sport-icon">${sportDisplayIcon(b)}</div>
+        <div class="sport-name">${sportDisplayLabel(b)}</div>
+        <div class="sport-primary">${dist ?? (dur ?? '—')}</div>
+        ${dist && dur ? `<div class="sport-secondary">${dur}</div>` : ''}
+        <div class="sport-sessions">${b.count} session${b.count !== 1 ? 's' : ''}</div>
+      </div>`
+  }).join('')
+}
+
+// ── Render recent activities ───────────────────────────
+async function loadActivities() {
+  const data = await fetch('/api/activities/recent').then(r => r.json())
+  const list = document.getElementById('activity-list')
+
+  if (!Array.isArray(data) || data.length === 0) {
+    list.innerHTML = '<li class="empty">No recent activities</li>'
+    return
+  }
+
+  list.innerHTML = data.map(act => {
+    const typeKey = act.activityType?.typeKey ?? ''
+    const meta = sportMeta(typeKey)
+    const dist = act.distance > 100 ? fmtDist(act.distance) : null
+    const dur = fmtDur(act.movingDuration ?? act.duration)
+    const isRun = meta.sport === 'run'
+    const pace = isRun && act.distance && (act.movingDuration ?? act.duration)
+      ? fmtPace(act.distance, act.movingDuration ?? act.duration)
+      : null
+    const name = act.activityName || meta.label
+    const dateStr = relativeDate(act.startTimeLocal)
+    const hrStr = act.averageHR ? ` · ${act.averageHR} bpm` : ''
+
+    return `
+      <li class="activity-item">
+        <div class="activity-icon">${meta.icon}</div>
+        <div class="activity-body">
+          <div class="activity-name" title="${name}">${name}</div>
+          <div class="activity-meta">${dateStr}${hrStr}</div>
+        </div>
+        <div class="activity-stats">
+          ${dist ? `<div class="activity-dist">${dist}</div>` : ''}
+          ${dur ? `<div class="activity-time">${pace ?? dur}</div>` : ''}
+        </div>
+      </li>`
+  }).join('')
+}
+
+// ── Render wellness ────────────────────────────────────
+async function loadWellness() {
+  // Use yesterday if today isn't available yet
+  const today = new Date()
+  const fmt = d => d.toISOString().slice(0, 10)
+
+  let data = await fetch(`/api/stats/daily?date=${fmt(today)}`).then(r => r.json())
+  if (data.error) {
+    const yest = new Date(today)
+    yest.setDate(today.getDate() - 1)
+    data = await fetch(`/api/stats/daily?date=${fmt(yest)}`).then(r => r.json())
+  }
+
+  const el = document.getElementById('wellness-content')
+
+  if (data.error) {
+    el.innerHTML = '<div class="error-note">Wellness data unavailable</div>'
+    return
+  }
+
+  const steps = data.steps ?? 0
+  const stepsGoal = 10000
+  const stepsPct = Math.min(100, Math.round((steps / stepsGoal) * 100))
+
+  const hr = data.heart_rate
+  const restingHR = hr?.restingHeartRate
+  const maxHR = hr?.maxHeartRate
+
+  const sleep = data.sleep?.dailySleepDTO
+  const sleepSec = sleep?.sleepTimeSeconds
+  const sleepH = sleepSec ? (sleepSec / 3600).toFixed(1) : null
+
+  const spo2 = data.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2
+
+  const rows = []
+
+  if (steps) rows.push(`
+    <div class="wellness-row">
+      <div>
+        <div class="wellness-label">⚡ Steps</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${stepsPct}%"></div></div>
+      </div>
+      <div class="wellness-value">${steps.toLocaleString()}</div>
+    </div>`)
+
+  if (sleepH) rows.push(`
+    <div class="wellness-row">
+      <div class="wellness-label">🌙 Sleep</div>
+      <div class="wellness-value">${sleepH}h</div>
+    </div>`)
+
+  if (restingHR) rows.push(`
+    <div class="wellness-row">
+      <div class="wellness-label">❤️ Resting HR</div>
+      <div class="wellness-value">${restingHR} <span style="font-size:11px;color:var(--muted)">bpm</span></div>
+    </div>`)
+
+  if (maxHR) rows.push(`
+    <div class="wellness-row">
+      <div class="wellness-label">📈 Max HR</div>
+      <div class="wellness-value">${maxHR} <span style="font-size:11px;color:var(--muted)">bpm</span></div>
+    </div>`)
+
+  if (spo2) rows.push(`
+    <div class="wellness-row">
+      <div class="wellness-label">💧 SpO₂</div>
+      <div class="wellness-value">${spo2}<span style="font-size:11px;color:var(--muted)">%</span></div>
+    </div>`)
+
+  if (rows.length === 0) {
+    el.innerHTML = '<div class="error-note">No data for ' + (data.date ?? 'today') + '</div>'
+  } else {
+    const dateNote = data.date && data.date !== fmt(today)
+      ? `<div style="font-size:10px;color:var(--muted);padding-top:10px">Data from ${data.date}</div>` : ''
+    el.innerHTML = rows.join('') + dateNote
+  }
+}
+
+// ── Header ─────────────────────────────────────────────
+async function loadAthlete() {
+  const data = await fetch('/api/athlete').then(r => r.json())
+  if (data.fullName) {
+    document.getElementById('header-name').textContent = data.fullName
+    document.title = data.fullName.split(' ')[0]
+  }
+  if (data.profileImageUrlSmall || data.profileImageUrlMedium) {
+    const img = document.createElement('img')
+    img.className = 'avatar'
+    img.src = data.profileImageUrlSmall ?? data.profileImageUrlMedium
+    img.alt = data.fullName ?? 'avatar'
+    img.onerror = () => {}
+    document.getElementById('avatar').replaceWith(img)
+  }
+}
+
+// ── Date header ────────────────────────────────────────
+function setDateHeader() {
+  const now = new Date()
+  const day = now.toLocaleDateString('en-US', { weekday: 'long' })
+  const date = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  document.getElementById('header-date').innerHTML = `${day}<br>${date}`
+}
+
+// ── Boot ───────────────────────────────────────────────
+setDateHeader()
+Promise.allSettled([
+  loadAthlete(),
+  loadWeekly(),
+  loadActivities(),
+  loadWellness(),
+])
+</script>
 </body>
 </html>

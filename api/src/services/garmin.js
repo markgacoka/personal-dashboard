@@ -179,7 +179,7 @@ export async function garmin(fn) {
     return await fn(await getClient())
   } catch (err) {
     const msg = String(err?.message ?? err)
-    if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('expired')) {
+    if (msg.includes('401') || msg.includes('403') || msg.includes('Unauthorized') || msg.includes('Forbidden') || msg.includes('expired')) {
       _client = null
       // Token expired — re-authenticate automatically via Gmail
       await autoMFA()

@@ -148,6 +148,20 @@ export async function completeMFA(code) {
 // ─── Fully automated MFA: init → read Gmail → complete ─────────────────────
 
 export async function autoMFA() {
+  // Try the existing on-disk token first — avoid a full SSO login when possible.
+  // Repeated logins trigger Cloudflare bot detection on Garmin's SSO endpoint.
+  if (existsSync(`${SESSION_DIR}/oauth2_token.json`)) {
+    try {
+      const client = await getClient()
+      await client.getUserProfile()
+      console.log('Garmin: existing token valid — skipping login')
+      return { ok: true, mfa: false }
+    } catch {
+      console.log('Garmin: existing token invalid — re-authenticating')
+      _client = null
+    }
+  }
+
   const { needsMfa } = await initMFA()
   if (!needsMfa) return { ok: true, mfa: false }
 

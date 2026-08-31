@@ -267,3 +267,126 @@ export async function migrateV2() {
     client.release()
   }
 }
+
+// V3: showcase flight with every field set + GPS track + approaches
+export async function migrateV3() {
+  const client = await pool.connect()
+  try {
+    // Idempotent — skip if showcase already exists
+    const { rows: chk } = await client.query(
+      `SELECT id FROM flights WHERE foreflight_source = 'showcase' LIMIT 1`
+    )
+    if (chk.length) return
+
+    const { rows: [ac]  } = await client.query(`SELECT id FROM aircraft   WHERE tail_number = 'N5624H'`)
+    const { rows: [ins] } = await client.query(`SELECT id FROM instructors WHERE name = 'Michael Torres'`)
+    if (!ac || !ins) return
+
+    // Fix existing seed flights: dual was stored as dual_given for a student (should be dual_received)
+    await client.query(`
+      UPDATE flights
+         SET dual_received = dual_given, dual_given = 0
+       WHERE instructor_id IS NOT NULL
+         AND foreflight_source IS NULL
+         AND dual_given > 0
+         AND dual_received = 0
+    `)
+
+    const { rows: [f] } = await client.query(`
+      INSERT INTO flights (
+        date, aircraft_id, departure_icao, arrival_icao, via, training_type,
+        total_duration, dual_given, dual_received, pic, sic, solo,
+        cross_country, night, actual_instrument, instrument,
+        takeoffs, landings, day_takeoffs, day_landings_full_stop,
+        night_takeoffs, night_landings, night_landings_full_stop,
+        holds, distance_nm, hobbs_start, hobbs_end, tach_start, tach_end,
+        time_out, time_in, instructor_id, instructor_comments,
+        flight_review, checkride, ipc, remarks, foreflight_source
+      ) VALUES (
+        '2026-05-10', $1, 'KSQL', 'KWVI', ARRAY['KHAF']::text[], 'instrument',
+        2.3, 0, 2.3, 0, 0, 0,
+        2.3, 0, 0.4, 1.2,
+        1, 1, 1, 1,
+        0, 0, 0,
+        1, 68.4, 1842.4, 1844.7, 2103.2, 2105.1,
+        '2026-05-10T14:30:00Z', '2026-05-10T16:48:00Z', $2,
+        'Strong hold entry and correction on VOR hold at KWVI — excellent tracking within ±0.2 dots. ILS glideslope interception needs refinement; came in 0.5 dots high on first attempt and executed the missed approach correctly and promptly. Maintained altitude ±60ft in actual IMC over Half Moon Bay — impressive for student level. Partial panel recovery was clean. Recommend 1–2 more instrument sessions before IR checkride prep.',
+        false, false, false,
+        'Coastal XC instrument training: KSQL→KHAF→KWVI. Actual IMC (marine layer) over Half Moon Bay — 0.4h in actual conditions. VOR hold at KWVI before ILS. First approach went missed (glideslope 0.5 dots high at DH); second ILS to full stop. Good SFO Class B lateral boundary awareness throughout.',
+        'showcase'
+      ) RETURNING id`,
+      [ac.id, ins.id]
+    )
+
+    // Two ILS approaches: one missed, one full stop
+    await client.query(
+      `INSERT INTO approaches (flight_id, approach_type, airport_icao, runway, circle_to_land)
+       VALUES ($1,'ILS','KWVI','2',false), ($1,'ILS','KWVI','2',false)`,
+      [f.id]
+    )
+
+    // GPS track: KSQL → KHAF → KWVI with VOR hold + missed approach + second ILS
+    // [min_offset, lat, lon, alt_ft, spd_kt, trk_deg, vs_fpm]
+    const wpts = [
+      [0,   37.5119,-122.2498,  5,  0, 300,   0],  // KSQL ground
+      [4,   37.5195,-122.2560,500, 62, 282, 480],  // Departure climb
+      [9,   37.5200,-122.3200,2200, 95, 270, 340],  // Bay crossing
+      [14,  37.5160,-122.4100,3400,100, 265, 180],  // Peninsula
+      [18,  37.5134,-122.5006,3500,100, 220,   0],  // KHAF overhead (IMC begins)
+      [24,  37.4550,-122.4850,3500, 98, 198,   0],  // Coast south
+      [32,  37.3600,-122.3700,3800, 92, 152,  55],  // Turning inland
+      [42,  37.2400,-122.1900,4400, 88, 140,  50],  // Mountains
+      [52,  37.1300,-121.9800,3600, 95, 138, -70],  // Descending
+      [60,  37.0400,-121.8900,2700, 90, 148, -90],  // Approaching KWVI area
+      [67,  36.9800,-121.8350,2500, 88, 202, -45],  // VOR hold entry
+      [73,  36.9300,-121.8200,2500, 88,  96,   0],  // Hold outbound turn
+      [78,  36.9300,-121.7700,2500, 88,  22,   0],  // Hold inbound turn
+      [84,  36.9800,-121.7900,2500, 88, 198,   0],  // Hold complete, cleared ILS
+      [90,  36.9650,-121.7900,2000, 82, 192,-200],  // ILS intercept
+      [95,  36.9530,-121.7900,1300, 78, 192,-310],  // On glideslope
+      [99,  36.9450,-121.7900, 820, 76, 192,-400],  // Decision height → missed
+      [102, 36.9370,-121.8010,1400, 92,  22, 650],  // Missed approach climb
+      [107, 36.9150,-121.8350,2000, 90, 305, 180],  // Procedure turn outbound
+      [112, 36.9500,-121.8450,2100, 82,  38,   0],  // Procedure turn inbound
+      [117, 36.9700,-121.8200,1800, 80, 192,-250],  // Second ILS intercept
+      [122, 36.9560,-121.7960,1100, 78, 192,-340],  // Glideslope stable
+      [127, 36.9440,-121.7910, 560, 74, 192,-380],  // Short final
+      [131, 36.9380,-121.7904, 230, 42, 192,-500],  // Flare
+      [133, 36.9360,-121.7903, 163,  0, 192,-300],  // KWVI touchdown
+    ]
+
+    const base = new Date('2026-05-10T14:30:00Z').getTime()
+    for (let i = 0; i < wpts.length - 1; i++) {
+      const [t0,lat0,lon0,alt0,spd0,trk0,vs0] = wpts[i]
+      const [t1,lat1,lon1,alt1,spd1,trk1,vs1] = wpts[i + 1]
+      const steps = t1 - t0
+      for (let s = 0; s < steps; s++) {
+        const fr = s / steps
+        await client.query(
+          `INSERT INTO track_log_points
+             (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            f.id,
+            new Date(base + (t0 + s) * 60000).toISOString(),
+            parseFloat((lat0 + (lat1 - lat0) * fr).toFixed(5)),
+            parseFloat((lon0 + (lon1 - lon0) * fr).toFixed(5)),
+            Math.round(alt0 + (alt1 - alt0) * fr),
+            Math.round(spd0 + (spd1 - spd0) * fr),
+            Math.round(trk0 + (trk1 - trk0) * fr),
+            Math.round(vs0  + (vs1  - vs0)  * fr),
+          ]
+        )
+      }
+    }
+    const lw = wpts[wpts.length - 1]
+    await client.query(
+      `INSERT INTO track_log_points
+         (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [f.id, new Date(base + lw[0] * 60000).toISOString(), lw[1], lw[2], lw[3], lw[4], lw[5], lw[6]]
+    )
+  } finally {
+    client.release()
+  }
+}

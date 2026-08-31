@@ -4,32 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gacoka — Athlete Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <!-- DaisyUI v4 component styles + CSS vars -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+  <!-- Tailwind CDN v3 — scans DOM and generates utility classes -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Icons -->
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- React 18 -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Recharts (depends on React) -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.13.0/umd/Recharts.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Babel — transpiles JSX at runtime -->
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+
   <style>
-    body { background: oklch(var(--b1)); min-height: 100vh; }
-    .recharts-text { fill: oklch(var(--bc) / 0.6) !important; font-size: 11px; }
+    /* Recharts text uses DaisyUI base-content colour */
+    .recharts-text { font-size: 11px; }
     .recharts-cartesian-grid-horizontal line,
-    .recharts-cartesian-grid-vertical line { stroke: oklch(var(--bc) / 0.08) !important; }
-    .recharts-tooltip-wrapper .recharts-default-tooltip {
-      background: oklch(var(--b2)) !important;
-      border: 1px solid oklch(var(--bc) / 0.15) !important;
-      border-radius: 8px !important;
-      color: oklch(var(--bc)) !important;
-    }
-    .activity-row { cursor: pointer; transition: background 0.15s; }
-    .activity-row:hover { background: oklch(var(--b3) / 0.5); }
-    .split-bar { height: 6px; border-radius: 3px; transition: width 0.4s; }
+    .recharts-cartesian-grid-vertical line { stroke-opacity: 0.08; }
+    .activity-row { cursor: pointer; transition: background 0.12s; }
+    .activity-row:hover { background: rgba(255,255,255,0.04); }
+    [data-theme="light"] .activity-row:hover { background: rgba(0,0,0,0.04); }
+    .zone-bar { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
+    /* Fix Tailwind CDN occasionally conflicting with DaisyUI btn */
+    .btn { text-transform: none; }
   </style>
 </head>
-<body>
-
+<body class="bg-base-100 min-h-screen">
 <div id="root"></div>
 
 <script type="text/babel" data-presets="react">
@@ -39,81 +42,61 @@ const {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } = window.Recharts;
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ─── constants ───────────────────────────────────────────────────────────────
 const M_TO_MI = 0.000621371;
-const MS_TO_MPH = 2.23694;
 
-const SPORT_COLORS = {
-  running:    '#4ade80',
-  cycling:    '#facc15',
-  swimming:   '#38bdf8',
-  rowing:     '#f472b6',
-  other:      '#a78bfa',
-};
-const SPORT_ICONS = {
-  running:  'ph-person-simple-run',
-  cycling:  'ph-bicycle',
-  swimming: 'ph-waves',
-  rowing:   'ph-rowing',
-  other:    'ph-activity',
-};
-const HR_ZONE_COLORS = ['#38bdf8','#4ade80','#facc15','#fb923c','#f87171'];
-const HR_ZONE_NAMES  = ['Z1 Recovery','Z2 Base','Z3 Tempo','Z4 Threshold','Z5 VO2Max'];
-const SPLIT_LABELS = {
-  INTERVAL_WARMUP:   { label: 'Warmup',     color: '#4ade80' },
-  INTERVAL_ACTIVE:   { label: 'Active',     color: '#f87171' },
-  INTERVAL_RECOVERY: { label: 'Recovery',   color: '#38bdf8' },
-  INTERVAL_COOLDOWN: { label: 'Cooldown',   color: '#818cf8' },
-  RWD_RUN:           { label: 'Run',        color: '#4ade80' },
-  RWD_STAND:         { label: 'Stand',      color: '#6b7280' },
-  RWD_WALK:          { label: 'Walk',       color: '#a78bfa' },
+const SPORT = {
+  running:  { color: '#4ade80', icon: 'ph-person-simple-run' },
+  cycling:  { color: '#facc15', icon: 'ph-bicycle' },
+  swimming: { color: '#38bdf8', icon: 'ph-waves' },
+  rowing:   { color: '#f472b6', icon: 'ph-rowing' },
+  other:    { color: '#a78bfa', icon: 'ph-activity' },
 };
 
-// ── Formatting helpers ────────────────────────────────────────────────────────
-function mi(m) { return m * M_TO_MI; }
+const HR_ZONES = [
+  { name: 'Z1 Recovery',  color: '#38bdf8' },
+  { name: 'Z2 Base',      color: '#4ade80' },
+  { name: 'Z3 Tempo',     color: '#facc15' },
+  { name: 'Z4 Threshold', color: '#fb923c' },
+  { name: 'Z5 VO2Max',    color: '#f87171' },
+];
 
-function fmtDist(m) {
-  if (!m) return '—';
-  const miles = mi(m);
-  return miles >= 0.1 ? `${miles.toFixed(2)} mi` : `${Math.round(m)} m`;
-}
+const SPLIT_META = {
+  INTERVAL_WARMUP:   { label: 'Warmup',   color: '#4ade80' },
+  INTERVAL_ACTIVE:   { label: 'Active',   color: '#f87171' },
+  INTERVAL_RECOVERY: { label: 'Recovery', color: '#38bdf8' },
+  INTERVAL_COOLDOWN: { label: 'Cooldown', color: '#818cf8' },
+  RWD_RUN:           { label: 'Run',      color: '#4ade80' },
+  RWD_STAND:         { label: 'Stand',    color: '#6b7280' },
+  RWD_WALK:          { label: 'Walk',     color: '#a78bfa' },
+};
 
-function fmtTime(s) {
+// ─── formatters ──────────────────────────────────────────────────────────────
+const fmtMi = m => (m * M_TO_MI).toFixed(2) + ' mi';
+const fmtDist = m => !m ? '—' : m * M_TO_MI >= 0.05 ? fmtMi(m) : Math.round(m) + ' m';
+
+const fmtTime = s => {
   if (!s) return '—';
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.floor(s % 60);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${sec.toString().padStart(2,'0')}s`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
   return `${sec}s`;
-}
+};
 
-function fmtPace(metersPerSec) {
-  // returns min/mi
-  if (!metersPerSec || metersPerSec <= 0) return '—';
-  const secPerMile = 1609.344 / metersPerSec;
-  const m = Math.floor(secPerMile / 60);
-  const s = Math.round(secPerMile % 60).toString().padStart(2, '0');
-  return `${m}:${s}/mi`;
-}
+const fmtPace = mps => {
+  if (!mps || mps <= 0) return '—';
+  const spm = 1609.344 / mps;
+  return `${Math.floor(spm/60)}:${String(Math.round(spm%60)).padStart(2,'0')}/mi`;
+};
 
-function fmtSpeed(metersPerSec, sport) {
-  if (!metersPerSec) return '—';
-  if (sport === 'cycling') return `${(metersPerSec * MS_TO_MPH).toFixed(1)} mph`;
-  return fmtPace(metersPerSec);
-}
+const fmtSpeed = (mps, sport) => {
+  if (!mps) return '—';
+  return sport === 'cycling' ? `${(mps * 2.23694).toFixed(1)} mph` : fmtPace(mps);
+};
 
-function fmtDate(str) {
-  if (!str) return '—';
-  return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+const fmtDate = str => !str ? '—' : new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-function fmtDateTime(str) {
-  if (!str) return '—';
-  return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function normalizeType(t) {
+const normSport = t => {
   if (!t) return 'other';
   const l = t.toLowerCase();
   if (l.includes('run') || l.includes('treadmill')) return 'running';
@@ -121,69 +104,62 @@ function normalizeType(t) {
   if (l.includes('swim')) return 'swimming';
   if (l.includes('row')) return 'rowing';
   return 'other';
-}
+};
 
-// ── API ────────────────────────────────────────────────────────────────────────
-async function fetchAll() {
+// ─── API ─────────────────────────────────────────────────────────────────────
+const api = path => fetch(path).then(r => r.json());
+
+async function loadAll() {
   const today = new Date().toISOString().slice(0, 10);
   const [athlete, activities, weekly, daily] = await Promise.all([
-    fetch('/api/athlete').then(r => r.json()),
-    fetch('/api/activities?limit=200').then(r => r.json()),
-    fetch('/api/stats/weekly').then(r => r.json()),
-    fetch(`/api/stats/daily?date=${today}`).then(r => r.json()).catch(() => ({})),
+    api('/api/athlete'),
+    api('/api/activities?limit=200'),
+    api('/api/stats/weekly'),
+    api(`/api/stats/daily?date=${today}`).catch(() => ({})),
   ]);
-  return { athlete, activities: activities || [], weekly: weekly || {}, daily: daily || {} };
+  return { athlete, activities: Array.isArray(activities) ? activities : [], weekly, daily: daily || {} };
 }
 
-async function fetchActivityDetail(id) {
-  return fetch(`/api/activities/${id}`).then(r => r.json());
-}
-
-// ── Theme toggle ──────────────────────────────────────────────────────────────
+// ─── Theme hook ───────────────────────────────────────────────────────────────
 function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('dashboard-theme') || 'dim');
+  const [theme, setTheme] = useState(() => localStorage.getItem('dash-theme') || 'dim');
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggle = useCallback(() => {
     setTheme(t => {
       const next = t === 'dim' ? 'light' : 'dim';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('dashboard-theme', next);
+      localStorage.setItem('dash-theme', next);
       return next;
     });
-  }, []);
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
   }, []);
   return [theme, toggle];
 }
 
-// ── Wellness stat tile ────────────────────────────────────────────────────────
+// ─── Stat tile ────────────────────────────────────────────────────────────────
 function StatTile({ icon, label, value, unit, color }) {
   return (
-    <div className="stat bg-base-200 rounded-xl">
+    <div className="stat">
       <div className="stat-figure text-2xl" style={{ color }}>
-        <i className={`ph-bold ${icon}`}></i>
+        <i className={`ph-bold ${icon}`} />
       </div>
-      <div className="stat-title text-xs opacity-60">{label}</div>
-      <div className="stat-value text-2xl font-bold" style={{ color }}>{value}</div>
-      {unit && <div className="stat-desc opacity-50">{unit}</div>}
+      <div className="stat-title text-xs">{label}</div>
+      <div className="stat-value text-xl font-bold" style={{ color }}>{value}</div>
+      {unit && <div className="stat-desc">{unit}</div>}
     </div>
   );
 }
 
-// ── Weekly sport tile ─────────────────────────────────────────────────────────
+// ─── Sport tile ───────────────────────────────────────────────────────────────
 function SportTile({ sport, stats }) {
-  const color = SPORT_COLORS[sport] || SPORT_COLORS.other;
-  const icon  = SPORT_ICONS[sport]  || SPORT_ICONS.other;
-  const label = sport.charAt(0).toUpperCase() + sport.slice(1);
+  const { color, icon } = SPORT[sport] || SPORT.other;
   return (
     <div className="card bg-base-200 shadow border border-base-300">
       <div className="card-body p-4 gap-2">
         <div className="flex items-center gap-2">
-          <i className={`ph-bold ${icon} text-xl`} style={{ color }}></i>
-          <span className="font-semibold text-sm">{label}</span>
-          <span className="ml-auto badge badge-sm badge-ghost opacity-50">{stats.count ?? 0}</span>
+          <i className={`ph-bold ${icon} text-xl`} style={{ color }} />
+          <span className="font-semibold text-sm capitalize">{sport}</span>
+          <span className="ml-auto badge badge-sm badge-ghost opacity-50">{stats.count || 0}×</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-1">
+        <div className="grid grid-cols-2 gap-2">
           <div>
             <div className="text-xs opacity-50">Distance</div>
             <div className="font-bold text-sm" style={{ color }}>{fmtDist(stats.distance_m)}</div>
@@ -194,29 +170,24 @@ function SportTile({ sport, stats }) {
           </div>
         </div>
         {stats.calories > 0 && (
-          <div className="text-xs opacity-40">{Math.round(stats.calories).toLocaleString()} kcal · {fmtDist(stats.elevation_gain_m * 1 ? stats.elevation_gain_m : 0)} elev</div>
+          <div className="text-xs opacity-40">{Math.round(stats.calories).toLocaleString()} kcal</div>
         )}
       </div>
     </div>
   );
 }
 
-// ── HR Zone mini-bar ──────────────────────────────────────────────────────────
-function HRZoneBars({ activity }) {
-  const zones = [1,2,3,4,5].map(i => ({
-    name: HR_ZONE_NAMES[i-1],
-    color: HR_ZONE_COLORS[i-1],
-    secs: activity[`hrTimeInZone_${i}`] || 0,
-  }));
+// ─── Zone bars ────────────────────────────────────────────────────────────────
+function ZoneBars({ zones }) {
   const total = zones.reduce((s, z) => s + z.secs, 0);
   if (!total) return null;
   return (
     <div className="space-y-1.5">
-      {zones.map(z => (
+      {zones.filter(z => z.secs > 0).map(z => (
         <div key={z.name} className="flex items-center gap-2">
-          <span className="text-xs w-24 opacity-60 shrink-0">{z.name}</span>
-          <div className="flex-1 bg-base-300 rounded-full h-1.5 overflow-hidden">
-            <div className="split-bar h-1.5 rounded-full" style={{ width: `${(z.secs / total * 100).toFixed(1)}%`, background: z.color }}></div>
+          <span className="text-xs w-28 opacity-60 shrink-0">{z.name}</span>
+          <div className="flex-1 bg-base-300 rounded-full overflow-hidden" style={{ height: 6 }}>
+            <div className="zone-bar" style={{ width: `${(z.secs/total*100).toFixed(1)}%`, background: z.color }} />
           </div>
           <span className="text-xs w-10 text-right opacity-60 shrink-0">{fmtTime(z.secs)}</span>
         </div>
@@ -225,75 +196,56 @@ function HRZoneBars({ activity }) {
   );
 }
 
-// ── Power Zone mini-bar ───────────────────────────────────────────────────────
-function PowerZoneBars({ activity }) {
-  const zones = [1,2,3,4,5].map(i => ({
-    name: `PZ${i}`,
-    color: HR_ZONE_COLORS[i-1],
-    secs: activity[`powerTimeInZone_${i}`] || 0,
-  }));
-  const total = zones.reduce((s, z) => s + z.secs, 0);
-  if (!total) return null;
-  return (
-    <div className="space-y-1.5">
-      {zones.map(z => (
-        <div key={z.name} className="flex items-center gap-2">
-          <span className="text-xs w-10 opacity-60 shrink-0">{z.name}</span>
-          <div className="flex-1 bg-base-300 rounded-full h-1.5 overflow-hidden">
-            <div className="split-bar h-1.5 rounded-full" style={{ width: `${(z.secs / total * 100).toFixed(1)}%`, background: z.color }}></div>
-          </div>
-          <span className="text-xs w-10 text-right opacity-60 shrink-0">{fmtTime(z.secs)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Activity detail panel ─────────────────────────────────────────────────────
-function ActivityDetail({ activity, detail }) {
-  const sport = normalizeType(activity.activityType?.typeKey || '');
+// ─── Activity detail (expanded) ───────────────────────────────────────────────
+function ActivityDetail({ activity: a, detail }) {
+  const sport = normSport(a.activityType?.typeKey);
   const s = detail?.summaryDTO || {};
   const splits = (detail?.splitSummaries || []).filter(sp => sp.distance > 0 || sp.duration > 0);
   const meta = detail?.metadataDTO || {};
 
-  return (
-    <div className="px-4 pb-4 space-y-5 border-t border-base-300 pt-4">
+  const metrics = [
+    ['Avg HR',       a.averageHR     ? `${Math.round(a.averageHR)} bpm`  : null, '#f472b6'],
+    ['Max HR',       a.maxHR         ? `${Math.round(a.maxHR)} bpm`      : null, '#fb923c'],
+    ['Min HR',       s.minHR         ? `${Math.round(s.minHR)} bpm`      : null, '#38bdf8'],
+    ['Avg Power',    (s.averagePower||a.avgPower)   ? `${Math.round(s.averagePower||a.avgPower)} W`  : null, '#facc15'],
+    ['Norm Power',   (s.normalizedPower||a.normPower) ? `${Math.round(s.normalizedPower||a.normPower)} W` : null, '#facc15'],
+    ['Max Power',    (s.maxPower||a.maxPower)       ? `${Math.round(s.maxPower||a.maxPower)} W`     : null, '#fb923c'],
+    ['Pace',         fmtSpeed(s.averageSpeed||a.averageSpeed, sport) !== '—' ? fmtSpeed(s.averageSpeed||a.averageSpeed, sport) : null],
+    ['Max Pace',     fmtSpeed(s.maxSpeed||a.maxSpeed, sport) !== '—' ? fmtSpeed(s.maxSpeed||a.maxSpeed, sport) : null],
+    ['Cadence',      (s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute) ? `${Math.round(s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute)} spm` : null],
+    ['Max Cadence',  a.maxRunningCadenceInStepsPerMinute ? `${a.maxRunningCadenceInStepsPerMinute} spm` : null],
+    ['Stride',       (s.strideLength||a.avgStrideLength) ? `${((s.strideLength||a.avgStrideLength)/100).toFixed(2)} m` : null],
+    ['Gnd Contact',  (s.groundContactTime||a.avgGroundContactTime) ? `${Math.round(s.groundContactTime||a.avgGroundContactTime)} ms` : null],
+    ['Vert Osc',     (s.verticalOscillation||a.avgVerticalOscillation) ? `${(s.verticalOscillation||a.avgVerticalOscillation).toFixed(1)} cm` : null],
+    ['Vert Ratio',   (s.verticalRatio||a.avgVerticalRatio) ? `${(s.verticalRatio||a.avgVerticalRatio).toFixed(1)}%` : null],
+    ['Trng Load',    (s.activityTrainingLoad||a.activityTrainingLoad) ? Math.round(s.activityTrainingLoad||a.activityTrainingLoad) : null, '#818cf8'],
+    ['Calories',     (s.calories||a.calories) ? `${s.calories||a.calories} kcal` : null],
+    ['Body Battery', (s.differenceBodyBattery??a.differenceBodyBattery) != null ? `${(s.differenceBodyBattery??a.differenceBodyBattery)>0?'+':''}${s.differenceBodyBattery??a.differenceBodyBattery}` : null,
+      (s.differenceBodyBattery??a.differenceBodyBattery) > 0 ? '#4ade80' : '#f87171'],
+    ['Stamina Start',s.beginPotentialStamina ? `${s.beginPotentialStamina}%` : null],
+    ['Stamina End',  s.endPotentialStamina   ? `${s.endPotentialStamina}%`   : null],
+    ['Total Work',   s.totalWork   ? `${s.totalWork.toFixed(1)} kJ`  : null],
+    ['Impact Load',  s.impactLoad  ? s.impactLoad.toLocaleString()   : null],
+    ['Hydration',    s.waterEstimated ? `${s.waterEstimated} ml`     : null],
+    ['Workout Feel', s.directWorkoutFeel ? `${s.directWorkoutFeel}/100` : null],
+    ['RPE',          s.directWorkoutRpe  ? `${s.directWorkoutRpe}/100`  : null],
+    ['Steps',        (s.steps||a.steps) ? (s.steps||a.steps).toLocaleString() : null],
+    ['Mod Intensity',s.moderateIntensityMinutes ? `${s.moderateIntensityMinutes} min` : null],
+    ['Vig Intensity',s.vigorousIntensityMinutes ? `${s.vigorousIntensityMinutes} min` : null],
+    ['Laps',         meta.lapCount != null ? meta.lapCount : null],
+  ].filter(([, v]) => v != null);
 
-      {/* ── Core metrics grid ─────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'Avg HR',       value: s.averageHR ? `${Math.round(s.averageHR)} bpm` : activity.averageHR ? `${activity.averageHR} bpm` : '—', color: '#f472b6' },
-          { label: 'Max HR',       value: s.maxHR ? `${Math.round(s.maxHR)} bpm` : activity.maxHR ? `${activity.maxHR} bpm` : '—', color: '#fb923c' },
-          { label: 'Min HR',       value: s.minHR ? `${Math.round(s.minHR)} bpm` : '—', color: '#38bdf8' },
-          { label: 'Avg Power',    value: (s.averagePower || activity.avgPower) ? `${Math.round(s.averagePower || activity.avgPower)} W` : '—', color: '#facc15' },
-          { label: 'Norm Power',   value: (s.normalizedPower || activity.normPower) ? `${Math.round(s.normalizedPower || activity.normPower)} W` : '—', color: '#facc15' },
-          { label: 'Max Power',    value: (s.maxPower || activity.maxPower) ? `${Math.round(s.maxPower || activity.maxPower)} W` : '—', color: '#fb923c' },
-          { label: 'Avg Pace',     value: fmtSpeed(s.averageSpeed || activity.averageSpeed, sport) },
-          { label: 'Max Pace',     value: fmtSpeed(s.maxSpeed || activity.maxSpeed, sport) },
-          { label: 'Cadence',      value: (s.averageRunCadence || activity.averageRunningCadenceInStepsPerMinute) ? `${Math.round(s.averageRunCadence || activity.averageRunningCadenceInStepsPerMinute)} spm` : '—' },
-          { label: 'Max Cadence',  value: (activity.maxRunningCadenceInStepsPerMinute) ? `${activity.maxRunningCadenceInStepsPerMinute} spm` : '—' },
-          { label: 'Stride',       value: s.strideLength || activity.avgStrideLength ? `${((s.strideLength || activity.avgStrideLength) / 100).toFixed(2)} m` : '—' },
-          { label: 'GCT',          value: (s.groundContactTime || activity.avgGroundContactTime) ? `${Math.round(s.groundContactTime || activity.avgGroundContactTime)} ms` : '—' },
-          { label: 'Vert Osc',     value: (s.verticalOscillation || activity.avgVerticalOscillation) ? `${(s.verticalOscillation || activity.avgVerticalOscillation).toFixed(1)} cm` : '—' },
-          { label: 'Vert Ratio',   value: (s.verticalRatio || activity.avgVerticalRatio) ? `${(s.verticalRatio || activity.avgVerticalRatio).toFixed(1)}%` : '—' },
-          { label: 'Training Load',value: (s.activityTrainingLoad || activity.activityTrainingLoad) ? Math.round(s.activityTrainingLoad || activity.activityTrainingLoad) : '—', color: '#818cf8' },
-          { label: 'Calories',     value: s.calories ? `${s.calories} kcal` : activity.calories ? `${activity.calories} kcal` : '—' },
-          { label: 'Body Battery', value: (s.differenceBodyBattery ?? activity.differenceBodyBattery) !== undefined && (s.differenceBodyBattery ?? activity.differenceBodyBattery) !== null
-              ? `${(s.differenceBodyBattery ?? activity.differenceBodyBattery) > 0 ? '+' : ''}${s.differenceBodyBattery ?? activity.differenceBodyBattery}`
-              : '—',
-            color: (s.differenceBodyBattery ?? activity.differenceBodyBattery) > 0 ? '#4ade80' : '#f87171' },
-          { label: 'Stamina Start',value: s.beginPotentialStamina ? `${s.beginPotentialStamina}%` : '—' },
-          { label: 'Stamina End',  value: s.endPotentialStamina ? `${s.endPotentialStamina}%` : '—' },
-          { label: 'Total Work',   value: s.totalWork ? `${s.totalWork.toFixed(1)} kJ` : '—' },
-          { label: 'Impact Load',  value: s.impactLoad ? s.impactLoad.toLocaleString() : '—' },
-          { label: 'Hydration Est',value: s.waterEstimated ? `${s.waterEstimated} ml` : '—' },
-          { label: 'Workout Feel', value: s.directWorkoutFeel ? `${s.directWorkoutFeel}/100` : '—' },
-          { label: 'Workout RPE',  value: s.directWorkoutRpe ? `${s.directWorkoutRpe}/100` : '—' },
-          { label: 'Steps',        value: s.steps ? s.steps.toLocaleString() : activity.steps ? activity.steps.toLocaleString() : '—' },
-          { label: 'Mod. Int. Min',value: s.moderateIntensityMinutes ? `${s.moderateIntensityMinutes} min` : '—' },
-          { label: 'Vig. Int. Min',value: s.vigorousIntensityMinutes ? `${s.vigorousIntensityMinutes} min` : '—' },
-          { label: 'Laps',         value: meta.lapCount ?? '—' },
-        ].filter(m => m.value && m.value !== '—').map(({ label, value, color }) => (
+  const hrZones = HR_ZONES.map((z, i) => ({ ...z, secs: a[`hrTimeInZone_${i+1}`] || 0 }));
+  const pwrZones = HR_ZONES.map((z, i) => ({ name: `PZ${i+1}`, color: z.color, secs: a[`powerTimeInZone_${i+1}`] || 0 }));
+  const hasHRZones  = hrZones.some(z => z.secs > 0);
+  const hasPwrZones = pwrZones.some(z => z.secs > 0);
+
+  return (
+    <div className="px-4 pb-5 pt-4 space-y-5 border-t border-base-300">
+
+      {/* metrics grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        {metrics.map(([label, value, color]) => (
           <div key={label} className="bg-base-300 rounded-lg p-2.5">
             <div className="text-xs opacity-50 mb-0.5">{label}</div>
             <div className="font-bold text-sm" style={color ? { color } : {}}>{value}</div>
@@ -301,102 +253,88 @@ function ActivityDetail({ activity, detail }) {
         ))}
       </div>
 
-      {/* ── Training effect ────────────────────────────────────── */}
-      {(activity.aerobicTrainingEffect || activity.anaerobicTrainingEffect) && (
-        <div className="grid grid-cols-2 gap-3">
-          {activity.aerobicTrainingEffect > 0 && (
+      {/* training effect */}
+      {(a.aerobicTrainingEffect > 0 || a.anaerobicTrainingEffect > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {a.aerobicTrainingEffect > 0 && (
             <div className="bg-base-300 rounded-lg p-3">
-              <div className="text-xs opacity-50 mb-1">Aerobic Effect</div>
-              <div className="flex items-center gap-2">
-                <div className="radial-progress text-success" style={{ '--value': activity.aerobicTrainingEffect * 20, '--size': '2.5rem', '--thickness': '3px', fontSize: '10px' }}>
-                  {activity.aerobicTrainingEffect?.toFixed(1)}
-                </div>
+              <div className="text-xs opacity-50 mb-1">Aerobic Training Effect</div>
+              <div className="flex items-center gap-3">
+                <div className="text-3xl font-black text-success">{a.aerobicTrainingEffect.toFixed(1)}</div>
                 <div>
-                  <div className="font-bold text-sm text-success">{activity.trainingEffectLabel || '—'}</div>
-                  <div className="text-xs opacity-50">{activity.aerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
+                  <div className="font-bold text-sm text-success capitalize">{a.trainingEffectLabel?.toLowerCase()}</div>
+                  <div className="text-xs opacity-50">{a.aerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
                 </div>
               </div>
             </div>
           )}
-          {activity.anaerobicTrainingEffect > 0 && (
+          {a.anaerobicTrainingEffect > 0 && (
             <div className="bg-base-300 rounded-lg p-3">
-              <div className="text-xs opacity-50 mb-1">Anaerobic Effect</div>
-              <div className="flex items-center gap-2">
-                <div className="radial-progress text-warning" style={{ '--value': activity.anaerobicTrainingEffect * 20, '--size': '2.5rem', '--thickness': '3px', fontSize: '10px' }}>
-                  {activity.anaerobicTrainingEffect?.toFixed(1)}
-                </div>
-                <div>
-                  <div className="font-bold text-sm text-warning">{activity.anaerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
-                </div>
+              <div className="text-xs opacity-50 mb-1">Anaerobic Training Effect</div>
+              <div className="flex items-center gap-3">
+                <div className="text-3xl font-black text-warning">{a.anaerobicTrainingEffect.toFixed(1)}</div>
+                <div className="text-xs opacity-50">{a.anaerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── HR & Power Zones ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[1,2,3,4,5].some(i => activity[`hrTimeInZone_${i}`] > 0) && (
-          <div>
-            <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Heart Rate Zones</div>
-            <HRZoneBars activity={activity} />
-          </div>
-        )}
-        {[1,2,3,4,5].some(i => activity[`powerTimeInZone_${i}`] > 0) && (
-          <div>
-            <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Power Zones</div>
-            <PowerZoneBars activity={activity} />
-          </div>
-        )}
-      </div>
+      {/* HR + power zones */}
+      {(hasHRZones || hasPwrZones) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {hasHRZones && (
+            <div>
+              <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Heart Rate Zones</div>
+              <ZoneBars zones={hrZones} />
+            </div>
+          )}
+          {hasPwrZones && (
+            <div>
+              <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Power Zones</div>
+              <ZoneBars zones={pwrZones} />
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* ── Splits / Intervals ────────────────────────────────── */}
+      {/* splits table */}
       {splits.length > 0 && (
         <div>
-          <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">
-            Intervals &amp; Splits
-          </div>
+          <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Intervals & Splits</div>
           <div className="overflow-x-auto">
             <table className="table table-xs w-full">
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Count</th>
-                  <th>Distance</th>
-                  <th>Duration</th>
-                  <th>Pace / Speed</th>
-                  <th>Avg HR</th>
-                  <th>Avg Power</th>
-                  <th>NP</th>
-                  <th>Cadence</th>
-                  <th>Stride</th>
-                  <th>Vert Osc</th>
-                  <th>GCT</th>
-                  <th>Calories</th>
+                  <th>Type</th><th>n</th><th>Dist</th><th>Time</th>
+                  <th>Pace</th><th>Avg HR</th><th>Max HR</th>
+                  <th>Avg W</th><th>NP</th><th>Cadence</th>
+                  <th>Stride</th><th>Vert Osc</th><th>GCT</th><th>Cal</th>
                 </tr>
               </thead>
               <tbody>
                 {splits.map((sp, i) => {
-                  const info = SPLIT_LABELS[sp.splitType] || { label: sp.splitType, color: '#888' };
+                  const m = SPLIT_META[sp.splitType] || { label: sp.splitType, color: '#888' };
                   return (
                     <tr key={i}>
                       <td>
-                        <span className="badge badge-xs badge-outline font-medium" style={{ borderColor: info.color + '80', color: info.color }}>
-                          {info.label}
+                        <span className="badge badge-xs badge-outline" style={{ borderColor: m.color+'80', color: m.color }}>
+                          {m.label}
                         </span>
                       </td>
-                      <td className="opacity-50">{sp.noOfSplits || 1}</td>
+                      <td className="opacity-40">{sp.noOfSplits || 1}</td>
                       <td>{fmtDist(sp.distance)}</td>
                       <td>{fmtTime(sp.movingDuration || sp.duration)}</td>
                       <td className="font-mono text-xs">{fmtSpeed(sp.averageMovingSpeed || sp.averageSpeed, sport)}</td>
-                      <td>{sp.averageHR ? `${Math.round(sp.averageHR)}` : '—'}</td>
-                      <td>{sp.averagePower ? `${Math.round(sp.averagePower)} W` : '—'}</td>
-                      <td>{sp.normalizedPower ? `${Math.round(sp.normalizedPower)} W` : '—'}</td>
-                      <td>{sp.averageRunCadence ? `${Math.round(sp.averageRunCadence)}` : '—'}</td>
-                      <td>{sp.strideLength ? `${(sp.strideLength / 100).toFixed(2)} m` : '—'}</td>
-                      <td>{sp.verticalOscillation ? `${sp.verticalOscillation.toFixed(1)} cm` : '—'}</td>
-                      <td>{sp.groundContactTime ? `${Math.round(sp.groundContactTime)} ms` : '—'}</td>
-                      <td>{sp.calories ? sp.calories : '—'}</td>
+                      <td>{sp.averageHR ? Math.round(sp.averageHR) : '—'}</td>
+                      <td>{sp.maxHR ? Math.round(sp.maxHR) : '—'}</td>
+                      <td>{sp.averagePower ? `${Math.round(sp.averagePower)}W` : '—'}</td>
+                      <td>{sp.normalizedPower ? `${Math.round(sp.normalizedPower)}W` : '—'}</td>
+                      <td>{sp.averageRunCadence ? Math.round(sp.averageRunCadence) : '—'}</td>
+                      <td>{sp.strideLength ? `${(sp.strideLength/100).toFixed(2)}m` : '—'}</td>
+                      <td>{sp.verticalOscillation ? `${sp.verticalOscillation.toFixed(1)}cm` : '—'}</td>
+                      <td>{sp.groundContactTime ? `${Math.round(sp.groundContactTime)}ms` : '—'}</td>
+                      <td>{sp.calories || '—'}</td>
                     </tr>
                   );
                 })}
@@ -406,444 +344,328 @@ function ActivityDetail({ activity, detail }) {
         </div>
       )}
 
-      {/* Description */}
-      {activity.description && (
-        <div className="text-xs opacity-50 italic border-l-2 border-base-300 pl-3">{activity.description}</div>
+      {a.description && (
+        <div className="text-xs opacity-40 italic border-l-2 border-base-300 pl-3">{a.description}</div>
       )}
     </div>
   );
 }
 
-// ── Expandable activity row ───────────────────────────────────────────────────
-function ActivityRow({ activity }) {
+// ─── Expandable activity row ───────────────────────────────────────────────────
+function ActivityRow({ activity: a }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const sport = normalizeType(activity.activityType?.typeKey || '');
-  const color = SPORT_COLORS[sport];
+  const sport = normSport(a.activityType?.typeKey);
+  const { color, icon } = SPORT[sport] || SPORT.other;
 
-  const handleToggle = async () => {
+  const toggle = async () => {
     if (!open && !detail && !loading) {
       setLoading(true);
-      try {
-        const d = await fetchActivityDetail(activity.activityId);
-        setDetail(d);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
+      try { setDetail(await api(`/api/activities/${a.activityId}`)); }
+      catch(e) { console.error(e); }
+      finally { setLoading(false); }
     }
     setOpen(o => !o);
   };
 
   return (
     <div className="border-b border-base-300 last:border-0">
-      {/* Summary row */}
-      <div className="activity-row px-4 py-3 flex items-center gap-3" onClick={handleToggle}>
-        {/* Sport icon */}
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: color + '20' }}>
-          <i className={`ph-bold ${SPORT_ICONS[sport] || SPORT_ICONS.other} text-sm`} style={{ color }}></i>
+      <div className="activity-row px-4 py-3 flex items-center gap-3" onClick={toggle}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+             style={{ background: color + '20' }}>
+          <i className={`ph-bold ${icon} text-sm`} style={{ color }} />
         </div>
-
-        {/* Name + date */}
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate">{activity.activityName || sport}</div>
-          <div className="text-xs opacity-50">{fmtDate(activity.startTimeLocal)}</div>
+          <div className="font-medium text-sm truncate">{a.activityName || sport}</div>
+          <div className="text-xs opacity-50">{fmtDate(a.startTimeLocal)}</div>
         </div>
-
-        {/* Metrics */}
-        <div className="hidden sm:flex items-center gap-6 text-right shrink-0">
-          {activity.distance > 0 && (
+        <div className="hidden sm:flex items-center gap-5 text-right shrink-0">
+          {a.distance > 0 && (
             <div>
-              <div className="text-sm font-bold" style={{ color }}>{fmtDist(activity.distance)}</div>
-              <div className="text-xs opacity-40">{fmtTime(activity.movingDuration || activity.duration)}</div>
+              <div className="text-sm font-bold" style={{ color }}>{fmtDist(a.distance)}</div>
+              <div className="text-xs opacity-40">{fmtTime(a.movingDuration || a.duration)}</div>
             </div>
           )}
-          {!activity.distance && activity.movingDuration > 0 && (
-            <div>
-              <div className="text-sm font-bold">{fmtTime(activity.movingDuration || activity.duration)}</div>
-            </div>
+          {!a.distance && a.movingDuration > 0 && (
+            <div className="text-sm font-bold">{fmtTime(a.movingDuration)}</div>
           )}
-          {activity.averageHR > 0 && (
+          {a.averageHR > 0 && (
             <div>
-              <div className="text-sm font-bold" style={{ color: '#f472b6' }}>{activity.averageHR} bpm</div>
+              <div className="text-sm font-bold" style={{ color: '#f472b6' }}>{a.averageHR} bpm</div>
               <div className="text-xs opacity-40">avg HR</div>
             </div>
           )}
-          {activity.averageSpeed > 0 && activity.distance > 0 && (
+          {a.averageSpeed > 0 && a.distance > 0 && (
             <div className="hidden md:block">
-              <div className="text-sm font-mono">{fmtSpeed(activity.averageSpeed, sport)}</div>
+              <div className="text-sm font-mono">{fmtSpeed(a.averageSpeed, sport)}</div>
               <div className="text-xs opacity-40">pace</div>
             </div>
           )}
-          {activity.activityTrainingLoad > 0 && (
+          {a.activityTrainingLoad > 0 && (
             <div className="hidden lg:block">
-              <div className="text-sm font-bold" style={{ color: '#818cf8' }}>{Math.round(activity.activityTrainingLoad)}</div>
+              <div className="text-sm font-bold" style={{ color: '#818cf8' }}>{Math.round(a.activityTrainingLoad)}</div>
               <div className="text-xs opacity-40">load</div>
             </div>
           )}
-          {activity.trainingEffectLabel && (
-            <span className="badge badge-sm badge-outline hidden xl:inline-flex opacity-60">
-              {activity.trainingEffectLabel.toLowerCase()}
+          {a.trainingEffectLabel && (
+            <span className="badge badge-sm badge-outline opacity-50 hidden xl:inline-flex capitalize">
+              {a.trainingEffectLabel.toLowerCase()}
             </span>
           )}
         </div>
-
-        {/* Expand chevron */}
         <div className="ml-2 shrink-0 opacity-40">
           {loading
-            ? <span className="loading loading-spinner loading-xs"></span>
-            : <i className={`ph-bold ph-caret-${open ? 'up' : 'down'} text-sm`}></i>
-          }
+            ? <span className="loading loading-spinner loading-xs" />
+            : <i className={`ph-bold ph-caret-${open ? 'up' : 'down'} text-sm`} />}
         </div>
       </div>
-
-      {/* Expandable detail */}
-      {open && (detail
-        ? <ActivityDetail activity={activity} detail={detail} />
-        : <div className="px-4 pb-3 flex items-center gap-2 opacity-40 text-sm">
-            <span className="loading loading-spinner loading-xs"></span> Loading detail…
-          </div>
+      {open && (
+        detail
+          ? <ActivityDetail activity={a} detail={detail} />
+          : <div className="px-4 pb-3 flex items-center gap-2 opacity-40 text-sm">
+              <span className="loading loading-spinner loading-xs" /> Loading…
+            </div>
       )}
     </div>
   );
 }
 
-// ── 30-day volume trend ────────────────────────────────────────────────────────
+// ─── Charts ───────────────────────────────────────────────────────────────────
 function VolumeTrend({ activities }) {
   const data = useMemo(() => {
-    const days = {};
-    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    const days = {}, cutoff = Date.now() - 30*86400000;
     for (const a of activities) {
-      const ts = new Date(a.startTimeLocal || 0).getTime();
+      const ts = new Date(a.startTimeLocal||0).getTime();
       if (ts < cutoff || !a.distance) continue;
-      const day = new Date(ts).toISOString().slice(0, 10);
-      if (!days[day]) days[day] = { day, running: 0, cycling: 0, swimming: 0, rowing: 0, other: 0 };
-      const sport = normalizeType(a.activityType?.typeKey || '');
-      days[day][sport] = (days[day][sport] || 0) + mi(a.distance);
+      const day = new Date(ts).toISOString().slice(0,10);
+      if (!days[day]) days[day] = { day, running:0, cycling:0, swimming:0, rowing:0, other:0 };
+      days[day][normSport(a.activityType?.typeKey)] += a.distance * M_TO_MI;
     }
-    return Object.values(days).sort((a, b) => a.day.localeCompare(b.day)).map(d => ({
-      ...d,
-      day: new Date(d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    return Object.values(days).sort((a,b)=>a.day.localeCompare(b.day)).map(d=>({
+      ...d, day: new Date(d.day).toLocaleDateString('en-US',{month:'short',day:'numeric'})
     }));
   }, [activities]);
 
-  if (!data.length) return <div className="text-center opacity-40 py-8 text-sm">No data</div>;
+  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <AreaChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+      <AreaChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 10 }} unit="mi" />
-        <Tooltip formatter={(v) => `${v.toFixed(2)} mi`} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        {['running','cycling','swimming','rowing','other'].map(sport => (
-          <Area key={sport} type="monotone" dataKey={sport} stackId="1"
-            stroke={SPORT_COLORS[sport]} fill={SPORT_COLORS[sport]} fillOpacity={0.6} dot={false} />
+        <XAxis dataKey="day" tick={{fontSize:10}} interval="preserveStartEnd" />
+        <YAxis tick={{fontSize:10}} unit="mi" />
+        <Tooltip formatter={v=>`${v.toFixed(2)} mi`} />
+        <Legend wrapperStyle={{fontSize:11}} />
+        {['running','cycling','swimming','rowing','other'].map(sp=>(
+          <Area key={sp} type="monotone" dataKey={sp} stackId="1"
+            stroke={SPORT[sp].color} fill={SPORT[sp].color} fillOpacity={0.55} dot={false} />
         ))}
       </AreaChart>
     </ResponsiveContainer>
   );
 }
 
-// ── 7-day HR trend ─────────────────────────────────────────────────────────────
 function HRTrend({ activities }) {
   const data = useMemo(() => {
-    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+    const cutoff = Date.now() - 7*86400000;
     return activities
       .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
-      .sort((a, b) => new Date(a.startTimeLocal) - new Date(b.startTimeLocal))
-      .map(a => ({ day: fmtDate(a.startTimeLocal), avgHR: Math.round(a.averageHR), maxHR: Math.round(a.maxHR || 0) }));
+      .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal))
+      .map(a => ({ day:fmtDate(a.startTimeLocal), avgHR:Math.round(a.averageHR), maxHR:Math.round(a.maxHR||0) }));
   }, [activities]);
 
-  if (!data.length) return <div className="text-center opacity-40 py-8 text-sm">No data</div>;
+  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+      <LineChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} unit="bpm" domain={['auto','auto']} />
-        <Tooltip formatter={(v) => `${v} bpm`} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Line type="monotone" dataKey="avgHR" stroke="#f472b6" strokeWidth={2} dot={{ r: 3 }} name="Avg HR" />
-        <Line type="monotone" dataKey="maxHR" stroke="#fb923c" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 2" name="Max HR" />
+        <XAxis dataKey="day" tick={{fontSize:10}} />
+        <YAxis tick={{fontSize:10}} unit="bpm" domain={['auto','auto']} />
+        <Tooltip formatter={v=>`${v} bpm`} />
+        <Legend wrapperStyle={{fontSize:11}} />
+        <Line type="monotone" dataKey="avgHR" stroke="#f472b6" strokeWidth={2} dot={{r:3}} name="Avg HR" />
+        <Line type="monotone" dataKey="maxHR" stroke="#fb923c" strokeWidth={1.5} dot={{r:2}} strokeDasharray="4 2" name="Max HR" />
       </LineChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Training load trend ────────────────────────────────────────────────────────
-function TrainingLoadTrend({ activities }) {
+function LoadTrend({ activities }) {
   const data = useMemo(() => {
-    const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    const cutoff = Date.now() - 30*86400000;
     return activities
       .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
-      .sort((a, b) => new Date(a.startTimeLocal) - new Date(b.startTimeLocal))
-      .map(a => ({
-        day: fmtDate(a.startTimeLocal),
-        load: Math.round(a.activityTrainingLoad),
-        sport: normalizeType(a.activityType?.typeKey || ''),
-      }));
+      .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal))
+      .map(a => ({ day:fmtDate(a.startTimeLocal), load:Math.round(a.activityTrainingLoad), sport:normSport(a.activityType?.typeKey) }));
   }, [activities]);
 
-  if (!data.length) return <div className="text-center opacity-40 py-8 text-sm">No data</div>;
+  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+      <BarChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 10 }} />
-        <Tooltip formatter={(v) => `${v} load`} />
+        <XAxis dataKey="day" tick={{fontSize:10}} interval="preserveStartEnd" />
+        <YAxis tick={{fontSize:10}} />
+        <Tooltip formatter={v=>`${v} load`} />
         <Bar dataKey="load" radius={[3,3,0,0]}>
-          {data.map((entry, i) => (
-            <Cell key={i} fill={SPORT_COLORS[entry.sport] || SPORT_COLORS.other} />
-          ))}
+          {data.map((d,i) => <Cell key={i} fill={SPORT[d.sport]?.color||SPORT.other.color} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Last activity HR zone chart ────────────────────────────────────────────────
 function HRZoneChart({ activity }) {
   if (!activity) return null;
-  const zones = [1,2,3,4,5]
-    .map(i => ({ zone: HR_ZONE_NAMES[i-1], color: HR_ZONE_COLORS[i-1], mins: Math.round((activity[`hrTimeInZone_${i}`] || 0) / 60) }))
-    .filter(z => z.mins > 0);
-  if (!zones.length) return <div className="text-center opacity-40 py-8 text-sm">No zone data</div>;
+  const zones = HR_ZONES.map((z,i)=>({ ...z, mins:Math.round((activity[`hrTimeInZone_${i+1}`]||0)/60) })).filter(z=>z.mins>0);
+  if (!zones.length) return <p className="text-center opacity-40 py-8 text-sm">No zone data</p>;
   return (
     <ResponsiveContainer width="100%" height={160}>
-      <BarChart data={zones} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+      <BarChart data={zones} margin={{top:5,right:8,left:-10,bottom:0}}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="zone" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} unit="m" />
-        <Tooltip formatter={(v) => `${v} min`} />
+        <XAxis dataKey="name" tick={{fontSize:10}} />
+        <YAxis tick={{fontSize:10}} unit="m" />
+        <Tooltip formatter={v=>`${v} min`} />
         <Bar dataKey="mins" radius={[4,4,0,0]}>
-          {zones.map((z, i) => <Cell key={i} fill={z.color} />)}
+          {zones.map((z,i)=><Cell key={i} fill={z.color} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
+// ─── App ──────────────────────────────────────────────────────────────────────
 function App() {
   const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  const [err,  setErr]  = useState(null);
   const [theme, toggleTheme] = useTheme();
 
-  useEffect(() => {
-    fetchAll().then(setData).catch(e => setError(e.message));
-  }, []);
+  useEffect(() => { loadAll().then(setData).catch(e => setErr(e.message)); }, []);
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="alert alert-error max-w-md">
-          <i className="ph-bold ph-warning-circle text-xl"></i>
-          <span>Failed to load: {error}</span>
-        </div>
+  if (err) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="alert alert-error max-w-md">
+        <i className="ph-bold ph-warning-circle text-xl" />
+        <span>Load failed: {err}</span>
       </div>
-    );
-  }
+    </div>
+  );
 
   const athlete    = data?.athlete || {};
   const activities = data?.activities || [];
-  const weekly     = data?.weekly?.by_sport || {};
+  const bySport    = data?.weekly?.by_sport || {};
   const daily      = data?.daily || {};
 
-  const steps    = daily.steps;
-  const rhr      = daily.heart_rate?.restingHeartRate;
-  const maxHR    = daily.heart_rate?.maxHeartRate;
-  const sleepSecs = daily.sleep?.dailySleepDTO?.sleepTimeSeconds;
-  const spo2     = daily.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
-  const latestActivity = activities[0];
-  const sportKeys = ['running','cycling','swimming','rowing'];
+  const steps  = daily.steps;
+  const rhr    = daily.heart_rate?.restingHeartRate;
+  const maxHRd = daily.heart_rate?.maxHeartRate;
+  const sleep  = daily.sleep?.dailySleepDTO?.sleepTimeSeconds;
+  const spo2   = daily.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
+  const latest = activities[0];
 
   return (
     <div className="min-h-screen bg-base-100">
 
-      {/* ── Navbar ──────────────────────────────────────────────── */}
-      <div className="navbar bg-base-200 border-b border-base-300 px-6 sticky top-0 z-50 shadow-sm">
+      {/* navbar */}
+      <div className="navbar bg-base-200 border-b border-base-300 px-4 sm:px-6 sticky top-0 z-50 shadow-sm">
         <div className="flex-1 flex items-center gap-3">
-          {athlete.profileImageUrlSmall ? (
-            <div className="avatar">
-              <div className="w-9 rounded-full ring ring-primary ring-offset-base-100 ring-offset-1">
-                <img src={athlete.profileImageUrlSmall} alt="avatar" />
-              </div>
-            </div>
-          ) : (
-            <div className="avatar placeholder">
-              <div className="bg-neutral text-neutral-content rounded-full w-9">
-                <i className="ph-bold ph-user text-lg"></i>
-              </div>
-            </div>
-          )}
+          {athlete.profileImageUrlSmall
+            ? <div className="avatar"><div className="w-9 rounded-full ring ring-primary ring-offset-base-100 ring-offset-1"><img src={athlete.profileImageUrlSmall} alt="avatar" /></div></div>
+            : <div className="avatar placeholder"><div className="bg-neutral text-neutral-content rounded-full w-9"><i className="ph-bold ph-user text-lg" /></div></div>
+          }
           <div>
             <div className="font-bold text-sm leading-tight">{athlete.fullName || 'Athlete'}</div>
             <div className="text-xs opacity-50 leading-tight">Ironman Trainee · 2026 SF Marathon</div>
           </div>
         </div>
-        <div className="flex-none flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-xs opacity-40 hidden sm:block">
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
           </span>
-          <button
-            onClick={toggleTheme}
-            className="btn btn-ghost btn-sm btn-circle"
-            title="Toggle light/dark mode"
-          >
-            <i className={`ph-bold ${theme === 'dim' ? 'ph-sun' : 'ph-moon'} text-lg`}></i>
+          <button onClick={toggleTheme} className="btn btn-ghost btn-sm btn-circle" title="Toggle theme">
+            <i className={`ph-bold ${theme === 'dim' ? 'ph-sun' : 'ph-moon'} text-lg`} />
           </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-        {/* ── Wellness row ─────────────────────────────────────── */}
+        {/* wellness */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <i className="ph-bold ph-heartbeat opacity-60"></i>
-            <h2 className="text-sm font-semibold opacity-60 uppercase tracking-wider">Today</h2>
-          </div>
+          <h2 className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <i className="ph-bold ph-heartbeat" /> Today
+          </h2>
           <div className="stats stats-horizontal bg-base-200 shadow w-full flex-wrap">
-            {!data ? (
-              [1,2,3,4,5].map(i => (
-                <div key={i} className="stat">
-                  <div className="skeleton h-4 w-20 mb-2 rounded"></div>
-                  <div className="skeleton h-8 w-16 rounded"></div>
-                </div>
-              ))
-            ) : (
-              <>
-                <StatTile icon="ph-person-simple-walk" label="Steps" value={steps ? steps.toLocaleString() : '—'} color="#4ade80" />
-                <StatTile icon="ph-heart" label="Resting HR" value={rhr ? `${rhr}` : '—'} unit={rhr ? 'bpm' : undefined} color="#f472b6" />
-                <StatTile icon="ph-heartbeat" label="Max HR" value={maxHR ? `${maxHR}` : '—'} unit={maxHR ? 'bpm' : undefined} color="#fb923c" />
-                <StatTile icon="ph-moon" label="Sleep" value={sleepSecs ? `${(sleepSecs / 3600).toFixed(1)}` : '—'} unit={sleepSecs ? 'hours' : undefined} color="#818cf8" />
-                <StatTile icon="ph-wind" label="SpO₂" value={spo2 ? `${Math.round(spo2)}%` : '—'} color="#38bdf8" />
-              </>
-            )}
+            {!data
+              ? [1,2,3,4,5].map(i=><div key={i} className="stat"><div className="skeleton h-4 w-20 mb-2 rounded"/><div className="skeleton h-8 w-16 rounded"/></div>)
+              : <>
+                  <StatTile icon="ph-person-simple-walk" label="Steps"      value={steps  ? steps.toLocaleString() : '—'}                          color="#4ade80" />
+                  <StatTile icon="ph-heart"              label="Resting HR"  value={rhr    ? `${rhr}`    : '—'} unit={rhr    ? 'bpm'   : undefined} color="#f472b6" />
+                  <StatTile icon="ph-heartbeat"          label="Max HR"      value={maxHRd ? `${maxHRd}` : '—'} unit={maxHRd ? 'bpm'   : undefined} color="#fb923c" />
+                  <StatTile icon="ph-moon"               label="Sleep"       value={sleep  ? `${(sleep/3600).toFixed(1)}` : '—'} unit={sleep ? 'hrs' : undefined} color="#818cf8" />
+                  <StatTile icon="ph-wind"               label="SpO₂"        value={spo2   ? `${Math.round(spo2)}%` : '—'}                          color="#38bdf8" />
+                </>
+            }
           </div>
         </section>
 
-        {/* ── Weekly tiles ─────────────────────────────────────── */}
+        {/* weekly */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <i className="ph-bold ph-calendar-check opacity-60"></i>
-            <h2 className="text-sm font-semibold opacity-60 uppercase tracking-wider">This Week</h2>
-          </div>
-          {!data ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[1,2,3,4].map(i => <div key={i} className="card bg-base-200 shadow h-28"><div className="card-body"><div className="skeleton h-full w-full rounded"></div></div></div>)}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {sportKeys.map(sport => (
-                <SportTile key={sport} sport={sport} stats={weekly[sport] || { count: 0, distance_m: 0, moving_time_s: 0, calories: 0, elevation_gain_m: 0 }} />
-              ))}
-            </div>
-          )}
+          <h2 className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <i className="ph-bold ph-calendar-check" /> This Week
+          </h2>
+          {!data
+            ? <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[1,2,3,4].map(i=><div key={i} className="card bg-base-200 shadow h-28"><div className="card-body p-4"><div className="skeleton h-full w-full rounded"/></div></div>)}</div>
+            : <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {['running','cycling','swimming','rowing'].map(sp=>(
+                  <SportTile key={sp} sport={sp} stats={bySport[sp]||{count:0,distance_m:0,moving_time_s:0,calories:0}} />
+                ))}
+              </div>
+          }
         </section>
 
-        {/* ── Charts row ───────────────────────────────────────── */}
+        {/* charts */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="card bg-base-200 shadow border border-base-300">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <i className="ph-bold ph-chart-line-up text-lg" style={{ color: '#4ade80' }}></i>
-                <h3 className="font-semibold text-sm">30-Day Volume</h3>
+          {[
+            { title: '30-Day Volume',      icon: 'ph-chart-line-up', color: '#4ade80', Component: VolumeTrend,  props: { activities } },
+            { title: '7-Day Heart Rate',   icon: 'ph-heartbeat',     color: '#f472b6', Component: HRTrend,      props: { activities } },
+            { title: '30-Day Trng Load',   icon: 'ph-lightning',     color: '#facc15', Component: LoadTrend,    props: { activities } },
+            { title: 'Last Activity Zones',icon: 'ph-chart-bar',     color: '#38bdf8', Component: HRZoneChart,  props: { activity: latest } },
+          ].map(({ title, icon, color, Component, props }) => (
+            <div key={title} className="card bg-base-200 shadow border border-base-300">
+              <div className="card-body p-4">
+                <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
+                  <i className={`ph-bold ${icon}`} style={{ color }} /> {title}
+                </h3>
+                {!data ? <div className="skeleton h-48 w-full rounded" /> : <Component {...props} />}
               </div>
-              {!data ? <div className="skeleton h-48 w-full rounded"></div> : <VolumeTrend activities={activities} />}
             </div>
-          </div>
-
-          <div className="card bg-base-200 shadow border border-base-300">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <i className="ph-bold ph-heartbeat text-lg" style={{ color: '#f472b6' }}></i>
-                <h3 className="font-semibold text-sm">7-Day Heart Rate</h3>
-              </div>
-              {!data ? <div className="skeleton h-48 w-full rounded"></div> : <HRTrend activities={activities} />}
-            </div>
-          </div>
-
-          <div className="card bg-base-200 shadow border border-base-300">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <i className="ph-bold ph-lightning text-lg" style={{ color: '#facc15' }}></i>
-                <h3 className="font-semibold text-sm">30-Day Training Load</h3>
-              </div>
-              {!data ? <div className="skeleton h-48 w-full rounded"></div> : <TrainingLoadTrend activities={activities} />}
-            </div>
-          </div>
-
-          <div className="card bg-base-200 shadow border border-base-300">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <i className="ph-bold ph-chart-bar text-lg" style={{ color: '#38bdf8' }}></i>
-                <h3 className="font-semibold text-sm">HR Zones</h3>
-                {latestActivity && (
-                  <span className="text-xs opacity-40 ml-auto">last activity · {fmtDate(latestActivity.startTimeLocal)}</span>
-                )}
-              </div>
-              {latestActivity && (
-                <div className="flex gap-2 mb-2 flex-wrap">
-                  {latestActivity.aerobicTrainingEffect > 0 && (
-                    <span className="badge badge-sm badge-outline" style={{ borderColor: '#4ade8060', color: '#4ade80' }}>
-                      Aerobic {latestActivity.aerobicTrainingEffect?.toFixed(1)}
-                    </span>
-                  )}
-                  {latestActivity.anaerobicTrainingEffect > 0 && (
-                    <span className="badge badge-sm badge-outline" style={{ borderColor: '#fb923c60', color: '#fb923c' }}>
-                      Anaerobic {latestActivity.anaerobicTrainingEffect?.toFixed(1)}
-                    </span>
-                  )}
-                  {latestActivity.trainingEffectLabel && (
-                    <span className="badge badge-sm badge-ghost opacity-60">{latestActivity.trainingEffectLabel}</span>
-                  )}
-                </div>
-              )}
-              {!data ? <div className="skeleton h-40 w-full rounded"></div> : <HRZoneChart activity={latestActivity} />}
-            </div>
-          </div>
+          ))}
         </section>
 
-        {/* ── Activity list (expandable) ───────────────────────── */}
+        {/* activity list */}
         <section>
           <div className="card bg-base-200 shadow border border-base-300">
-            <div className="card-body p-0">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-base-300">
-                <i className="ph-bold ph-list-bullets opacity-70"></i>
-                <h3 className="font-semibold text-sm">Recent Activities</h3>
-                {data && <span className="text-xs opacity-40 ml-auto">{activities.length} loaded · click to expand</span>}
-              </div>
-              {!data ? (
-                <div className="p-4 space-y-3">
-                  {[1,2,3,4,5].map(i => <div key={i} className="skeleton h-12 w-full rounded"></div>)}
-                </div>
-              ) : (
-                <div>
-                  {activities.slice(0, 50).map(a => (
-                    <ActivityRow key={a.activityId} activity={a} />
-                  ))}
-                </div>
-              )}
+            <div className="px-4 py-3 border-b border-base-300 flex items-center gap-2">
+              <i className="ph-bold ph-list-bullets opacity-60" />
+              <h3 className="font-semibold text-sm">Recent Activities</h3>
+              {data && <span className="ml-auto text-xs opacity-40">{activities.length} loaded · tap to expand</span>}
             </div>
+            {!data
+              ? <div className="p-4 space-y-3">{[1,2,3,4,5].map(i=><div key={i} className="skeleton h-12 w-full rounded"/>)}</div>
+              : <div>{activities.slice(0,50).map(a=><ActivityRow key={a.activityId} activity={a} />)}</div>
+            }
           </div>
         </section>
 
-        <footer className="text-center text-xs opacity-20 py-4">
-          gacoka.com · powered by Garmin Connect
-        </footer>
+        <footer className="text-center text-xs opacity-20 py-4">gacoka.com · Garmin Connect</footer>
       </div>
     </div>
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>

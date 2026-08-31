@@ -71,8 +71,9 @@ jobs:
           ln -sfn "${RELEASE_DIR}" "${DEPLOY_PATH}/current"
 
           # Build and restart containers
+          # --env-file lets Docker Compose resolve ${POSTGRES_PASSWORD} etc. from the persisted .env
           cd "${DEPLOY_PATH}/current"
-          docker compose up -d --build --remove-orphans
+          docker compose --env-file "${DEPLOY_PATH}/.env" up -d --build --remove-orphans
 
           # Prune dangling images from previous builds
           docker image prune -f

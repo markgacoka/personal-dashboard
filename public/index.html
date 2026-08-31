@@ -393,10 +393,6 @@
           <i class="ph-bold ph-squares-four"></i>
           <span class="sb-lbl">Overview</span>
         </div>
-        <div class="sb-item" data-view="trends">
-          <i class="ph-bold ph-chart-line"></i>
-          <span class="sb-lbl">Trends</span>
-        </div>
         <div class="sb-item" data-view="activities">
           <i class="ph-bold ph-list-bullets"></i>
           <span class="sb-lbl">Activities</span>
@@ -457,12 +453,8 @@
             <div class="card skel" style="height:120px"></div>
           </div>
         </div>
-      </div>
-
-      <!-- TRENDS ───────────────────────────────────────────────── -->
-      <div class="view" id="view-trends">
-        <div class="section-first">
-          <h2 style="margin-bottom:16px"><i class="ph-bold ph-chart-line"></i> Trends</h2>
+        <div class="section">
+          <h2 style="margin-bottom:14px"><i class="ph-bold ph-chart-line"></i> Activity Trends</h2>
           <div class="grid-2">
             <div class="card">
               <div class="eyebrow" style="margin-bottom:12px">30-Day Volume <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400">(miles)</span></div>
@@ -579,7 +571,7 @@ const TYPE_CFG = {
 };
 
 const VIEW_TITLES = {
-  overview: 'Overview', trends: 'Trends', activities: 'Activities',
+  overview: 'Overview', activities: 'Activities',
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
 };
 
@@ -707,15 +699,12 @@ function navigate(view, id) {
 
 function route(view, id) {
   if (!view) {
-    const raw = location.hash.slice(1) || localStorage.getItem('dash-view') || 'overview';
+    const saved = localStorage.getItem('dash-view') || 'overview';
+    const raw = location.hash.slice(1) || (saved === 'trends' ? 'overview' : saved);
     const [v, i] = raw.split('/');
     view = v; id = i;
   }
   switch (view) {
-    case 'trends':
-      showView('trends', { title: 'Trends' });
-      initTrends();
-      break;
     case 'activities':
       showView('activities', { title: 'Activities' });
       break;
@@ -848,16 +837,6 @@ function renderWeekly(bySport) {
 }
 
 // ─── charts ───────────────────────────────────────────────────────────────────
-let _chartsInited = false;
-function initTrends() {
-  if (_chartsInited || !window._actsArr) return;
-  _chartsInited = true;
-  buildVolumeChart(window._actsArr);
-  buildLoadChart(window._actsArr);
-  buildHRChart(window._actsArr);
-  buildZonesChart(window._actsArr[0]);
-}
-
 function buildVolumeChart(activities) {
   const days = {}, cutoff = Date.now() - 30*86400000;
   for (const a of activities) {
@@ -1463,6 +1442,12 @@ async function loadFlights() {
   renderWellness(daily || {});
   renderWeekly((weekly && weekly.by_sport) || {});
   renderActivities(window._actsArr);
+
+  // Build trend charts — they live on the overview page, always rendered
+  buildVolumeChart(window._actsArr);
+  buildLoadChart(window._actsArr);
+  buildHRChart(window._actsArr);
+  buildZonesChart(window._actsArr[0]);
 
   loadFlights().catch(err => {
     document.getElementById('logbook-stats').innerHTML =

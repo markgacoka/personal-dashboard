@@ -4,47 +4,140 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gacoka — Athlete Dashboard</title>
-
-  <!-- DaisyUI v4 component styles + CSS vars -->
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
-  <!-- Tailwind CDN v3 — scans DOM and generates utility classes -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <!-- Icons -->
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <!-- React 18 -->
-  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Recharts (depends on React) -->
-  <script src="https://cdn.jsdelivr.net/npm/recharts@2.13.0/umd/Recharts.min.js"></script>
-  <!-- Babel — transpiles JSX at runtime -->
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
-    /* Recharts text uses DaisyUI base-content colour */
-    .recharts-text { font-size: 11px; }
-    .recharts-cartesian-grid-horizontal line,
-    .recharts-cartesian-grid-vertical line { stroke-opacity: 0.08; }
-    .activity-row { cursor: pointer; transition: background 0.12s; }
-    .activity-row:hover { background: rgba(255,255,255,0.04); }
-    [data-theme="light"] .activity-row:hover { background: rgba(0,0,0,0.04); }
+    .row-toggle { cursor: pointer; transition: background 0.12s; }
+    .row-toggle:hover { background: rgba(255,255,255,0.05); }
+    [data-theme="light"] .row-toggle:hover { background: rgba(0,0,0,0.04); }
     .zone-bar { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
-    /* Fix Tailwind CDN occasionally conflicting with DaisyUI btn */
-    .btn { text-transform: none; }
+    .detail-panel { display: none; }
+    .detail-panel.open { display: block; }
+    .chevron-icon { transition: transform 0.2s; }
+    .chevron-icon.open { transform: rotate(180deg); }
+    canvas { max-height: 200px; }
   </style>
 </head>
-<body class="bg-base-100 min-h-screen">
-<div id="root"></div>
+<body class="min-h-screen bg-base-100">
 
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useCallback, useMemo } = React;
-const {
-  AreaChart, Area, BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
-} = window.Recharts;
+<!-- NAVBAR -->
+<nav class="navbar bg-base-200 border-b border-base-300 px-4 sm:px-6 sticky top-0 z-50 shadow-sm">
+  <div class="flex-1 flex items-center gap-3">
+    <div id="nav-avatar" class="avatar placeholder">
+      <div class="bg-neutral text-neutral-content rounded-full w-9">
+        <i class="ph-bold ph-user text-lg"></i>
+      </div>
+    </div>
+    <div>
+      <div id="nav-name" class="font-bold text-sm leading-tight">Loading…</div>
+      <div class="text-xs opacity-50 leading-tight">Ironman Trainee · 2026 SF Marathon</div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="nav-date" class="text-xs opacity-40 hidden sm:block"></span>
+    <button id="theme-toggle" class="btn btn-ghost btn-sm btn-circle" title="Toggle theme">
+      <i class="ph-bold ph-sun text-lg"></i>
+    </button>
+  </div>
+</nav>
 
-// ─── constants ───────────────────────────────────────────────────────────────
+<div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- WELLNESS -->
+  <section>
+    <h2 class="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+      <i class="ph-bold ph-heartbeat"></i> Today
+    </h2>
+    <div class="stats stats-horizontal bg-base-200 shadow w-full flex-wrap" id="wellness-stats">
+      <div class="stat"><div class="skeleton h-4 w-20 mb-2 rounded"></div><div class="skeleton h-8 w-16 rounded"></div></div>
+      <div class="stat"><div class="skeleton h-4 w-20 mb-2 rounded"></div><div class="skeleton h-8 w-16 rounded"></div></div>
+      <div class="stat"><div class="skeleton h-4 w-20 mb-2 rounded"></div><div class="skeleton h-8 w-16 rounded"></div></div>
+      <div class="stat"><div class="skeleton h-4 w-20 mb-2 rounded"></div><div class="skeleton h-8 w-16 rounded"></div></div>
+      <div class="stat"><div class="skeleton h-4 w-20 mb-2 rounded"></div><div class="skeleton h-8 w-16 rounded"></div></div>
+    </div>
+  </section>
+
+  <!-- WEEKLY SPORTS -->
+  <section>
+    <h2 class="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+      <i class="ph-bold ph-calendar-check"></i> This Week
+    </h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="weekly-sports">
+      <div class="card bg-base-200 shadow h-28"><div class="card-body"><div class="skeleton h-full w-full rounded"></div></div></div>
+      <div class="card bg-base-200 shadow h-28"><div class="card-body"><div class="skeleton h-full w-full rounded"></div></div></div>
+      <div class="card bg-base-200 shadow h-28"><div class="card-body"><div class="skeleton h-full w-full rounded"></div></div></div>
+      <div class="card bg-base-200 shadow h-28"><div class="card-body"><div class="skeleton h-full w-full rounded"></div></div></div>
+    </div>
+  </section>
+
+  <!-- CHARTS -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card bg-base-200 shadow border border-base-300">
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-sm flex items-center gap-2 mb-3">
+          <i class="ph-bold ph-chart-line-up" style="color:#4ade80"></i> 30-Day Volume
+        </h3>
+        <div style="position:relative;height:200px"><canvas id="chart-volume"></canvas></div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow border border-base-300">
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-sm flex items-center gap-2 mb-3">
+          <i class="ph-bold ph-heartbeat" style="color:#f472b6"></i> 7-Day Heart Rate
+        </h3>
+        <div style="position:relative;height:200px"><canvas id="chart-hr"></canvas></div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow border border-base-300">
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-sm flex items-center gap-2 mb-3">
+          <i class="ph-bold ph-lightning" style="color:#facc15"></i> 30-Day Training Load
+        </h3>
+        <div style="position:relative;height:200px"><canvas id="chart-load"></canvas></div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow border border-base-300">
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-sm flex items-center gap-2 mb-3">
+          <i class="ph-bold ph-chart-bar" style="color:#38bdf8"></i>
+          <span>HR Zones</span>
+          <span id="zones-subtitle" class="text-xs opacity-40 ml-auto"></span>
+        </h3>
+        <div style="position:relative;height:200px"><canvas id="chart-zones"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTIVITY LIST -->
+  <section>
+    <div class="card bg-base-200 shadow border border-base-300">
+      <div class="px-4 py-3 border-b border-base-300 flex items-center gap-2">
+        <i class="ph-bold ph-list-bullets opacity-60"></i>
+        <h3 class="font-semibold text-sm">Recent Activities</h3>
+        <span id="activity-count" class="ml-auto text-xs opacity-40"></span>
+      </div>
+      <div id="activity-list">
+        <div class="p-4 space-y-3">
+          <div class="skeleton h-12 w-full rounded"></div>
+          <div class="skeleton h-12 w-full rounded"></div>
+          <div class="skeleton h-12 w-full rounded"></div>
+          <div class="skeleton h-12 w-full rounded"></div>
+          <div class="skeleton h-12 w-full rounded"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="text-center text-xs opacity-20 py-4">gacoka.com · Garmin Connect</footer>
+</div>
+
+<script>
+'use strict';
+
+// ─── constants ────────────────────────────────────────────────────────────────
 const M_TO_MI = 0.000621371;
-
 const SPORT = {
   running:  { color: '#4ade80', icon: 'ph-person-simple-run' },
   cycling:  { color: '#facc15', icon: 'ph-bicycle' },
@@ -52,7 +145,6 @@ const SPORT = {
   rowing:   { color: '#f472b6', icon: 'ph-rowing' },
   other:    { color: '#a78bfa', icon: 'ph-activity' },
 };
-
 const HR_ZONES = [
   { name: 'Z1 Recovery',  color: '#38bdf8' },
   { name: 'Z2 Base',      color: '#4ade80' },
@@ -60,7 +152,6 @@ const HR_ZONES = [
   { name: 'Z4 Threshold', color: '#fb923c' },
   { name: 'Z5 VO2Max',    color: '#f87171' },
 ];
-
 const SPLIT_META = {
   INTERVAL_WARMUP:   { label: 'Warmup',   color: '#4ade80' },
   INTERVAL_ACTIVE:   { label: 'Active',   color: '#f87171' },
@@ -72,31 +163,32 @@ const SPLIT_META = {
 };
 
 // ─── formatters ──────────────────────────────────────────────────────────────
-const fmtMi = m => (m * M_TO_MI).toFixed(2) + ' mi';
-const fmtDist = m => !m ? '—' : m * M_TO_MI >= 0.05 ? fmtMi(m) : Math.round(m) + ' m';
-
-const fmtTime = s => {
+function fmtDist(m) {
+  if (!m) return '—';
+  const mi = m * M_TO_MI;
+  return mi >= 0.05 ? mi.toFixed(2) + ' mi' : Math.round(m) + ' m';
+}
+function fmtTime(s) {
   if (!s) return '—';
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
   return `${sec}s`;
-};
-
-const fmtPace = mps => {
+}
+function fmtPace(mps) {
   if (!mps || mps <= 0) return '—';
   const spm = 1609.344 / mps;
   return `${Math.floor(spm/60)}:${String(Math.round(spm%60)).padStart(2,'0')}/mi`;
-};
-
-const fmtSpeed = (mps, sport) => {
+}
+function fmtSpeed(mps, sport) {
   if (!mps) return '—';
-  return sport === 'cycling' ? `${(mps * 2.23694).toFixed(1)} mph` : fmtPace(mps);
-};
-
-const fmtDate = str => !str ? '—' : new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-const normSport = t => {
+  return sport === 'cycling' ? (mps * 2.23694).toFixed(1) + ' mph' : fmtPace(mps);
+}
+function fmtDate(str) {
+  if (!str) return '—';
+  return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function normSport(t) {
   if (!t) return 'other';
   const l = t.toLowerCase();
   if (l.includes('run') || l.includes('treadmill')) return 'running';
@@ -104,568 +196,504 @@ const normSport = t => {
   if (l.includes('swim')) return 'swimming';
   if (l.includes('row')) return 'rowing';
   return 'other';
-};
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── theme ────────────────────────────────────────────────────────────────────
+let currentTheme = localStorage.getItem('dash-theme') || 'dim';
+document.documentElement.setAttribute('data-theme', currentTheme);
+document.getElementById('theme-toggle').querySelector('i').className =
+  'ph-bold ' + (currentTheme === 'dim' ? 'ph-sun' : 'ph-moon') + ' text-lg';
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  currentTheme = currentTheme === 'dim' ? 'light' : 'dim';
+  localStorage.setItem('dash-theme', currentTheme);
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  document.getElementById('theme-toggle').querySelector('i').className =
+    'ph-bold ' + (currentTheme === 'dim' ? 'ph-sun' : 'ph-moon') + ' text-lg';
+});
+
+// ─── nav date ─────────────────────────────────────────────────────────────────
+document.getElementById('nav-date').textContent =
+  new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+// ─── chart defaults ───────────────────────────────────────────────────────────
+Chart.defaults.color = 'rgba(150,150,170,0.8)';
+Chart.defaults.borderColor = 'rgba(150,150,170,0.1)';
+Chart.defaults.font.size = 11;
+
+function chartOpts(extra) {
+  return Object.assign({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { boxWidth: 10, padding: 10 } } },
+  }, extra);
+}
 
 // ─── API ─────────────────────────────────────────────────────────────────────
-const api = path => fetch(path).then(r => r.json());
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
 
-async function loadAll() {
-  const today = new Date().toISOString().slice(0, 10);
+// ─── render wellness ─────────────────────────────────────────────────────────
+function renderWellness(daily) {
+  const steps = daily.steps;
+  const rhr   = daily.heart_rate && daily.heart_rate.restingHeartRate;
+  const maxHR = daily.heart_rate && daily.heart_rate.maxHeartRate;
+  const sleepS = daily.sleep && daily.sleep.dailySleepDTO && daily.sleep.dailySleepDTO.sleepTimeSeconds;
+  const spo2  = daily.sleep && daily.sleep.wellnessSpO2SleepSummaryDTO && daily.sleep.wellnessSpO2SleepSummaryDTO.averageSPO2;
+
+  const tiles = [
+    { icon: 'ph-person-simple-walk', label: 'Steps',      value: steps  ? steps.toLocaleString()          : '—', unit: '',      color: '#4ade80' },
+    { icon: 'ph-heart',              label: 'Resting HR',  value: rhr    ? rhr                             : '—', unit: rhr  ? 'bpm' : '', color: '#f472b6' },
+    { icon: 'ph-heartbeat',          label: 'Max HR',      value: maxHR  ? maxHR                           : '—', unit: maxHR? 'bpm' : '', color: '#fb923c' },
+    { icon: 'ph-moon',               label: 'Sleep',       value: sleepS ? (sleepS/3600).toFixed(1)        : '—', unit: sleepS ? 'hrs' : '', color: '#818cf8' },
+    { icon: 'ph-wind',               label: 'SpO₂',        value: spo2   ? Math.round(spo2) + '%'          : '—', unit: '',      color: '#38bdf8' },
+  ];
+
+  document.getElementById('wellness-stats').innerHTML = tiles.map(t => `
+    <div class="stat">
+      <div class="stat-figure text-2xl" style="color:${t.color}"><i class="ph-bold ${t.icon}"></i></div>
+      <div class="stat-title text-xs">${t.label}</div>
+      <div class="stat-value text-xl font-bold" style="color:${t.color}">${t.value}</div>
+      ${t.unit ? `<div class="stat-desc">${t.unit}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ─── render weekly sports ─────────────────────────────────────────────────────
+function renderWeekly(bySport) {
+  const sports = ['running','cycling','swimming','rowing'];
+  document.getElementById('weekly-sports').innerHTML = sports.map(sp => {
+    const s = bySport[sp] || {};
+    const { color, icon } = SPORT[sp];
+    return `
+      <div class="card bg-base-200 shadow border border-base-300">
+        <div class="card-body p-4 gap-2">
+          <div class="flex items-center gap-2">
+            <i class="ph-bold ${icon} text-xl" style="color:${color}"></i>
+            <span class="font-semibold text-sm capitalize">${sp}</span>
+            <span class="ml-auto badge badge-sm badge-ghost opacity-50">${s.count||0}×</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><div class="text-xs opacity-50">Distance</div><div class="font-bold text-sm" style="color:${color}">${fmtDist(s.distance_m)}</div></div>
+            <div><div class="text-xs opacity-50">Time</div><div class="font-bold text-sm">${fmtTime(s.moving_time_s)}</div></div>
+          </div>
+          ${s.calories > 0 ? `<div class="text-xs opacity-40">${Math.round(s.calories).toLocaleString()} kcal</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── charts ──────────────────────────────────────────────────────────────────
+function renderVolumeChart(activities) {
+  const days = {}, cutoff = Date.now() - 30*86400000;
+  for (const a of activities) {
+    const ts = new Date(a.startTimeLocal || 0).getTime();
+    if (ts < cutoff || !a.distance) continue;
+    const day = new Date(ts).toISOString().slice(0,10);
+    if (!days[day]) days[day] = { running:0, cycling:0, swimming:0, rowing:0, other:0 };
+    days[day][normSport(a.activityType && a.activityType.typeKey)] += a.distance * M_TO_MI;
+  }
+  const labels = Object.keys(days).sort().map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const dayVals = Object.keys(days).sort().map(d => days[d]);
+  const sports = ['running','cycling','swimming','rowing','other'];
+
+  new Chart(document.getElementById('chart-volume'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: sports.map(sp => ({
+        label: sp,
+        data: dayVals.map(d => parseFloat((d[sp]||0).toFixed(2))),
+        backgroundColor: SPORT[sp].color + 'aa',
+        borderColor: SPORT[sp].color,
+        borderWidth: 1,
+        stack: 'v',
+      }))
+    },
+    options: chartOpts({
+      scales: {
+        x: { stacked: true, ticks: { maxTicksLimit: 8 } },
+        y: { stacked: true, title: { display: true, text: 'mi' } }
+      }
+    })
+  });
+}
+
+function renderHRChart(activities) {
+  const cutoff = Date.now() - 7*86400000;
+  const recent = activities
+    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
+    .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
+
+  new Chart(document.getElementById('chart-hr'), {
+    type: 'line',
+    data: {
+      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      datasets: [
+        { label: 'Avg HR', data: recent.map(a => Math.round(a.averageHR)), borderColor: '#f472b6', backgroundColor: '#f472b620', tension: 0.3, pointRadius: 4, fill: false },
+        { label: 'Max HR', data: recent.map(a => Math.round(a.maxHR||0)),  borderColor: '#fb923c', backgroundColor: '#fb923c20', tension: 0.3, pointRadius: 3, borderDash: [4,3], fill: false },
+      ]
+    },
+    options: chartOpts({ scales: { y: { title: { display: true, text: 'bpm' } } } })
+  });
+}
+
+function renderLoadChart(activities) {
+  const cutoff = Date.now() - 30*86400000;
+  const recent = activities
+    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
+    .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
+
+  new Chart(document.getElementById('chart-load'), {
+    type: 'bar',
+    data: {
+      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      datasets: [{
+        label: 'Training Load',
+        data: recent.map(a => Math.round(a.activityTrainingLoad)),
+        backgroundColor: recent.map(a => (SPORT[normSport(a.activityType && a.activityType.typeKey)] || SPORT.other).color + 'bb'),
+        borderRadius: 4,
+      }]
+    },
+    options: chartOpts({ plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10 } } } })
+  });
+}
+
+function renderZoneChart(activity) {
+  if (!activity) return;
+  document.getElementById('zones-subtitle').textContent = 'last · ' + fmtDate(activity.startTimeLocal);
+  const zones = HR_ZONES.map((z,i) => ({
+    ...z,
+    mins: Math.round((activity['hrTimeInZone_' + (i+1)] || 0) / 60)
+  })).filter(z => z.mins > 0);
+
+  if (!zones.length) return;
+  new Chart(document.getElementById('chart-zones'), {
+    type: 'bar',
+    data: {
+      labels: zones.map(z => z.name),
+      datasets: [{
+        data: zones.map(z => z.mins),
+        backgroundColor: zones.map(z => z.color + 'cc'),
+        borderColor: zones.map(z => z.color),
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: chartOpts({
+      plugins: { legend: { display: false } },
+      scales: { y: { title: { display: true, text: 'min' } } }
+    })
+  });
+}
+
+// ─── zone bars (inline HTML) ─────────────────────────────────────────────────
+function zoneBarsHTML(zones) {
+  const total = zones.reduce((s,z) => s+z.secs, 0);
+  if (!total) return '';
+  return zones.filter(z => z.secs > 0).map(z => `
+    <div class="flex items-center gap-2">
+      <span class="text-xs w-28 opacity-60 shrink-0">${z.name}</span>
+      <div class="flex-1 bg-base-300 rounded-full overflow-hidden" style="height:6px">
+        <div class="zone-bar" style="width:${(z.secs/total*100).toFixed(1)}%;background:${z.color}"></div>
+      </div>
+      <span class="text-xs w-10 text-right opacity-60 shrink-0">${fmtTime(z.secs)}</span>
+    </div>
+  `).join('');
+}
+
+// ─── activity detail HTML ─────────────────────────────────────────────────────
+function buildDetailHTML(a, detail) {
+  const sport = normSport(a.activityType && a.activityType.typeKey);
+  const s = detail.summaryDTO || {};
+  const splits = (detail.splitSummaries || []).filter(sp => sp.distance > 0 || sp.duration > 0);
+  const meta = detail.metadataDTO || {};
+
+  // metrics grid
+  const metrics = [
+    ['Avg HR',       a.averageHR ? Math.round(a.averageHR)+' bpm' : null, '#f472b6'],
+    ['Max HR',       a.maxHR ? Math.round(a.maxHR)+' bpm' : null, '#fb923c'],
+    ['Min HR',       s.minHR ? Math.round(s.minHR)+' bpm' : null, '#38bdf8'],
+    ['Avg Power',    (s.averagePower||a.avgPower) ? Math.round(s.averagePower||a.avgPower)+' W' : null, '#facc15'],
+    ['Norm Power',   (s.normalizedPower||a.normPower) ? Math.round(s.normalizedPower||a.normPower)+' W' : null, '#facc15'],
+    ['Max Power',    (s.maxPower||a.maxPower) ? Math.round(s.maxPower||a.maxPower)+' W' : null, '#fb923c'],
+    ['Pace',         fmtSpeed(s.averageSpeed||a.averageSpeed, sport)],
+    ['Max Pace',     fmtSpeed(s.maxSpeed||a.maxSpeed, sport)],
+    ['Cadence',      (s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute) ? Math.round(s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute)+' spm' : null],
+    ['Max Cadence',  a.maxRunningCadenceInStepsPerMinute ? a.maxRunningCadenceInStepsPerMinute+' spm' : null],
+    ['Stride',       (s.strideLength||a.avgStrideLength) ? ((s.strideLength||a.avgStrideLength)/100).toFixed(2)+' m' : null],
+    ['Gnd Contact',  (s.groundContactTime||a.avgGroundContactTime) ? Math.round(s.groundContactTime||a.avgGroundContactTime)+' ms' : null],
+    ['Vert Osc',     (s.verticalOscillation||a.avgVerticalOscillation) ? (s.verticalOscillation||a.avgVerticalOscillation).toFixed(1)+' cm' : null],
+    ['Vert Ratio',   (s.verticalRatio||a.avgVerticalRatio) ? (s.verticalRatio||a.avgVerticalRatio).toFixed(1)+'%' : null],
+    ['Trng Load',    (s.activityTrainingLoad||a.activityTrainingLoad) ? Math.round(s.activityTrainingLoad||a.activityTrainingLoad) : null, '#818cf8'],
+    ['Calories',     (s.calories||a.calories) ? (s.calories||a.calories)+' kcal' : null],
+    ['Body Battery', (s.differenceBodyBattery!=null?s.differenceBodyBattery:a.differenceBodyBattery)!=null ? ((s.differenceBodyBattery!=null?s.differenceBodyBattery:a.differenceBodyBattery)>0?'+':'')+String(s.differenceBodyBattery!=null?s.differenceBodyBattery:a.differenceBodyBattery) : null,
+      (s.differenceBodyBattery!=null?s.differenceBodyBattery:a.differenceBodyBattery) > 0 ? '#4ade80' : '#f87171'],
+    ['Stamina Start',s.beginPotentialStamina ? s.beginPotentialStamina+'%' : null],
+    ['Stamina End',  s.endPotentialStamina   ? s.endPotentialStamina+'%'   : null],
+    ['Total Work',   s.totalWork   ? s.totalWork.toFixed(1)+' kJ' : null],
+    ['Impact Load',  s.impactLoad  ? s.impactLoad.toLocaleString() : null],
+    ['Hydration',    s.waterEstimated ? s.waterEstimated+' ml' : null],
+    ['Workout Feel', s.directWorkoutFeel ? s.directWorkoutFeel+'/100' : null],
+    ['RPE',          s.directWorkoutRpe  ? s.directWorkoutRpe+'/100'  : null],
+    ['Steps',        (s.steps||a.steps) ? (s.steps||a.steps).toLocaleString() : null],
+    ['Mod Intensity',s.moderateIntensityMinutes ? s.moderateIntensityMinutes+' min' : null],
+    ['Vig Intensity',s.vigorousIntensityMinutes ? s.vigorousIntensityMinutes+' min' : null],
+    ['Laps',         meta.lapCount!=null ? meta.lapCount : null],
+  ].filter(([,v]) => v && v !== '—');
+
+  const metricsHTML = `
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      ${metrics.map(([label,value,color]) => `
+        <div class="bg-base-300 rounded-lg p-2.5">
+          <div class="text-xs opacity-50 mb-0.5">${label}</div>
+          <div class="font-bold text-sm" ${color?`style="color:${color}"`:''}>${esc(value)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // training effect
+  let effectHTML = '';
+  if (a.aerobicTrainingEffect > 0 || a.anaerobicTrainingEffect > 0) {
+    effectHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${a.aerobicTrainingEffect > 0 ? `
+          <div class="bg-base-300 rounded-lg p-3">
+            <div class="text-xs opacity-50 mb-1">Aerobic Training Effect</div>
+            <div class="flex items-center gap-3">
+              <div class="text-3xl font-black text-success">${a.aerobicTrainingEffect.toFixed(1)}</div>
+              <div>
+                <div class="font-bold text-sm text-success capitalize">${esc((a.trainingEffectLabel||'').toLowerCase())}</div>
+                <div class="text-xs opacity-50">${esc((a.aerobicTrainingEffectMessage||'').replace(/_/g,' ').toLowerCase())}</div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        ${a.anaerobicTrainingEffect > 0 ? `
+          <div class="bg-base-300 rounded-lg p-3">
+            <div class="text-xs opacity-50 mb-1">Anaerobic Training Effect</div>
+            <div class="flex items-center gap-3">
+              <div class="text-3xl font-black text-warning">${a.anaerobicTrainingEffect.toFixed(1)}</div>
+              <div class="text-xs opacity-50">${esc((a.anaerobicTrainingEffectMessage||'').replace(/_/g,' ').toLowerCase())}</div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  // HR + power zones
+  const hrZones  = HR_ZONES.map((z,i) => ({ ...z, secs: a['hrTimeInZone_'+(i+1)] || 0 }));
+  const pwrZones = HR_ZONES.map((z,i) => ({ name:'PZ'+(i+1), color:z.color, secs: a['powerTimeInZone_'+(i+1)] || 0 }));
+  const hasHR  = hrZones.some(z => z.secs > 0);
+  const hasPwr = pwrZones.some(z => z.secs > 0);
+  let zonesHTML = '';
+  if (hasHR || hasPwr) {
+    zonesHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        ${hasHR ? `<div><div class="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Heart Rate Zones</div>${zoneBarsHTML(hrZones)}</div>` : ''}
+        ${hasPwr ? `<div><div class="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Power Zones</div>${zoneBarsHTML(pwrZones)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // splits table
+  let splitsHTML = '';
+  if (splits.length > 0) {
+    splitsHTML = `
+      <div>
+        <div class="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Intervals &amp; Splits</div>
+        <div class="overflow-x-auto">
+          <table class="table table-xs w-full">
+            <thead><tr>
+              <th>Type</th><th>n</th><th>Dist</th><th>Time</th><th>Pace</th>
+              <th>Avg HR</th><th>Max HR</th><th>Avg W</th><th>NP</th>
+              <th>Cadence</th><th>Stride</th><th>Vert Osc</th><th>GCT</th><th>Cal</th>
+            </tr></thead>
+            <tbody>
+              ${splits.map(sp => {
+                const m = SPLIT_META[sp.splitType] || { label: sp.splitType, color: '#888' };
+                return `
+                  <tr>
+                    <td><span class="badge badge-xs badge-outline" style="border-color:${m.color}80;color:${m.color}">${m.label}</span></td>
+                    <td class="opacity-40">${sp.noOfSplits||1}</td>
+                    <td>${fmtDist(sp.distance)}</td>
+                    <td>${fmtTime(sp.movingDuration||sp.duration)}</td>
+                    <td class="font-mono text-xs">${fmtSpeed(sp.averageMovingSpeed||sp.averageSpeed, sport)}</td>
+                    <td>${sp.averageHR ? Math.round(sp.averageHR) : '—'}</td>
+                    <td>${sp.maxHR ? Math.round(sp.maxHR) : '—'}</td>
+                    <td>${sp.averagePower ? Math.round(sp.averagePower)+'W' : '—'}</td>
+                    <td>${sp.normalizedPower ? Math.round(sp.normalizedPower)+'W' : '—'}</td>
+                    <td>${sp.averageRunCadence ? Math.round(sp.averageRunCadence) : '—'}</td>
+                    <td>${sp.strideLength ? (sp.strideLength/100).toFixed(2)+'m' : '—'}</td>
+                    <td>${sp.verticalOscillation ? sp.verticalOscillation.toFixed(1)+'cm' : '—'}</td>
+                    <td>${sp.groundContactTime ? Math.round(sp.groundContactTime)+'ms' : '—'}</td>
+                    <td>${sp.calories||'—'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  const descHTML = a.description ? `
+    <div class="text-xs opacity-40 italic border-l-2 border-base-300 pl-3">${esc(a.description)}</div>
+  ` : '';
+
+  return `
+    <div class="px-4 pb-5 pt-4 space-y-4 border-t border-base-300">
+      ${metricsHTML}${effectHTML}${zonesHTML}${splitsHTML}${descHTML}
+    </div>
+  `;
+}
+
+// ─── render activity list ─────────────────────────────────────────────────────
+function renderActivities(activities) {
+  document.getElementById('activity-count').textContent = activities.length + ' loaded · tap to expand';
+
+  const rows = activities.slice(0, 50).map(a => {
+    const sport = normSport(a.activityType && a.activityType.typeKey);
+    const { color, icon } = SPORT[sport] || SPORT.other;
+    const id = 'act-' + a.activityId;
+
+    return `
+      <div class="border-b border-base-300 last:border-0">
+        <div class="row-toggle px-4 py-3 flex items-center gap-3" data-id="${esc(String(a.activityId))}">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:${color}20">
+            <i class="ph-bold ${icon} text-sm" style="color:${color}"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-sm truncate">${esc(a.activityName||sport)}</div>
+            <div class="text-xs opacity-50">${fmtDate(a.startTimeLocal)}</div>
+          </div>
+          <div class="hidden sm:flex items-center gap-5 text-right shrink-0">
+            ${a.distance > 0 ? `
+              <div>
+                <div class="text-sm font-bold" style="color:${color}">${fmtDist(a.distance)}</div>
+                <div class="text-xs opacity-40">${fmtTime(a.movingDuration||a.duration)}</div>
+              </div>` : (!a.distance && a.movingDuration > 0 ? `<div class="text-sm font-bold">${fmtTime(a.movingDuration)}</div>` : '')}
+            ${a.averageHR > 0 ? `
+              <div>
+                <div class="text-sm font-bold" style="color:#f472b6">${a.averageHR} bpm</div>
+                <div class="text-xs opacity-40">avg HR</div>
+              </div>` : ''}
+            ${a.averageSpeed > 0 && a.distance > 0 ? `
+              <div class="hidden md:block">
+                <div class="text-sm font-mono">${fmtSpeed(a.averageSpeed, sport)}</div>
+                <div class="text-xs opacity-40">pace</div>
+              </div>` : ''}
+            ${a.activityTrainingLoad > 0 ? `
+              <div class="hidden lg:block">
+                <div class="text-sm font-bold" style="color:#818cf8">${Math.round(a.activityTrainingLoad)}</div>
+                <div class="text-xs opacity-40">load</div>
+              </div>` : ''}
+            ${a.trainingEffectLabel ? `<span class="badge badge-sm badge-outline opacity-50 hidden xl:inline-flex capitalize">${esc(a.trainingEffectLabel.toLowerCase())}</span>` : ''}
+          </div>
+          <div class="ml-2 shrink-0 opacity-40">
+            <i class="ph-bold ph-caret-down text-sm chevron-icon" id="chev-${esc(String(a.activityId))}"></i>
+          </div>
+        </div>
+        <div class="detail-panel" id="${id}">
+          <div class="px-4 pb-3 flex items-center gap-2 opacity-40 text-sm">
+            <span class="loading loading-spinner loading-xs"></span> Loading…
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('activity-list').innerHTML = rows;
+
+  // store activity data for lookup
+  window._activityMap = {};
+  for (const a of activities) {
+    window._activityMap[a.activityId] = a;
+  }
+
+  // attach toggle listeners
+  document.querySelectorAll('.row-toggle').forEach(row => {
+    row.addEventListener('click', async () => {
+      const actId = row.dataset.id;
+      const panel = document.getElementById('act-' + actId);
+      const chev  = document.getElementById('chev-' + actId);
+      const isOpen = panel.classList.contains('open');
+
+      if (isOpen) {
+        panel.classList.remove('open');
+        chev.classList.remove('open');
+      } else {
+        panel.classList.add('open');
+        chev.classList.add('open');
+        if (!panel.dataset.loaded) {
+          panel.dataset.loaded = '1';
+          try {
+            const detail = await api('/api/activities/' + actId);
+            const activity = window._activityMap[actId];
+            panel.innerHTML = buildDetailHTML(activity, detail);
+          } catch(e) {
+            panel.innerHTML = `<div class="px-4 pb-3 text-xs opacity-50 text-error">Failed to load detail.</div>`;
+          }
+        }
+      }
+    });
+  });
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+async function main() {
+  const today = new Date().toISOString().slice(0,10);
+
   const [athlete, activities, weekly, daily] = await Promise.all([
     api('/api/athlete'),
     api('/api/activities?limit=200'),
     api('/api/stats/weekly'),
-    api(`/api/stats/daily?date=${today}`).catch(() => ({})),
+    api('/api/stats/daily?date=' + today).catch(() => ({})),
   ]);
-  return { athlete, activities: Array.isArray(activities) ? activities : [], weekly, daily: daily || {} };
-}
 
-// ─── Theme hook ───────────────────────────────────────────────────────────────
-function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('dash-theme') || 'dim');
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
-  const toggle = useCallback(() => {
-    setTheme(t => {
-      const next = t === 'dim' ? 'light' : 'dim';
-      localStorage.setItem('dash-theme', next);
-      return next;
-    });
-  }, []);
-  return [theme, toggle];
-}
-
-// ─── Stat tile ────────────────────────────────────────────────────────────────
-function StatTile({ icon, label, value, unit, color }) {
-  return (
-    <div className="stat">
-      <div className="stat-figure text-2xl" style={{ color }}>
-        <i className={`ph-bold ${icon}`} />
+  // navbar
+  const name = athlete.fullName || 'Athlete';
+  document.getElementById('nav-name').textContent = name;
+  if (athlete.profileImageUrlSmall) {
+    document.getElementById('nav-avatar').innerHTML = `
+      <div class="w-9 rounded-full ring ring-primary ring-offset-base-100 ring-offset-1 overflow-hidden">
+        <img src="${esc(athlete.profileImageUrlSmall)}" alt="avatar" class="w-full h-full object-cover">
       </div>
-      <div className="stat-title text-xs">{label}</div>
-      <div className="stat-value text-xl font-bold" style={{ color }}>{value}</div>
-      {unit && <div className="stat-desc">{unit}</div>}
-    </div>
-  );
+    `;
+  }
+
+  const acts = Array.isArray(activities) ? activities : [];
+
+  renderWellness(daily || {});
+  renderWeekly((weekly && weekly.by_sport) || {});
+  renderVolumeChart(acts);
+  renderHRChart(acts);
+  renderLoadChart(acts);
+  renderZoneChart(acts[0]);
+  renderActivities(acts);
 }
 
-// ─── Sport tile ───────────────────────────────────────────────────────────────
-function SportTile({ sport, stats }) {
-  const { color, icon } = SPORT[sport] || SPORT.other;
-  return (
-    <div className="card bg-base-200 shadow border border-base-300">
-      <div className="card-body p-4 gap-2">
-        <div className="flex items-center gap-2">
-          <i className={`ph-bold ${icon} text-xl`} style={{ color }} />
-          <span className="font-semibold text-sm capitalize">{sport}</span>
-          <span className="ml-auto badge badge-sm badge-ghost opacity-50">{stats.count || 0}×</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="text-xs opacity-50">Distance</div>
-            <div className="font-bold text-sm" style={{ color }}>{fmtDist(stats.distance_m)}</div>
-          </div>
-          <div>
-            <div className="text-xs opacity-50">Time</div>
-            <div className="font-bold text-sm">{fmtTime(stats.moving_time_s)}</div>
-          </div>
-        </div>
-        {stats.calories > 0 && (
-          <div className="text-xs opacity-40">{Math.round(stats.calories).toLocaleString()} kcal</div>
-        )}
+main().catch(err => {
+  console.error('Dashboard load error:', err);
+  document.getElementById('activity-list').innerHTML = `
+    <div class="p-6 text-center">
+      <div class="alert alert-error max-w-md mx-auto">
+        <i class="ph-bold ph-warning-circle text-xl"></i>
+        <span>Load failed: ${esc(err.message)}</span>
       </div>
     </div>
-  );
-}
-
-// ─── Zone bars ────────────────────────────────────────────────────────────────
-function ZoneBars({ zones }) {
-  const total = zones.reduce((s, z) => s + z.secs, 0);
-  if (!total) return null;
-  return (
-    <div className="space-y-1.5">
-      {zones.filter(z => z.secs > 0).map(z => (
-        <div key={z.name} className="flex items-center gap-2">
-          <span className="text-xs w-28 opacity-60 shrink-0">{z.name}</span>
-          <div className="flex-1 bg-base-300 rounded-full overflow-hidden" style={{ height: 6 }}>
-            <div className="zone-bar" style={{ width: `${(z.secs/total*100).toFixed(1)}%`, background: z.color }} />
-          </div>
-          <span className="text-xs w-10 text-right opacity-60 shrink-0">{fmtTime(z.secs)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Activity detail (expanded) ───────────────────────────────────────────────
-function ActivityDetail({ activity: a, detail }) {
-  const sport = normSport(a.activityType?.typeKey);
-  const s = detail?.summaryDTO || {};
-  const splits = (detail?.splitSummaries || []).filter(sp => sp.distance > 0 || sp.duration > 0);
-  const meta = detail?.metadataDTO || {};
-
-  const metrics = [
-    ['Avg HR',       a.averageHR     ? `${Math.round(a.averageHR)} bpm`  : null, '#f472b6'],
-    ['Max HR',       a.maxHR         ? `${Math.round(a.maxHR)} bpm`      : null, '#fb923c'],
-    ['Min HR',       s.minHR         ? `${Math.round(s.minHR)} bpm`      : null, '#38bdf8'],
-    ['Avg Power',    (s.averagePower||a.avgPower)   ? `${Math.round(s.averagePower||a.avgPower)} W`  : null, '#facc15'],
-    ['Norm Power',   (s.normalizedPower||a.normPower) ? `${Math.round(s.normalizedPower||a.normPower)} W` : null, '#facc15'],
-    ['Max Power',    (s.maxPower||a.maxPower)       ? `${Math.round(s.maxPower||a.maxPower)} W`     : null, '#fb923c'],
-    ['Pace',         fmtSpeed(s.averageSpeed||a.averageSpeed, sport) !== '—' ? fmtSpeed(s.averageSpeed||a.averageSpeed, sport) : null],
-    ['Max Pace',     fmtSpeed(s.maxSpeed||a.maxSpeed, sport) !== '—' ? fmtSpeed(s.maxSpeed||a.maxSpeed, sport) : null],
-    ['Cadence',      (s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute) ? `${Math.round(s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute)} spm` : null],
-    ['Max Cadence',  a.maxRunningCadenceInStepsPerMinute ? `${a.maxRunningCadenceInStepsPerMinute} spm` : null],
-    ['Stride',       (s.strideLength||a.avgStrideLength) ? `${((s.strideLength||a.avgStrideLength)/100).toFixed(2)} m` : null],
-    ['Gnd Contact',  (s.groundContactTime||a.avgGroundContactTime) ? `${Math.round(s.groundContactTime||a.avgGroundContactTime)} ms` : null],
-    ['Vert Osc',     (s.verticalOscillation||a.avgVerticalOscillation) ? `${(s.verticalOscillation||a.avgVerticalOscillation).toFixed(1)} cm` : null],
-    ['Vert Ratio',   (s.verticalRatio||a.avgVerticalRatio) ? `${(s.verticalRatio||a.avgVerticalRatio).toFixed(1)}%` : null],
-    ['Trng Load',    (s.activityTrainingLoad||a.activityTrainingLoad) ? Math.round(s.activityTrainingLoad||a.activityTrainingLoad) : null, '#818cf8'],
-    ['Calories',     (s.calories||a.calories) ? `${s.calories||a.calories} kcal` : null],
-    ['Body Battery', (s.differenceBodyBattery??a.differenceBodyBattery) != null ? `${(s.differenceBodyBattery??a.differenceBodyBattery)>0?'+':''}${s.differenceBodyBattery??a.differenceBodyBattery}` : null,
-      (s.differenceBodyBattery??a.differenceBodyBattery) > 0 ? '#4ade80' : '#f87171'],
-    ['Stamina Start',s.beginPotentialStamina ? `${s.beginPotentialStamina}%` : null],
-    ['Stamina End',  s.endPotentialStamina   ? `${s.endPotentialStamina}%`   : null],
-    ['Total Work',   s.totalWork   ? `${s.totalWork.toFixed(1)} kJ`  : null],
-    ['Impact Load',  s.impactLoad  ? s.impactLoad.toLocaleString()   : null],
-    ['Hydration',    s.waterEstimated ? `${s.waterEstimated} ml`     : null],
-    ['Workout Feel', s.directWorkoutFeel ? `${s.directWorkoutFeel}/100` : null],
-    ['RPE',          s.directWorkoutRpe  ? `${s.directWorkoutRpe}/100`  : null],
-    ['Steps',        (s.steps||a.steps) ? (s.steps||a.steps).toLocaleString() : null],
-    ['Mod Intensity',s.moderateIntensityMinutes ? `${s.moderateIntensityMinutes} min` : null],
-    ['Vig Intensity',s.vigorousIntensityMinutes ? `${s.vigorousIntensityMinutes} min` : null],
-    ['Laps',         meta.lapCount != null ? meta.lapCount : null],
-  ].filter(([, v]) => v != null);
-
-  const hrZones = HR_ZONES.map((z, i) => ({ ...z, secs: a[`hrTimeInZone_${i+1}`] || 0 }));
-  const pwrZones = HR_ZONES.map((z, i) => ({ name: `PZ${i+1}`, color: z.color, secs: a[`powerTimeInZone_${i+1}`] || 0 }));
-  const hasHRZones  = hrZones.some(z => z.secs > 0);
-  const hasPwrZones = pwrZones.some(z => z.secs > 0);
-
-  return (
-    <div className="px-4 pb-5 pt-4 space-y-5 border-t border-base-300">
-
-      {/* metrics grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-        {metrics.map(([label, value, color]) => (
-          <div key={label} className="bg-base-300 rounded-lg p-2.5">
-            <div className="text-xs opacity-50 mb-0.5">{label}</div>
-            <div className="font-bold text-sm" style={color ? { color } : {}}>{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* training effect */}
-      {(a.aerobicTrainingEffect > 0 || a.anaerobicTrainingEffect > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {a.aerobicTrainingEffect > 0 && (
-            <div className="bg-base-300 rounded-lg p-3">
-              <div className="text-xs opacity-50 mb-1">Aerobic Training Effect</div>
-              <div className="flex items-center gap-3">
-                <div className="text-3xl font-black text-success">{a.aerobicTrainingEffect.toFixed(1)}</div>
-                <div>
-                  <div className="font-bold text-sm text-success capitalize">{a.trainingEffectLabel?.toLowerCase()}</div>
-                  <div className="text-xs opacity-50">{a.aerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
-                </div>
-              </div>
-            </div>
-          )}
-          {a.anaerobicTrainingEffect > 0 && (
-            <div className="bg-base-300 rounded-lg p-3">
-              <div className="text-xs opacity-50 mb-1">Anaerobic Training Effect</div>
-              <div className="flex items-center gap-3">
-                <div className="text-3xl font-black text-warning">{a.anaerobicTrainingEffect.toFixed(1)}</div>
-                <div className="text-xs opacity-50">{a.anaerobicTrainingEffectMessage?.replace(/_/g,' ').toLowerCase()}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* HR + power zones */}
-      {(hasHRZones || hasPwrZones) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {hasHRZones && (
-            <div>
-              <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Heart Rate Zones</div>
-              <ZoneBars zones={hrZones} />
-            </div>
-          )}
-          {hasPwrZones && (
-            <div>
-              <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Power Zones</div>
-              <ZoneBars zones={pwrZones} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* splits table */}
-      {splits.length > 0 && (
-        <div>
-          <div className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-2">Intervals & Splits</div>
-          <div className="overflow-x-auto">
-            <table className="table table-xs w-full">
-              <thead>
-                <tr>
-                  <th>Type</th><th>n</th><th>Dist</th><th>Time</th>
-                  <th>Pace</th><th>Avg HR</th><th>Max HR</th>
-                  <th>Avg W</th><th>NP</th><th>Cadence</th>
-                  <th>Stride</th><th>Vert Osc</th><th>GCT</th><th>Cal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {splits.map((sp, i) => {
-                  const m = SPLIT_META[sp.splitType] || { label: sp.splitType, color: '#888' };
-                  return (
-                    <tr key={i}>
-                      <td>
-                        <span className="badge badge-xs badge-outline" style={{ borderColor: m.color+'80', color: m.color }}>
-                          {m.label}
-                        </span>
-                      </td>
-                      <td className="opacity-40">{sp.noOfSplits || 1}</td>
-                      <td>{fmtDist(sp.distance)}</td>
-                      <td>{fmtTime(sp.movingDuration || sp.duration)}</td>
-                      <td className="font-mono text-xs">{fmtSpeed(sp.averageMovingSpeed || sp.averageSpeed, sport)}</td>
-                      <td>{sp.averageHR ? Math.round(sp.averageHR) : '—'}</td>
-                      <td>{sp.maxHR ? Math.round(sp.maxHR) : '—'}</td>
-                      <td>{sp.averagePower ? `${Math.round(sp.averagePower)}W` : '—'}</td>
-                      <td>{sp.normalizedPower ? `${Math.round(sp.normalizedPower)}W` : '—'}</td>
-                      <td>{sp.averageRunCadence ? Math.round(sp.averageRunCadence) : '—'}</td>
-                      <td>{sp.strideLength ? `${(sp.strideLength/100).toFixed(2)}m` : '—'}</td>
-                      <td>{sp.verticalOscillation ? `${sp.verticalOscillation.toFixed(1)}cm` : '—'}</td>
-                      <td>{sp.groundContactTime ? `${Math.round(sp.groundContactTime)}ms` : '—'}</td>
-                      <td>{sp.calories || '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {a.description && (
-        <div className="text-xs opacity-40 italic border-l-2 border-base-300 pl-3">{a.description}</div>
-      )}
-    </div>
-  );
-}
-
-// ─── Expandable activity row ───────────────────────────────────────────────────
-function ActivityRow({ activity: a }) {
-  const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const sport = normSport(a.activityType?.typeKey);
-  const { color, icon } = SPORT[sport] || SPORT.other;
-
-  const toggle = async () => {
-    if (!open && !detail && !loading) {
-      setLoading(true);
-      try { setDetail(await api(`/api/activities/${a.activityId}`)); }
-      catch(e) { console.error(e); }
-      finally { setLoading(false); }
-    }
-    setOpen(o => !o);
-  };
-
-  return (
-    <div className="border-b border-base-300 last:border-0">
-      <div className="activity-row px-4 py-3 flex items-center gap-3" onClick={toggle}>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-             style={{ background: color + '20' }}>
-          <i className={`ph-bold ${icon} text-sm`} style={{ color }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate">{a.activityName || sport}</div>
-          <div className="text-xs opacity-50">{fmtDate(a.startTimeLocal)}</div>
-        </div>
-        <div className="hidden sm:flex items-center gap-5 text-right shrink-0">
-          {a.distance > 0 && (
-            <div>
-              <div className="text-sm font-bold" style={{ color }}>{fmtDist(a.distance)}</div>
-              <div className="text-xs opacity-40">{fmtTime(a.movingDuration || a.duration)}</div>
-            </div>
-          )}
-          {!a.distance && a.movingDuration > 0 && (
-            <div className="text-sm font-bold">{fmtTime(a.movingDuration)}</div>
-          )}
-          {a.averageHR > 0 && (
-            <div>
-              <div className="text-sm font-bold" style={{ color: '#f472b6' }}>{a.averageHR} bpm</div>
-              <div className="text-xs opacity-40">avg HR</div>
-            </div>
-          )}
-          {a.averageSpeed > 0 && a.distance > 0 && (
-            <div className="hidden md:block">
-              <div className="text-sm font-mono">{fmtSpeed(a.averageSpeed, sport)}</div>
-              <div className="text-xs opacity-40">pace</div>
-            </div>
-          )}
-          {a.activityTrainingLoad > 0 && (
-            <div className="hidden lg:block">
-              <div className="text-sm font-bold" style={{ color: '#818cf8' }}>{Math.round(a.activityTrainingLoad)}</div>
-              <div className="text-xs opacity-40">load</div>
-            </div>
-          )}
-          {a.trainingEffectLabel && (
-            <span className="badge badge-sm badge-outline opacity-50 hidden xl:inline-flex capitalize">
-              {a.trainingEffectLabel.toLowerCase()}
-            </span>
-          )}
-        </div>
-        <div className="ml-2 shrink-0 opacity-40">
-          {loading
-            ? <span className="loading loading-spinner loading-xs" />
-            : <i className={`ph-bold ph-caret-${open ? 'up' : 'down'} text-sm`} />}
-        </div>
-      </div>
-      {open && (
-        detail
-          ? <ActivityDetail activity={a} detail={detail} />
-          : <div className="px-4 pb-3 flex items-center gap-2 opacity-40 text-sm">
-              <span className="loading loading-spinner loading-xs" /> Loading…
-            </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Charts ───────────────────────────────────────────────────────────────────
-function VolumeTrend({ activities }) {
-  const data = useMemo(() => {
-    const days = {}, cutoff = Date.now() - 30*86400000;
-    for (const a of activities) {
-      const ts = new Date(a.startTimeLocal||0).getTime();
-      if (ts < cutoff || !a.distance) continue;
-      const day = new Date(ts).toISOString().slice(0,10);
-      if (!days[day]) days[day] = { day, running:0, cycling:0, swimming:0, rowing:0, other:0 };
-      days[day][normSport(a.activityType?.typeKey)] += a.distance * M_TO_MI;
-    }
-    return Object.values(days).sort((a,b)=>a.day.localeCompare(b.day)).map(d=>({
-      ...d, day: new Date(d.day).toLocaleDateString('en-US',{month:'short',day:'numeric'})
-    }));
-  }, [activities]);
-
-  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
-  return (
-    <ResponsiveContainer width="100%" height={200}>
-      <AreaChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{fontSize:10}} interval="preserveStartEnd" />
-        <YAxis tick={{fontSize:10}} unit="mi" />
-        <Tooltip formatter={v=>`${v.toFixed(2)} mi`} />
-        <Legend wrapperStyle={{fontSize:11}} />
-        {['running','cycling','swimming','rowing','other'].map(sp=>(
-          <Area key={sp} type="monotone" dataKey={sp} stackId="1"
-            stroke={SPORT[sp].color} fill={SPORT[sp].color} fillOpacity={0.55} dot={false} />
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-function HRTrend({ activities }) {
-  const data = useMemo(() => {
-    const cutoff = Date.now() - 7*86400000;
-    return activities
-      .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
-      .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal))
-      .map(a => ({ day:fmtDate(a.startTimeLocal), avgHR:Math.round(a.averageHR), maxHR:Math.round(a.maxHR||0) }));
-  }, [activities]);
-
-  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
-  return (
-    <ResponsiveContainer width="100%" height={200}>
-      <LineChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{fontSize:10}} />
-        <YAxis tick={{fontSize:10}} unit="bpm" domain={['auto','auto']} />
-        <Tooltip formatter={v=>`${v} bpm`} />
-        <Legend wrapperStyle={{fontSize:11}} />
-        <Line type="monotone" dataKey="avgHR" stroke="#f472b6" strokeWidth={2} dot={{r:3}} name="Avg HR" />
-        <Line type="monotone" dataKey="maxHR" stroke="#fb923c" strokeWidth={1.5} dot={{r:2}} strokeDasharray="4 2" name="Max HR" />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-function LoadTrend({ activities }) {
-  const data = useMemo(() => {
-    const cutoff = Date.now() - 30*86400000;
-    return activities
-      .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
-      .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal))
-      .map(a => ({ day:fmtDate(a.startTimeLocal), load:Math.round(a.activityTrainingLoad), sport:normSport(a.activityType?.typeKey) }));
-  }, [activities]);
-
-  if (!data.length) return <p className="text-center opacity-40 py-8 text-sm">No data</p>;
-  return (
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data} margin={{top:5,right:8,left:-10,bottom:0}}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="day" tick={{fontSize:10}} interval="preserveStartEnd" />
-        <YAxis tick={{fontSize:10}} />
-        <Tooltip formatter={v=>`${v} load`} />
-        <Bar dataKey="load" radius={[3,3,0,0]}>
-          {data.map((d,i) => <Cell key={i} fill={SPORT[d.sport]?.color||SPORT.other.color} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function HRZoneChart({ activity }) {
-  if (!activity) return null;
-  const zones = HR_ZONES.map((z,i)=>({ ...z, mins:Math.round((activity[`hrTimeInZone_${i+1}`]||0)/60) })).filter(z=>z.mins>0);
-  if (!zones.length) return <p className="text-center opacity-40 py-8 text-sm">No zone data</p>;
-  return (
-    <ResponsiveContainer width="100%" height={160}>
-      <BarChart data={zones} margin={{top:5,right:8,left:-10,bottom:0}}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" tick={{fontSize:10}} />
-        <YAxis tick={{fontSize:10}} unit="m" />
-        <Tooltip formatter={v=>`${v} min`} />
-        <Bar dataKey="mins" radius={[4,4,0,0]}>
-          {zones.map((z,i)=><Cell key={i} fill={z.color} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ─── App ──────────────────────────────────────────────────────────────────────
-function App() {
-  const [data, setData] = useState(null);
-  const [err,  setErr]  = useState(null);
-  const [theme, toggleTheme] = useTheme();
-
-  useEffect(() => { loadAll().then(setData).catch(e => setErr(e.message)); }, []);
-
-  if (err) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="alert alert-error max-w-md">
-        <i className="ph-bold ph-warning-circle text-xl" />
-        <span>Load failed: {err}</span>
-      </div>
-    </div>
-  );
-
-  const athlete    = data?.athlete || {};
-  const activities = data?.activities || [];
-  const bySport    = data?.weekly?.by_sport || {};
-  const daily      = data?.daily || {};
-
-  const steps  = daily.steps;
-  const rhr    = daily.heart_rate?.restingHeartRate;
-  const maxHRd = daily.heart_rate?.maxHeartRate;
-  const sleep  = daily.sleep?.dailySleepDTO?.sleepTimeSeconds;
-  const spo2   = daily.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
-  const latest = activities[0];
-
-  return (
-    <div className="min-h-screen bg-base-100">
-
-      {/* navbar */}
-      <div className="navbar bg-base-200 border-b border-base-300 px-4 sm:px-6 sticky top-0 z-50 shadow-sm">
-        <div className="flex-1 flex items-center gap-3">
-          {athlete.profileImageUrlSmall
-            ? <div className="avatar"><div className="w-9 rounded-full ring ring-primary ring-offset-base-100 ring-offset-1"><img src={athlete.profileImageUrlSmall} alt="avatar" /></div></div>
-            : <div className="avatar placeholder"><div className="bg-neutral text-neutral-content rounded-full w-9"><i className="ph-bold ph-user text-lg" /></div></div>
-          }
-          <div>
-            <div className="font-bold text-sm leading-tight">{athlete.fullName || 'Athlete'}</div>
-            <div className="text-xs opacity-50 leading-tight">Ironman Trainee · 2026 SF Marathon</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs opacity-40 hidden sm:block">
-            {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
-          </span>
-          <button onClick={toggleTheme} className="btn btn-ghost btn-sm btn-circle" title="Toggle theme">
-            <i className={`ph-bold ${theme === 'dim' ? 'ph-sun' : 'ph-moon'} text-lg`} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-
-        {/* wellness */}
-        <section>
-          <h2 className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <i className="ph-bold ph-heartbeat" /> Today
-          </h2>
-          <div className="stats stats-horizontal bg-base-200 shadow w-full flex-wrap">
-            {!data
-              ? [1,2,3,4,5].map(i=><div key={i} className="stat"><div className="skeleton h-4 w-20 mb-2 rounded"/><div className="skeleton h-8 w-16 rounded"/></div>)
-              : <>
-                  <StatTile icon="ph-person-simple-walk" label="Steps"      value={steps  ? steps.toLocaleString() : '—'}                          color="#4ade80" />
-                  <StatTile icon="ph-heart"              label="Resting HR"  value={rhr    ? `${rhr}`    : '—'} unit={rhr    ? 'bpm'   : undefined} color="#f472b6" />
-                  <StatTile icon="ph-heartbeat"          label="Max HR"      value={maxHRd ? `${maxHRd}` : '—'} unit={maxHRd ? 'bpm'   : undefined} color="#fb923c" />
-                  <StatTile icon="ph-moon"               label="Sleep"       value={sleep  ? `${(sleep/3600).toFixed(1)}` : '—'} unit={sleep ? 'hrs' : undefined} color="#818cf8" />
-                  <StatTile icon="ph-wind"               label="SpO₂"        value={spo2   ? `${Math.round(spo2)}%` : '—'}                          color="#38bdf8" />
-                </>
-            }
-          </div>
-        </section>
-
-        {/* weekly */}
-        <section>
-          <h2 className="text-xs font-semibold opacity-50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <i className="ph-bold ph-calendar-check" /> This Week
-          </h2>
-          {!data
-            ? <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[1,2,3,4].map(i=><div key={i} className="card bg-base-200 shadow h-28"><div className="card-body p-4"><div className="skeleton h-full w-full rounded"/></div></div>)}</div>
-            : <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {['running','cycling','swimming','rowing'].map(sp=>(
-                  <SportTile key={sp} sport={sp} stats={bySport[sp]||{count:0,distance_m:0,moving_time_s:0,calories:0}} />
-                ))}
-              </div>
-          }
-        </section>
-
-        {/* charts */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[
-            { title: '30-Day Volume',      icon: 'ph-chart-line-up', color: '#4ade80', Component: VolumeTrend,  props: { activities } },
-            { title: '7-Day Heart Rate',   icon: 'ph-heartbeat',     color: '#f472b6', Component: HRTrend,      props: { activities } },
-            { title: '30-Day Trng Load',   icon: 'ph-lightning',     color: '#facc15', Component: LoadTrend,    props: { activities } },
-            { title: 'Last Activity Zones',icon: 'ph-chart-bar',     color: '#38bdf8', Component: HRZoneChart,  props: { activity: latest } },
-          ].map(({ title, icon, color, Component, props }) => (
-            <div key={title} className="card bg-base-200 shadow border border-base-300">
-              <div className="card-body p-4">
-                <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
-                  <i className={`ph-bold ${icon}`} style={{ color }} /> {title}
-                </h3>
-                {!data ? <div className="skeleton h-48 w-full rounded" /> : <Component {...props} />}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* activity list */}
-        <section>
-          <div className="card bg-base-200 shadow border border-base-300">
-            <div className="px-4 py-3 border-b border-base-300 flex items-center gap-2">
-              <i className="ph-bold ph-list-bullets opacity-60" />
-              <h3 className="font-semibold text-sm">Recent Activities</h3>
-              {data && <span className="ml-auto text-xs opacity-40">{activities.length} loaded · tap to expand</span>}
-            </div>
-            {!data
-              ? <div className="p-4 space-y-3">{[1,2,3,4,5].map(i=><div key={i} className="skeleton h-12 w-full rounded"/>)}</div>
-              : <div>{activities.slice(0,50).map(a=><ActivityRow key={a.activityId} activity={a} />)}</div>
-            }
-          </div>
-        </section>
-
-        <footer className="text-center text-xs opacity-20 py-4">gacoka.com · Garmin Connect</footer>
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  `;
+});
 </script>
+
 </body>
 </html>

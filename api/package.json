@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test": "node --test src/test/routes.test.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

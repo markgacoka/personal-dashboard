@@ -8,6 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts@3/dist/apexcharts.min.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -160,6 +162,48 @@
 
     /* data-source note */
     .data-note { font-size: 11px; color: var(--subtle); display: flex; align-items: center; gap: 4px; }
+
+    /* ─── Flight log ─────────────────────────────────────────── */
+    .section-divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+    #flight-map { height: 400px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .maplibregl-popup-content { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; font-family: 'Inter', sans-serif !important; font-size: 12px !important; padding: 10px 14px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important; }
+    .maplibregl-popup-tip { border-top-color: var(--border) !important; border-bottom-color: var(--border) !important; }
+
+    .logbook-stat { display: flex; flex-direction: column; gap: 2px; }
+    .logbook-stat .lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+    .logbook-stat .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .logbook-stat .sub { font-size: 11px; color: var(--muted); }
+
+    .fl-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    .fl-row:last-child { border-bottom: none; }
+    .fl-row:hover { background: var(--surface-2); }
+    .fl-row.active { background: var(--surface-2); }
+    .fl-summary { padding: 11px 16px; display: flex; align-items: center; gap: 12px; }
+    .fl-type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fl-info { flex: 1; min-width: 0; }
+    .fl-route { font-size: 13px; font-weight: 600; }
+    .fl-date  { font-size: 11px; color: var(--muted); }
+    .fl-kpis  { display: flex; gap: 18px; align-items: center; flex-shrink: 0; }
+    .fl-kpi   { text-align: right; }
+    .fl-kpi-v { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .fl-kpi-l { font-size: 10px; color: var(--muted); }
+    .fl-detail { display: none; padding: 14px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+    .fl-detail.open { display: block; }
+    .fl-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .fl-metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
+    .fl-metric-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+    .fl-metric-val   { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ac-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+    .ac-card-title { font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .ac-specs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 16px; font-size: 12px; color: var(--muted); }
+    .ac-spec-label { font-weight: 500; color: var(--text); }
+    .type-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 12px; border: 1px solid currentColor; opacity: 0.85; text-transform: capitalize; }
+
+    @media (max-width: 700px) {
+      .fl-kpis { display: none; }
+      #flight-map { height: 280px; }
+    }
   </style>
 </head>
 <body>
@@ -236,7 +280,33 @@
     </div>
   </div>
 
-  <footer style="margin-top:32px;text-align:center;font-size:11px;color:var(--subtle)">gacoka.com · data from Garmin Connect</footer>
+  <!-- ── FLIGHTS ────────────────────────────────────────────── -->
+  <div class="section-divider"></div>
+
+  <div class="section">
+    <h2><i class="ph-bold ph-airplane"></i> Flight Log
+      <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px" id="fl-subtitle"></span>
+    </h2>
+
+    <!-- Logbook stats -->
+    <div class="grid-5" id="logbook-stats" style="margin-bottom:12px">
+      <div class="card card-sm skel" style="height:76px"></div>
+      <div class="card card-sm skel" style="height:76px"></div>
+      <div class="card card-sm skel" style="height:76px"></div>
+      <div class="card card-sm skel" style="height:76px"></div>
+      <div class="card card-sm skel" style="height:76px"></div>
+    </div>
+
+    <!-- Map -->
+    <div id="flight-map" style="margin-bottom:12px"></div>
+
+    <!-- Flight table -->
+    <div class="act-list" id="fl-list">
+      <div style="padding:32px;text-align:center"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <footer style="margin-top:32px;text-align:center;font-size:11px;color:var(--subtle)">gacoka.com · fitness data from Garmin Connect · flight log via PostgreSQL</footer>
 </div>
 
 <script>
@@ -799,6 +869,281 @@ function renderActivities(activities) {
   });
 }
 
+// ─── flight log ──────────────────────────────────────────────────────────────
+
+const TYPE_CFG = {
+  maneuvers:     { color: '#bc8cff', label: 'Maneuvers' },
+  pattern:       { color: '#3fb950', label: 'Pattern'   },
+  'x-country':   { color: '#58a6ff', label: 'X-Country' },
+  night:         { color: '#e3b341', label: 'Night'     },
+  instrument:    { color: '#39d353', label: 'Instrument'},
+  solo:          { color: '#db61a2', label: 'Solo'      },
+  checkride_prep:{ color: '#f0883e', label: 'Checkride Prep' },
+};
+
+function typeColor(t) { return (TYPE_CFG[t] || {}).color || '#8b949e'; }
+function typeLabel(t) { return (TYPE_CFG[t] || {}).label || (t || 'Other'); }
+
+function fmtHrs(h) {
+  if (!h || h <= 0) return '—';
+  return parseFloat(h).toFixed(1) + 'h';
+}
+
+function routeLabel(f) {
+  const stops = [f.departure?.icao || f.departure_icao];
+  if (f.via && f.via.length) stops.push(...f.via);
+  stops.push(f.arrival?.icao || f.arrival_icao);
+  return stops.join(' → ');
+}
+
+function buildFlightDetailHTML(f) {
+  const metrics = [
+    ['Total',     fmtHrs(f.total_duration), '#e6edf3'],
+    ['Dual',      fmtHrs(f.dual_given),     '#bc8cff'],
+    ['PIC',       fmtHrs(f.pic),            '#3fb950'],
+    ['Solo',      fmtHrs(f.solo),           '#db61a2'],
+    ['X-Country', fmtHrs(f.cross_country),  '#58a6ff'],
+    ['Night',     fmtHrs(f.night),          '#e3b341'],
+    ['Instrument',fmtHrs(f.instrument),     '#39d353'],
+    ['Takeoffs',  f.takeoffs || '—',        null],
+    ['Landings',  f.landings || '—',        null],
+    ['Night T/O', f.night_takeoffs || '—',  '#e3b341'],
+    ['Night Lnd', f.night_landings || '—',  '#e3b341'],
+  ].filter(([,v]) => v && v !== '—');
+
+  const ac = f.aircraft;
+  const acHTML = ac ? `
+    <div class="ac-card">
+      <div class="ac-card-title">
+        <i class="ph-bold ph-airplane-tilt"></i>
+        ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)} ${ac.year || ''}
+      </div>
+      <div class="ac-specs">
+        ${ac.engine_type ? `<div><span class="ac-spec-label">Engine</span> ${esc(ac.engine_type)} (${ac.engine_hp} HP)</div>` : ''}
+        <div><span class="ac-spec-label">Seats</span> ${ac.seats || 4}</div>
+        <div><span class="ac-spec-label">IFR</span> ${ac.ifr_equipped ? 'Yes' : 'No'}</div>
+        ${ac.glass_cockpit ? '<div><span class="ac-spec-label">Avionics</span> Glass cockpit</div>' : ''}
+        ${ac.notes ? `<div style="grid-column:1/-1;margin-top:4px;color:var(--muted);font-size:11px">${esc(ac.notes)}</div>` : ''}
+      </div>
+    </div>` : '';
+
+  const remarksHTML = f.remarks ? `
+    <div class="desc-note" style="margin-top:6px">${esc(f.remarks)}</div>` : '';
+
+  return `
+    ${acHTML}
+    <div class="fl-detail-grid">
+      ${metrics.map(([l,v,c]) => `
+        <div class="fl-metric">
+          <div class="fl-metric-label">${l}</div>
+          <div class="fl-metric-val" ${c?`style="color:${c}"`:''}>${esc(String(v))}</div>
+        </div>`).join('')}
+    </div>
+    ${f.instructor_name ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px"><i class="ph-bold ph-user"></i> ${esc(f.instructor_name)}</div>` : ''}
+    ${remarksHTML}`;
+}
+
+let _flightMap = null;
+
+function initFlightMap(flights) {
+  _flightMap = new maplibregl.Map({
+    container: 'flight-map',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [-122.0, 37.5],
+    zoom: 8.5,
+    attributionControl: false,
+  });
+
+  _flightMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  _flightMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  _flightMap.on('load', () => {
+    // Build route features
+    const features = flights.map(f => {
+      const coords = [];
+      const dep = f.departure;
+      if (dep) coords.push([dep.lon, dep.lat]);
+      if (f.via_airports) for (const a of f.via_airports) { if (a.lon) coords.push([a.lon, a.lat]); }
+      const arr = f.arrival;
+      if (arr) coords.push([arr.lon, arr.lat]);
+      return {
+        type: 'Feature',
+        properties: { id: f.id, type: f.training_type, color: typeColor(f.training_type) },
+        geometry: { type: 'LineString', coordinates: coords },
+      };
+    }).filter(f => f.geometry.coordinates.length >= 2);
+
+    // Airport markers
+    const aptSet = {};
+    for (const f of flights) {
+      if (f.departure) aptSet[f.departure.icao] = f.departure;
+      if (f.arrival)   aptSet[f.arrival.icao]   = f.arrival;
+      if (f.via_airports) for (const a of f.via_airports) { if (a.icao) aptSet[a.icao] = a; }
+    }
+
+    const aptFeatures = Object.values(aptSet).filter(a => a.lon && a.lat).map(a => ({
+      type: 'Feature',
+      properties: { icao: a.icao, name: a.name },
+      geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
+    }));
+
+    _flightMap.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+    _flightMap.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: aptFeatures } });
+
+    // Route lines (inactive)
+    _flightMap.addLayer({
+      id: 'routes-base', type: 'line', source: 'routes',
+      paint: { 'line-color': ['get','color'], 'line-width': 1.5, 'line-opacity': 0.35 },
+    });
+
+    // Route lines (active highlight)
+    _flightMap.addLayer({
+      id: 'routes-active', type: 'line', source: 'routes',
+      filter: ['==', ['get','id'], -1],
+      paint: { 'line-color': ['get','color'], 'line-width': 3, 'line-opacity': 1 },
+    });
+
+    // Airport circles
+    _flightMap.addLayer({
+      id: 'airports-dot', type: 'circle', source: 'airports',
+      paint: {
+        'circle-radius': 5, 'circle-color': '#58a6ff',
+        'circle-stroke-width': 1.5, 'circle-stroke-color': '#0d1117',
+      },
+    });
+
+    // Airport labels
+    _flightMap.addLayer({
+      id: 'airports-label', type: 'symbol', source: 'airports',
+      layout: { 'text-field': ['get','icao'], 'text-size': 10, 'text-offset': [0, 1.4], 'text-anchor': 'top' },
+      paint: { 'text-color': '#8b949e', 'text-halo-color': '#0d1117', 'text-halo-width': 1 },
+    });
+
+    // Popup on airport click
+    _flightMap.on('click', 'airports-dot', (e) => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup({ offset: 8, closeButton: false })
+        .setLngLat(e.features[0].geometry.coordinates)
+        .setHTML(`<strong>${p.icao}</strong><br>${p.name}`)
+        .addTo(_flightMap);
+    });
+    _flightMap.on('mouseenter', 'airports-dot', () => _flightMap.getCanvas().style.cursor = 'pointer');
+    _flightMap.on('mouseleave', 'airports-dot', () => _flightMap.getCanvas().style.cursor = '');
+  });
+}
+
+function highlightFlight(id) {
+  if (!_flightMap || !_flightMap.getLayer('routes-active')) return;
+  _flightMap.setFilter('routes-active', id ? ['==', ['get','id'], id] : ['==', ['get','id'], -1]);
+}
+
+function renderLogbookStats(s) {
+  const tiles = [
+    { label: 'Total Hours', val: fmtHrs(s.total_hours), sub: `${s.total_flights} flights`, color: '#e6edf3' },
+    { label: 'PIC / Solo',  val: fmtHrs(s.pic),         sub: `${fmtHrs(s.solo)} solo`,   color: '#3fb950' },
+    { label: 'X-Country',   val: fmtHrs(s.cross_country),sub: `${s.airports_visited} airports`, color: '#58a6ff' },
+    { label: 'Night',       val: fmtHrs(s.night),        sub: `${s.night_landings || 0} night ldg`, color: '#e3b341' },
+    { label: 'Instrument',  val: fmtHrs(s.instrument),   sub: 'sim instrument',          color: '#39d353' },
+  ];
+  document.getElementById('logbook-stats').innerHTML = tiles.map(t => `
+    <div class="card card-sm logbook-stat">
+      <div class="lbl">${t.label}</div>
+      <div class="val" style="color:${t.color}">${t.val}</div>
+      <div class="sub">${t.sub}</div>
+    </div>`).join('');
+  document.getElementById('fl-subtitle').textContent =
+    `· ${s.total_hours}h total · PPL training`;
+}
+
+function renderFlights(flights) {
+  if (!flights.length) {
+    document.getElementById('fl-list').innerHTML =
+      '<div style="padding:32px;text-align:center;color:var(--muted)">No flights logged yet.</div>';
+    return;
+  }
+
+  document.getElementById('fl-list').innerHTML = flights.map(f => {
+    const color = typeColor(f.training_type);
+    const id = f.id;
+    const solo_tag = f.solo > 0 && f.dual_given === 0 ? `<span class="type-badge" style="color:#db61a2;border-color:#db61a2;margin-left:6px">solo</span>` : '';
+    return `
+      <div class="fl-row" id="flr-${id}">
+        <div class="fl-summary" data-flid="${id}">
+          <span class="fl-type-dot" style="background:${color}"></span>
+          <div class="fl-info">
+            <div class="fl-route">
+              ${esc(routeLabel(f))}
+              <span class="type-badge" style="color:${color};border-color:${color};margin-left:6px">${esc(typeLabel(f.training_type))}</span>
+              ${solo_tag}
+            </div>
+            <div class="fl-date">${new Date(f.date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})} · ${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</div>
+          </div>
+          <div class="fl-kpis">
+            <div class="fl-kpi">
+              <div class="fl-kpi-v" style="color:${color}">${fmtHrs(f.total_duration)}</div>
+              <div class="fl-kpi-l">duration</div>
+            </div>
+            ${f.takeoffs > 0 ? `
+            <div class="fl-kpi">
+              <div class="fl-kpi-v">${f.takeoffs}/${f.landings}</div>
+              <div class="fl-kpi-l">T/O · Lnd</div>
+            </div>` : ''}
+            ${f.dual_given > 0 ? `
+            <div class="fl-kpi">
+              <div class="fl-kpi-v" style="color:#bc8cff">${fmtHrs(f.dual_given)}</div>
+              <div class="fl-kpi-l">dual</div>
+            </div>` : ''}
+          </div>
+          <i class="ph-bold ph-caret-down act-chevron" id="flchev-${id}"></i>
+        </div>
+        <div class="fl-detail" id="fldet-${id}">${buildFlightDetailHTML(f)}</div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.fl-summary').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = parseInt(row.dataset.flid);
+      const panel = document.getElementById('fldet-' + id);
+      const chev  = document.getElementById('flchev-' + id);
+      const rowEl = document.getElementById('flr-' + id);
+      const isOpen = panel.classList.contains('open');
+      // Close all others
+      document.querySelectorAll('.fl-detail.open').forEach(p => p.classList.remove('open'));
+      document.querySelectorAll('.act-chevron.open').forEach(c => c.classList.remove('open'));
+      document.querySelectorAll('.fl-row.active').forEach(r => r.classList.remove('active'));
+      if (!isOpen) {
+        panel.classList.add('open');
+        chev.classList.add('open');
+        rowEl.classList.add('active');
+        highlightFlight(id);
+      } else {
+        highlightFlight(null);
+      }
+    });
+  });
+}
+
+async function loadFlights() {
+  const [statsRes, flightsRes] = await Promise.allSettled([
+    fetch('/api/stats/logbook').then(r => r.ok ? r.json() : null),
+    fetch('/api/flights').then(r => r.ok ? r.json() : []),
+  ]);
+
+  const stats   = statsRes.status   === 'fulfilled' ? statsRes.value   : null;
+  const flights = flightsRes.status === 'fulfilled' ? flightsRes.value : [];
+
+  if (stats) renderLogbookStats(stats);
+  else {
+    document.getElementById('logbook-stats').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;padding:12px">Flight data unavailable</div>';
+  }
+
+  const list = Array.isArray(flights) ? flights : [];
+  if (list.length) initFlightMap(list);
+  else document.getElementById('flight-map').style.display = 'none';
+  renderFlights(list);
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 (async function main() {
   const [athlete, activities, weekly, daily] = await Promise.all([
@@ -826,6 +1171,16 @@ function renderActivities(activities) {
   buildZonesChart(acts[0]);
 
   renderActivities(acts);
+
+  // Flight log loads independently (DB may not be available on all deploys)
+  loadFlights().catch(err => {
+    console.warn('Flight log unavailable:', err.message);
+    document.getElementById('logbook-stats').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;padding:12px">Flight data unavailable — DB not connected</div>';
+    document.getElementById('flight-map').style.display = 'none';
+    document.getElementById('fl-list').innerHTML =
+      '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No flight data</div>';
+  });
 })().catch(err => {
   console.error(err);
   document.getElementById('act-list').innerHTML =

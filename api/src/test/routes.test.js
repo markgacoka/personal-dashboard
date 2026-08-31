@@ -210,6 +210,55 @@ describe('filterFrom — date filtering', () => {
   });
 });
 
+// ─── Flight log unit tests ────────────────────────────────────────────────────
+
+function fmtHrs(h) {
+  if (!h || h <= 0) return '—';
+  return parseFloat(h).toFixed(1) + 'h';
+}
+
+function routeLabel(f) {
+  const stops = [f.departure?.icao || f.departure_icao];
+  if (f.via && f.via.length) stops.push(...f.via);
+  stops.push(f.arrival?.icao || f.arrival_icao);
+  return stops.join(' → ');
+}
+
+describe('fmtHrs — flight hours formatting', () => {
+  test('zero/null returns em dash', () => {
+    assert.equal(fmtHrs(0),    '—');
+    assert.equal(fmtHrs(null), '—');
+  });
+  test('1.5 hours formats correctly', () => {
+    assert.equal(fmtHrs(1.5), '1.5h');
+  });
+  test('string coercion works', () => {
+    assert.equal(fmtHrs('3.2'), '3.2h');
+  });
+  test('rounds to one decimal', () => {
+    assert.equal(fmtHrs(1.05), '1.1h');
+  });
+});
+
+describe('routeLabel — flight route formatting', () => {
+  test('direct flight with no via', () => {
+    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KLVK' }, via: [] };
+    assert.equal(routeLabel(f), 'KSQL → KLVK');
+  });
+  test('flight with via stop', () => {
+    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KSQL' }, via: ['KLVK', 'KRHV'] };
+    assert.equal(routeLabel(f), 'KSQL → KLVK → KRHV → KSQL');
+  });
+  test('local pattern (same dep/arr)', () => {
+    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KSQL' }, via: [] };
+    assert.equal(routeLabel(f), 'KSQL → KSQL');
+  });
+  test('falls back to departure_icao string', () => {
+    const f = { departure_icao: 'KPAO', arrival_icao: 'KRHV', via: [] };
+    assert.equal(routeLabel(f), 'KPAO → KRHV');
+  });
+});
+
 // ─── Smoke tests — live API ──────────────────────────────────────────────────
 // Require network; skip gracefully if SKIP_SMOKE=1
 
@@ -255,13 +304,52 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
     assert.equal(status, 200, 'daily stats should return 200 even when some data is missing');
   });
 
-  test('Frontend index.html → 200 with correct title', async () => {
+  test('Frontend index.html → 200 with correct content', async () => {
     const r = await fetch(BASE + '/', { signal: AbortSignal.timeout(10000) });
     assert.equal(r.status, 200);
     const html = await r.text();
     assert.ok(html.includes('Gacoka'), 'page should contain athlete name');
-    assert.ok(html.includes('daisyui@4'), 'should reference DaisyUI v4');
-    assert.ok(html.includes('chart.js'), 'should reference Chart.js');
+    assert.ok(html.includes('apexcharts'), 'should reference ApexCharts');
+    assert.ok(html.includes('maplibre-gl'), 'should reference MapLibre GL');
     assert.ok(!html.includes('text/babel'), 'should NOT use Babel (which caused blank page)');
+    assert.ok(!html.includes('Ironman Trainee'), 'should NOT show Ironman Trainee subtitle');
+  });
+
+  test('GET /api/flights → 200 with array', async () => {
+    const { status, body } = await get('/api/flights');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body), 'should return array');
+    assert.ok(body.length >= 1, 'should have at least one flight');
+  });
+
+  test('GET /api/flights/:id → 200 with aircraft and airports', async () => {
+    const { body: flights } = await get('/api/flights');
+    const { status, body } = await get('/api/flights/' + flights[0].id);
+    assert.equal(status, 200);
+    assert.ok(body.aircraft?.tail_number, 'should have aircraft tail number');
+    assert.ok(body.departure?.icao, 'should have departure airport');
+    assert.ok(body.arrival?.icao, 'should have arrival airport');
+  });
+
+  test('GET /api/stats/logbook → 200 with totals', async () => {
+    const { status, body } = await get('/api/stats/logbook');
+    assert.equal(status, 200);
+    assert.ok(body.total_hours > 0, 'should have total hours > 0');
+    assert.ok(body.total_flights >= 1, 'should have at least one flight');
+    assert.ok(body.airports_visited >= 1, 'should have visited airports');
+  });
+
+  test('GET /api/aircraft → 200 with aircraft list', async () => {
+    const { status, body } = await get('/api/aircraft');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body) && body.length >= 1, 'should return aircraft');
+    assert.ok(body[0].tail_number, 'each aircraft should have tail_number');
+  });
+
+  test('GET /api/airports/KSQL → 200 with coordinates', async () => {
+    const { status, body } = await get('/api/airports/KSQL');
+    assert.equal(status, 200);
+    assert.ok(body.lat && body.lon, 'should have lat/lon');
+    assert.equal(body.icao, 'KSQL');
   });
 });

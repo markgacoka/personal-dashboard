@@ -8,6 +8,8 @@ import authRoutes from './routes/auth.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
+import flightRoutes from './routes/flights.js'
+import { migrate } from './db/migrate.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -42,6 +44,16 @@ await fastify.register(authRoutes)
 await fastify.register(athleteRoutes)
 await fastify.register(activitiesRoutes)
 await fastify.register(statsRoutes)
+
+if (process.env.DATABASE_URL) {
+  try {
+    await migrate()
+    fastify.log.info('DB migration complete')
+    await fastify.register(flightRoutes)
+  } catch (err) {
+    fastify.log.warn({ err }, 'DB unavailable — flight routes disabled')
+  }
+}
 
 // SPA fallback — serve index.html for any unmatched route
 fastify.setNotFoundHandler((req, reply) => {

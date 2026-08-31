@@ -3,19 +3,38 @@ import { pool } from '../db/client.js'
 const FLIGHT_SELECT = `
   SELECT
     f.id, f.date, f.via, f.training_type, f.total_duration,
-    f.dual_given, f.pic, f.solo, f.cross_country, f.night, f.instrument,
-    f.takeoffs, f.landings, f.night_takeoffs, f.night_landings,
-    f.remarks,
+    f.dual_given, f.dual_received, f.pic, f.sic, f.solo,
+    f.cross_country, f.night, f.actual_instrument, f.instrument AS simulated_instrument,
+    f.takeoffs, f.landings, f.day_takeoffs, f.day_landings_full_stop,
+    f.night_takeoffs, f.night_landings, f.night_landings_full_stop,
+    f.holds, f.distance_nm, f.hobbs_start, f.hobbs_end, f.tach_start, f.tach_end,
+    f.time_out, f.time_in, f.flight_review, f.checkride, f.ipc,
+    f.ground_training, f.simulated_flight, f.foreflight_source,
+    f.remarks, f.instructor_comments,
+    EXISTS(SELECT 1 FROM track_log_points tlp WHERE tlp.flight_id = f.id) AS has_track,
     row_to_json(dep) AS departure,
     row_to_json(arr) AS arrival,
     json_build_object(
       'id', ac.id, 'tail_number', ac.tail_number,
       'make', ac.make, 'model', ac.model, 'year', ac.year,
+      'type_code', ac.type_code, 'category', ac.category,
+      'aircraft_class', ac.aircraft_class, 'gear_type', ac.gear_type,
       'engine_type', ac.engine_type, 'engine_hp', ac.engine_hp,
       'seats', ac.seats, 'ifr_equipped', ac.ifr_equipped,
+      'is_complex', ac.is_complex, 'is_high_performance', ac.is_high_performance,
       'glass_cockpit', ac.glass_cockpit, 'notes', ac.notes
     ) AS aircraft,
-    i.name AS instructor_name
+    i.name AS instructor_name,
+    COALESCE(
+      (SELECT json_agg(json_build_object(
+        'approach_type', ap.approach_type,
+        'airport_icao', ap.airport_icao,
+        'runway', ap.runway,
+        'circle_to_land', ap.circle_to_land
+      ) ORDER BY ap.id)
+      FROM approaches ap WHERE ap.flight_id = f.id),
+      '[]'::json
+    ) AS approaches
   FROM flights f
   JOIN airports dep ON dep.icao = f.departure_icao
   JOIN airports arr ON arr.icao = f.arrival_icao
@@ -93,17 +112,24 @@ export default async function flightRoutes(fastify) {
   fastify.get('/api/stats/logbook', async () => {
     const { rows } = await pool.query(`
       SELECT
-        COUNT(*)::int                   AS total_flights,
-        ROUND(SUM(total_duration)::numeric, 1)  AS total_hours,
-        ROUND(SUM(dual_given)::numeric, 1)      AS dual_given,
-        ROUND(SUM(pic)::numeric, 1)             AS pic,
-        ROUND(SUM(solo)::numeric, 1)            AS solo,
-        ROUND(SUM(cross_country)::numeric, 1)   AS cross_country,
-        ROUND(SUM(night)::numeric, 1)           AS night,
-        ROUND(SUM(instrument)::numeric, 1)      AS instrument,
-        SUM(takeoffs)::int               AS total_takeoffs,
-        SUM(landings)::int               AS total_landings,
-        SUM(night_landings)::int         AS night_landings
+        COUNT(*)::int                                    AS total_flights,
+        ROUND(SUM(total_duration)::numeric, 1)           AS total_hours,
+        ROUND(SUM(dual_given)::numeric, 1)               AS dual_given,
+        ROUND(COALESCE(SUM(dual_received),0)::numeric,1) AS dual_received,
+        ROUND(SUM(pic)::numeric, 1)                      AS pic,
+        ROUND(COALESCE(SUM(sic),0)::numeric, 1)          AS sic,
+        ROUND(SUM(solo)::numeric, 1)                     AS solo,
+        ROUND(SUM(cross_country)::numeric, 1)            AS cross_country,
+        ROUND(SUM(night)::numeric, 1)                    AS night,
+        ROUND(COALESCE(SUM(actual_instrument),0)::numeric,1) AS actual_instrument,
+        ROUND(SUM(instrument)::numeric, 1)               AS simulated_instrument,
+        ROUND(COALESCE(SUM(ground_training),0)::numeric,1)  AS ground_training,
+        SUM(takeoffs)::int                               AS total_takeoffs,
+        SUM(landings)::int                               AS total_landings,
+        SUM(night_landings)::int                         AS night_landings,
+        SUM(holds)::int                                  AS total_holds,
+        (SELECT COUNT(*)::int FROM approaches)           AS total_approaches,
+        (SELECT COUNT(*)::int FROM flights WHERE flight_review=true OR checkride=true) AS certificates
       FROM flights
     `)
     const { rows: visited } = await pool.query(`

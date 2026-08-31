@@ -1,5 +1,65 @@
 import { pool } from './client.js'
 
+// V2 migration: additive ForeFlight-aligned columns
+const SCHEMA_V2 = `
+-- Aircraft: ForeFlight classification fields
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS type_code         TEXT;
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS category          TEXT DEFAULT 'Airplane';
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS aircraft_class    TEXT DEFAULT 'ASEL';
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS gear_type         TEXT DEFAULT 'fixed_tricycle';
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS is_complex        BOOLEAN DEFAULT false;
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS is_high_performance BOOLEAN DEFAULT false;
+ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS is_pressurized    BOOLEAN DEFAULT false;
+
+-- Flights: ForeFlight logbook fields
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS sic                REAL DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS time_out           TEXT;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS time_in            TEXT;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS on_duty            TEXT;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS off_duty           TEXT;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS distance_nm        REAL;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS day_takeoffs       INTEGER DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS day_landings_full_stop   INTEGER DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS night_landings_full_stop INTEGER DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS actual_instrument  REAL DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS hobbs_start        REAL;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS hobbs_end          REAL;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS tach_start         REAL;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS tach_end           REAL;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS holds              INTEGER DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS dual_received      REAL DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS simulated_flight   REAL DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS ground_training    REAL DEFAULT 0;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS instructor_comments TEXT;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS flight_review      BOOLEAN DEFAULT false;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS checkride          BOOLEAN DEFAULT false;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS ipc                BOOLEAN DEFAULT false;
+ALTER TABLE flights ADD COLUMN IF NOT EXISTS foreflight_source  TEXT;
+
+-- Approach table: one row per approach per flight
+CREATE TABLE IF NOT EXISTS approaches (
+  id             SERIAL PRIMARY KEY,
+  flight_id      INTEGER REFERENCES flights(id) ON DELETE CASCADE,
+  approach_type  TEXT,
+  airport_icao   TEXT,
+  runway         TEXT,
+  circle_to_land BOOLEAN DEFAULT false
+);
+
+-- Track log GPS points
+CREATE TABLE IF NOT EXISTS track_log_points (
+  id             SERIAL PRIMARY KEY,
+  flight_id      INTEGER REFERENCES flights(id) ON DELETE CASCADE,
+  ts             TIMESTAMPTZ NOT NULL,
+  lat            REAL NOT NULL,
+  lon            REAL NOT NULL,
+  altitude_ft    INTEGER,
+  groundspeed_kts INTEGER,
+  track_deg      INTEGER,
+  vertical_speed_fpm INTEGER
+);
+`
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS airports (
   icao TEXT PRIMARY KEY,
@@ -80,6 +140,8 @@ const AIRCRAFT_SEED = [
     engine_hp: 180, seats: 4,
     ifr_equipped: true, glass_cockpit: false,
     notes: 'G1000 not installed. Vx=59kt, Vy=74kt, Va=105kt. IFR certified, dual VOR/GPS.',
+    type_code: 'C172', category: 'Airplane', aircraft_class: 'ASEL',
+    gear_type: 'fixed_tricycle', is_complex: false, is_high_performance: false, is_pressurized: false,
   },
   {
     tail_number: 'N4786H',
@@ -88,6 +150,8 @@ const AIRCRAFT_SEED = [
     engine_hp: 160, seats: 4,
     ifr_equipped: false, glass_cockpit: false,
     notes: 'Warrior II. VSO=49kt, VS=55kt, VX=63kt, VY=79kt. Used for instrument ground reference.',
+    type_code: 'PA28', category: 'Airplane', aircraft_class: 'ASEL',
+    gear_type: 'fixed_tricycle', is_complex: false, is_high_performance: false, is_pressurized: false,
   },
 ]
 
@@ -175,6 +239,30 @@ export async function migrate() {
   } catch (err) {
     await client.query('ROLLBACK')
     throw err
+  } finally {
+    client.release()
+  }
+}
+
+export async function migrateV2() {
+  const client = await pool.connect()
+  try {
+    // Run each ALTER TABLE statement individually (can't batch IF NOT EXISTS in one transaction easily)
+    const stmts = SCHEMA_V2.split(';').map(s => s.trim()).filter(s => s && !s.startsWith('--'))
+    for (const stmt of stmts) {
+      await client.query(stmt)
+    }
+    // Backfill ForeFlight classification fields on existing aircraft rows
+    for (const ac of AIRCRAFT_SEED) {
+      await client.query(
+        `UPDATE aircraft SET
+           type_code=$1, category=$2, aircraft_class=$3, gear_type=$4,
+           is_complex=$5, is_high_performance=$6, is_pressurized=$7
+         WHERE tail_number=$8 AND type_code IS NULL`,
+        [ac.type_code, ac.category, ac.aircraft_class, ac.gear_type,
+         ac.is_complex, ac.is_high_performance, ac.is_pressurized, ac.tail_number]
+      )
+    }
   } finally {
     client.release()
   }

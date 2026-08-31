@@ -898,17 +898,26 @@ function routeLabel(f) {
 
 function buildFlightDetailHTML(f) {
   const metrics = [
-    ['Total',     fmtHrs(f.total_duration), '#e6edf3'],
-    ['Dual',      fmtHrs(f.dual_given),     '#bc8cff'],
-    ['PIC',       fmtHrs(f.pic),            '#3fb950'],
-    ['Solo',      fmtHrs(f.solo),           '#db61a2'],
-    ['X-Country', fmtHrs(f.cross_country),  '#58a6ff'],
-    ['Night',     fmtHrs(f.night),          '#e3b341'],
-    ['Instrument',fmtHrs(f.instrument),     '#39d353'],
-    ['Takeoffs',  f.takeoffs || '—',        null],
-    ['Landings',  f.landings || '—',        null],
-    ['Night T/O', f.night_takeoffs || '—',  '#e3b341'],
-    ['Night Lnd', f.night_landings || '—',  '#e3b341'],
+    ['Total',       fmtHrs(f.total_duration),   '#e6edf3'],
+    ['Dual Given',  fmtHrs(f.dual_given),        '#bc8cff'],
+    ['Dual Rcvd',   fmtHrs(f.dual_received),     '#bc8cff'],
+    ['PIC',         fmtHrs(f.pic),               '#3fb950'],
+    ['SIC',         fmtHrs(f.sic),               '#8b949e'],
+    ['Solo',        fmtHrs(f.solo),              '#db61a2'],
+    ['X-Country',   fmtHrs(f.cross_country),     '#58a6ff'],
+    ['Night',       fmtHrs(f.night),             '#e3b341'],
+    ['Act Inst',    fmtHrs(f.actual_instrument), '#39d353'],
+    ['Sim Inst',    fmtHrs(f.simulated_instrument), '#39d353'],
+    ['Gnd Train',   fmtHrs(f.ground_training),   '#8b949e'],
+    ['Sim Flight',  fmtHrs(f.simulated_flight),  '#8b949e'],
+    ['Day T/O',     f.day_takeoffs || '—',        null],
+    ['Day Lnd',     f.day_landings_full_stop || '—', null],
+    ['Night T/O',   f.night_takeoffs || '—',      '#e3b341'],
+    ['Night Lnd',   f.night_landings_full_stop || '—', '#e3b341'],
+    ['Holds',       f.holds || '—',               '#58a6ff'],
+    ['Distance',    f.distance_nm ? f.distance_nm.toFixed(0) + ' nm' : '—', null],
+    ['Hobbs',       (f.hobbs_start && f.hobbs_end) ? `${f.hobbs_start}→${f.hobbs_end}` : '—', null],
+    ['Tach',        (f.tach_start && f.tach_end)   ? `${f.tach_start}→${f.tach_end}`   : '—', null],
   ].filter(([,v]) => v && v !== '—');
 
   const ac = f.aircraft;
@@ -940,6 +949,24 @@ function buildFlightDetailHTML(f) {
         </div>`).join('')}
     </div>
     ${f.instructor_name ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px"><i class="ph-bold ph-user"></i> ${esc(f.instructor_name)}</div>` : ''}
+    ${(f.approaches && f.approaches.length) ? `
+      <div style="margin-bottom:10px">
+        <div class="section-title" style="margin-bottom:6px">Approaches</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${f.approaches.map(ap => `
+            <span class="type-badge" style="color:#39d353;border-color:#39d353;font-size:11px">
+              ${esc(ap.approach_type)} ${ap.runway ? 'Rwy '+esc(ap.runway) : ''} ${esc(ap.airport_icao||'')}${ap.circle_to_land?' C/L':''}
+            </span>`).join('')}
+        </div>
+      </div>` : ''}
+    ${(f.flight_review || f.checkride || f.ipc) ? `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        ${f.flight_review ? '<span class="type-badge" style="color:#e3b341;border-color:#e3b341">Flight Review</span>' : ''}
+        ${f.checkride    ? '<span class="type-badge" style="color:#3fb950;border-color:#3fb950">Checkride</span>' : ''}
+        ${f.ipc          ? '<span class="type-badge" style="color:#58a6ff;border-color:#58a6ff">IPC</span>' : ''}
+      </div>` : ''}
+    ${f.foreflight_source ? '<div style="font-size:10px;color:var(--subtle);margin-bottom:4px">· imported from ForeFlight</div>' : ''}
+    ${f.instructor_comments ? `<div class="desc-note" style="margin-bottom:8px"><strong>CFI notes:</strong> ${esc(f.instructor_comments)}</div>` : ''}
     ${remarksHTML}`;
 }
 
@@ -958,20 +985,29 @@ function initFlightMap(flights) {
   _flightMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
   _flightMap.on('load', () => {
-    // Build route features
-    const features = flights.map(f => {
-      const coords = [];
-      const dep = f.departure;
-      if (dep) coords.push([dep.lon, dep.lat]);
-      if (f.via_airports) for (const a of f.via_airports) { if (a.lon) coords.push([a.lon, a.lat]); }
-      const arr = f.arrival;
-      if (arr) coords.push([arr.lon, arr.lat]);
+    // Build route features (use actual GPS track if available, else straight lines)
+    const features = await Promise.all(flights.map(async f => {
+      let coords = [];
+      if (f.has_track) {
+        try {
+          const pts = await fetch('/api/flights/' + f.id + '/track').then(r => r.ok ? r.json() : []);
+          coords = pts.map(p => [p.lon, p.lat]);
+        } catch (_) {}
+      }
+      if (coords.length < 2) {
+        const dep = f.departure;
+        if (dep) coords.push([dep.lon, dep.lat]);
+        if (f.via_airports) for (const a of f.via_airports) { if (a.lon) coords.push([a.lon, a.lat]); }
+        const arr = f.arrival;
+        if (arr) coords.push([arr.lon, arr.lat]);
+      }
       return {
         type: 'Feature',
-        properties: { id: f.id, type: f.training_type, color: typeColor(f.training_type) },
+        properties: { id: f.id, type: f.training_type, color: typeColor(f.training_type), has_track: f.has_track },
         geometry: { type: 'LineString', coordinates: coords },
       };
-    }).filter(f => f.geometry.coordinates.length >= 2);
+    }));
+    const validFeatures = features.filter(f => f.geometry.coordinates.length >= 2);
 
     // Airport markers
     const aptSet = {};
@@ -987,7 +1023,7 @@ function initFlightMap(flights) {
       geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
     }));
 
-    _flightMap.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+    _flightMap.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: validFeatures } });
     _flightMap.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: aptFeatures } });
 
     // Route lines (inactive)

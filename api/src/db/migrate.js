@@ -248,7 +248,7 @@ export async function migrateV2() {
   const client = await pool.connect()
   try {
     // Run each ALTER TABLE statement individually (can't batch IF NOT EXISTS in one transaction easily)
-    const stmts = SCHEMA_V2.split(';').map(s => s.trim()).filter(s => s && !s.startsWith('--'))
+    const stmts = SCHEMA_V2.split(';').map(s => s.replace(/--[^\n]*/g, '').trim()).filter(s => s.length > 0)
     for (const stmt of stmts) {
       await client.query(stmt)
     }

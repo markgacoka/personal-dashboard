@@ -1,8 +1,8 @@
 import { garmin } from '../services/garmin.js'
 
-function weekStart() {
+function daysAgo(n) {
   const d = new Date()
-  d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1))
+  d.setDate(d.getDate() - n)
   d.setHours(0, 0, 0, 0)
   return d
 }
@@ -34,17 +34,38 @@ function filterFrom(activities, since) {
   return activities.filter((a) => new Date(a.startTimeLocal) >= since)
 }
 
+async function fetchDailyForDate(dateStr) {
+  const d = new Date(dateStr)
+  const [stepsR, hrR, sleepR] = await Promise.allSettled([
+    garmin((gc) => gc.getSteps(d)),
+    garmin((gc) => gc.getHeartRate(d)),
+    garmin((gc) => gc.getSleepData(d)),
+  ])
+  const steps      = stepsR.status === 'fulfilled' ? stepsR.value : null
+  const heart_rate = hrR.status    === 'fulfilled' ? hrR.value    : null
+  const sleep      = sleepR.status === 'fulfilled' ? sleepR.value : null
+  return { date: dateStr, steps, heart_rate, sleep }
+}
+
+function hasData(daily) {
+  return (
+    daily.steps ||
+    daily.heart_rate?.restingHeartRate ||
+    daily.sleep?.dailySleepDTO?.sleepTimeSeconds
+  )
+}
+
 export default async function statsRoutes(fastify) {
-  // Garmin user profile with all-time stats
   fastify.get('/api/stats', async () => {
     return garmin((gc) => gc.getUserProfile())
   })
 
+  // 7-day rolling window so Monday doesn't show empty
   fastify.get('/api/stats/weekly', async () => {
-    const from = weekStart()
+    const from = daysAgo(7)
     const all = await garmin((gc) => gc.getActivities(0, 100))
     const activities = filterFrom(all, from)
-    return { period: 'week', from: from.toISOString(), by_sport: aggregate(activities), total_count: activities.length }
+    return { period: 'last_7_days', from: from.toISOString(), by_sport: aggregate(activities), total_count: activities.length }
   })
 
   fastify.get('/api/stats/monthly', async () => {
@@ -54,23 +75,20 @@ export default async function statsRoutes(fastify) {
     return { period: 'month', from: from.toISOString(), by_sport: aggregate(activities), total_count: activities.length }
   })
 
-  // Daily wellness snapshot (steps, HR, sleep) — individual calls degrade gracefully
+  // Auto-fallback: tries today, then yesterday, then day before
   fastify.get('/api/stats/daily', async (req) => {
-    const date = req.query.date ?? new Date().toISOString().slice(0, 10)
-    const [stepsR, hrR, sleepR] = await Promise.allSettled([
-      garmin((gc) => gc.getSteps(new Date(date))),
-      garmin((gc) => gc.getHeartRate(new Date(date))),
-      garmin((gc) => gc.getSleepData(new Date(date))),
-    ])
-    return {
-      date,
-      steps:      stepsR.status === 'fulfilled' ? stepsR.value : null,
-      heart_rate: hrR.status    === 'fulfilled' ? hrR.value    : null,
-      sleep:      sleepR.status === 'fulfilled' ? sleepR.value : null,
+    if (req.query.date) {
+      return fetchDailyForDate(req.query.date)
     }
+    for (let offset = 0; offset <= 2; offset++) {
+      const dateStr = daysAgo(offset).toISOString().slice(0, 10)
+      const result = await fetchDailyForDate(dateStr)
+      if (hasData(result)) return result
+    }
+    const dateStr = daysAgo(0).toISOString().slice(0, 10)
+    return fetchDailyForDate(dateStr)
   })
 
-  // HRV status (Garmin-specific, requires compatible device)
   fastify.get('/api/stats/hrv', async (req) => {
     const date = req.query.date ?? new Date().toISOString().slice(0, 10)
     return garmin((gc) => gc.getHrvData(new Date(date)))

@@ -984,7 +984,7 @@ function initFlightMap(flights) {
   _flightMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   _flightMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
-  _flightMap.on('load', () => {
+  _flightMap.on('load', async () => {
     // Build route features (use actual GPS track if available, else straight lines)
     const features = await Promise.all(flights.map(async f => {
       let coords = [];

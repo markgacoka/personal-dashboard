@@ -54,15 +54,20 @@ export default async function statsRoutes(fastify) {
     return { period: 'month', from: from.toISOString(), by_sport: aggregate(activities), total_count: activities.length }
   })
 
-  // Daily wellness snapshot (steps, calories, stress, body battery)
+  // Daily wellness snapshot (steps, HR, sleep) — individual calls degrade gracefully
   fastify.get('/api/stats/daily', async (req) => {
     const date = req.query.date ?? new Date().toISOString().slice(0, 10)
-    const [steps, hr, sleep] = await Promise.all([
+    const [stepsR, hrR, sleepR] = await Promise.allSettled([
       garmin((gc) => gc.getSteps(new Date(date))),
       garmin((gc) => gc.getHeartRate(new Date(date))),
       garmin((gc) => gc.getSleepData(new Date(date))),
     ])
-    return { date, steps, heart_rate: hr, sleep }
+    return {
+      date,
+      steps:      stepsR.status === 'fulfilled' ? stepsR.value : null,
+      heart_rate: hrR.status    === 'fulfilled' ? hrR.value    : null,
+      sleep:      sleepR.status === 'fulfilled' ? sleepR.value : null,
+    }
   })
 
   // HRV status (Garmin-specific, requires compatible device)

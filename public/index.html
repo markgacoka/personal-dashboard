@@ -784,6 +784,168 @@
     }
     .ap-rm:hover { color: var(--warn); border-color: var(--warn); }
 
+    /* ── Modal ───────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: oklch(4% 0.004 95 / 0.7);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(3px);
+      animation: mo-fade 0.15s ease;
+    }
+    @keyframes mo-fade { from { opacity: 0 } to { opacity: 1 } }
+    .modal-box {
+      background: var(--raised); border: 1px solid var(--rule);
+      border-radius: var(--r-lg); width: 100%; max-width: 840px;
+      max-height: 92vh; display: flex; flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 28px 72px oklch(0% 0 0 / 0.45);
+      animation: mo-up 0.18s ease;
+    }
+    @keyframes mo-up { from { transform: translateY(14px); opacity: 0.6 } to { transform: none; opacity: 1 } }
+    .modal-hd {
+      display: flex; align-items: center; gap: 12px;
+      padding: 15px 20px; flex-shrink: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .modal-title {
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 18px; font-weight: 300; letter-spacing: 0.01em;
+      color: var(--champagne); flex: 1;
+    }
+    .modal-close {
+      background: none; border: 1px solid var(--rule); color: var(--faint);
+      border-radius: var(--r-sm); width: 28px; height: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .modal-close:hover { color: var(--body-text); border-color: var(--muted); }
+    .modal-steps {
+      display: flex; align-items: center; gap: 0;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--rule);
+      flex-shrink: 0; overflow-x: auto;
+    }
+    .ms-tab {
+      font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+      color: var(--disabled); padding: 10px 16px;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .ms-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .ms-tab.done   { color: var(--muted); cursor: pointer; }
+    .ms-tab.done:hover { color: var(--body-text); }
+    .modal-bd {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 24px;
+    }
+    .modal-ft {
+      padding: 14px 24px; border-top: 1px solid var(--rule);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+
+    /* aircraft enrichment card */
+    .ac-enrich {
+      background: var(--graphite); border: 1px solid var(--rule-strong);
+      border-radius: var(--r-sm); padding: 14px 18px; margin-top: 14px;
+    }
+    .ac-enrich-title {
+      font-size: 14px; font-weight: 600; color: var(--patina-text);
+      margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .ac-enrich-specs {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
+      gap: 5px 16px; font-size: 12px;
+    }
+    .ac-spec-k { color: var(--faint); }
+    .ac-spec-v { color: var(--body-text); font-weight: 500; }
+
+    /* info cards (airport + weather) */
+    .info-strip {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+      gap: 12px; margin-top: 12px;
+    }
+    .info-card {
+      background: var(--graphite); border: 1px solid var(--rule);
+      border-radius: var(--r-sm); padding: 12px 16px;
+    }
+    .info-card-hd {
+      font-size: 10px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--faint);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .info-card-icao {
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 22px; font-weight: 400; color: var(--champagne); line-height: 1;
+    }
+    .info-card-name { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .info-card-meta { font-size: 11px; color: var(--faint); margin-top: 5px; line-height: 1.5; }
+    .metar-raw {
+      font-size: 11px; font-family: 'Courier New', monospace;
+      color: var(--muted); line-height: 1.5; word-break: break-all;
+      background: var(--raised); border-radius: var(--r-xs);
+      padding: 6px 8px; margin-top: 8px;
+    }
+    .metar-decoded { font-size: 12px; color: var(--body-text); margin-top: 5px; line-height: 1.5; }
+
+    /* flight preview list (step 2) */
+    #modal-preview-map {
+      height: 240px; border-radius: var(--r-md); overflow: hidden;
+      border: 1px solid var(--rule); margin-bottom: 14px;
+    }
+    .fpl { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; }
+    .fpl-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--rule);
+      transition: background 0.15s; position: relative;
+    }
+    .fpl-item:last-child { border-bottom: none; }
+    .fpl-item:hover, .fpl-item.sel { background: var(--graphite); }
+    .fpl-item::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: 2px; background: var(--gold); opacity: 0; transition: opacity 0.15s;
+    }
+    .fpl-item:hover::before, .fpl-item.sel::before { opacity: 1; }
+    .fpl-route { font-size: 14px; font-weight: 600; color: var(--champagne); }
+    .fpl-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .fpl-new {
+      display: flex; align-items: center; gap: 8px; padding: 13px 16px;
+      cursor: pointer; color: var(--patina-text); font-size: 13px;
+      transition: background 0.15s;
+    }
+    .fpl-new:hover { background: var(--graphite); }
+
+    /* logbook row action buttons */
+    .row-actions {
+      display: flex; gap: 4px; flex-shrink: 0;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .fl-row:hover .row-actions { opacity: 1; }
+    .row-btn {
+      background: none; border: 1px solid var(--rule); color: var(--faint);
+      border-radius: var(--r-sm); width: 27px; height: 27px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 12px;
+      transition: color 0.15s, border-color 0.15s; flex-shrink: 0;
+    }
+    .row-btn:hover { color: var(--body-text); border-color: var(--muted); }
+    .row-btn.danger:hover { color: var(--warn); border-color: var(--warn); }
+    .row-confirm {
+      display: flex; align-items: center; gap: 6px;
+      padding: 2px 0; flex-shrink: 0;
+    }
+    .row-confirm-label { font-size: 12px; color: var(--warn); white-space: nowrap; }
+
+    @media (max-width: 640px) {
+      .modal-overlay { padding: 0; align-items: flex-end; }
+      .modal-box { max-height: 96vh; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+      .modal-bd { padding: 16px; }
+      .modal-ft { padding: 12px 16px; }
+      .ac-enrich-specs { grid-template-columns: repeat(2,1fr); }
+      .info-strip { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr !important; }
+      .row-actions { opacity: 1; }
+    }
+
     @media (max-width: 700px) {
       .fl-kpis, .act-kpis { display: none; }
       .sidebar { width: 52px; }
@@ -832,10 +994,6 @@
         <div class="sb-item" data-view="logbook">
           <i class="ph-bold ph-book-open"></i>
           <span class="sb-lbl">Logbook</span>
-        </div>
-        <div class="sb-item" data-view="log-flight">
-          <i class="ph-bold ph-note-pencil"></i>
-          <span class="sb-lbl">Log Flight</span>
         </div>
       </div>
     </div>
@@ -927,7 +1085,7 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Flight Log</span>
             <span id="fl-subtitle" class="data-note" style="flex:1"></span>
-            <button class="btn-primary" onclick="navigate('log-flight')" style="padding:6px 14px;font-size:12px">
+            <button class="btn-primary" onclick="openFlightModal()" style="padding:6px 14px;font-size:12px">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
           </div>
@@ -954,6 +1112,28 @@
   </div><!-- /main-wrap -->
 
 </div><!-- /app-shell -->
+
+<!-- ─── FLIGHT MODAL ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="flight-modal-overlay" style="display:none"
+     onclick="if(event.target===this)closeFlightModal()">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-title" id="modal-title">Log Flight</span>
+      <button class="modal-close" onclick="closeFlightModal()" title="Close (Esc)">
+        <i class="ph-bold ph-x"></i>
+      </button>
+    </div>
+    <div class="modal-steps" id="modal-steps" style="display:none">
+      <div class="ms-tab active" id="mstab-1">1 · Route &amp; Aircraft</div>
+      <div class="ms-tab" id="mstab-2">2 · Select Flight</div>
+      <div class="ms-tab" id="mstab-3">3 · Details</div>
+    </div>
+    <div class="modal-bd" id="modal-bd">
+      <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+    </div>
+    <div class="modal-ft" id="modal-ft" style="display:none"></div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -1655,6 +1835,14 @@ function renderFlights(flights) {
             <div class="fl-kpi-l">dual rcvd</div>
           </div>` : ''}
         </div>
+        <div class="row-actions" id="ra-${id}">
+          <button class="row-btn" title="Edit" onclick="event.stopPropagation();openFlightModal('${id}')">
+            <i class="ph-bold ph-pencil-simple"></i>
+          </button>
+          <button class="row-btn danger" title="Delete" onclick="event.stopPropagation();rowConfirmDelete('${id}')">
+            <i class="ph-bold ph-trash"></i>
+          </button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1744,7 +1932,7 @@ async function showFlightDetail(id) {
         </div>`).join('')}
       </div>
       <div id="flight-action-area" style="display:flex;gap:8px;margin-top:20px">
-        <button class="btn-ghost" onclick="navigate('log-flight','${f.id}')" style="font-size:12px;padding:6px 12px">
+        <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:6px 12px">
           <i class="ph-bold ph-pencil-simple"></i> Edit
         </button>
         <button class="btn-ghost" id="delete-flight-btn" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:6px 12px">
@@ -1875,6 +2063,37 @@ async function initFlightDetailMap(f) {
       _fdMap.on('mouseleave', 'apts-dot', () => _fdMap.getCanvas().style.cursor = '');
     }
   });
+}
+
+// ─── row-level delete (logbook list) ─────────────────────────────────────────
+function rowConfirmDelete(id) {
+  const area = document.getElementById('ra-' + id);
+  if (!area) return;
+  area.style.opacity = '1';
+  area.innerHTML = `
+    <div class="row-confirm">
+      <span class="row-confirm-label">Delete?</span>
+      <button class="row-btn danger" title="Confirm delete"
+        onclick="event.stopPropagation();rowDoDelete('${id}',this)">
+        <i class="ph-bold ph-check"></i>
+      </button>
+      <button class="row-btn" title="Cancel"
+        onclick="event.stopPropagation();renderFlights(window._flights)">
+        <i class="ph-bold ph-x"></i>
+      </button>
+    </div>`;
+}
+
+async function rowDoDelete(id, btn) {
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/flights/' + id, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    window._flights = (window._flights || []).filter(f => String(f.id) !== String(id));
+    await loadFlights();
+  } catch(e) {
+    renderFlights(window._flights); // reset row
+  }
 }
 
 // ─── flight delete ────────────────────────────────────────────────────────────
@@ -2273,6 +2492,806 @@ document.addEventListener('click', e => {
     if (icon) icon.textContent = open ? '▸ expand' : '▾ collapse';
   }
 });
+
+// ─── flight modal ─────────────────────────────────────────────────────────────
+const _m = { step:0, editId:null, aircraft:null, date:null, dep:null, previewMap:null };
+
+function openFlightModal(editId = null) {
+  _m.editId = editId ? String(editId) : null;
+  _m.aircraft = null; _m.date = null; _m.dep = null;
+  if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
+  document.getElementById('flight-modal-overlay').style.display = 'flex';
+  document.getElementById('modal-title').textContent = editId ? 'Edit Flight' : 'Log Flight';
+  if (editId) {
+    const f = (window._flights||[]).find(f=>String(f.id)===String(editId));
+    if (f) { _m.aircraft = f.aircraft; _m.date = f.date; _m.dep = f.departure?.icao||''; }
+    showModalSteps(3);
+    renderModalStep3(f || null);
+  } else {
+    showModalSteps(0);
+    renderModalStep1();
+  }
+}
+
+function closeFlightModal() {
+  document.getElementById('flight-modal-overlay').style.display = 'none';
+  if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeFlightModal(); });
+
+function showModalSteps(active) {
+  const el = document.getElementById('modal-steps');
+  el.style.display = active > 0 ? 'flex' : 'none';
+  [1,2,3].forEach(i => {
+    const t = document.getElementById('mstab-'+i);
+    if (!t) return;
+    t.className = 'ms-tab' + (i===active?' active':i<active?' done':'');
+  });
+  if (active > 0) {
+    document.getElementById('mstab-1').onclick = active>1 ? ()=>renderModalStep1() : null;
+    document.getElementById('mstab-2').onclick = active>2 ? ()=>renderModalStep2FromCache() : null;
+  }
+}
+
+// Step 1 ──────────────────────────────────────────────────────────────────────
+function renderModalStep1() {
+  _m.step = 1; showModalSteps(1);
+  document.getElementById('modal-ft').style.display = 'none';
+  const typeOpts = Object.entries(TYPE_CFG).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join('');
+  document.getElementById('modal-bd').innerHTML = `
+    <div class="section-label" style="margin-bottom:18px">Route &amp; Aircraft</div>
+    <div class="form-grid" style="grid-template-columns:160px 1fr 120px;align-items:start">
+      <div class="form-field">
+        <label class="form-label" for="ms-date">Date</label>
+        <input class="form-input" type="date" id="ms-date" value="${new Date().toISOString().slice(0,10)}">
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="ms-tail">
+          Tail Number
+          <span id="ms-tail-status" style="margin-left:6px;text-transform:none;letter-spacing:0;font-weight:400;font-size:11px;color:var(--faint)"></span>
+        </label>
+        <input class="form-input" type="text" id="ms-tail" placeholder="N5624H" maxlength="8"
+          autocomplete="off" style="text-transform:uppercase">
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="ms-dep">Departure</label>
+        <input class="form-input" type="text" id="ms-dep" placeholder="KSQL" maxlength="6"
+          style="text-transform:uppercase">
+      </div>
+    </div>
+    <div id="ms-ac-card" style="margin-top:14px"></div>
+    <div style="margin-top:24px;display:flex;gap:10px;align-items:center">
+      <button class="btn-primary" id="ms-continue" onclick="onStep1Continue()" disabled>
+        Continue <i class="ph-bold ph-arrow-right"></i>
+      </button>
+      <button class="btn-ghost" onclick="closeFlightModal()">Cancel</button>
+    </div>`;
+
+  let tailTimer;
+  document.getElementById('ms-tail').addEventListener('input', e => {
+    clearTimeout(tailTimer);
+    tailTimer = setTimeout(()=>onTailLookup(e.target.value.trim().toUpperCase()), 450);
+    updateStep1Btn();
+  });
+  ['ms-dep','ms-date'].forEach(id => document.getElementById(id)?.addEventListener('input', updateStep1Btn));
+}
+
+function updateStep1Btn() {
+  const tail = document.getElementById('ms-tail')?.value?.trim();
+  const dep  = document.getElementById('ms-dep')?.value?.trim();
+  const date = document.getElementById('ms-date')?.value;
+  const btn  = document.getElementById('ms-continue');
+  if (btn) btn.disabled = !(tail && dep && date && _m.aircraft);
+}
+
+let _tailCache = {};
+async function onTailLookup(tail) {
+  if (!tail || tail.length < 3) {
+    _m.aircraft = null;
+    document.getElementById('ms-ac-card').innerHTML = '';
+    updateStep1Btn();
+    return;
+  }
+  const status = document.getElementById('ms-tail-status');
+  if (!status) return;
+  status.innerHTML = '<span class="spinner" style="width:10px;height:10px;vertical-align:middle;display:inline-block"></span>';
+
+  if (_tailCache[tail]) {
+    _m.aircraft = _tailCache[tail];
+    status.textContent = '✓'; status.style.color = 'var(--run)';
+    renderAircraftEnrichCard(_m.aircraft);
+    updateStep1Btn(); return;
+  }
+
+  // 1. Internal DB
+  const allAc = await fetch('/api/aircraft').then(r=>r.ok?r.json():[]).catch(()=>[]);
+  const found = allAc.find(a=>a.tail_number.toUpperCase()===tail);
+  if (found) {
+    _m.aircraft = _tailCache[tail] = found;
+    status.textContent = '✓ in logbook'; status.style.color = 'var(--run)';
+    renderAircraftEnrichCard(found);
+    updateStep1Btn(); return;
+  }
+
+  // 2. FAA registry via proxy
+  status.textContent = 'Searching FAA registry…'; status.style.color = 'var(--faint)';
+  try {
+    const reg = await fetch('/api/external/aircraft/'+encodeURIComponent(tail)).then(r=>r.ok?r.json():null).catch(()=>null);
+    if (reg) {
+      const ac = {
+        id: null, tail_number: tail, _fromReg: true,
+        make: reg.mfr || reg.manufacturer || '—',
+        model: reg.model || '—',
+        year: reg.year_mfr || null,
+        engine_type: reg.eng_mfr_mdl || null,
+        engine_hp: null, seats: null, ifr_equipped: null,
+        type_code: null, aircraft_class: null,
+        notes: reg.cert_issue_date ? `Cert issued: ${reg.cert_issue_date}` : null,
+      };
+      _m.aircraft = _tailCache[tail] = ac;
+      status.textContent = '✓ FAA registry'; status.style.color = 'oklch(65% 0.16 145)';
+      renderAircraftEnrichCard(ac, true);
+    } else {
+      status.textContent = 'Not found'; status.style.color = 'var(--faint)';
+      _m.aircraft = null;
+      document.getElementById('ms-ac-card').innerHTML =
+        `<div style="font-size:12px;color:var(--faint);padding:10px 0">Aircraft not found. Continuing will let you manually fill all fields.</div>`;
+      // still allow user to proceed (aircraft_id will be null)
+      _m.aircraft = { id:null, tail_number:tail, make:'', model:'', _unknown:true };
+    }
+  } catch(_) {
+    status.textContent = ''; _m.aircraft = null;
+  }
+  updateStep1Btn();
+}
+
+function renderAircraftEnrichCard(ac, fromReg = false) {
+  const card = document.getElementById('ms-ac-card');
+  if (!card) return;
+  const specs = [
+    ac.engine_type && ['Engine', ac.engine_type+(ac.engine_hp?' ('+ac.engine_hp+' HP)':'')],
+    ac.seats && ['Seats', ac.seats],
+    ac.aircraft_class && ['Class', ac.aircraft_class],
+    ac.type_code && ['Type', ac.type_code],
+    ac.ifr_equipped!=null && ['IFR', ac.ifr_equipped ? 'Equipped' : 'VFR only'],
+    ac.is_complex && ['Complex', 'Yes'],
+    ac.notes && ['Notes', ac.notes],
+  ].filter(Boolean);
+
+  card.innerHTML = `
+    <div class="ac-enrich">
+      <div class="ac-enrich-title">
+        <i class="ph-bold ph-airplane-tilt" style="color:var(--patina-text)"></i>
+        ${esc(ac.tail_number)}${ac.make&&ac.model ? ' — '+esc(ac.make)+' '+esc(ac.model) : ''}${ac.year?' '+ac.year:''}
+        ${fromReg ? '<span style="font-size:10px;font-weight:400;color:var(--faint);margin-left:6px">FAA registry</span>' : ''}
+        ${ac._unknown ? '<span style="font-size:10px;font-weight:400;color:var(--warn);margin-left:6px">specs unknown</span>' : ''}
+      </div>
+      ${specs.length ? `<div class="ac-enrich-specs">${specs.map(([k,v])=>`<div><span class="ac-spec-k">${k}</span> <span class="ac-spec-v">${esc(String(v))}</span></div>`).join('')}</div>` : ''}
+      ${fromReg && !ac.id ? `<div style="margin-top:10px">
+        <button class="btn-link" onclick="addAircraftToDB()">
+          <i class="ph-bold ph-plus-circle"></i> Add to my aircraft list
+        </button>
+      </div>` : ''}
+    </div>`;
+}
+
+async function addAircraftToDB() {
+  if (!_m.aircraft || _m.aircraft.id) return;
+  const ac = _m.aircraft;
+  try {
+    const res = await fetch('/api/aircraft', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tail_number: ac.tail_number, make: ac.make||'Unknown', model: ac.model||'Unknown',
+        year: ac.year||null, engine_type: ac.engine_type||null,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    const created = await res.json();
+    _m.aircraft = _tailCache[ac.tail_number] = created;
+    const status = document.getElementById('ms-tail-status');
+    if (status) { status.textContent = '✓ added'; status.style.color = 'var(--run)'; }
+    renderAircraftEnrichCard(created);
+    updateStep1Btn();
+  } catch(_) {}
+}
+
+async function onStep1Continue() {
+  _m.date = document.getElementById('ms-date').value;
+  _m.dep  = document.getElementById('ms-dep').value.trim().toUpperCase();
+  const tail = (_m.aircraft?.tail_number||'').toUpperCase();
+
+  // Search existing logbook entries matching date + aircraft + departure
+  let matches = [];
+  if (tail && _m.date && _m.dep) {
+    try {
+      const params = new URLSearchParams({ date: _m.date, departure: _m.dep });
+      if (tail) params.set('tail', tail);
+      const r = await fetch('/api/flights?'+params).then(r=>r.ok?r.json():[]).catch(()=>[]);
+      matches = Array.isArray(r) ? r : [];
+    } catch(_) {}
+  }
+  _m._matches = matches;
+  renderModalStep2(matches);
+}
+
+// Step 2 ──────────────────────────────────────────────────────────────────────
+function renderModalStep2FromCache() { renderModalStep2(_m._matches||[]); }
+
+function renderModalStep2(flights) {
+  _m.step = 2; showModalSteps(2);
+  document.getElementById('modal-ft').style.display = 'none';
+  if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
+
+  const dateLabel = new Date(_m.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const tail = _m.aircraft?.tail_number || '';
+
+  const listHTML = flights.map(f => {
+    const col = typeColor(f.training_type);
+    return `<div class="fpl-item" data-fid="${f.id}">
+      <span class="fl-type-dot" style="background:${col}"></span>
+      <div style="flex:1;min-width:0">
+        <div class="fpl-route">${esc(routeLabel(f))}</div>
+        <div class="fpl-meta">${esc(typeLabel(f.training_type))} · ${fmtHrs(f.total_duration)} · ${f.takeoffs||0} T/O · ${f.landings||0} Lnd</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:13px;font-weight:500;color:var(--body-text)">${fmtHrs(f.total_duration)}</div>
+        <div style="font-size:11px;color:var(--faint)">${esc(f.aircraft?.tail_number||tail)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-bd').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+      <button class="btn-link" onclick="renderModalStep1()" style="font-size:13px">
+        <i class="ph-bold ph-caret-left"></i> Back
+      </button>
+      <div style="font-size:13px;color:var(--muted)">
+        ${esc(tail)} from <strong style="color:var(--champagne)">${esc(_m.dep)}</strong>
+        on <strong style="color:var(--champagne)">${esc(dateLabel)}</strong>
+      </div>
+    </div>
+    ${flights.length ? `
+      <div id="modal-preview-map"></div>
+      <div class="fpl">
+        ${listHTML}
+        <div class="fpl-new" onclick="onModalNewFlight()">
+          <i class="ph-bold ph-plus-circle"></i> Log a new flight on this date
+        </div>
+      </div>` :
+    `<div style="padding:36px 0 20px;text-align:center">
+       <i class="ph-bold ph-airplane-landing" style="font-size:36px;color:var(--faint);display:block;margin-bottom:12px"></i>
+       <div style="color:var(--muted);font-size:13px">No existing entries found for this aircraft on ${esc(dateLabel)}.</div>
+     </div>
+     <button class="btn-primary" onclick="onModalNewFlight()">
+       <i class="ph-bold ph-plus"></i> Log this flight
+     </button>`
+    }`;
+
+  if (flights.length) {
+    requestAnimationFrame(() => initPreviewMap(flights));
+    document.querySelectorAll('.fpl-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.fpl-item').forEach(i=>i.classList.remove('sel'));
+        item.classList.add('sel');
+        const fid = item.dataset.fid;
+        const f = flights.find(x=>String(x.id)===fid);
+        if (f) { highlightRoute(String(f.id)); onModalFlightSelected(f); }
+      });
+      item.addEventListener('mouseenter', () => highlightRoute(item.dataset.fid));
+      item.addEventListener('mouseleave', () => highlightRoute(null));
+    });
+  }
+}
+
+function initPreviewMap(flights) {
+  const container = document.getElementById('modal-preview-map');
+  if (!container || _m.previewMap) return;
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  _m.previewMap = new maplibregl.Map({
+    container: 'modal-preview-map', zoom: 8, attributionControl: false,
+    style: dark
+      ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+      : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    center: [flights[0]?.departure?.lon||-122, flights[0]?.departure?.lat||37.5],
+  });
+  _m.previewMap.addControl(new maplibregl.AttributionControl({compact:true}), 'bottom-right');
+  _m.previewMap.on('load', () => {
+    const allCoords = [];
+    flights.forEach(f => {
+      const coords = flightCoords(f);
+      if (coords.length < 2) return;
+      allCoords.push(...coords);
+      const col = typeColor(f.training_type);
+      _m.previewMap.addSource('fl'+f.id, { type:'geojson', data:{type:'Feature',geometry:{type:'LineString',coordinates:coords}} });
+      _m.previewMap.addLayer({ id:'fl'+f.id+'g', type:'line', source:'fl'+f.id, paint:{'line-color':col,'line-width':6,'line-opacity':0.15,'line-blur':4} });
+      _m.previewMap.addLayer({ id:'fl'+f.id, type:'line', source:'fl'+f.id, paint:{'line-color':col,'line-width':2,'line-opacity':0.75,'line-dasharray':[2,0]} });
+    });
+    const aptSet = {}, aptFeats = [];
+    flights.forEach(f => {
+      [f.departure,...(f.via_airports||[]),f.arrival].forEach(a => {
+        if (a?.lon && !aptSet[a.icao]) { aptSet[a.icao]=1; aptFeats.push({type:'Feature',properties:{icao:a.icao},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}); }
+      });
+    });
+    if (aptFeats.length) {
+      _m.previewMap.addSource('pmapts',{type:'geojson',data:{type:'FeatureCollection',features:aptFeats}});
+      _m.previewMap.addLayer({id:'pmapts',type:'circle',source:'pmapts',paint:{'circle-radius':5,'circle-color':'oklch(84% 0.19 80.46)','circle-stroke-width':1.5,'circle-stroke-color':'oklch(4% 0.004 95)'}});
+    }
+    if (allCoords.length) {
+      const b = allCoords.reduce((b,c)=>b.extend(c), new maplibregl.LngLatBounds(allCoords[0],allCoords[0]));
+      _m.previewMap.fitBounds(b, {padding:40,duration:400});
+    }
+  });
+}
+
+function flightCoords(f) {
+  const c = [];
+  if (f.departure?.lon) c.push([f.departure.lon, f.departure.lat]);
+  (f.via_airports||[]).forEach(a => { if(a?.lon) c.push([a.lon,a.lat]); });
+  if (f.arrival?.lon) c.push([f.arrival.lon, f.arrival.lat]);
+  return c;
+}
+
+function highlightRoute(activeId) {
+  if (!_m.previewMap || !_m._matches) return;
+  _m._matches.forEach(f => {
+    const lid = 'fl'+f.id, gid = lid+'g';
+    if (!_m.previewMap.getLayer(lid)) return;
+    const isActive = activeId === null || String(f.id) === String(activeId);
+    _m.previewMap.setPaintProperty(lid,'line-width', isActive ? 3 : 1.5);
+    _m.previewMap.setPaintProperty(lid,'line-opacity', isActive ? 1 : 0.3);
+    _m.previewMap.setPaintProperty(gid,'line-opacity', isActive ? 0.25 : 0.05);
+  });
+}
+
+function onModalNewFlight() { _m.editId = null; document.getElementById('modal-title').textContent='Log Flight'; renderModalStep3(null); }
+function onModalFlightSelected(f) { _m.editId = String(f.id); document.getElementById('modal-title').textContent='Edit Flight'; renderModalStep3(f); }
+
+// Step 3 ──────────────────────────────────────────────────────────────────────
+async function renderModalStep3(existing) {
+  _m.step = 3; showModalSteps(3);
+  if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
+
+  const allAc = await fetch('/api/aircraft').then(r=>r.ok?r.json():[]).catch(()=>[]);
+  const allIns = await fetch('/api/instructors').then(r=>r.ok?r.json():[]).catch(()=>[]);
+
+  const acOpts = allAc.map(a=>`<option value="${a.id}">${esc(a.tail_number)} — ${esc(a.make)} ${esc(a.model)}</option>`).join('');
+  const insOpts = allIns.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('');
+  const typeOpts = Object.entries(TYPE_CFG).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join('');
+
+  const editId = _m.editId || (existing?.id ? String(existing.id) : '');
+
+  document.getElementById('modal-bd').innerHTML = `
+  <form id="mf-form" novalidate>
+    <input type="hidden" name="mf_edit_id" value="${editId}">
+
+    <!-- ROUTE -->
+    <div class="section-label" style="margin-bottom:14px">Route</div>
+    <div class="form-grid" style="grid-template-columns:120px 1fr 120px 120px;gap:12px;margin-bottom:12px">
+      <div class="form-field">
+        <label class="form-label">Date</label>
+        <input class="form-input" type="date" name="date" value="${existing?.date||_m.date||new Date().toISOString().slice(0,10)}" required>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Aircraft</label>
+        <select class="form-select" name="aircraft_id" required>
+          <option value="">Select…</option>${acOpts}
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Departure</label>
+        <input class="form-input" type="text" name="departure_icao" placeholder="KSQL"
+          value="${existing?.departure?.icao||_m.dep||''}" maxlength="6" style="text-transform:uppercase"
+          id="mf-dep" oninput="onMFRouteChange()">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Training Type</label>
+        <select class="form-select" name="training_type"><option value="">—</option>${typeOpts}</select>
+      </div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0">
+      <div class="form-field">
+        <label class="form-label">Via Airports <span style="font-weight:400;text-transform:none;letter-spacing:0">(comma-sep)</span></label>
+        <input class="form-input" type="text" name="via" placeholder="KHAF, KPAO"
+          value="${existing?.via?.join(', ')||''}" style="text-transform:uppercase">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Arrival</label>
+        <input class="form-input" type="text" name="arrival_icao" placeholder="KWVI"
+          value="${existing?.arrival?.icao||''}" maxlength="6" style="text-transform:uppercase"
+          id="mf-arr" oninput="onMFRouteChange()">
+      </div>
+    </div>
+
+    <!-- Airport info cards (async) -->
+    <div id="mf-airport-strip" class="info-strip" style="margin-bottom:20px"></div>
+
+    <!-- AIRCRAFT enrichment (from step 1 or existing flight) -->
+    <div id="mf-ac-enrich" style="margin-bottom:20px"></div>
+    <div class="form-grid" style="grid-template-columns:1fr;margin-bottom:20px">
+      <div class="form-field">
+        <label class="form-label">Instructor (optional)</label>
+        <select class="form-select" name="instructor_id">
+          <option value="">None / solo</option>${insOpts}
+        </select>
+      </div>
+    </div>
+
+    <hr class="detail-rule" style="margin:20px 0">
+
+    <!-- FLIGHT TIME -->
+    <div class="section-label" style="margin-bottom:14px">
+      Flight Time <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">(hours)</span>
+    </div>
+    <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:12px">
+      ${mfNum('total_duration','Total',true)}
+      ${mfNum('dual_received','Dual Rcvd')}
+      ${mfNum('dual_given','Dual Given')}
+      ${mfNum('pic','PIC')}
+      ${mfNum('solo','Solo')}
+      ${mfNum('sic','SIC')}
+    </div>
+    <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:0">
+      ${mfNum('cross_country','X-Country')}
+      ${mfNum('night','Night')}
+      ${mfNum('actual_instrument','Actual IFR')}
+      ${mfNum('instrument','Sim Inst')}
+    </div>
+
+    <!-- Weather cards (async, keyed to departure time) -->
+    <div id="mf-weather-strip" class="info-strip" style="margin-bottom:0"></div>
+
+    <hr class="detail-rule" style="margin:20px 0">
+
+    <!-- OPERATIONS -->
+    <div class="section-label" style="margin-bottom:14px">Operations</div>
+    <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;margin-bottom:20px">
+      ${mfInt('takeoffs','Takeoffs')}
+      ${mfInt('landings','Landings')}
+      ${mfInt('night_takeoffs','Night T/O')}
+      ${mfInt('night_landings','Night Ldg')}
+      ${mfInt('holds','Holds')}
+      ${mfNum('distance_nm','Distance nm')}
+    </div>
+
+    <!-- APPROACHES -->
+    <div class="section-label" style="margin-bottom:12px">Approaches</div>
+    <div id="mf-approach-rows"></div>
+    <button type="button" class="btn-link" onclick="addMFApproach()" style="margin-bottom:20px">
+      <i class="ph-bold ph-plus-circle"></i> Add approach
+    </button>
+
+    <hr class="detail-rule" style="margin:20px 0">
+
+    <!-- REMARKS -->
+    <div class="section-label" style="margin-bottom:12px">Remarks</div>
+    <div class="form-field" style="margin-bottom:20px">
+      <textarea class="form-textarea" name="remarks" rows="3"
+        placeholder="Route narrative, conditions, lessons…">${esc(existing?.remarks||'')}</textarea>
+    </div>
+
+    <!-- HOBBS / TACH (collapsible) -->
+    <div class="section-label" style="margin-bottom:12px;cursor:pointer" id="mf-hobbs-toggle" onclick="toggleMFHobbs()">
+      Hobbs &amp; Tach <span id="mf-hobbs-icon" style="font-size:11px;color:var(--faint)">▸ expand</span>
+    </div>
+    <div id="mf-hobbs-fields" style="display:none;margin-bottom:20px">
+      <div class="form-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">
+        ${mfNum('hobbs_start','Hobbs Start')}
+        ${mfNum('hobbs_end','Hobbs End')}
+        ${mfNum('tach_start','Tach Start')}
+        ${mfNum('tach_end','Tach End')}
+      </div>
+    </div>
+
+    <div id="mf-error" class="form-error"></div>
+  </form>`;
+
+  document.getElementById('modal-ft').style.display = 'flex';
+  document.getElementById('modal-ft').innerHTML = `
+    <button class="btn-primary" id="mf-submit" onclick="handleMFSubmit(event)">
+      <i class="ph-bold ph-paper-plane-tilt"></i> ${editId ? 'Save Changes' : 'Log Flight'}
+    </button>
+    <button class="btn-ghost" onclick="closeFlightModal()">Cancel</button>
+    <div id="mf-save-status" style="margin-left:auto;font-size:12px;color:var(--faint)"></div>`;
+
+  // Pre-populate existing flight data
+  if (existing) populateMFForm(existing, allAc, allIns);
+  else {
+    // Pre-fill aircraft from step 1
+    if (_m.aircraft?.id) {
+      const sel = document.querySelector('[name="aircraft_id"]');
+      if (sel) sel.value = _m.aircraft.id;
+    }
+  }
+
+  // Show aircraft card from step 1 or from existing flight
+  const acToShow = existing?.aircraft || (_m.aircraft?.id ? _m.aircraft : null);
+  if (acToShow) {
+    document.getElementById('mf-ac-enrich').innerHTML = buildSmallAircraftCard(acToShow);
+  } else {
+    document.getElementById('mf-ac-enrich').remove?.();
+  }
+
+  // Load enrichment asynchronously
+  loadMFEnrichment(existing);
+}
+
+function mfNum(name, label, req='') {
+  return `<div class="form-field">
+    <label class="form-label">${label}</label>
+    <input class="form-input" type="number" name="${name}" step="0.1" min="0" placeholder="0.0" ${req?'required':''}>
+  </div>`;
+}
+function mfInt(name, label) {
+  return `<div class="form-field">
+    <label class="form-label">${label}</label>
+    <input class="form-input" type="number" name="${name}" step="1" min="0" placeholder="0">
+  </div>`;
+}
+
+function toggleMFHobbs() {
+  const f = document.getElementById('mf-hobbs-fields');
+  const i = document.getElementById('mf-hobbs-icon');
+  const open = f.style.display !== 'none';
+  f.style.display = open ? 'none' : 'grid';
+  if (i) i.textContent = open ? '▸ expand' : '▾ collapse';
+}
+
+function addMFApproach(data={}) {
+  const container = document.getElementById('mf-approach-rows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'approach-row';
+  row.innerHTML = `
+    <select class="form-select ap-type">
+      <option value="">Type…</option>
+      ${['ILS','RNAV (GPS)','VOR','NDB','LOC','LOC/BC','LDA','SDF','Visual'].map(t=>`<option value="${t}" ${data.approach_type===t?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <input class="form-input ap-icao" type="text" placeholder="ICAO" maxlength="6"
+      style="text-transform:uppercase" value="${esc(data.airport_icao||'')}">
+    <input class="form-input ap-rwy" type="text" placeholder="Rwy" maxlength="4"
+      value="${esc(data.runway||'')}">
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap">
+      <input type="checkbox" class="ap-ctl" ${data.circle_to_land?'checked':''}> C/L
+    </label>
+    <button type="button" class="ap-rm" title="Remove" onclick="this.closest('.approach-row').remove()">
+      <i class="ph-bold ph-x"></i>
+    </button>`;
+  container.appendChild(row);
+}
+
+function buildSmallAircraftCard(ac) {
+  if (!ac) return '';
+  const specs = [
+    ac.engine_type && `<span class="ac-spec-k">Engine</span> <span class="ac-spec-v">${esc(ac.engine_type)}${ac.engine_hp?' ('+ac.engine_hp+' HP)':''}</span>`,
+    ac.seats && `<span class="ac-spec-k">Seats</span> <span class="ac-spec-v">${ac.seats}</span>`,
+    ac.aircraft_class && `<span class="ac-spec-k">Class</span> <span class="ac-spec-v">${esc(ac.aircraft_class)}</span>`,
+    ac.ifr_equipped!=null && `<span class="ac-spec-k">IFR</span> <span class="ac-spec-v">${ac.ifr_equipped?'Equipped':'VFR only'}</span>`,
+  ].filter(Boolean);
+  return `<div class="ac-enrich">
+    <div class="ac-enrich-title">
+      <i class="ph-bold ph-airplane-tilt" style="color:var(--patina-text)"></i>
+      ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}
+    </div>
+    ${specs.length?`<div class="ac-enrich-specs" style="display:flex;flex-wrap:wrap;gap:8px 20px">${specs.map(s=>`<div>${s}</div>`).join('')}</div>`:''}
+    ${ac.notes?`<div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(ac.notes)}</div>`:''}
+  </div>`;
+}
+
+function populateMFForm(f, allAc, allIns) {
+  const form = document.getElementById('mf-form');
+  if (!form) return;
+  const set = (name, val) => {
+    const el = form.querySelector(`[name="${name}"]`);
+    if (el && val != null && val !== '') el.value = val;
+  };
+  set('date', f.date);
+  set('aircraft_id', f.aircraft?.id);
+  set('departure_icao', f.departure?.icao||'');
+  set('arrival_icao', f.arrival?.icao||'');
+  set('via', (f.via||[]).join(', '));
+  set('training_type', f.training_type);
+  if (f.instructor_id) set('instructor_id', f.instructor_id);
+
+  const nums = ['total_duration','dual_received','dual_given','pic','sic','solo','cross_country','night','actual_instrument','holds','distance_nm','hobbs_start','hobbs_end','tach_start','tach_end'];
+  nums.forEach(n => { const v = n==='instrument'?f.simulated_instrument:f[n]; if(v>0) set(n, parseFloat(v).toFixed(1)); });
+  set('instrument', f.simulated_instrument > 0 ? parseFloat(f.simulated_instrument).toFixed(1) : '');
+  ['takeoffs','landings','night_takeoffs','night_landings','holds'].forEach(n=>{if(f[n]>0)set(n,f[n]);});
+  set('remarks', f.remarks||'');
+
+  // Hobbs/Tach
+  if (f.hobbs_start||f.hobbs_end||f.tach_start||f.tach_end) {
+    document.getElementById('mf-hobbs-fields').style.display = 'grid';
+    const icon = document.getElementById('mf-hobbs-icon');
+    if (icon) icon.textContent = '▾ collapse';
+    ['hobbs_start','hobbs_end','tach_start','tach_end'].forEach(n=>{if(f[n])set(n,f[n]);});
+  }
+
+  // Approaches
+  for (const ap of f.approaches||[]) addMFApproach(ap);
+}
+
+let _mfRouteTimer;
+function onMFRouteChange() {
+  clearTimeout(_mfRouteTimer);
+  _mfRouteTimer = setTimeout(loadMFEnrichment, 800);
+}
+
+async function loadMFEnrichment(existing) {
+  const form = document.getElementById('mf-form');
+  if (!form) return;
+  const g = n => (form.querySelector(`[name="${n}"]`)?.value||'').trim().toUpperCase();
+  const dep = g('departure_icao') || existing?.departure?.icao || _m.dep || '';
+  const arr = g('arrival_icao')   || existing?.arrival?.icao  || '';
+  const date = form.querySelector('[name="date"]')?.value || existing?.date || _m.date || '';
+  const timeOut = existing?.time_out || (date ? date+'T14:00:00Z' : null);
+
+  // Airport strip
+  const aptStrip = document.getElementById('mf-airport-strip');
+  if (aptStrip && (dep||arr)) {
+    const icaos = [dep, arr].filter(Boolean);
+    aptStrip.innerHTML = icaos.map(ic=>`
+      <div class="info-card" id="apt-card-${ic}">
+        <div class="info-card-hd"><i class="ph-bold ph-map-pin"></i> ${ic}</div>
+        <div class="spinner" style="width:12px;height:12px"></div>
+      </div>`).join('');
+    icaos.forEach(async ic => {
+      const card = document.getElementById('apt-card-'+ic);
+      if (!card) return;
+      try {
+        // Try our local DB first
+        const local = await fetch('/api/airports/'+ic).then(r=>r.ok?r.json():null).catch(()=>null);
+        if (local) {
+          card.innerHTML = buildAptCard(local, ic);
+        } else {
+          const ext = await fetch('/api/external/airport/'+ic).then(r=>r.ok?r.json():null).catch(()=>null);
+          card.innerHTML = ext ? buildAptCardExt(ext, ic) : buildAptCardUnknown(ic);
+        }
+      } catch(_) { card.innerHTML = buildAptCardUnknown(ic); }
+    });
+  }
+
+  // Weather strip
+  const wxStrip = document.getElementById('mf-weather-strip');
+  if (wxStrip && (dep||arr) && date) {
+    const icaos = [dep, arr].filter(Boolean);
+    wxStrip.innerHTML = `<div style="grid-column:1/-1;font-size:11px;color:var(--faint);margin-top:4px;margin-bottom:2px"><i class="ph-bold ph-cloud"></i> Weather near ${date}</div>`
+      + icaos.map(ic=>`
+      <div class="info-card" id="wx-card-${ic}">
+        <div class="info-card-hd"><i class="ph-bold ph-cloud-sun"></i> METAR · ${ic}</div>
+        <div class="spinner" style="width:12px;height:12px"></div>
+      </div>`).join('');
+    icaos.forEach(async ic => {
+      const card = document.getElementById('wx-card-'+ic);
+      if (!card) return;
+      try {
+        const qs = timeOut ? `?time=${encodeURIComponent(timeOut)}` : '';
+        const wx = await fetch(`/api/external/metar/${ic}${qs}`).then(r=>r.ok?r.json():null).catch(()=>null);
+        card.innerHTML = buildWeatherCard(wx, ic);
+      } catch(_) { card.innerHTML = buildWeatherCardEmpty(ic); }
+    });
+  }
+}
+
+function buildAptCard(a, icao) {
+  return `<div class="info-card-hd"><i class="ph-bold ph-map-pin"></i> ${icao}</div>
+    <div class="info-card-icao">${esc(a.icao||icao)}</div>
+    <div class="info-card-name">${esc(a.name||'')}</div>
+    <div class="info-card-meta">${[a.city,a.state].filter(Boolean).join(', ')}${a.elevation_ft?' · '+a.elevation_ft+' ft MSL':''}</div>`;
+}
+function buildAptCardExt(a, icao) {
+  return `<div class="info-card-hd"><i class="ph-bold ph-map-pin"></i> ${icao}</div>
+    <div class="info-card-icao">${esc(a.icaoId||icao)}</div>
+    <div class="info-card-name">${esc(a.name||a.stnName||'')}</div>
+    <div class="info-card-meta">${[a.state,a.country].filter(Boolean).join(', ')}${a.elev?' · '+a.elev+' ft':''}</div>`;
+}
+function buildAptCardUnknown(icao) {
+  return `<div class="info-card-hd"><i class="ph-bold ph-map-pin"></i> ${icao}</div>
+    <div class="info-card-icao">${esc(icao)}</div>
+    <div class="info-card-meta" style="color:var(--faint)">No data available</div>`;
+}
+
+function buildWeatherCard(wx, icao) {
+  if (!wx?.metar) return buildWeatherCardEmpty(icao);
+  const m = wx.metar;
+  const raw = m.rawOb || m.rawObservation || '';
+  const time = m.obsTime || m.reportTime || '';
+  const timeStr = time ? new Date(time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+' UTC' : '';
+  // Decode key fields
+  const decoded = [
+    m.temp!=null && `${m.temp}°C`,
+    m.dewpoint!=null && `Dew ${m.dewpoint}°C`,
+    m.wspd!=null && `Wind ${m.wdir||'VRB'}°/${m.wspd}kt${m.wgst?' G'+m.wgst:''}`,
+    m.visib!=null && `Vis ${m.visib} SM`,
+    m.altim!=null && `Alt ${m.altim.toFixed(2)} inHg`,
+    m.wxString && m.wxString,
+    m.skyCondition && m.skyCondition.map(s=>`${s.skyCover}@${s.cloudBase||0}`).join(' '),
+    m.flightCategory && `<span style="color:${m.flightCategory==='VFR'?'var(--run)':m.flightCategory==='MVFR'?'oklch(80% 0.17 85)':m.flightCategory==='IFR'?'var(--warn)':'oklch(68% 0.15 235)'}">${m.flightCategory}</span>`,
+  ].filter(Boolean);
+
+  return `<div class="info-card-hd"><i class="ph-bold ph-cloud-sun"></i> METAR · ${icao}${timeStr?' · '+timeStr:''}</div>
+    ${raw ? `<div class="metar-raw">${esc(raw)}</div>` : ''}
+    ${decoded.length ? `<div class="metar-decoded">${decoded.join(' · ')}</div>` : ''}
+    <div style="font-size:10px;color:var(--faint);margin-top:4px">Source: ${wx.source==='mesonet'?'Iowa State Mesonet':'NOAA/AWC'}</div>`;
+}
+function buildWeatherCardEmpty(icao) {
+  return `<div class="info-card-hd"><i class="ph-bold ph-cloud"></i> METAR · ${icao}</div>
+    <div style="font-size:12px;color:var(--faint)">No METAR available</div>`;
+}
+
+async function handleMFSubmit(e) {
+  e.preventDefault();
+  const form = document.getElementById('mf-form');
+  const submitBtn = document.getElementById('mf-submit');
+  const errEl = document.getElementById('mf-error');
+  const status = document.getElementById('mf-save-status');
+  if (!form) return;
+  errEl.style.display = 'none';
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div>';
+
+  const g = n => { const el = form.querySelector(`[name="${n}"]`); return el ? el.value : ''; };
+  const fv = n => parseFloat(g(n))||0;
+  const iv = n => parseInt(g(n))||0;
+  const sv = n => g(n).trim()||null;
+  const editId = g('mf_edit_id');
+
+  const viaRaw = g('via').trim();
+  const via = viaRaw ? viaRaw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean) : [];
+
+  const approaches = Array.from(document.querySelectorAll('#mf-approach-rows .approach-row')).map(row=>({
+    approach_type: row.querySelector('.ap-type')?.value||'',
+    airport_icao: (row.querySelector('.ap-icao')?.value||'').trim().toUpperCase(),
+    runway: (row.querySelector('.ap-rwy')?.value||'').trim(),
+    circle_to_land: row.querySelector('.ap-ctl')?.checked||false,
+  })).filter(a=>a.approach_type&&a.airport_icao);
+
+  const body = {
+    date: g('date'), aircraft_id: parseInt(g('aircraft_id'))||null,
+    departure_icao: g('departure_icao').toUpperCase(),
+    arrival_icao: g('arrival_icao').toUpperCase(),
+    via, training_type: sv('training_type'),
+    total_duration: fv('total_duration'),
+    dual_received: fv('dual_received'), dual_given: fv('dual_given'),
+    pic: fv('pic'), sic: fv('sic'), solo: fv('solo'),
+    cross_country: fv('cross_country'), night: fv('night'),
+    actual_instrument: fv('actual_instrument'), instrument: fv('instrument'),
+    takeoffs: iv('takeoffs'), landings: iv('landings'),
+    night_takeoffs: iv('night_takeoffs'), night_landings: iv('night_landings'),
+    holds: iv('holds'),
+    distance_nm: sv('distance_nm') ? parseFloat(sv('distance_nm')) : null,
+    hobbs_start: sv('hobbs_start') ? parseFloat(sv('hobbs_start')) : null,
+    hobbs_end: sv('hobbs_end') ? parseFloat(sv('hobbs_end')) : null,
+    tach_start: sv('tach_start') ? parseFloat(sv('tach_start')) : null,
+    tach_end: sv('tach_end') ? parseFloat(sv('tach_end')) : null,
+    instructor_id: sv('instructor_id') ? parseInt(sv('instructor_id')) : null,
+    remarks: sv('remarks'), approaches,
+  };
+
+  const isEdit = !!editId;
+  const url = isEdit ? '/api/flights/'+editId : '/api/flights';
+  try {
+    const res = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(()=>({}));
+      throw new Error(d.error || `Error ${res.status}`);
+    }
+    if (status) status.textContent = 'Saved ✓';
+    await loadFlights();
+    closeFlightModal();
+    if (isEdit) navigate('flight', editId);
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="ph-bold ph-paper-plane-tilt"></i> ${isEdit?'Save Changes':'Log Flight'}`;
+  }
+}
 
 // ─── load flights ─────────────────────────────────────────────────────────────
 async function loadFlights() {

@@ -10,6 +10,7 @@ import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
 import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
+import proxyRoutes from './routes/proxy.js'
 import { migrate, migrateV2, migrateV3, migrateV4 } from './db/migrate.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -27,6 +28,8 @@ await fastify.register(fastifyStatic, {
   root: publicDir,
   prefix: '/',
 })
+
+await fastify.register(proxyRoutes)
 
 fastify.get('/health', async () => ({ ok: true }))
 

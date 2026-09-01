@@ -44,8 +44,14 @@ const FLIGHT_SELECT = `
 `
 
 export default async function flightRoutes(fastify) {
-  fastify.get('/api/flights', async () => {
-    const { rows } = await pool.query(FLIGHT_SELECT + ' ORDER BY f.date DESC')
+  fastify.get('/api/flights', async (req) => {
+    const { date, tail, departure } = req.query
+    const clauses = [], params = []
+    if (date)      { clauses.push(`f.date = $${params.length+1}::date`);             params.push(date) }
+    if (tail)      { clauses.push(`ac.tail_number = $${params.length+1}`);           params.push(tail.toUpperCase()) }
+    if (departure) { clauses.push(`f.departure_icao = $${params.length+1}`);         params.push(departure.toUpperCase()) }
+    const where = clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''
+    const { rows } = await pool.query(FLIGHT_SELECT + where + ' ORDER BY f.date DESC', params)
     // Attach via airport objects from the airports table
     const allIcaos = [...new Set(rows.flatMap(r => r.via || []))]
     const airportMap = {}

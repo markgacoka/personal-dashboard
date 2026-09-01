@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gacoka</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@100;300;400;600&family=Albert+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts@3/dist/apexcharts.min.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
@@ -14,368 +15,713 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0d1117;
-      --surface:   #161b22;
-      --surface-2: #21262d;
-      --border:    #30363d;
-      --border-subtle: #21262d;
-      --text:      #e6edf3;
-      --text-secondary: #c9d1d9;
-      --muted:     #8b949e;
-      --subtle:    #6e7681;
-      --green:  #3fb950;
-      --blue:   #58a6ff;
-      --purple: #bc8cff;
-      --orange: #f0883e;
-      --rose:   #f85149;
-      --amber:  #e3b341;
-      --teal:   #39d353;
-      --pink:   #db61a2;
-      --run:  #3fb950;
-      --bike: #e3b341;
-      --swim: #58a6ff;
-      --row:  #db61a2;
-      --radius: 10px;
-      --radius-sm: 6px;
-      --radius-lg: 14px;
+      /* ── Surfaces ──────────────────────────────────────── */
+      --ground:        oklch(7% 0.006 95);
+      --deep:          oklch(4% 0.004 95);
+      --raised:        oklch(11% 0.006 95);
+      --graphite:      oklch(15% 0.008 95);
+      --graphite-2:    oklch(19% 0.008 95);
+
+      /* ── Text ─────────────────────────────────────────── */
+      --champagne:     oklch(91% 0 0);
+      --body-text:     oklch(88% 0 0);
+      --muted:         oklch(72% 0 0);
+      --faint:         oklch(62% 0 0);
+      --disabled:      oklch(52% 0 0);
+
+      /* ── Gold ─────────────────────────────────────────── */
+      --gold:          oklch(84% 0.19 80.46);
+      --gold-pale:     oklch(86% 0.07 84);
+      --gold-rich:     oklch(77% 0.13 82);
+      --gold-deep:     oklch(61% 0.085 78);
+      --gold-ink:      oklch(14% 0.018 95);
+
+      /* ── Hairlines ────────────────────────────────────── */
+      --rule:          oklch(78% 0 0 / 0.16);
+      --rule-strong:   oklch(74% 0.09 82 / 0.6);
+
+      /* ── Patina ───────────────────────────────────────── */
+      --patina:        oklch(70% 0.12 188);
+      --patina-text:   oklch(76% 0.088 190);
+      --patina-pale:   oklch(82% 0.07 188);
+
+      /* ── Sport colors ─────────────────────────────────── */
+      --run:   oklch(65% 0.16 145);
+      --bike:  oklch(80% 0.17 85);
+      --swim:  oklch(68% 0.15 235);
+      --row:   oklch(65% 0.15 350);
+      --other: oklch(62% 0 0);
+
+      /* ── State ────────────────────────────────────────── */
+      --warn:  oklch(58% 0.15 35);
+
+      /* ── Radii ────────────────────────────────────────── */
+      --r-xs: 2px;
+      --r-sm: 4px;
+      --r-md: 6px;
+      --r-lg: 8px;
     }
+
+    /* Light theme: minimal adaptation, keep dark palette shapes */
     [data-theme="light"] {
-      --bg:        #f6f8fa;
-      --surface:   #ffffff;
-      --surface-2: #f0f3f6;
-      --border:    #d0d7de;
-      --border-subtle: #e8ecf0;
-      --text:      #1c2128;
-      --text-secondary: #24292f;
-      --muted:     #57606a;
-      --subtle:    #6e7781;
+      --ground:     oklch(97% 0.012 95);
+      --deep:       oklch(94% 0.014 95);
+      --raised:     oklch(99% 0.008 95);
+      --graphite:   oklch(91% 0.012 95);
+      --graphite-2: oklch(88% 0.014 95);
+      --champagne:  oklch(18% 0.02 95);
+      --body-text:  oklch(25% 0.018 95);
+      --muted:      oklch(45% 0.015 95);
+      --faint:      oklch(55% 0.012 95);
+      --rule:       oklch(25% 0.02 95 / 0.13);
+      --rule-strong:oklch(74% 0.09 82 / 0.5);
     }
+
+    /* ── Browser surfaces ──────────────────────────────────── */
+    ::selection {
+      background: oklch(84% 0.19 80.46 / 0.25);
+      color: var(--champagne);
+    }
+    :focus-visible {
+      outline: 2px solid oklch(70% 0.12 188);
+      outline-offset: 3px;
+    }
+
+    /* Webkit scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--deep); }
+    ::-webkit-scrollbar-thumb { background: var(--graphite-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
 
     html, body {
       height: 100%; overflow: hidden;
-      background: var(--bg); color: var(--text);
-      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      background: var(--ground);
+      color: var(--body-text);
+      font-family: 'Albert Sans', system-ui, sans-serif;
       font-size: 14px; line-height: 1.5;
       -webkit-font-smoothing: antialiased;
-      font-feature-settings: 'cv02', 'cv03', 'cv04';
     }
 
-    /* ─── Typography scale ─────────────────────────────────────── */
-    .eyebrow {
-      font-size: 10px; font-weight: 600;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--muted);
-    }
-    .page-title {
-      font-size: 22px; font-weight: 700;
-      letter-spacing: -0.025em; line-height: 1.2;
-      color: var(--text);
-    }
-    .metric-label {
-      font-size: 11px; font-weight: 500;
-      letter-spacing: 0.04em; text-transform: uppercase;
-      color: var(--muted);
-    }
-    .metric-val {
-      font-size: 20px; font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em; line-height: 1.1;
-    }
-    .metric-val-lg {
-      font-size: 28px; font-weight: 800;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.03em; line-height: 1;
-    }
-    .metric-unit {
-      font-size: 12px; font-weight: 400;
-      color: var(--muted); margin-left: 2px;
-    }
-    .body-sm { font-size: 12px; color: var(--muted); line-height: 1.4; }
-    h2 {
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--muted);
-      display: flex; align-items: center; gap: 6px;
-    }
+    /* ── Type utilities ──────────────────────────────────── */
+    .font-display { font-family: 'Alumni Sans', 'Albert Sans', Arial, sans-serif; }
+    .champagne    { color: var(--champagne); }
+    .muted        { color: var(--muted); }
+    .faint        { color: var(--faint); }
+    .gold         { color: var(--gold); }
+    .patina       { color: var(--patina); }
 
-    /* ─── Layout helpers ───────────────────────────────────────── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
-    @media (max-width: 960px) { .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
-    @media (max-width: 560px) { .grid-4, .grid-5 { grid-template-columns: 1fr 1fr; } }
-
-    /* ─── Components ───────────────────────────────────────────── */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-    .card-sm { padding: 14px 18px; }
-    .badge {
-      display: inline-flex; align-items: center;
-      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
-      padding: 2px 8px; border-radius: 20px;
-      border: 1px solid currentColor; opacity: 0.85;
-    }
-    .skel { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: var(--radius); }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-    .section-header {
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--muted);
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 14px;
-    }
-
-    /* ─── App Shell ────────────────────────────────────────────── */
+    /* ── App shell ───────────────────────────────────────── */
     .app-shell { display: flex; height: 100vh; overflow: hidden; }
 
-    /* ─── Sidebar ──────────────────────────────────────────────── */
+    /* ── Sidebar ─────────────────────────────────────────── */
     .sidebar {
       width: 220px; flex-shrink: 0;
-      background: var(--surface); border-right: 1px solid var(--border);
+      background: var(--deep);
+      border-right: 1px solid var(--rule);
       display: flex; flex-direction: column;
-      overflow: hidden; transition: width 0.22s ease;
+      overflow: hidden;
+      transition: width 0.18s ease;
     }
     .sidebar.collapsed { width: 52px; }
 
     .sb-head {
-      height: 54px; flex-shrink: 0;
+      height: 52px; flex-shrink: 0;
       display: flex; align-items: center; gap: 10px;
       padding: 0 10px 0 14px;
-      border-bottom: 1px solid var(--border); overflow: hidden;
+      border-bottom: 1px solid var(--rule);
+      overflow: hidden;
     }
-    .sb-logo { font-size: 13px; font-weight: 700; flex: 1; white-space: nowrap; letter-spacing: -0.01em; }
+    .sb-mark {
+      font-size: 16px; color: var(--gold); flex-shrink: 0;
+      line-height: 1; user-select: none;
+    }
+    .sb-logo {
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 13px; font-weight: 400;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--champagne);
+      flex: 1; white-space: nowrap;
+    }
     .sidebar.collapsed .sb-logo { display: none; }
-    .sb-toggle { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius-sm); width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color .15s, border-color .15s; }
-    .sb-toggle:hover { color: var(--text); border-color: var(--muted); }
+    .sb-toggle {
+      background: none; border: 1px solid var(--rule);
+      color: var(--faint); border-radius: var(--r-sm);
+      width: 26px; height: 26px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .sb-toggle:hover { color: var(--muted); border-color: var(--muted); }
 
-    .sb-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0 16px; }
+    .sb-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 0 16px; }
 
     .sb-group-hdr {
-      height: 30px; display: flex; align-items: center; gap: 8px;
+      height: 28px; display: flex; align-items: center; gap: 8px;
       padding: 0 14px; cursor: pointer; user-select: none;
-      font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--subtle); white-space: nowrap; margin-top: 12px;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--faint);
+      white-space: nowrap; margin-top: 14px;
+      transition: color 0.15s;
     }
     .sb-group-hdr:hover { color: var(--muted); }
     .sb-caret { margin-left: auto; font-size: 10px; flex-shrink: 0; transition: transform 0.18s; }
     .sb-group-hdr.closed .sb-caret { transform: rotate(-90deg); }
 
-    .sb-group-items { max-height: 200px; overflow: hidden; transition: max-height 0.22s ease; }
+    .sb-group-items { max-height: 200px; overflow: hidden; transition: max-height 0.2s ease; }
     .sb-group-items.closed { max-height: 0; }
 
     .sb-item {
-      height: 36px; display: flex; align-items: center; gap: 10px;
-      padding: 0 8px 0 24px; cursor: pointer;
-      font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap;
-      border-radius: var(--radius-sm); margin: 1px 8px;
-      transition: background 0.1s, color 0.1s;
+      height: 34px; display: flex; align-items: center; gap: 10px;
+      padding: 0 8px 0 22px; cursor: pointer;
+      font-size: 13px; font-weight: 400;
+      color: var(--muted); white-space: nowrap;
+      border-radius: var(--r-sm); margin: 1px 8px;
+      transition: color 0.15s;
     }
-    .sb-item:hover { background: var(--surface-2); color: var(--text-secondary); }
-    .sb-item.active { background: var(--surface-2); color: var(--blue); }
-    .sb-item i { font-size: 15px; flex-shrink: 0; width: 18px; text-align: center; }
+    .sb-item:hover { color: var(--body-text); }
+    .sb-item.active { color: var(--gold); }
+    .sb-item i { font-size: 14px; flex-shrink: 0; width: 16px; text-align: center; }
 
-    .sidebar.collapsed .sb-group-hdr { padding: 0; justify-content: center; margin-top: 8px; height: 20px; border-top: 1px solid var(--border); }
+    .sidebar.collapsed .sb-group-hdr {
+      padding: 0; justify-content: center;
+      margin-top: 10px; height: 20px;
+      border-top: 1px solid var(--rule);
+    }
     .sidebar.collapsed .sb-group-hdr span,
     .sidebar.collapsed .sb-caret { display: none; }
     .sidebar.collapsed .sb-group-items { max-height: 200px !important; }
     .sidebar.collapsed .sb-item { padding: 0; justify-content: center; margin: 2px 4px; }
     .sidebar.collapsed .sb-lbl { display: none; }
 
-    /* ─── Main wrap ────────────────────────────────────────────── */
+    /* ── Avatar ──────────────────────────────────────────── */
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      overflow: hidden; border: 1px solid var(--rule);
+      flex-shrink: 0; background: var(--graphite);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ── Main wrap ───────────────────────────────────────── */
     .main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 
     .topbar {
-      height: 54px; flex-shrink: 0;
-      background: var(--surface); border-bottom: 1px solid var(--border);
+      height: 52px; flex-shrink: 0;
+      background: var(--ground);
+      border-bottom: 1px solid var(--rule);
       display: flex; align-items: center; gap: 10px; padding: 0 24px;
     }
     .back-btn {
       display: none; align-items: center; gap: 6px;
-      font-size: 13px; font-weight: 500; color: var(--muted);
+      font-size: 13px; font-weight: 400; color: var(--muted);
       background: none; border: none; cursor: pointer;
-      padding: 6px 10px 6px 6px; border-radius: var(--radius-sm);
-      transition: color .15s, background .15s;
+      padding: 5px 8px 5px 4px; border-radius: var(--r-sm);
+      transition: color 0.15s;
       flex-shrink: 0;
     }
-    .back-btn:hover { color: var(--text); background: var(--surface-2); }
-    .back-btn i { font-size: 14px; }
-    .back-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
-    .topbar-title { font-size: 15px; font-weight: 600; flex: 1; letter-spacing: -0.01em; }
-    .nav-date { font-size: 12px; color: var(--muted); }
-    .icon-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius-sm); width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color .15s, border-color .15s; }
-    .icon-btn:hover { color: var(--text); border-color: var(--muted); }
+    .back-btn:hover { color: var(--body-text); }
+    .back-btn i { font-size: 13px; }
+    .back-sep { width: 1px; height: 16px; background: var(--rule); flex-shrink: 0; }
+    .topbar-title {
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 18px; font-weight: 300;
+      letter-spacing: 0.01em;
+      color: var(--champagne);
+      flex: 1;
+    }
+    .nav-date { font-size: 12px; color: var(--faint); }
+    .icon-btn {
+      background: none; border: 1px solid var(--rule);
+      color: var(--faint); border-radius: var(--r-sm);
+      width: 30px; height: 30px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .icon-btn:hover { color: var(--muted); border-color: var(--rule-strong); }
 
-    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 28px 28px 48px; }
+    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 28px 28px 56px; }
     .view { display: none; }
     .view.active { display: block; }
-
-    .section { margin-top: 28px; }
+    .section { margin-top: 32px; }
     .section-first { margin-top: 0; }
-    .section > h2, .section-first > h2 { margin-bottom: 12px; }
 
-    /* ─── Avatar ───────────────────────────────────────────────── */
-    .avatar { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; border: 2px solid var(--border); flex-shrink: 0; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
-    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    /* ── Card ────────────────────────────────────────────── */
+    .card {
+      background: var(--raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      padding: 20px 24px;
+    }
 
-    /* ─── Wellness tiles ───────────────────────────────────────── */
-    .wellness-card { display: flex; flex-direction: column; gap: 6px; }
-    .wellness-card .trend { font-size: 12px; color: var(--muted); }
-    .trend.up   { color: var(--green); }
-    .trend.down { color: var(--rose); }
+    /* ── Skeleton ────────────────────────────────────────── */
+    .skel {
+      background: linear-gradient(90deg,
+        var(--raised) 25%,
+        var(--graphite) 50%,
+        var(--raised) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.6s infinite;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--rule);
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .spinner {
+      display: inline-block; width: 15px; height: 15px;
+      border: 2px solid var(--graphite-2);
+      border-top-color: var(--patina);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ─── Sport summary ────────────────────────────────────────── */
-    .sport-card { display: flex; flex-direction: column; gap: 12px; }
-    .sport-header { display: flex; align-items: center; gap: 8px; }
-    .sport-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .sport-name { font-size: 14px; font-weight: 600; }
-    .sport-count { font-size: 12px; color: var(--muted); margin-left: auto; }
-    .sport-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .sport-metric-label { font-size: 11px; color: var(--muted); margin-bottom: 1px; letter-spacing: 0.02em; }
-    .sport-metric-val   { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .divider { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 
-    /* ─── Activity list ────────────────────────────────────────── */
-    .act-list { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
-    .act-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    /* ── Grid helpers ────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Wellness strip ──────────────────────────────────── */
+    #wellness-strip {
+      display: flex; align-items: center; flex-wrap: wrap;
+      background: var(--raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      padding: 16px 24px;
+      gap: 0;
+    }
+    .dp {
+      display: flex; align-items: baseline; gap: 5px;
+      padding: 6px 20px 6px 0;
+      flex-shrink: 0;
+    }
+    .dp:first-child { padding-left: 0; }
+    .dp-n {
+      font-size: 20px; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: var(--champagne);
+      line-height: 1;
+    }
+    .dp-u {
+      font-size: 12px; color: var(--muted);
+      font-weight: 400; letter-spacing: 0.01em;
+    }
+    .dp-s {
+      font-size: 11px; color: var(--faint);
+      margin-left: 2px;
+    }
+    .dp-div {
+      width: 1px; height: 28px;
+      background: var(--rule);
+      flex-shrink: 0;
+      margin-right: 20px;
+    }
+    #wellness-strip.skel-strip { height: 64px; }
+
+    /* ── Weekly ledger ───────────────────────────────────── */
+    #weekly-ledger {
+      background: var(--raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+    }
+    .sl-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 20px;
+      border-bottom: 1px solid var(--rule);
+      transition: background 0.15s;
+    }
+    .sl-row:last-child { border-bottom: none; }
+    .sl-row:hover { background: var(--graphite); }
+    .sl-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sl-name {
+      font-size: 13px; font-weight: 500;
+      color: var(--body-text);
+      min-width: 80px; flex-shrink: 0;
+    }
+    .sl-val {
+      font-size: 13px; color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      flex: 1;
+    }
+    .sl-empty {
+      padding: 16px 20px;
+      font-size: 13px; color: var(--faint);
+    }
+
+    /* ── Section label (no eyebrow, just a quiet rule line) ── */
+    .section-label {
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1; height: 1px;
+      background: var(--rule);
+    }
+
+    /* ── Activity list ───────────────────────────────────── */
+    .act-list {
+      border-radius: var(--r-sm); overflow: hidden;
+      border: 1px solid var(--rule);
+      background: var(--raised);
+    }
+    .act-row {
+      border-bottom: 1px solid var(--rule);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
     .act-row:last-child { border-bottom: none; }
-    .act-row:hover { background: var(--surface-2); }
-    .act-summary { padding: 14px 18px; display: flex; align-items: center; gap: 14px; }
-    .act-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
-    .act-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
-    .act-date { font-size: 12px; color: var(--muted); margin-top: 1px; }
-    .act-kpis { margin-left: auto; display: flex; gap: 22px; flex-shrink: 0; align-items: center; }
-    .act-kpi  { text-align: right; }
-    .act-kpi-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .act-kpi-l { font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .row-arrow { color: var(--subtle); flex-shrink: 0; font-size: 14px; margin-left: 6px; }
-    .act-row:hover .row-arrow { color: var(--muted); }
+    .act-row:hover { background: var(--graphite); }
+    /* Patina left indicator on hover */
+    .act-row::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 1px;
+      background: var(--patina);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .act-row:hover::before { opacity: 1; }
 
-    /* ─── Activity detail page ─────────────────────────────────── */
-    .detail-hero {
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--border);
+    .act-summary { padding: 12px 18px; display: flex; align-items: center; gap: 14px; }
+    .act-icon {
+      width: 34px; height: 34px; border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 16px;
+    }
+    .act-name {
+      font-size: 13px; font-weight: 500; color: var(--champagne);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .act-date { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .act-kpis { margin-left: auto; display: flex; gap: 20px; flex-shrink: 0; align-items: center; }
+    .act-kpi  { text-align: right; }
+    .act-kpi-v {
+      font-size: 13px; font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--body-text);
+    }
+    .act-kpi-l { font-size: 11px; color: var(--faint); margin-top: 1px; }
+
+    /* ── Badge ───────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+      padding: 2px 7px; border-radius: var(--r-sm);
+      border: 1px solid currentColor; opacity: 0.8;
+    }
+
+    /* ── Activity detail page ────────────────────────────── */
+    .detail-header {
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--rule);
       margin-bottom: 28px;
     }
     .detail-sport-chip {
       display: inline-flex; align-items: center; gap: 6px;
-      font-size: 12px; font-weight: 500; color: var(--muted);
-      margin-bottom: 10px;
+      font-size: 12px; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .detail-title {
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 28px; font-weight: 300;
+      color: var(--champagne);
+      letter-spacing: -0.01em; line-height: 1.15;
     }
     .hero-kpis {
       display: flex; gap: 32px; flex-wrap: wrap;
       margin-top: 16px;
     }
     .hero-kpi { display: flex; flex-direction: column; gap: 3px; }
-    .hero-kpi .label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-    .hero-kpi .val   { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1; }
+    .hero-kpi .label {
+      font-size: 11px; color: var(--faint);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .hero-kpi .val {
+      font-size: 22px; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--champagne);
+      letter-spacing: -0.02em; line-height: 1.1;
+    }
 
-    .detail-metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px; }
-    .detail-metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
-    .detail-metric .label { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
-    .detail-metric .val   { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* Performance metrics — dl/dt/dd horizontal table */
+    .perf-dl {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .perf-entry {
+      background: var(--raised);
+      padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .perf-label {
+      font-size: 11px; color: var(--faint);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .perf-val {
+      font-size: 15px; font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--champagne);
+    }
 
-    .te-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
-    .te-score { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
-    .te-lbl   { font-size: 14px; font-weight: 600; margin-top: 4px; }
+    .te-card {
+      background: var(--raised); border: 1px solid var(--rule);
+      border-radius: var(--r-sm); padding: 16px 20px;
+    }
+    .te-score {
+      font-size: 36px; font-weight: 600;
+      letter-spacing: -0.04em; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .te-lbl   { font-size: 13px; font-weight: 500; margin-top: 4px; color: var(--body-text); }
     .te-msg   { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 
     .zone-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .zone-name { font-size: 12px; color: var(--muted); width: 100px; flex-shrink: 0; font-weight: 500; }
-    .zone-bar-track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; flex: 1; }
-    .zone-bar-fill  { height: 6px; border-radius: 3px; transition: width 0.5s ease; }
-    .zone-time { font-size: 12px; color: var(--muted); width: 40px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+    .zone-name { font-size: 12px; color: var(--muted); width: 100px; flex-shrink: 0; }
+    .zone-bar-track { height: 4px; background: var(--graphite-2); border-radius: 2px; overflow: hidden; flex: 1; }
+    .zone-bar-fill  { height: 4px; border-radius: 2px; transition: width 0.5s ease; }
+    .zone-time { font-size: 12px; color: var(--faint); width: 40px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
-    .splits-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .splits-table th { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    .splits-table td { padding: 9px 12px; border-bottom: 1px solid var(--border-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .splits-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .splits-table th {
+      text-align: left; font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--faint); padding: 8px 12px;
+      border-bottom: 1px solid var(--rule); white-space: nowrap;
+    }
+    .splits-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--rule);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+      color: var(--body-text);
+    }
     .splits-table tr:last-child td { border-bottom: none; }
-    .splits-table tr:hover td { background: var(--surface-2); }
+    .splits-table tr:hover td { background: var(--graphite); }
 
-    .desc-block { font-size: 13px; color: var(--muted); line-height: 1.6; border-left: 2px solid var(--border); padding-left: 14px; }
+    .desc-block {
+      font-size: 13px; color: var(--muted); line-height: 1.65;
+      border-left: 1px solid var(--rule-strong);
+      padding-left: 16px;
+    }
 
-    /* ─── Logbook ──────────────────────────────────────────────── */
-    .logbook-stat { display: flex; flex-direction: column; gap: 4px; }
-    .logbook-stat .lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-    .logbook-stat .val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.025em; }
-    .logbook-stat .sub { font-size: 12px; color: var(--muted); }
+    /* ── Logbook ─────────────────────────────────────────── */
+    /* logbook-stats is now a data-strip like wellness */
+    #logbook-stats {
+      display: flex; align-items: center; flex-wrap: wrap;
+      background: var(--raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      padding: 16px 24px;
+      margin-bottom: 16px;
+      gap: 0;
+    }
 
-    .fl-list { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
-    .fl-row { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    .fl-list {
+      border-radius: var(--r-sm); overflow: hidden;
+      border: 1px solid var(--rule);
+      background: var(--raised);
+    }
+    .fl-row {
+      border-bottom: 1px solid var(--rule);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
     .fl-row:last-child { border-bottom: none; }
-    .fl-row:hover { background: var(--surface-2); }
-    .fl-summary { padding: 14px 18px; display: flex; align-items: center; gap: 14px; }
-    .fl-type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fl-row:hover { background: var(--graphite); }
+    .fl-row::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 1px; background: var(--gold);
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .fl-row:hover::before { opacity: 1; }
+    .fl-summary { padding: 13px 18px; display: flex; align-items: center; gap: 14px; }
+    .fl-type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .fl-info { flex: 1; min-width: 0; }
-    .fl-route { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .fl-route {
+      font-size: 14px; font-weight: 600;
+      color: var(--champagne);
+      letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
     .fl-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .fl-kpis  { display: flex; gap: 22px; align-items: center; flex-shrink: 0; }
+    .fl-kpis  { display: flex; gap: 20px; align-items: center; flex-shrink: 0; }
     .fl-kpi   { text-align: right; }
-    .fl-kpi-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .fl-kpi-l { font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .fl-row:hover .row-arrow { color: var(--muted); }
+    .fl-kpi-v {
+      font-size: 13px; font-weight: 500;
+      font-variant-numeric: tabular-nums; color: var(--body-text);
+    }
+    .fl-kpi-l { font-size: 11px; color: var(--faint); margin-top: 1px; }
 
-    /* ─── Flight detail page ───────────────────────────────────── */
-    .flight-route-header {
-      display: flex; align-items: flex-start; gap: 14px;
-      flex-wrap: wrap; margin-bottom: 6px;
+    /* ── Flight detail page ──────────────────────────────── */
+    .flight-detail-header {
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 28px;
     }
     .flight-route-label {
-      font-size: 24px; font-weight: 800;
-      letter-spacing: -0.03em; line-height: 1.1;
-      font-variant-numeric: tabular-nums;
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 32px; font-weight: 300;
+      color: var(--champagne);
+      letter-spacing: -0.01em; line-height: 1.1;
     }
-    .flight-meta { font-size: 13px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .flight-meta-sep { color: var(--border); }
+    .flight-meta {
+      font-size: 13px; color: var(--muted);
+      margin-top: 6px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .flight-meta-sep { color: var(--rule-strong); }
     .flight-hero-stats { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 20px; }
-    .flight-hero-stat .label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-    .flight-hero-stat .val   { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1; }
-    .flight-hero-stat .unit  { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 2px; }
+    .flight-hero-stat .label {
+      font-size: 11px; color: var(--faint);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px;
+    }
+    .flight-hero-stat .val {
+      font-size: 20px; font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--champagne);
+      letter-spacing: -0.02em; line-height: 1.1;
+    }
+    .flight-hero-stat .unit {
+      font-size: 12px; color: var(--muted); margin-left: 2px;
+    }
 
-    #fd-map-container { height: 380px; border-radius: var(--radius-lg); overflow: hidden; margin: 24px 0; border: 1px solid var(--border); }
+    #fd-map-container {
+      height: 360px; border-radius: var(--r-md); overflow: hidden;
+      margin: 24px 0; border: 1px solid var(--rule);
+    }
     #fd-map { height: 100%; }
 
-    .ac-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
-    .ac-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--blue); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-    .ac-specs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px 20px; font-size: 13px; color: var(--muted); }
-    .ac-spec-key { font-weight: 500; color: var(--text-secondary); }
+    .ac-card {
+      background: var(--graphite);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      padding: 16px 20px;
+    }
+    .ac-title {
+      font-size: 14px; font-weight: 600;
+      color: var(--patina-text);
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ac-specs {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 5px 20px; font-size: 13px; color: var(--muted);
+    }
+    .ac-spec-key { font-weight: 500; color: var(--body-text); }
 
-    .approach-tag { display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 40%, transparent); background: color-mix(in srgb, var(--teal) 8%, transparent); }
-    .type-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 20px; border: 1px solid currentColor; opacity: 0.85; }
+    .approach-tag {
+      display: inline-flex; align-items: center;
+      font-size: 12px; font-weight: 400; padding: 3px 10px;
+      border-radius: var(--r-sm); border: 1px solid var(--rule-strong);
+      color: var(--patina-text);
+    }
+    .type-badge {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+      padding: 2px 9px; border-radius: var(--r-sm);
+      border: 1px solid currentColor; opacity: 0.85;
+    }
 
-    /* ─── Charts ───────────────────────────────────────────────── */
-    .apexcharts-tooltip { background: var(--surface) !important; border: 1px solid var(--border) !important; color: var(--text) !important; font-family: 'Inter', sans-serif !important; font-size: 12px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important; }
-    .apexcharts-tooltip-title { background: var(--surface-2) !important; border-bottom: 1px solid var(--border) !important; font-weight: 600 !important; }
-    .apexcharts-xaxistooltip { background: var(--surface) !important; border-color: var(--border) !important; color: var(--text) !important; }
-    .apexcharts-xaxistooltip-bottom::before, .apexcharts-xaxistooltip-bottom::after { border-bottom-color: var(--border) !important; }
+    /* ── Charts overrides ────────────────────────────────── */
+    .apexcharts-tooltip {
+      background: var(--raised) !important;
+      border: 1px solid var(--rule-strong) !important;
+      color: var(--body-text) !important;
+      font-family: 'Albert Sans', sans-serif !important;
+      font-size: 12px !important;
+    }
+    .apexcharts-tooltip-title {
+      background: var(--graphite) !important;
+      border-bottom: 1px solid var(--rule) !important;
+      font-weight: 600 !important; color: var(--champagne) !important;
+    }
+    .apexcharts-xaxistooltip {
+      background: var(--raised) !important;
+      border-color: var(--rule-strong) !important;
+      color: var(--body-text) !important;
+    }
+    .apexcharts-xaxistooltip-bottom::before,
+    .apexcharts-xaxistooltip-bottom::after {
+      border-bottom-color: var(--rule-strong) !important;
+    }
 
-    /* ─── MapLibre overrides ───────────────────────────────────── */
-    .maplibregl-popup-content { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; font-family: 'Inter', sans-serif !important; font-size: 13px !important; padding: 12px 16px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important; }
-    .maplibregl-popup-tip { border-top-color: var(--border) !important; border-bottom-color: var(--border) !important; }
-    .maplibregl-ctrl-group { background: var(--surface) !important; border: 1px solid var(--border) !important; }
-    .maplibregl-ctrl-group button { background: var(--surface) !important; color: var(--muted) !important; border-bottom-color: var(--border) !important; }
-    .maplibregl-ctrl-group button:hover { background: var(--surface-2) !important; }
+    /* ── MapLibre overrides ──────────────────────────────── */
+    .maplibregl-popup-content {
+      background: var(--raised) !important;
+      color: var(--body-text) !important;
+      border: 1px solid var(--rule-strong) !important;
+      border-radius: var(--r-md) !important;
+      font-family: 'Albert Sans', sans-serif !important;
+      font-size: 13px !important;
+      padding: 10px 14px !important;
+    }
+    .maplibregl-popup-tip {
+      border-top-color: var(--rule-strong) !important;
+      border-bottom-color: var(--rule-strong) !important;
+    }
+    .maplibregl-ctrl-group {
+      background: var(--raised) !important;
+      border: 1px solid var(--rule) !important;
+      border-radius: var(--r-sm) !important;
+    }
+    .maplibregl-ctrl-group button {
+      background: var(--raised) !important;
+      color: var(--muted) !important;
+      border-bottom-color: var(--rule) !important;
+    }
+    .maplibregl-ctrl-group button:hover { background: var(--graphite) !important; }
 
-    /* ─── data note ────────────────────────────────────────────── */
-    .data-note { font-size: 12px; color: var(--subtle); display: flex; align-items: center; gap: 4px; }
+    /* ── Chart card ──────────────────────────────────────── */
+    .chart-card {
+      background: var(--raised);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      padding: 18px 20px;
+    }
+    .chart-label {
+      font-size: 12px; color: var(--muted);
+      margin-bottom: 12px; font-weight: 400;
+    }
+
+    /* ── Data note ───────────────────────────────────────── */
+    .data-note { font-size: 12px; color: var(--faint); }
+
+    /* ── Separator for flight detail ─────────────────────── */
+    .detail-rule { border: none; border-top: 1px solid var(--rule); margin: 28px 0; }
 
     @media (max-width: 700px) {
       .fl-kpis, .act-kpis { display: none; }
       .sidebar { width: 52px; }
       .sb-logo { display: none !important; }
       .view-scroller { padding: 20px 16px 40px; }
+      .flight-route-label { font-size: 24px; }
     }
   </style>
 </head>
 <body>
 <div class="app-shell">
 
-  <!-- ─── SIDEBAR ──────────────────────────────────────────────── -->
+  <!-- ─── SIDEBAR ─────────────────────────────────────────── -->
   <nav class="sidebar" id="sidebar">
     <div class="sb-head">
       <div class="avatar" id="nav-avatar">
-        <i class="ph-bold ph-user" style="color:var(--muted)"></i>
+        <i class="ph-bold ph-user" style="color:var(--faint)"></i>
       </div>
       <div class="sb-logo" id="nav-name">Loading…</div>
       <button class="sb-toggle" id="sb-toggle" title="Toggle sidebar">
@@ -412,7 +758,7 @@
     </div>
   </nav>
 
-  <!-- ─── MAIN ─────────────────────────────────────────────────── -->
+  <!-- ─── MAIN ────────────────────────────────────────────── -->
   <div class="main-wrap">
     <div class="topbar">
       <button class="back-btn" id="back-btn">
@@ -429,96 +775,84 @@
 
     <div class="view-scroller" id="view-scroller">
 
-      <!-- OVERVIEW ─────────────────────────────────────────────── -->
+      <!-- OVERVIEW ──────────────────────────────────────────── -->
       <div class="view active" id="view-overview">
+
+        <!-- Today's wellness strip -->
         <div class="section-first">
-          <h2 style="margin-bottom:12px">
-            <i class="ph-bold ph-heartbeat"></i> Today's Snapshot
-            <span id="data-date" class="data-note" style="text-transform:none;letter-spacing:0;margin-left:4px;font-weight:400"></span>
-          </h2>
-          <div class="grid-5" id="wellness-row">
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Today</span>
+            <span id="data-date" class="data-note"></span>
           </div>
+          <div id="wellness-strip" class="skel" style="height:64px"></div>
         </div>
+
+        <!-- 7-day ledger -->
         <div class="section">
-          <h2 style="margin-bottom:12px"><i class="ph-bold ph-calendar-dots"></i> Last 7 Days</h2>
-          <div class="grid-4" id="weekly-row">
-            <div class="card skel" style="height:120px"></div>
-            <div class="card skel" style="height:120px"></div>
-            <div class="card skel" style="height:120px"></div>
-            <div class="card skel" style="height:120px"></div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Last 7 days</span>
           </div>
+          <div id="weekly-ledger" class="skel" style="height:120px"></div>
         </div>
+
+        <!-- Trend charts 2×2 -->
         <div class="section">
-          <h2 style="margin-bottom:14px"><i class="ph-bold ph-chart-line"></i> Activity Trends</h2>
           <div class="grid-2">
-            <div class="card">
-              <div class="eyebrow" style="margin-bottom:12px">30-Day Volume <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400">(miles)</span></div>
+            <div class="chart-card">
+              <div class="chart-label">30-day volume <span style="color:var(--faint)">(miles)</span></div>
               <div id="chart-volume"></div>
             </div>
-            <div class="card">
-              <div class="eyebrow" style="margin-bottom:12px">30-Day Training Load</div>
+            <div class="chart-card">
+              <div class="chart-label">30-day training load</div>
               <div id="chart-load"></div>
             </div>
-            <div class="card">
-              <div class="eyebrow" style="margin-bottom:12px">7-Day Heart Rate</div>
+            <div class="chart-card">
+              <div class="chart-label">7-day heart rate</div>
               <div id="chart-hr"></div>
             </div>
-            <div class="card">
-              <div class="eyebrow" style="margin-bottom:12px">Last Activity — HR Zones
-                <span id="zones-label" style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400"></span>
-              </div>
+            <div class="chart-card">
+              <div class="chart-label">Last activity — HR zones <span id="zones-label" style="color:var(--faint)"></span></div>
               <div id="chart-zones"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ACTIVITIES LIST ──────────────────────────────────────── -->
+      <!-- ACTIVITIES LIST ──────────────────────────────────── -->
       <div class="view" id="view-activities">
         <div class="section-first">
-          <h2 style="margin-bottom:12px">
-            <i class="ph-bold ph-list-bullets"></i> Activities
-            <span id="act-count" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px"></span>
-          </h2>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Activities</span>
+            <span id="act-count" class="data-note"></span>
+          </div>
           <div class="act-list" id="act-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
           </div>
         </div>
       </div>
 
-      <!-- ACTIVITY DETAIL ──────────────────────────────────────── -->
+      <!-- ACTIVITY DETAIL ──────────────────────────────────── -->
       <div class="view" id="view-activity-detail">
         <div id="activity-detail-content">
           <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
         </div>
       </div>
 
-      <!-- LOGBOOK ──────────────────────────────────────────────── -->
+      <!-- LOGBOOK ────────────────────────────────────────────── -->
       <div class="view" id="view-logbook">
         <div class="section-first">
-          <h2 style="margin-bottom:14px">
-            <i class="ph-bold ph-airplane"></i> Flight Log
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;margin-left:4px" id="fl-subtitle"></span>
-          </h2>
-          <div class="grid-5" id="logbook-stats" style="margin-bottom:16px">
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
-            <div class="card card-sm skel" style="height:88px"></div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Flight Log</span>
+            <span id="fl-subtitle" class="data-note"></span>
           </div>
+          <div id="logbook-stats" class="skel" style="height:64px;margin-bottom:16px"></div>
           <div class="fl-list" id="fl-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
           </div>
         </div>
       </div>
 
-      <!-- FLIGHT DETAIL ────────────────────────────────────────── -->
+      <!-- FLIGHT DETAIL ──────────────────────────────────────── -->
       <div class="view" id="view-flight-detail">
         <div id="flight-detail-content"></div>
       </div>
@@ -535,39 +869,39 @@
 const M_TO_MI = 0.000621371;
 
 const SPORT_CFG = {
-  running:  { color: '#3fb950', icon: 'ph-person-simple-run',  label: 'Running'  },
-  cycling:  { color: '#e3b341', icon: 'ph-bicycle',             label: 'Cycling'  },
-  swimming: { color: '#58a6ff', icon: 'ph-waves',               label: 'Swimming' },
-  rowing:   { color: '#db61a2', icon: 'ph-rowing',              label: 'Rowing'   },
-  other:    { color: '#8b949e', icon: 'ph-activity',            label: 'Other'    },
+  running:  { color: 'oklch(65% 0.16 145)', icon: 'ph-person-simple-run',  label: 'Running'  },
+  cycling:  { color: 'oklch(80% 0.17 85)',  icon: 'ph-bicycle',             label: 'Cycling'  },
+  swimming: { color: 'oklch(68% 0.15 235)', icon: 'ph-waves',               label: 'Swimming' },
+  rowing:   { color: 'oklch(65% 0.15 350)', icon: 'ph-rowing',              label: 'Rowing'   },
+  other:    { color: 'oklch(62% 0 0)',       icon: 'ph-activity',            label: 'Other'    },
 };
 
 const HR_ZONES = [
-  { name: 'Z1 Recovery',  color: '#58a6ff' },
-  { name: 'Z2 Base',      color: '#3fb950' },
-  { name: 'Z3 Tempo',     color: '#e3b341' },
-  { name: 'Z4 Threshold', color: '#f0883e' },
-  { name: 'Z5 VO2Max',    color: '#f85149' },
+  { name: 'Z1 Recovery',  color: 'oklch(68% 0.15 235)' },
+  { name: 'Z2 Base',      color: 'oklch(65% 0.16 145)' },
+  { name: 'Z3 Tempo',     color: 'oklch(80% 0.17 85)'  },
+  { name: 'Z4 Threshold', color: 'oklch(72% 0.17 55)'  },
+  { name: 'Z5 VO2Max',    color: 'oklch(65% 0.18 25)'  },
 ];
 
 const SPLIT_META = {
-  INTERVAL_WARMUP:   { label: 'Warmup',   color: '#3fb950' },
-  INTERVAL_ACTIVE:   { label: 'Active',   color: '#f85149' },
-  INTERVAL_RECOVERY: { label: 'Recovery', color: '#58a6ff' },
-  INTERVAL_COOLDOWN: { label: 'Cooldown', color: '#bc8cff' },
-  RWD_RUN:           { label: 'Run',      color: '#3fb950' },
-  RWD_STAND:         { label: 'Stand',    color: '#6e7681' },
-  RWD_WALK:          { label: 'Walk',     color: '#8b949e' },
+  INTERVAL_WARMUP:   { label: 'Warmup',   color: 'oklch(65% 0.16 145)' },
+  INTERVAL_ACTIVE:   { label: 'Active',   color: 'oklch(65% 0.18 25)'  },
+  INTERVAL_RECOVERY: { label: 'Recovery', color: 'oklch(68% 0.15 235)' },
+  INTERVAL_COOLDOWN: { label: 'Cooldown', color: 'oklch(70% 0.12 188)' },
+  RWD_RUN:           { label: 'Run',      color: 'oklch(65% 0.16 145)' },
+  RWD_STAND:         { label: 'Stand',    color: 'oklch(52% 0 0)'      },
+  RWD_WALK:          { label: 'Walk',     color: 'oklch(62% 0 0)'      },
 };
 
 const TYPE_CFG = {
-  maneuvers:     { color: '#bc8cff', label: 'Maneuvers' },
-  pattern:       { color: '#3fb950', label: 'Pattern'   },
-  'x-country':   { color: '#58a6ff', label: 'X-Country' },
-  night:         { color: '#e3b341', label: 'Night'     },
-  instrument:    { color: '#39d353', label: 'Instrument'},
-  solo:          { color: '#db61a2', label: 'Solo'      },
-  checkride_prep:{ color: '#f0883e', label: 'Checkride Prep' },
+  maneuvers:     { color: 'oklch(70% 0.12 188)', label: 'Maneuvers' },
+  pattern:       { color: 'oklch(65% 0.16 145)', label: 'Pattern'   },
+  'x-country':   { color: 'oklch(68% 0.15 235)', label: 'X-Country' },
+  night:         { color: 'oklch(80% 0.17 85)',  label: 'Night'     },
+  instrument:    { color: 'oklch(76% 0.088 190)',label: 'Instrument'},
+  solo:          { color: 'oklch(65% 0.15 350)', label: 'Solo'      },
+  checkride_prep:{ color: 'oklch(72% 0.17 55)',  label: 'Checkride Prep' },
 };
 
 const VIEW_TITLES = {
@@ -577,7 +911,7 @@ const VIEW_TITLES = {
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
 let _chartsBuilt = false;
-let _fdMap = null; // flight detail map instance
+let _fdMap = null;
 
 // ─── theme ────────────────────────────────────────────────────────────────────
 let theme = localStorage.getItem('dash-theme') || 'dark';
@@ -637,7 +971,7 @@ function normSport(t) {
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function typeColor(t) { return (TYPE_CFG[t]||{}).color || '#8b949e'; }
+function typeColor(t) { return (TYPE_CFG[t]||{}).color || 'oklch(62% 0 0)'; }
 function typeLabel(t) { return (TYPE_CFG[t]||{}).label || (t||'Other'); }
 function routeLabel(f) {
   const stops = [f.departure?.icao || f.departure_icao];
@@ -648,8 +982,13 @@ function routeLabel(f) {
 
 // ─── chart defaults ───────────────────────────────────────────────────────────
 const CHART_OPTS = {
-  chart: { background: 'transparent', toolbar: { show: false }, fontFamily: 'Inter, sans-serif', foreColor: '#8b949e' },
-  grid:  { borderColor: '#21262d', strokeDashArray: 3 },
+  chart: {
+    background: 'transparent',
+    toolbar: { show: false },
+    fontFamily: 'Albert Sans, system-ui, sans-serif',
+    foreColor: 'oklch(72% 0 0)',
+  },
+  grid:  { borderColor: 'oklch(15% 0.008 95)', strokeDashArray: 3 },
   tooltip: { theme: 'dark' },
   stroke: { curve: 'smooth' },
 };
@@ -660,12 +999,10 @@ function showView(viewId, opts = {}) {
   const el = document.getElementById('view-' + viewId);
   if (el) el.classList.add('active');
 
-  // Sidebar active state (detail pages highlight parent)
   const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook' }[viewId] || viewId;
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll(`.sb-item[data-view="${sidebarKey}"]`).forEach(n => n.classList.add('active'));
 
-  // Topbar
   const backBtn  = document.getElementById('back-btn');
   const backSep  = document.getElementById('back-sep');
   const backLbl  = document.getElementById('back-label');
@@ -766,36 +1103,40 @@ function renderWellness(daily) {
     el.textContent = isToday ? '' : '· as of ' + new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   }
 
-  const tiles = [
-    { icon:'ph-person-simple-walk', color:'var(--green)',  label:'Steps',
-      value: steps ? steps.toLocaleString() : '—', unit:'',
-      sub: steps ? (steps>=10000 ? '✓ Goal reached' : `${(10000-steps).toLocaleString()} to goal`) : '',
-      subClass: steps>=10000 ? 'trend up' : 'trend' },
-    { icon:'ph-heart',    color:'var(--rose)',   label:'Resting HR',
-      value: rhr ? String(rhr) : '—', unit: rhr?'bpm':'',
-      sub: avgRhr&&rhr ? (rhr<=avgRhr?`↓ ${avgRhr-rhr} below avg`:`↑ ${rhr-avgRhr} above avg`) : avgRhr?`7d avg: ${avgRhr}`:'' },
-    { icon:'ph-heartbeat', color:'var(--orange)', label:'Max HR',
-      value: maxHR ? String(maxHR) : '—', unit: maxHR?'bpm':'', sub:'' },
-    { icon:'ph-moon',     color:'var(--purple)', label:'Sleep',
-      value: sleep ? (sleep/3600).toFixed(1) : '—', unit: sleep?'hrs':'',
-      sub: (deep&&rem) ? `${(deep/3600).toFixed(1)}h deep · ${(rem/3600).toFixed(1)}h REM` : '' },
-    { icon:'ph-wind',     color:'var(--blue)',   label:'SpO₂',
-      value: spo2 ? Math.round(spo2)+'%' : '—', unit:'',
-      sub: spo2 ? (spo2>=95?'Normal':'Below normal') : '',
-      subClass: spo2&&spo2<95?'trend down':'trend' },
-  ];
+  const stepSub = steps ? (steps>=10000 ? 'goal reached' : `${(10000-steps).toLocaleString()} to go`) : '';
+  const rhrSub  = avgRhr&&rhr ? (rhr<=avgRhr?`↓${avgRhr-rhr} avg`:`↑${rhr-avgRhr} avg`) : '';
+  const sleepHrs = sleep ? (sleep/3600).toFixed(1) : null;
+  const spo2pct  = spo2 ? Math.round(spo2)+'%' : null;
 
-  document.getElementById('wellness-row').innerHTML = tiles.map(t => `
-    <div class="card card-sm wellness-card">
-      <div class="eyebrow" style="display:flex;align-items:center;gap:5px">
-        <i class="ph-bold ${t.icon}" style="color:${t.color};font-size:12px"></i>${t.label}
-      </div>
-      <div style="display:flex;align-items:baseline;gap:3px;margin-top:6px">
-        <span class="metric-val" style="font-size:22px;color:${t.value==='—'?'var(--muted)':t.color}">${t.value}</span>
-        ${t.unit ? `<span class="metric-unit">${t.unit}</span>` : ''}
-      </div>
-      ${t.sub ? `<div class="${t.subClass||'trend'}" style="margin-top:2px">${t.sub}</div>` : ''}
-    </div>`).join('');
+  document.getElementById('wellness-strip').innerHTML = `
+    <div class="dp">
+      <span class="dp-n">${steps ? steps.toLocaleString() : '—'}</span>
+      <span class="dp-u">steps</span>
+      ${stepSub ? `<span class="dp-s">${stepSub}</span>` : ''}
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:var(--patina-text)">${rhr || '—'}</span>
+      <span class="dp-u">bpm rhr</span>
+      ${rhrSub ? `<span class="dp-s">${rhrSub}</span>` : ''}
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n">${maxHR || '—'}</span>
+      <span class="dp-u">bpm max</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n">${sleepHrs || '—'}</span>
+      <span class="dp-u">hrs sleep</span>
+      ${(deep&&rem) ? `<span class="dp-s">${(deep/3600).toFixed(1)}h deep</span>` : ''}
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="${spo2&&spo2<95?'color:var(--warn)':''}">${spo2pct || '—'}</span>
+      <span class="dp-u">SpO₂</span>
+    </div>
+  `;
 }
 
 // ─── weekly ───────────────────────────────────────────────────────────────────
@@ -811,29 +1152,32 @@ function renderWeekly(bySport) {
       buckets[b].calories += val.calories;
     }
   }
-  document.getElementById('weekly-row').innerHTML = ['running','cycling','swimming','rowing'].map(sp => {
+
+  const sports = ['running','cycling','swimming','rowing'];
+  const rows = sports.filter(sp => buckets[sp]?.count).map(sp => {
     const s = buckets[sp];
     const { color, label } = SPORT_CFG[sp];
-    if (!s || !s.count) return `
-      <div class="card" style="opacity:0.4">
-        <div class="sport-header"><span class="sport-dot" style="background:${color}"></span><span class="sport-name">${label}</span></div>
-        <div class="body-sm" style="margin-top:10px">No sessions</div>
-      </div>`;
+    const count = s.count;
+    const dist  = s.distance_m ? fmtDist(s.distance_m) : '—';
+    const time  = s.moving_time_s ? fmtTime(s.moving_time_s) : '—';
+    const calories = s.calories ? Math.round(s.calories).toLocaleString() + ' kcal' : '—';
     return `
-      <div class="card sport-card">
-        <div class="sport-header">
-          <span class="sport-dot" style="background:${color}"></span>
-          <span class="sport-name">${label}</span>
-          <span class="sport-count">${s.count} session${s.count>1?'s':''}</span>
-        </div>
-        <div class="sport-metrics">
-          <div><div class="sport-metric-label">Distance</div><div class="sport-metric-val" style="color:${color}">${fmtDist(s.distance_m)}</div></div>
-          <div><div class="sport-metric-label">Time</div><div class="sport-metric-val">${fmtTime(s.moving_time_s)}</div></div>
-          ${s.distance_m ? `<div><div class="sport-metric-label">Avg/session</div><div class="sport-metric-val">${fmtDist(s.distance_m/s.count)}</div></div>` : ''}
-          ${s.calories ? `<div><div class="sport-metric-label">Calories</div><div class="sport-metric-val">${Math.round(s.calories).toLocaleString()}</div></div>` : ''}
-        </div>
+      <div class="sl-row">
+        <span class="sl-dot" style="background:${color}"></span>
+        <span class="sl-name">${label}</span>
+        <span class="sl-val">${count} session${count>1?'s':''}</span>
+        <span class="sl-val">${dist}</span>
+        <span class="sl-val">${time}</span>
+        <span class="sl-val">${calories}</span>
       </div>`;
-  }).join('');
+  });
+
+  if (!rows.length) {
+    document.getElementById('weekly-ledger').innerHTML =
+      '<div class="sl-empty">No sessions recorded this week.</div>';
+  } else {
+    document.getElementById('weekly-ledger').innerHTML = rows.join('');
+  }
 }
 
 // ─── charts ───────────────────────────────────────────────────────────────────
@@ -849,19 +1193,19 @@ function buildVolumeChart(activities) {
   const sorted = Object.keys(days).sort();
   new ApexCharts(document.getElementById('chart-volume'), {
     ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type: 'area', height: 190, stacked: true },
+    chart: { ...CHART_OPTS.chart, type: 'area', height: 180, stacked: true },
     series: ['running','cycling','swimming','rowing','other'].map(sp => ({
       name: SPORT_CFG[sp].label,
       data: sorted.map(d => parseFloat(((days[d]||{})[sp]||0).toFixed(2))),
     })),
     xaxis: { categories: sorted.map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'})),
-      labels: { style:{ fontSize:'11px' }, formatter:(v,i)=>{ const step=Math.max(1,Math.floor(sorted.length/6)); return i%step===0?v:''; } } },
-    yaxis: { labels: { formatter: v => v.toFixed(1), style:{ fontSize:'11px' } } },
-    colors: ['#3fb950','#e3b341','#58a6ff','#db61a2','#8b949e'],
-    fill:  { type:'gradient', gradient:{ opacityFrom:0.7, opacityTo:0.2 } },
+      labels: { style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' }, formatter:(v,i)=>{ const step=Math.max(1,Math.floor(sorted.length/6)); return i%step===0?v:''; } } },
+    yaxis: { labels: { formatter: v => v.toFixed(1), style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' } } },
+    colors: ['oklch(65% 0.16 145)','oklch(80% 0.17 85)','oklch(68% 0.15 235)','oklch(65% 0.15 350)','oklch(62% 0 0)'],
+    fill:  { type:'gradient', gradient:{ opacityFrom:0.65, opacityTo:0.1 } },
     stroke: { width: 1.5, curve: 'smooth' },
     dataLabels: { enabled: false },
-    legend: { show: true, fontSize: '11px', offsetY: 4 },
+    legend: { show: true, fontSize: '11px', fontFamily: 'Albert Sans, sans-serif', offsetY: 4 },
     tooltip: { ...CHART_OPTS.tooltip, y: { formatter: v => v.toFixed(2)+' mi' } },
   }).render();
 }
@@ -875,15 +1219,15 @@ function buildLoadChart(activities) {
   const sports = recent.map(a => normSport(a.activityType?.typeKey));
   new ApexCharts(document.getElementById('chart-load'), {
     ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type: 'bar', height: 190 },
+    chart: { ...CHART_OPTS.chart, type: 'bar', height: 180 },
     series: [{ name:'Load', type:'bar', data:loads }, { name:'7d avg', type:'line', data:avg7 }],
-    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{ style:{fontSize:'11px'} } },
-    yaxis: { labels: { style:{ fontSize:'11px' } } },
-    colors: sports.map(sp => SPORT_CFG[sp].color).concat(['#8b949e']),
-    plotOptions: { bar: { borderRadius:3, columnWidth:'65%' } },
+    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{ style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
+    yaxis: { labels: { style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' } } },
+    colors: sports.map(sp => SPORT_CFG[sp].color).concat(['oklch(62% 0 0)']),
+    plotOptions: { bar: { borderRadius:2, columnWidth:'65%' } },
     stroke: { width:[0,2], curve:'smooth' },
     dataLabels: { enabled:false },
-    legend: { show:true, fontSize:'11px', offsetY:4 },
+    legend: { show:true, fontSize:'11px', fontFamily:'Albert Sans, sans-serif', offsetY:4 },
     fill: { opacity:[0.85,1] },
   }).render();
 }
@@ -894,18 +1238,18 @@ function buildHRChart(activities) {
     .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
   new ApexCharts(document.getElementById('chart-hr'), {
     ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type:'line', height:190 },
+    chart: { ...CHART_OPTS.chart, type:'line', height:180 },
     series: [
       { name:'Avg HR', data: recent.map(a => Math.round(a.averageHR)) },
       { name:'Max HR', data: recent.map(a => Math.round(a.maxHR||0)) },
     ],
-    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{style:{fontSize:'11px'}} },
-    yaxis: { labels: { formatter: v => v+' bpm', style:{fontSize:'11px'} } },
-    colors: ['#db61a2','#f0883e'],
+    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'}} },
+    yaxis: { labels: { formatter: v => v+' bpm', style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
+    colors: ['oklch(65% 0.15 350)','oklch(72% 0.17 55)'],
     stroke: { width:[2.5,1.5], dashArray:[0,4] },
-    markers: { size:4 },
+    markers: { size:3 },
     dataLabels: { enabled:false },
-    legend: { show:true, fontSize:'11px', offsetY:4 },
+    legend: { show:true, fontSize:'11px', fontFamily:'Albert Sans, sans-serif', offsetY:4 },
     tooltip: { ...CHART_OPTS.tooltip, y:{ formatter:v => v+' bpm' } },
   }).render();
 }
@@ -917,12 +1261,12 @@ function buildZonesChart(activity) {
   if (!zones.length) { document.getElementById('chart-zones').textContent = 'No zone data'; return; }
   new ApexCharts(document.getElementById('chart-zones'), {
     ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type:'bar', height:190 },
+    chart: { ...CHART_OPTS.chart, type:'bar', height:180 },
     series: [{ name:'Minutes', data:zones.map(z=>z.mins) }],
-    xaxis: { categories: zones.map(z=>z.name), labels:{style:{fontSize:'11px'}} },
-    yaxis: { labels: { formatter:v=>v+'m', style:{fontSize:'11px'} } },
+    xaxis: { categories: zones.map(z=>z.name), labels:{style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'}} },
+    yaxis: { labels: { formatter:v=>v+'m', style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
     colors: zones.map(z=>z.color),
-    plotOptions: { bar:{ distributed:true, borderRadius:4, columnWidth:'55%' } },
+    plotOptions: { bar:{ distributed:true, borderRadius:2, columnWidth:'55%' } },
     dataLabels: { enabled:false },
     legend: { show:false },
     tooltip: { ...CHART_OPTS.tooltip, y:{ formatter:v=>v+' min' } },
@@ -942,12 +1286,12 @@ function renderActivities(activities) {
     const te = a.trainingEffectLabel;
     return `<div class="act-row" data-id="${id}">
       <div class="act-summary">
-        <div class="act-icon" style="background:${color}18">
+        <div class="act-icon" style="background:color-mix(in oklch, ${color} 15%, var(--raised))">
           <i class="ph-bold ${icon}" style="color:${color}"></i>
         </div>
         <div style="flex:1;min-width:0">
           <div class="act-name">${esc(a.activityName||label)}</div>
-          <div class="act-date">${fmtDate(a.startTimeLocal)} · ${label}</div>
+          <div class="act-date">${fmtDate(a.startTimeLocal)} · <span style="color:var(--faint)">${label}</span></div>
         </div>
         <div class="act-kpis">
           ${a.distance > 0 ? `<div class="act-kpi">
@@ -955,16 +1299,15 @@ function renderActivities(activities) {
             <div class="act-kpi-l">${fmtTime(a.movingDuration||a.duration)}</div>
           </div>` : (a.movingDuration > 0 ? `<div class="act-kpi-v">${fmtTime(a.movingDuration)}</div>` : '')}
           ${a.averageHR > 0 ? `<div class="act-kpi">
-            <div class="act-kpi-v" style="color:#db61a2">${a.averageHR} bpm</div>
+            <div class="act-kpi-v" style="color:oklch(65% 0.15 350)">${a.averageHR} bpm</div>
             <div class="act-kpi-l">avg HR</div>
           </div>` : ''}
           ${a.activityTrainingLoad > 0 ? `<div class="act-kpi">
-            <div class="act-kpi-v" style="color:#bc8cff">${Math.round(a.activityTrainingLoad)}</div>
+            <div class="act-kpi-v" style="color:var(--patina-text)">${Math.round(a.activityTrainingLoad)}</div>
             <div class="act-kpi-l">load</div>
           </div>` : ''}
-          ${te ? `<span class="badge" style="color:var(--muted)">${esc(te.toLowerCase())}</span>` : ''}
+          ${te ? `<span class="badge" style="color:var(--faint);border-color:var(--rule)">${esc(te.toLowerCase())}</span>` : ''}
         </div>
-        <i class="ph-bold ph-arrow-right row-arrow"></i>
       </div>
     </div>`;
   }).join('');
@@ -990,20 +1333,20 @@ async function showActivityDetail(id) {
   const content = document.getElementById('activity-detail-content');
   const heroKpis = [
     a.distance > 0 ? { label:'Distance', val: fmtDist(a.distance), color } : null,
-    (a.movingDuration||a.duration) > 0 ? { label:'Duration', val: fmtTime(a.movingDuration||a.duration), color: 'var(--text)' } : null,
-    a.averageSpeed > 0 ? { label: sport==='cycling'?'Speed':'Pace', val: fmtSpeed(a.averageSpeed, sport), color:'var(--text)' } : null,
-    a.averageHR > 0 ? { label:'Avg HR', val: a.averageHR+' bpm', color:'#db61a2' } : null,
+    (a.movingDuration||a.duration) > 0 ? { label:'Duration', val: fmtTime(a.movingDuration||a.duration), color: 'var(--champagne)' } : null,
+    a.averageSpeed > 0 ? { label: sport==='cycling'?'Speed':'Pace', val: fmtSpeed(a.averageSpeed, sport), color:'var(--champagne)' } : null,
+    a.averageHR > 0 ? { label:'Avg HR', val: a.averageHR+' bpm', color:'oklch(65% 0.15 350)' } : null,
   ].filter(Boolean);
 
   content.innerHTML = `
-    <div class="detail-hero">
+    <div class="detail-header">
       <div class="detail-sport-chip">
-        <i class="ph-bold ${icon}" style="color:${color};font-size:14px"></i>
+        <i class="ph-bold ${icon}" style="color:${color};font-size:13px"></i>
         ${label}
-        <span style="color:var(--border)">·</span>
+        <span style="color:var(--rule-strong)">·</span>
         ${fmtDateLong(a.startTimeLocal)}
       </div>
-      <div class="page-title">${esc(a.activityName||label)}</div>
+      <div class="detail-title">${esc(a.activityName||label)}</div>
       <div class="hero-kpis">
         ${heroKpis.map(k => `<div class="hero-kpi">
           <div class="label">${k.label}</div>
@@ -1020,7 +1363,7 @@ async function showActivityDetail(id) {
     document.getElementById('act-detail-body').innerHTML = buildActivityDetailHTML(a, detail);
   } catch(e) {
     document.getElementById('act-detail-body').innerHTML =
-      `<div style="color:var(--rose);font-size:13px">Failed to load activity detail.</div>`;
+      `<div style="color:var(--warn);font-size:13px">Failed to load activity detail.</div>`;
   }
 }
 
@@ -1032,48 +1375,49 @@ function buildActivityDetailHTML(a, detail) {
   const bbDiff = s.differenceBodyBattery ?? a.differenceBodyBattery;
 
   const metrics = [
-    ['Avg HR',        a.averageHR ? Math.round(a.averageHR)+' bpm' : null,      '#db61a2'],
-    ['Max HR',        a.maxHR ? Math.round(a.maxHR)+' bpm' : null,              '#f0883e'],
-    ['Min HR',        s.minHR ? Math.round(s.minHR)+' bpm' : null,              '#58a6ff'],
-    ['Avg Power',     (s.averagePower||a.avgPower) ? Math.round(s.averagePower||a.avgPower)+' W' : null, '#e3b341'],
-    ['Norm Power',    (s.normalizedPower||a.normPower) ? Math.round(s.normalizedPower||a.normPower)+' W' : null, '#e3b341'],
-    ['Max Power',     (s.maxPower||a.maxPower) ? Math.round(s.maxPower||a.maxPower)+' W' : null, '#f0883e'],
+    ['Avg HR',        a.averageHR ? Math.round(a.averageHR)+' bpm' : null,      'oklch(65% 0.15 350)'],
+    ['Max HR',        a.maxHR ? Math.round(a.maxHR)+' bpm' : null,              'oklch(72% 0.17 55)'],
+    ['Min HR',        s.minHR ? Math.round(s.minHR)+' bpm' : null,              'oklch(68% 0.15 235)'],
+    ['Avg Power',     (s.averagePower||a.avgPower) ? Math.round(s.averagePower||a.avgPower)+' W' : null, 'oklch(80% 0.17 85)'],
+    ['Norm Power',    (s.normalizedPower||a.normPower) ? Math.round(s.normalizedPower||a.normPower)+' W' : null, 'oklch(80% 0.17 85)'],
+    ['Max Power',     (s.maxPower||a.maxPower) ? Math.round(s.maxPower||a.maxPower)+' W' : null, 'oklch(72% 0.17 55)'],
     ['Pace',          fmtSpeed(s.averageSpeed||a.averageSpeed, sport) !== '—' ? fmtSpeed(s.averageSpeed||a.averageSpeed, sport) : null],
     ['Max Pace',      fmtSpeed(s.maxSpeed||a.maxSpeed, sport) !== '—' ? fmtSpeed(s.maxSpeed||a.maxSpeed, sport) : null],
     ['Cadence',       (s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute) ? Math.round(s.averageRunCadence||a.averageRunningCadenceInStepsPerMinute)+' spm' : null],
     ['Stride',        (s.strideLength||a.avgStrideLength) ? ((s.strideLength||a.avgStrideLength)/100).toFixed(2)+' m' : null],
     ['Gnd Contact',   (s.groundContactTime||a.avgGroundContactTime) ? Math.round(s.groundContactTime||a.avgGroundContactTime)+' ms' : null],
     ['Vert Osc',      (s.verticalOscillation||a.avgVerticalOscillation) ? (s.verticalOscillation||a.avgVerticalOscillation).toFixed(1)+' cm' : null],
-    ['Training Load', (s.activityTrainingLoad||a.activityTrainingLoad) ? Math.round(s.activityTrainingLoad||a.activityTrainingLoad) : null, '#bc8cff'],
+    ['Training Load', (s.activityTrainingLoad||a.activityTrainingLoad) ? Math.round(s.activityTrainingLoad||a.activityTrainingLoad) : null, 'var(--patina-text)'],
     ['Calories',      (s.calories||a.calories) ? (s.calories||a.calories)+' kcal' : null],
-    ['Body Battery',  bbDiff != null ? (bbDiff>0?'+':'')+bbDiff : null, bbDiff > 0 ? '#3fb950' : '#f85149'],
+    ['Body Battery',  bbDiff != null ? (bbDiff>0?'+':'')+bbDiff : null, bbDiff > 0 ? 'oklch(65% 0.16 145)' : 'oklch(65% 0.18 25)'],
     ['Total Work',    s.totalWork ? s.totalWork.toFixed(1)+' kJ' : null],
     ['Steps',         (s.steps||a.steps) ? (s.steps||a.steps).toLocaleString() : null],
     ['Laps',          meta.lapCount != null ? String(meta.lapCount) : null],
   ].filter(([,v]) => v);
 
   const metricsHTML = metrics.length ? `
-    <div class="section-header">Performance</div>
-    <div class="detail-metric-grid">
-      ${metrics.map(([l,v,c]) => `<div class="detail-metric">
-        <div class="label">${l}</div>
-        <div class="val" ${c?`style="color:${c}"`:''}>${esc(v)}</div>
+    <div class="section-label" style="margin-bottom:10px">Performance</div>
+    <div class="perf-dl">
+      ${metrics.map(([l,v,c]) => `<div class="perf-entry">
+        <span class="perf-label">${l}</span>
+        <span class="perf-val" ${c?`style="color:${c}"`:''}>${esc(v)}</span>
       </div>`).join('')}
     </div>` : '';
 
   let teHTML = '';
   if (a.aerobicTrainingEffect > 0 || a.anaerobicTrainingEffect > 0) {
-    teHTML = `<div class="section-header" style="margin-top:28px">Training Effect</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px">
+    teHTML = `<hr class="detail-rule">
+    <div class="section-label" style="margin-bottom:12px">Training Effect</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px">
       ${a.aerobicTrainingEffect > 0 ? `<div class="te-card">
-        <div class="eyebrow" style="margin-bottom:8px">Aerobic</div>
-        <div class="te-score" style="color:#3fb950">${a.aerobicTrainingEffect.toFixed(1)}</div>
-        <div class="te-lbl" style="color:#3fb950">${esc((a.trainingEffectLabel||'').toLowerCase())}</div>
+        <div style="font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Aerobic</div>
+        <div class="te-score" style="color:oklch(65% 0.16 145)">${a.aerobicTrainingEffect.toFixed(1)}</div>
+        <div class="te-lbl">${esc((a.trainingEffectLabel||'').toLowerCase())}</div>
         <div class="te-msg">${esc((a.aerobicTrainingEffectMessage||'').replace(/_/g,' ').toLowerCase())}</div>
       </div>` : ''}
       ${a.anaerobicTrainingEffect > 0 ? `<div class="te-card">
-        <div class="eyebrow" style="margin-bottom:8px">Anaerobic</div>
-        <div class="te-score" style="color:#e3b341">${a.anaerobicTrainingEffect.toFixed(1)}</div>
+        <div style="font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Anaerobic</div>
+        <div class="te-score" style="color:oklch(80% 0.17 85)">${a.anaerobicTrainingEffect.toFixed(1)}</div>
         <div class="te-msg">${esc((a.anaerobicTrainingEffectMessage||'').replace(/_/g,' ').toLowerCase())}</div>
       </div>` : ''}
     </div>`;
@@ -1091,22 +1435,24 @@ function buildActivityDetailHTML(a, detail) {
 
   let zonesHTML = '';
   if (hrTotal || pwrTotal) {
-    zonesHTML = `<div class="section-header" style="margin-top:28px">Zones</div>
+    zonesHTML = `<hr class="detail-rule">
+    <div class="section-label" style="margin-bottom:12px">Zones</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-bottom:24px">
-      ${hrTotal  ? `<div><div class="eyebrow" style="margin-bottom:12px">Heart Rate</div>${hrZones.filter(z=>z.secs>0).map(z=>zoneBar(z,hrTotal)).join('')}</div>` : ''}
-      ${pwrTotal ? `<div><div class="eyebrow" style="margin-bottom:12px">Power</div>${pwrZones.filter(z=>z.secs>0).map(z=>zoneBar(z,pwrTotal)).join('')}</div>` : ''}
+      ${hrTotal  ? `<div><div style="font-size:11px;color:var(--faint);margin-bottom:10px">Heart Rate</div>${hrZones.filter(z=>z.secs>0).map(z=>zoneBar(z,hrTotal)).join('')}</div>` : ''}
+      ${pwrTotal ? `<div><div style="font-size:11px;color:var(--faint);margin-bottom:10px">Power</div>${pwrZones.filter(z=>z.secs>0).map(z=>zoneBar(z,pwrTotal)).join('')}</div>` : ''}
     </div>`;
   }
 
   let splitsHTML = '';
   if (splits.length) {
     const sport2 = normSport(a.activityType?.typeKey);
-    splitsHTML = `<div class="section-header" style="margin-top:28px">Intervals &amp; Splits</div>
-    <div style="overflow-x:auto;margin-bottom:24px">
+    splitsHTML = `<hr class="detail-rule">
+    <div class="section-label" style="margin-bottom:10px">Intervals &amp; Splits</div>
+    <div style="overflow-x:auto;margin-bottom:24px;border:1px solid var(--rule);border-radius:var(--r-sm);background:var(--raised)">
       <table class="splits-table">
         <thead><tr><th>Type</th><th>n</th><th>Dist</th><th>Time</th><th>Pace</th><th>Avg HR</th><th>Max HR</th><th>Avg W</th><th>NP</th><th>Cadence</th><th>Cal</th></tr></thead>
         <tbody>${splits.map(sp => {
-          const m = SPLIT_META[sp.splitType] || { label:sp.splitType, color:'#8b949e' };
+          const m = SPLIT_META[sp.splitType] || { label:sp.splitType, color:'oklch(62% 0 0)' };
           return `<tr>
             <td><span class="badge" style="color:${m.color};border-color:${m.color}">${m.label}</span></td>
             <td style="color:var(--muted)">${sp.noOfSplits||1}</td>
@@ -1125,26 +1471,43 @@ function buildActivityDetailHTML(a, detail) {
     </div>`;
   }
 
-  const descHTML = a.description ? `<div class="section-header" style="margin-top:28px">Notes</div><div class="desc-block">${esc(a.description)}</div>` : '';
+  const descHTML = a.description ? `<hr class="detail-rule"><div class="desc-block">${esc(a.description)}</div>` : '';
 
   return metricsHTML + teHTML + zonesHTML + splitsHTML + descHTML;
 }
 
 // ─── logbook ──────────────────────────────────────────────────────────────────
 function renderLogbookStats(s) {
-  const tiles = [
-    { label:'Total Hours', val: fmtHrs(s.total_hours), sub:`${s.total_flights} flights`, color:'var(--text)' },
-    { label:'PIC / Solo',  val: fmtHrs(s.pic),         sub:`${fmtHrs(s.solo)} solo`,     color:'#3fb950' },
-    { label:'X-Country',   val: fmtHrs(s.cross_country),sub:`${s.airports_visited} airports`, color:'#58a6ff' },
-    { label:'Night',       val: fmtHrs(s.night),        sub:`${s.night_landings||0} night ldg`, color:'#e3b341' },
-    { label:'Instrument',  val: fmtHrs(s.simulated_instrument), sub:'sim instrument',    color:'#39d353' },
-  ];
-  document.getElementById('logbook-stats').innerHTML = tiles.map(t => `
-    <div class="card card-sm logbook-stat">
-      <div class="lbl">${t.label}</div>
-      <div class="val" style="color:${t.color}">${t.val}</div>
-      <div class="sub">${t.sub}</div>
-    </div>`).join('');
+  document.getElementById('logbook-stats').innerHTML = `
+    <div class="dp">
+      <span class="dp-n">${fmtHrs(s.total_hours)}</span>
+      <span class="dp-u">total</span>
+      <span class="dp-s">${s.total_flights} flights</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:oklch(65% 0.16 145)">${fmtHrs(s.pic)}</span>
+      <span class="dp-u">PIC</span>
+      <span class="dp-s">${fmtHrs(s.solo)} solo</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:oklch(68% 0.15 235)">${fmtHrs(s.cross_country)}</span>
+      <span class="dp-u">X-country</span>
+      <span class="dp-s">${s.airports_visited} airports</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:oklch(80% 0.17 85)">${fmtHrs(s.night)}</span>
+      <span class="dp-u">night</span>
+      <span class="dp-s">${s.night_landings||0} ldg</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:var(--patina-text)">${fmtHrs(s.simulated_instrument)}</span>
+      <span class="dp-u">sim inst</span>
+    </div>
+  `;
   document.getElementById('fl-subtitle').textContent = `· ${s.total_hours}h · PPL training`;
 }
 
@@ -1158,21 +1521,22 @@ function renderFlights(flights) {
     const color   = typeColor(f.training_type);
     const id      = f.id;
     const soloTag = f.solo > 0 && !f.dual_given
-      ? `<span class="badge" style="color:#db61a2;border-color:#db61a2">solo</span>` : '';
+      ? `<span class="badge" style="color:oklch(65% 0.15 350);border-color:oklch(65% 0.15 350)">solo</span>` : '';
+    const icaoStyle = 'color:var(--champagne);font-weight:600';
     return `<div class="fl-row" data-flid="${id}">
       <div class="fl-summary">
         <span class="fl-type-dot" style="background:${color}"></span>
         <div class="fl-info">
           <div class="fl-route">
-            ${esc(routeLabel(f))}
+            <span style="${icaoStyle}">${esc(routeLabel(f))}</span>
             <span class="badge" style="color:${color};border-color:${color}">${esc(typeLabel(f.training_type))}</span>
             ${soloTag}
           </div>
-          <div class="fl-meta">${new Date(f.date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})} · ${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</div>
+          <div class="fl-meta">${new Date(f.date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})} · <span style="color:var(--faint)">${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</span></div>
         </div>
         <div class="fl-kpis">
           <div class="fl-kpi">
-            <div class="fl-kpi-v" style="color:${color}">${fmtHrs(f.total_duration)}</div>
+            <div class="fl-kpi-v">${fmtHrs(f.total_duration)}</div>
             <div class="fl-kpi-l">duration</div>
           </div>
           ${f.takeoffs > 0 ? `<div class="fl-kpi">
@@ -1180,15 +1544,14 @@ function renderFlights(flights) {
             <div class="fl-kpi-l">T/O · Lnd</div>
           </div>` : ''}
           ${f.dual_given > 0 ? `<div class="fl-kpi">
-            <div class="fl-kpi-v" style="color:#bc8cff">${fmtHrs(f.dual_given)}</div>
+            <div class="fl-kpi-v" style="color:var(--patina-text)">${fmtHrs(f.dual_given)}</div>
             <div class="fl-kpi-l">dual given</div>
           </div>` : ''}
           ${f.dual_received > 0 ? `<div class="fl-kpi">
-            <div class="fl-kpi-v" style="color:#bc8cff">${fmtHrs(f.dual_received)}</div>
+            <div class="fl-kpi-v" style="color:var(--patina-text)">${fmtHrs(f.dual_received)}</div>
             <div class="fl-kpi-l">dual rcvd</div>
           </div>` : ''}
         </div>
-        <i class="ph-bold ph-arrow-right row-arrow"></i>
       </div>
     </div>`;
   }).join('');
@@ -1211,17 +1574,17 @@ async function showFlightDetail(id) {
   });
 
   const heroStats = [
-    { label:'Total', val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'var(--text)' },
-    f.dual_received > 0 ? { label:'Dual Received', val: parseFloat(f.dual_received).toFixed(1), unit:'h', color:'#bc8cff' } : null,
-    f.dual_given > 0   ? { label:'Dual Given',    val: parseFloat(f.dual_given).toFixed(1),    unit:'h', color:'#bc8cff' } : null,
-    f.pic > 0          ? { label:'PIC',            val: parseFloat(f.pic).toFixed(1),            unit:'h', color:'#3fb950' } : null,
-    f.cross_country > 0 ? { label:'X-Country',    val: parseFloat(f.cross_country).toFixed(1),  unit:'h', color:'#58a6ff' } : null,
-    f.actual_instrument > 0 ? { label:'Actual IFR', val: parseFloat(f.actual_instrument).toFixed(1), unit:'h', color:'#39d353' } : null,
+    { label:'Total', val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'var(--champagne)' },
+    f.dual_received > 0 ? { label:'Dual Received', val: parseFloat(f.dual_received).toFixed(1), unit:'h', color:'var(--patina-text)' } : null,
+    f.dual_given > 0   ? { label:'Dual Given',    val: parseFloat(f.dual_given).toFixed(1),    unit:'h', color:'var(--patina-text)' } : null,
+    f.pic > 0          ? { label:'PIC',            val: parseFloat(f.pic).toFixed(1),            unit:'h', color:'oklch(65% 0.16 145)' } : null,
+    f.cross_country > 0 ? { label:'X-Country',    val: parseFloat(f.cross_country).toFixed(1),  unit:'h', color:'oklch(68% 0.15 235)' } : null,
+    f.actual_instrument > 0 ? { label:'Actual IFR', val: parseFloat(f.actual_instrument).toFixed(1), unit:'h', color:'var(--patina-text)' } : null,
   ].filter(Boolean);
 
   const ac = f.aircraft;
   const acHTML = ac ? `
-    <div class="section-header" style="margin-top:28px">Aircraft</div>
+    <hr class="detail-rule">
     <div class="ac-card">
       <div class="ac-title"><i class="ph-bold ph-airplane-tilt"></i> ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}</div>
       <div class="ac-specs">
@@ -1235,41 +1598,40 @@ async function showFlightDetail(id) {
     </div>` : '';
 
   const allMetrics = [
-    ['Total',        fmtHrs(f.total_duration),              'var(--text)'],
-    ['Dual Received',fmtHrs(f.dual_received),               '#bc8cff'],
-    ['Dual Given',   fmtHrs(f.dual_given),                  '#bc8cff'],
-    ['PIC',          fmtHrs(f.pic),                         '#3fb950'],
-    ['SIC',          fmtHrs(f.sic),                         '#8b949e'],
-    ['Solo',         fmtHrs(f.solo),                        '#db61a2'],
-    ['X-Country',    fmtHrs(f.cross_country),               '#58a6ff'],
-    ['Night',        fmtHrs(f.night),                       '#e3b341'],
-    ['Actual IFR',   fmtHrs(f.actual_instrument),           '#39d353'],
-    ['Sim Inst',     fmtHrs(f.simulated_instrument),        '#39d353'],
-    ['Ground Train', fmtHrs(f.ground_training),             '#8b949e'],
+    ['Total',        fmtHrs(f.total_duration),              'var(--champagne)'],
+    ['Dual Received',fmtHrs(f.dual_received),               'var(--patina-text)'],
+    ['Dual Given',   fmtHrs(f.dual_given),                  'var(--patina-text)'],
+    ['PIC',          fmtHrs(f.pic),                         'oklch(65% 0.16 145)'],
+    ['SIC',          fmtHrs(f.sic),                         'var(--muted)'],
+    ['Solo',         fmtHrs(f.solo),                        'oklch(65% 0.15 350)'],
+    ['X-Country',    fmtHrs(f.cross_country),               'oklch(68% 0.15 235)'],
+    ['Night',        fmtHrs(f.night),                       'oklch(80% 0.17 85)'],
+    ['Actual IFR',   fmtHrs(f.actual_instrument),           'var(--patina-text)'],
+    ['Sim Inst',     fmtHrs(f.simulated_instrument),        'var(--patina-text)'],
+    ['Ground Train', fmtHrs(f.ground_training),             'var(--muted)'],
     ['Day T/O',      f.day_takeoffs > 0 ? String(f.day_takeoffs) : null,          null],
     ['Day Ldg',      f.day_landings_full_stop > 0 ? String(f.day_landings_full_stop) : null, null],
-    ['Night T/O',    f.night_takeoffs > 0 ? String(f.night_takeoffs) : null,      '#e3b341'],
-    ['Night Ldg',    f.night_landings_full_stop > 0 ? String(f.night_landings_full_stop) : null, '#e3b341'],
-    ['Holds',        f.holds > 0 ? String(f.holds) : null,  '#58a6ff'],
+    ['Night T/O',    f.night_takeoffs > 0 ? String(f.night_takeoffs) : null,      'oklch(80% 0.17 85)'],
+    ['Night Ldg',    f.night_landings_full_stop > 0 ? String(f.night_landings_full_stop) : null, 'oklch(80% 0.17 85)'],
+    ['Holds',        f.holds > 0 ? String(f.holds) : null,  'oklch(68% 0.15 235)'],
     ['Distance',     f.distance_nm ? Math.round(f.distance_nm)+' nm' : null,      null],
     ['Hobbs',        (f.hobbs_start&&f.hobbs_end) ? `${f.hobbs_start} → ${f.hobbs_end}` : null, null],
     ['Tach',         (f.tach_start&&f.tach_end)   ? `${f.tach_start} → ${f.tach_end}`   : null, null],
   ].filter(([,v]) => v && v !== '—');
 
   document.getElementById('flight-detail-content').innerHTML = `
-    <!-- Hero -->
-    <div class="detail-hero">
+    <div class="flight-detail-header">
       <div class="detail-sport-chip">
-        <i class="ph-bold ph-airplane" style="color:${color};font-size:14px"></i>
+        <i class="ph-bold ph-airplane" style="color:${color};font-size:13px"></i>
         ${esc(typeLabel(f.training_type))}
-        ${f.solo > 0 && !f.dual_given ? '<span class="badge" style="color:#db61a2;border-color:#db61a2;margin-left:4px">solo</span>' : ''}
-        <span style="color:var(--border)">·</span>
+        ${f.solo > 0 && !f.dual_given ? '<span class="badge" style="color:oklch(65% 0.15 350);border-color:oklch(65% 0.15 350);margin-left:4px">solo</span>' : ''}
+        <span style="color:var(--rule-strong)">·</span>
         ${new Date(f.date).toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
       </div>
       <div class="flight-route-label">${esc(routeLabel(f))}</div>
       <div class="flight-meta">
         ${ac ? `<span>${esc(ac.tail_number)} · ${esc(ac.make)} ${esc(ac.model)}</span>` : ''}
-        ${f.instructor_name ? `<span class="flight-meta-sep">·</span><span><i class="ph-bold ph-user" style="font-size:12px"></i> ${esc(f.instructor_name)}</span>` : ''}
+        ${f.instructor_name ? `<span class="flight-meta-sep">·</span><span>${esc(f.instructor_name)}</span>` : ''}
         ${f.distance_nm ? `<span class="flight-meta-sep">·</span><span>${Math.round(f.distance_nm)} nm</span>` : ''}
       </div>
       <div class="flight-hero-stats">
@@ -1280,24 +1642,23 @@ async function showFlightDetail(id) {
       </div>
     </div>
 
-    <!-- Route Map -->
     <div id="fd-map-container">
       <div id="fd-map"></div>
     </div>
 
-    <!-- All flight time metrics -->
-    <div class="section-header">Flight Time Breakdown</div>
-    <div class="detail-metric-grid">
-      ${allMetrics.map(([l,v,c]) => `<div class="detail-metric">
-        <div class="label">${l}</div>
-        <div class="val" ${c?`style="color:${c}"`:''}>${esc(String(v))}</div>
+    <div class="section-label" style="margin-bottom:10px">Flight Time Breakdown</div>
+    <div class="perf-dl" style="margin-bottom:24px">
+      ${allMetrics.map(([l,v,c]) => `<div class="perf-entry">
+        <span class="perf-label">${l}</span>
+        <span class="perf-val" ${c?`style="color:${c}"`:''}>${esc(String(v))}</span>
       </div>`).join('')}
     </div>
 
     ${acHTML}
 
     ${(f.approaches&&f.approaches.length) ? `
-    <div class="section-header" style="margin-top:28px">Approaches</div>
+    <hr class="detail-rule">
+    <div class="section-label" style="margin-bottom:10px">Approaches</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
       ${f.approaches.map(ap => `<span class="approach-tag">
         ${esc(ap.approach_type)} ${ap.runway?'Rwy '+esc(ap.runway):''} ${esc(ap.airport_icao||'')}${ap.circle_to_land?' C/L':''}
@@ -1306,23 +1667,23 @@ async function showFlightDetail(id) {
 
     ${(f.flight_review||f.checkride||f.ipc) ? `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
-      ${f.flight_review ? '<span class="type-badge" style="color:#e3b341;border-color:#e3b341">Flight Review</span>' : ''}
-      ${f.checkride     ? '<span class="type-badge" style="color:#3fb950;border-color:#3fb950">Checkride</span>'    : ''}
-      ${f.ipc           ? '<span class="type-badge" style="color:#58a6ff;border-color:#58a6ff">IPC</span>'          : ''}
+      ${f.flight_review ? '<span class="type-badge" style="color:oklch(80% 0.17 85);border-color:oklch(80% 0.17 85)">Flight Review</span>' : ''}
+      ${f.checkride     ? '<span class="type-badge" style="color:oklch(65% 0.16 145);border-color:oklch(65% 0.16 145)">Checkride</span>'    : ''}
+      ${f.ipc           ? '<span class="type-badge" style="color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)">IPC</span>'          : ''}
     </div>` : ''}
 
     ${f.instructor_comments ? `
-    <div class="section-header" style="margin-top:28px">Instructor Notes</div>
+    <hr class="detail-rule">
+    <div style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Instructor Notes</div>
     <div class="desc-block" style="margin-bottom:24px">${esc(f.instructor_comments)}</div>` : ''}
 
     ${f.remarks ? `
-    <div class="section-header" style="margin-top:${f.instructor_comments?'0':'28px'}">Remarks</div>
+    <hr class="detail-rule">
     <div class="desc-block">${esc(f.remarks)}</div>` : ''}
 
-    ${f.foreflight_source ? `<div class="body-sm" style="margin-top:20px;color:var(--subtle)">· Imported from ForeFlight</div>` : ''}
+    ${f.foreflight_source ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
   `;
 
-  // Init the per-flight map after the DOM is painted
   if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
   requestAnimationFrame(() => initFlightDetailMap(f));
 }
@@ -1342,7 +1703,6 @@ async function initFlightDetailMap(f) {
   _fdMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
   _fdMap.on('load', async () => {
-    // Fetch GPS track if available
     let coords = [];
     if (f.has_track) {
       try {
@@ -1366,12 +1726,10 @@ async function initFlightDetailMap(f) {
       _fdMap.addLayer({ id:'route-line', type:'line', source:'route',
         paint: { 'line-color': typeColor(f.training_type), 'line-width': 2.5, 'line-opacity': 0.9 } });
 
-      // Fit map to route
       const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
       _fdMap.fitBounds(bounds, { padding: 56, duration: 600 });
     }
 
-    // Airport markers
     const apts = [];
     if (f.departure?.lon) apts.push(f.departure);
     if (f.via_airports)   f.via_airports.filter(a=>a.lon).forEach(a => apts.push(a));
@@ -1387,10 +1745,10 @@ async function initFlightDetailMap(f) {
         })) },
       });
       _fdMap.addLayer({ id:'apts-dot', type:'circle', source:'apts',
-        paint: { 'circle-radius': 6, 'circle-color': '#58a6ff', 'circle-stroke-width': 2, 'circle-stroke-color': '#0d1117' } });
+        paint: { 'circle-radius': 5, 'circle-color': 'oklch(84% 0.19 80.46)', 'circle-stroke-width': 2, 'circle-stroke-color': 'oklch(4% 0.004 95)' } });
       _fdMap.addLayer({ id:'apts-lbl', type:'symbol', source:'apts',
         layout: { 'text-field': ['get','icao'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-font':['Noto Sans Regular'] },
-        paint:  { 'text-color': '#c9d1d9', 'text-halo-color': '#0d1117', 'text-halo-width': 1.5 } });
+        paint:  { 'text-color': 'oklch(84% 0.19 80.46)', 'text-halo-color': 'oklch(4% 0.004 95)', 'text-halo-width': 1.5 } });
 
       _fdMap.on('click', 'apts-dot', e => {
         const p = e.features[0].properties;
@@ -1443,7 +1801,6 @@ async function loadFlights() {
   renderWeekly((weekly && weekly.by_sport) || {});
   renderActivities(window._actsArr);
 
-  // Build trend charts — they live on the overview page, always rendered
   buildVolumeChart(window._actsArr);
   buildLoadChart(window._actsArr);
   buildHRChart(window._actsArr);
@@ -1457,12 +1814,11 @@ async function loadFlights() {
     window._flights = [];
   });
 
-  // Route after data is in place (handles direct deep links on load)
   route();
 })().catch(err => {
   console.error(err);
   document.getElementById('act-list').innerHTML =
-    `<div style="padding:40px;text-align:center;color:var(--rose);font-size:13px">Failed to load: ${esc(err.message)}</div>`;
+    `<div style="padding:40px;text-align:center;color:var(--warn);font-size:13px">Failed to load: ${esc(err.message)}</div>`;
   route();
 });
 </script>

@@ -75,22 +75,42 @@ export default async function flightRoutes(fastify) {
     const {
       date, aircraft_id, departure_icao, arrival_icao,
       via = [], training_type, total_duration,
-      dual_given = 0, pic = 0, solo = 0, cross_country = 0,
-      night = 0, instrument = 0, takeoffs = 0, landings = 0,
-      night_takeoffs = 0, night_landings = 0, instructor_id, remarks,
+      dual_given = 0, dual_received = 0, pic = 0, sic = 0, solo = 0,
+      cross_country = 0, night = 0, actual_instrument = 0, instrument = 0,
+      takeoffs = 0, landings = 0, day_takeoffs = 0, day_landings_full_stop = 0,
+      night_takeoffs = 0, night_landings = 0, night_landings_full_stop = 0,
+      holds = 0, distance_nm = null,
+      hobbs_start = null, hobbs_end = null, tach_start = null, tach_end = null,
+      time_out = null, time_in = null,
+      instructor_id, remarks,
+      approaches = [],
     } = req.body
     const { rows } = await pool.query(
       `INSERT INTO flights
        (date,aircraft_id,departure_icao,arrival_icao,via,training_type,total_duration,
-        dual_given,pic,solo,cross_country,night,instrument,takeoffs,landings,
-        night_takeoffs,night_landings,instructor_id,remarks)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        dual_given,dual_received,pic,sic,solo,cross_country,night,actual_instrument,instrument,
+        takeoffs,landings,day_takeoffs,day_landings_full_stop,
+        night_takeoffs,night_landings,night_landings_full_stop,
+        holds,distance_nm,hobbs_start,hobbs_end,tach_start,tach_end,
+        time_out,time_in,instructor_id,remarks,foreflight_source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,'manual')
        RETURNING id`,
       [date, aircraft_id, departure_icao, arrival_icao, via, training_type, total_duration,
-       dual_given, pic, solo, cross_country, night, instrument, takeoffs, landings,
-       night_takeoffs, night_landings, instructor_id || null, remarks]
+       dual_given, dual_received, pic, sic, solo, cross_country, night, actual_instrument, instrument,
+       takeoffs, landings, day_takeoffs, day_landings_full_stop,
+       night_takeoffs, night_landings, night_landings_full_stop,
+       holds, distance_nm, hobbs_start, hobbs_end, tach_start, tach_end,
+       time_out, time_in, instructor_id || null, remarks]
     )
-    return reply.status(201).send({ id: rows[0].id })
+    const flightId = rows[0].id
+    for (const ap of approaches) {
+      if (!ap.approach_type || !ap.airport_icao) continue
+      await pool.query(
+        `INSERT INTO approaches (flight_id,approach_type,airport_icao,runway,circle_to_land) VALUES ($1,$2,$3,$4,$5)`,
+        [flightId, ap.approach_type, ap.airport_icao.toUpperCase(), ap.runway || null, ap.circle_to_land || false]
+      )
+    }
+    return reply.status(201).send({ id: flightId })
   })
 
   fastify.get('/api/aircraft', async () => {
@@ -100,6 +120,11 @@ export default async function flightRoutes(fastify) {
 
   fastify.get('/api/airports', async () => {
     const { rows } = await pool.query('SELECT * FROM airports ORDER BY icao')
+    return rows
+  })
+
+  fastify.get('/api/instructors', async () => {
+    const { rows } = await pool.query('SELECT * FROM instructors ORDER BY name')
     return rows
   })
 

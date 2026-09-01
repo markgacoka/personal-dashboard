@@ -707,6 +707,83 @@
     /* ── Separator for flight detail ─────────────────────── */
     .detail-rule { border: none; border-top: 1px solid var(--rule); margin: 28px 0; }
 
+    /* ── Form elements ───────────────────────────────────── */
+    .form-section { margin-bottom: 28px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .form-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .form-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .form-field { display: flex; flex-direction: column; gap: 5px; }
+    .form-field.span2 { grid-column: span 2; }
+    .form-field.span3 { grid-column: span 3; }
+    .form-field.full  { grid-column: 1 / -1; }
+    .form-label {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.07em;
+      text-transform: uppercase; color: var(--faint);
+    }
+    .form-input, .form-select, .form-textarea {
+      background: var(--raised); border: 1px solid var(--rule);
+      border-radius: var(--r-sm); color: var(--body-text);
+      font-family: 'Albert Sans', sans-serif; font-size: 13px;
+      padding: 7px 10px; width: 100%;
+      transition: border-color 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238888' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+      padding-right: 28px;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--patina);
+    }
+    .form-input::placeholder { color: var(--disabled); }
+    .form-textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+    .form-hint { font-size: 11px; color: var(--faint); margin-top: 2px; }
+    .form-error {
+      display: none; font-size: 13px; color: var(--warn);
+      padding: 10px 14px; border: 1px solid var(--warn);
+      border-radius: var(--r-sm); margin-top: 16px;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--gold); color: var(--gold-ink);
+      border: none; border-radius: var(--r-sm);
+      font-family: 'Albert Sans', sans-serif; font-size: 13px; font-weight: 600;
+      padding: 9px 20px; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: 1px solid var(--rule);
+      color: var(--muted); border-radius: var(--r-sm);
+      font-family: 'Albert Sans', sans-serif; font-size: 13px;
+      padding: 9px 16px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-ghost:hover { color: var(--body-text); border-color: var(--muted); }
+    .btn-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: none; border: none; padding: 0;
+      color: var(--patina-text); font-family: 'Albert Sans', sans-serif;
+      font-size: 12px; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-link:hover { opacity: 0.75; }
+    .approach-row {
+      display: grid; grid-template-columns: 1fr 80px 60px auto auto;
+      gap: 8px; align-items: center; margin-bottom: 8px;
+    }
+    .ap-rm {
+      background: none; border: 1px solid var(--rule); border-radius: var(--r-sm);
+      color: var(--faint); width: 28px; height: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.15s, border-color 0.15s; flex-shrink: 0;
+    }
+    .ap-rm:hover { color: var(--warn); border-color: var(--warn); }
+
     @media (max-width: 700px) {
       .fl-kpis, .act-kpis { display: none; }
       .sidebar { width: 52px; }
@@ -755,6 +832,10 @@
         <div class="sb-item" data-view="logbook">
           <i class="ph-bold ph-book-open"></i>
           <span class="sb-lbl">Logbook</span>
+        </div>
+        <div class="sb-item" data-view="log-flight">
+          <i class="ph-bold ph-note-pencil"></i>
+          <span class="sb-lbl">Log Flight</span>
         </div>
       </div>
     </div>
@@ -843,9 +924,12 @@
       <!-- LOGBOOK ────────────────────────────────────────────── -->
       <div class="view" id="view-logbook">
         <div class="section-first">
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Flight Log</span>
-            <span id="fl-subtitle" class="data-note"></span>
+            <span id="fl-subtitle" class="data-note" style="flex:1"></span>
+            <button class="btn-primary" onclick="navigate('log-flight')" style="padding:6px 14px;font-size:12px">
+              <i class="ph-bold ph-plus"></i> Log Flight
+            </button>
           </div>
           <div id="logbook-stats" class="skel" style="height:64px;margin-bottom:16px"></div>
           <div class="fl-list" id="fl-list">
@@ -857,6 +941,13 @@
       <!-- FLIGHT DETAIL ──────────────────────────────────────── -->
       <div class="view" id="view-flight-detail">
         <div id="flight-detail-content"></div>
+      </div>
+
+      <!-- LOG FLIGHT FORM ─────────────────────────────────────── -->
+      <div class="view" id="view-log-flight">
+        <div class="section-first" id="log-flight-content">
+          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
       </div>
 
     </div><!-- /view-scroller -->
@@ -909,6 +1000,7 @@ const TYPE_CFG = {
 const VIEW_TITLES = {
   overview: 'Overview', activities: 'Activities',
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
+  'log-flight': 'Log Flight',
 };
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
@@ -1002,6 +1094,7 @@ function showView(viewId, opts = {}) {
   if (el) el.classList.add('active');
 
   const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook' }[viewId] || viewId;
+  // log-flight is its own sidebar item — keep active highlight on it
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll(`.sb-item[data-view="${sidebarKey}"]`).forEach(n => n.classList.add('active'));
 
@@ -1057,6 +1150,9 @@ function route(view, id) {
     case 'flight':
       if (id) showFlightDetail(id);
       else showView('logbook', { title: 'Logbook' });
+      break;
+    case 'log-flight':
+      showLogFlightView();
       break;
     default:
       showView('overview', { title: 'Overview' });
@@ -1506,6 +1602,11 @@ function renderLogbookStats(s) {
     </div>
     <div class="dp-div"></div>
     <div class="dp">
+      <span class="dp-n" style="color:var(--patina-text)">${fmtHrs(s.actual_instrument)}</span>
+      <span class="dp-u">actual IFR</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
       <span class="dp-n" style="color:var(--patina-text)">${fmtHrs(s.simulated_instrument)}</span>
       <span class="dp-u">sim inst</span>
     </div>
@@ -1694,9 +1795,12 @@ async function initFlightDetailMap(f) {
   const container = document.getElementById('fd-map');
   if (!container) return;
 
+  const mapStyle = document.documentElement.getAttribute('data-theme') === 'light'
+    ? 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
   _fdMap = new maplibregl.Map({
     container: 'fd-map',
-    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    style: mapStyle,
     center: [f.departure?.lon || -122.0, f.departure?.lat || 37.5],
     zoom: 8,
     attributionControl: false,
@@ -1764,6 +1868,301 @@ async function initFlightDetailMap(f) {
     }
   });
 }
+
+// ─── log flight form ──────────────────────────────────────────────────────────
+async function showLogFlightView() {
+  showView('log-flight', { back: 'logbook', title: 'Log Flight' });
+  const content = document.getElementById('log-flight-content');
+  content.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+
+  let aircraft = [], instructors = [];
+  try {
+    [aircraft, instructors] = await Promise.all([
+      fetch('/api/aircraft').then(r => r.ok ? r.json() : []),
+      fetch('/api/instructors').then(r => r.ok ? r.json() : []),
+    ]);
+  } catch(_) {}
+
+  content.innerHTML = buildFlightFormHTML(aircraft, instructors);
+  document.getElementById('flight-form').addEventListener('submit', handleFlightSubmit);
+  document.getElementById('add-approach-btn').addEventListener('click', addApproachRow);
+
+  // Default date to today
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('ff-date').value = today;
+}
+
+function buildFlightFormHTML(aircraft, instructors) {
+  const acOpts = aircraft.map(a =>
+    `<option value="${a.id}">${esc(a.tail_number)} — ${esc(a.make)} ${esc(a.model)}</option>`
+  ).join('');
+  const insOpts = instructors.map(i =>
+    `<option value="${i.id}">${esc(i.name)}</option>`
+  ).join('');
+  const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) =>
+    `<option value="${k}">${esc(v.label)}</option>`
+  ).join('');
+
+  return `
+  <div style="max-width:860px">
+    <form id="flight-form" novalidate>
+
+      <!-- Route & Identity -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px">Route &amp; Identity</div>
+        <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="form-field">
+            <label class="form-label" for="ff-date">Date</label>
+            <input class="form-input" type="date" id="ff-date" name="date" required>
+          </div>
+          <div class="form-field span2">
+            <label class="form-label" for="ff-aircraft">Aircraft</label>
+            <select class="form-select" id="ff-aircraft" name="aircraft_id" required>
+              <option value="">Select aircraft…</option>
+              ${acOpts}
+            </select>
+          </div>
+        </div>
+        <div class="form-grid" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+          <div class="form-field">
+            <label class="form-label" for="ff-dep">Departure</label>
+            <input class="form-input" type="text" id="ff-dep" name="departure_icao" placeholder="KSQL" maxlength="6" required style="text-transform:uppercase">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="ff-via">Via (comma-sep)</label>
+            <input class="form-input" type="text" id="ff-via" name="via" placeholder="KHAF, KPAO" style="text-transform:uppercase">
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="ff-arr">Arrival</label>
+            <input class="form-input" type="text" id="ff-arr" name="arrival_icao" placeholder="KWVI" maxlength="6" required style="text-transform:uppercase">
+          </div>
+        </div>
+        <div class="form-grid" style="margin-top:12px;grid-template-columns:1fr 2fr">
+          <div class="form-field">
+            <label class="form-label" for="ff-type">Training Type</label>
+            <select class="form-select" id="ff-type" name="training_type">
+              <option value="">Select type…</option>
+              ${typeOpts}
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="ff-ins">Instructor (optional)</label>
+            <select class="form-select" id="ff-ins" name="instructor_id">
+              <option value="">None / solo</option>
+              ${insOpts}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flight Time -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px">Flight Time <span style="font-size:11px;color:var(--disabled);text-transform:none;letter-spacing:0">(hours)</span></div>
+        <div class="form-grid" style="grid-template-columns:repeat(6,1fr)">
+          ${numField('ff-total','total_duration','Total','required')}
+          ${numField('ff-dual-rcvd','dual_received','Dual Rcvd')}
+          ${numField('ff-dual-given','dual_given','Dual Given')}
+          ${numField('ff-pic','pic','PIC')}
+          ${numField('ff-solo','solo','Solo')}
+          ${numField('ff-sic','sic','SIC')}
+        </div>
+        <div class="form-grid" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">
+          ${numField('ff-xc','cross_country','X-Country')}
+          ${numField('ff-night','night','Night')}
+          ${numField('ff-act-ifr','actual_instrument','Actual IFR')}
+          ${numField('ff-sim-inst','instrument','Sim Inst')}
+        </div>
+      </div>
+
+      <!-- Operations -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px">Operations</div>
+        <div class="form-grid" style="grid-template-columns:repeat(6,1fr)">
+          ${intField('ff-to','takeoffs','Takeoffs')}
+          ${intField('ff-lnd','landings','Landings')}
+          ${intField('ff-nto','night_takeoffs','Night T/O')}
+          ${intField('ff-nlnd','night_landings','Night Ldg')}
+          ${intField('ff-holds','holds','Holds')}
+          ${numField('ff-dist','distance_nm','Distance (nm)')}
+        </div>
+      </div>
+
+      <!-- Approaches -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px">Approaches</div>
+        <div id="approach-rows"></div>
+        <button type="button" id="add-approach-btn" class="btn-link" style="margin-top:4px">
+          <i class="ph-bold ph-plus-circle"></i> Add approach
+        </button>
+      </div>
+
+      <!-- Remarks -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px">Notes</div>
+        <div class="form-field">
+          <label class="form-label" for="ff-remarks">Remarks</label>
+          <textarea class="form-textarea" id="ff-remarks" name="remarks" rows="3" placeholder="Route narrative, conditions, lessons…"></textarea>
+        </div>
+      </div>
+
+      <!-- Hobbs / Tach (collapsible) -->
+      <div class="form-section">
+        <div class="section-label" style="margin-bottom:14px;cursor:pointer" id="hobbs-toggle">
+          Hobbs &amp; Tach <span id="hobbs-toggle-icon" style="font-size:11px;color:var(--faint)">▸ expand</span>
+        </div>
+        <div id="hobbs-fields" style="display:none">
+          <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+            ${numField('ff-hobbs-s','hobbs_start','Hobbs Start')}
+            ${numField('ff-hobbs-e','hobbs_end','Hobbs End')}
+            ${numField('ff-tach-s','tach_start','Tach Start')}
+            ${numField('ff-tach-e','tach_end','Tach End')}
+          </div>
+        </div>
+      </div>
+
+      <div id="flight-form-error" class="form-error"></div>
+
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <button type="submit" class="btn-primary" id="ff-submit">
+          <i class="ph-bold ph-paper-plane-tilt"></i> Log Flight
+        </button>
+        <button type="button" class="btn-ghost" onclick="navigate('logbook')">Cancel</button>
+      </div>
+    </form>
+  </div>`;
+}
+
+function numField(id, name, label, extra='') {
+  return `<div class="form-field">
+    <label class="form-label" for="${id}">${label}</label>
+    <input class="form-input" type="number" id="${id}" name="${name}" step="0.1" min="0" placeholder="0.0" ${extra}>
+  </div>`;
+}
+function intField(id, name, label) {
+  return `<div class="form-field">
+    <label class="form-label" for="${id}">${label}</label>
+    <input class="form-input" type="number" id="${id}" name="${name}" step="1" min="0" placeholder="0">
+  </div>`;
+}
+
+function addApproachRow() {
+  const container = document.getElementById('approach-rows');
+  const row = document.createElement('div');
+  row.className = 'approach-row';
+  row.innerHTML = `
+    <select class="form-select ap-type">
+      <option value="">Type…</option>
+      <option value="ILS">ILS</option>
+      <option value="RNAV (GPS)">RNAV (GPS)</option>
+      <option value="VOR">VOR</option>
+      <option value="NDB">NDB</option>
+      <option value="LOC">LOC</option>
+      <option value="LOC/BC">LOC/BC</option>
+      <option value="LDA">LDA</option>
+      <option value="SDF">SDF</option>
+      <option value="Visual">Visual</option>
+    </select>
+    <input class="form-input ap-icao" type="text" placeholder="ICAO" maxlength="6" style="text-transform:uppercase">
+    <input class="form-input ap-rwy" type="text" placeholder="Rwy" maxlength="4">
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap">
+      <input type="checkbox" class="ap-ctl"> C/L
+    </label>
+    <button type="button" class="ap-rm" title="Remove"><i class="ph-bold ph-x"></i></button>
+  `;
+  row.querySelector('.ap-rm').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+async function handleFlightSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = document.getElementById('ff-submit');
+  const errEl = document.getElementById('flight-form-error');
+  errEl.style.display = 'none';
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin-right:6px"></div> Saving…';
+
+  const viaRaw = form.via.value.trim();
+  const via = viaRaw ? viaRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+
+  const approaches = Array.from(document.querySelectorAll('.approach-row')).map(row => ({
+    approach_type: row.querySelector('.ap-type').value,
+    airport_icao: row.querySelector('.ap-icao').value.trim().toUpperCase(),
+    runway: row.querySelector('.ap-rwy').value.trim(),
+    circle_to_land: row.querySelector('.ap-ctl').checked,
+  })).filter(a => a.approach_type && a.airport_icao);
+
+  const g = name => {
+    const el = form.querySelector(`[name="${name}"]`);
+    return el ? el.value : '';
+  };
+  const fv = name => parseFloat(g(name)) || 0;
+  const iv = name => parseInt(g(name)) || 0;
+  const sv = name => { const v = g(name).trim(); return v || null; };
+
+  const body = {
+    date: g('date'),
+    aircraft_id: parseInt(g('aircraft_id')),
+    departure_icao: g('departure_icao').toUpperCase(),
+    arrival_icao: g('arrival_icao').toUpperCase(),
+    via,
+    training_type: g('training_type') || null,
+    total_duration: fv('total_duration'),
+    dual_received: fv('dual_received'),
+    dual_given: fv('dual_given'),
+    pic: fv('pic'),
+    sic: fv('sic'),
+    solo: fv('solo'),
+    cross_country: fv('cross_country'),
+    night: fv('night'),
+    actual_instrument: fv('actual_instrument'),
+    instrument: fv('instrument'),
+    takeoffs: iv('takeoffs'),
+    landings: iv('landings'),
+    night_takeoffs: iv('night_takeoffs'),
+    night_landings: iv('night_landings'),
+    holds: iv('holds'),
+    distance_nm: sv('distance_nm') ? parseFloat(sv('distance_nm')) : null,
+    hobbs_start: sv('hobbs_start') ? parseFloat(sv('hobbs_start')) : null,
+    hobbs_end: sv('hobbs_end') ? parseFloat(sv('hobbs_end')) : null,
+    tach_start: sv('tach_start') ? parseFloat(sv('tach_start')) : null,
+    tach_end: sv('tach_end') ? parseFloat(sv('tach_end')) : null,
+    instructor_id: sv('instructor_id') ? parseInt(sv('instructor_id')) : null,
+    remarks: sv('remarks'),
+    approaches,
+  };
+
+  try {
+    const res = await fetch('/api/flights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || `Server error ${res.status}`);
+    }
+    await loadFlights();
+    navigate('logbook');
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i> Log Flight';
+  }
+}
+
+// Hobbs toggle
+document.addEventListener('click', e => {
+  if (e.target.closest('#hobbs-toggle')) {
+    const fields = document.getElementById('hobbs-fields');
+    const icon = document.getElementById('hobbs-toggle-icon');
+    if (!fields) return;
+    const open = fields.style.display !== 'none';
+    fields.style.display = open ? 'none' : 'grid';
+    if (icon) icon.textContent = open ? '▸ expand' : '▾ collapse';
+  }
+});
 
 // ─── load flights ─────────────────────────────────────────────────────────────
 async function loadFlights() {

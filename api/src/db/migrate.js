@@ -268,6 +268,20 @@ export async function migrateV2() {
   }
 }
 
+// V4: remove the 20 seed flights inserted by migrate(), keep showcase + manual entries
+export async function migrateV4() {
+  const client = await pool.connect()
+  try {
+    // foreflight_source IS NULL  → old seed flights (inserted before the form existed)
+    // foreflight_source = 'manual'   → user-added via the intake form (keep)
+    // foreflight_source = 'showcase' → demo flight (keep)
+    // foreflight_source = filename   → ForeFlight imports (keep)
+    await client.query(`DELETE FROM flights WHERE foreflight_source IS NULL`)
+  } finally {
+    client.release()
+  }
+}
+
 // V3: showcase flight with every field set + GPS track + approaches
 export async function migrateV3() {
   const client = await pool.connect()

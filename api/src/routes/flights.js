@@ -11,6 +11,7 @@ const FLIGHT_SELECT = `
     f.time_out, f.time_in, f.flight_review, f.checkride, f.ipc,
     f.ground_training, f.simulated_flight, f.foreflight_source,
     f.remarks, f.instructor_comments,
+    f.instructor_id,
     EXISTS(SELECT 1 FROM track_log_points tlp WHERE tlp.flight_id = f.id) AS has_track,
     row_to_json(dep) AS departure,
     row_to_json(arr) AS arrival,
@@ -111,6 +112,59 @@ export default async function flightRoutes(fastify) {
       )
     }
     return reply.status(201).send({ id: flightId })
+  })
+
+  fastify.put('/api/flights/:id', async (req, reply) => {
+    const id = parseInt(req.params.id)
+    const {
+      date, aircraft_id, departure_icao, arrival_icao,
+      via = [], training_type, total_duration,
+      dual_given = 0, dual_received = 0, pic = 0, sic = 0, solo = 0,
+      cross_country = 0, night = 0, actual_instrument = 0, instrument = 0,
+      takeoffs = 0, landings = 0, day_takeoffs = 0, day_landings_full_stop = 0,
+      night_takeoffs = 0, night_landings = 0, night_landings_full_stop = 0,
+      holds = 0, distance_nm = null,
+      hobbs_start = null, hobbs_end = null, tach_start = null, tach_end = null,
+      time_out = null, time_in = null,
+      instructor_id, remarks,
+      approaches = [],
+    } = req.body
+    const { rowCount } = await pool.query(
+      `UPDATE flights SET
+         date=$2, aircraft_id=$3, departure_icao=$4, arrival_icao=$5, via=$6,
+         training_type=$7, total_duration=$8,
+         dual_given=$9, dual_received=$10, pic=$11, sic=$12, solo=$13,
+         cross_country=$14, night=$15, actual_instrument=$16, instrument=$17,
+         takeoffs=$18, landings=$19, day_takeoffs=$20, day_landings_full_stop=$21,
+         night_takeoffs=$22, night_landings=$23, night_landings_full_stop=$24,
+         holds=$25, distance_nm=$26, hobbs_start=$27, hobbs_end=$28,
+         tach_start=$29, tach_end=$30, time_out=$31, time_in=$32,
+         instructor_id=$33, remarks=$34
+       WHERE id=$1`,
+      [id, date, aircraft_id, departure_icao, arrival_icao, via, training_type, total_duration,
+       dual_given, dual_received, pic, sic, solo, cross_country, night, actual_instrument, instrument,
+       takeoffs, landings, day_takeoffs, day_landings_full_stop,
+       night_takeoffs, night_landings, night_landings_full_stop,
+       holds, distance_nm, hobbs_start, hobbs_end, tach_start, tach_end,
+       time_out, time_in, instructor_id || null, remarks]
+    )
+    if (!rowCount) return reply.status(404).send({ error: 'Not found' })
+    await pool.query('DELETE FROM approaches WHERE flight_id=$1', [id])
+    for (const ap of approaches) {
+      if (!ap.approach_type || !ap.airport_icao) continue
+      await pool.query(
+        `INSERT INTO approaches (flight_id,approach_type,airport_icao,runway,circle_to_land) VALUES ($1,$2,$3,$4,$5)`,
+        [id, ap.approach_type, ap.airport_icao.toUpperCase(), ap.runway || null, ap.circle_to_land || false]
+      )
+    }
+    return { id }
+  })
+
+  fastify.delete('/api/flights/:id', async (req, reply) => {
+    const id = parseInt(req.params.id)
+    const { rowCount } = await pool.query('DELETE FROM flights WHERE id=$1', [id])
+    if (!rowCount) return reply.status(404).send({ error: 'Not found' })
+    return reply.status(204).send()
   })
 
   fastify.get('/api/aircraft', async () => {

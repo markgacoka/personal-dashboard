@@ -1152,7 +1152,7 @@ function route(view, id) {
       else showView('logbook', { title: 'Logbook' });
       break;
     case 'log-flight':
-      showLogFlightView();
+      showLogFlightView(id);
       break;
     default:
       showView('overview', { title: 'Overview' });
@@ -1743,6 +1743,14 @@ async function showFlightDetail(id) {
           <div class="val" style="color:${k.color}">${k.val}<span class="unit">${k.unit}</span></div>
         </div>`).join('')}
       </div>
+      <div id="flight-action-area" style="display:flex;gap:8px;margin-top:20px">
+        <button class="btn-ghost" onclick="navigate('log-flight','${f.id}')" style="font-size:12px;padding:6px 12px">
+          <i class="ph-bold ph-pencil-simple"></i> Edit
+        </button>
+        <button class="btn-ghost" id="delete-flight-btn" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:6px 12px">
+          <i class="ph-bold ph-trash"></i> Delete
+        </button>
+      </div>
     </div>
 
     <div id="fd-map-container">
@@ -1869,9 +1877,41 @@ async function initFlightDetailMap(f) {
   });
 }
 
+// ─── flight delete ────────────────────────────────────────────────────────────
+function confirmDeleteFlight(id) {
+  const area = document.getElementById('flight-action-area');
+  if (!area) return;
+  area.innerHTML = `
+    <span style="font-size:13px;color:var(--warn)">Delete this flight?</span>
+    <button class="btn-ghost" onclick="deleteFlight(${id})"
+      style="font-size:12px;padding:6px 12px;color:var(--warn);border-color:var(--warn)">
+      <i class="ph-bold ph-trash"></i> Yes, delete
+    </button>
+    <button class="btn-ghost" onclick="showFlightDetail(${id})"
+      style="font-size:12px;padding:6px 12px">Cancel</button>
+  `;
+}
+
+async function deleteFlight(id) {
+  try {
+    const res = await fetch('/api/flights/' + id, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    window._flights = (window._flights || []).filter(f => String(f.id) !== String(id));
+    renderFlights(window._flights);
+    navigate('logbook');
+    loadFlights().catch(() => {});
+  } catch(err) {
+    const area = document.getElementById('flight-action-area');
+    if (area) area.innerHTML = `<span style="color:var(--warn);font-size:13px">${esc(err.message)}</span>`;
+  }
+}
+
 // ─── log flight form ──────────────────────────────────────────────────────────
-async function showLogFlightView() {
-  showView('log-flight', { back: 'logbook', title: 'Log Flight' });
+async function showLogFlightView(editId) {
+  const isEdit = !!editId;
+  const existingFlight = isEdit ? (window._flights || []).find(f => String(f.id) === String(editId)) : null;
+
+  showView('log-flight', { back: 'logbook', title: isEdit ? 'Edit Flight' : 'Log Flight' });
   const content = document.getElementById('log-flight-content');
   content.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
 
@@ -1883,16 +1923,18 @@ async function showLogFlightView() {
     ]);
   } catch(_) {}
 
-  content.innerHTML = buildFlightFormHTML(aircraft, instructors);
+  content.innerHTML = buildFlightFormHTML(aircraft, instructors, isEdit ? editId : null);
   document.getElementById('flight-form').addEventListener('submit', handleFlightSubmit);
   document.getElementById('add-approach-btn').addEventListener('click', addApproachRow);
 
-  // Default date to today
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('ff-date').value = today;
+  if (existingFlight) {
+    populateFlightForm(existingFlight, instructors);
+  } else {
+    document.getElementById('ff-date').value = new Date().toISOString().slice(0, 10);
+  }
 }
 
-function buildFlightFormHTML(aircraft, instructors) {
+function buildFlightFormHTML(aircraft, instructors, editId) {
   const acOpts = aircraft.map(a =>
     `<option value="${a.id}">${esc(a.tail_number)} — ${esc(a.make)} ${esc(a.model)}</option>`
   ).join('');
@@ -1906,6 +1948,7 @@ function buildFlightFormHTML(aircraft, instructors) {
   return `
   <div style="max-width:860px">
     <form id="flight-form" novalidate>
+      <input type="hidden" name="edit_flight_id" value="${editId || ''}">
 
       <!-- Route & Identity -->
       <div class="form-section">
@@ -2024,9 +2067,9 @@ function buildFlightFormHTML(aircraft, instructors) {
 
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
         <button type="submit" class="btn-primary" id="ff-submit">
-          <i class="ph-bold ph-paper-plane-tilt"></i> Log Flight
+          <i class="ph-bold ph-paper-plane-tilt"></i> ${editId ? 'Save Changes' : 'Log Flight'}
         </button>
-        <button type="button" class="btn-ghost" onclick="navigate('logbook')">Cancel</button>
+        <button type="button" class="btn-ghost" onclick="navigate(${editId ? `'flight','${editId}'` : `'logbook'`})">Cancel</button>
       </div>
     </form>
   </div>`;
@@ -2071,6 +2114,63 @@ function addApproachRow() {
   `;
   row.querySelector('.ap-rm').addEventListener('click', () => row.remove());
   container.appendChild(row);
+  return row;
+}
+
+function populateFlightForm(f, instructors) {
+  const set = (name, val) => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el && val != null && val !== '') el.value = val;
+  };
+  // Date comes as "2026-05-10", input[type=date] wants "YYYY-MM-DD"
+  set('date', f.date);
+  set('aircraft_id', f.aircraft?.id);
+  set('departure_icao', f.departure?.icao || '');
+  set('arrival_icao', f.arrival?.icao || '');
+  set('via', (f.via || []).join(', '));
+  set('training_type', f.training_type);
+
+  // Match instructor by id (now returned by API)
+  if (f.instructor_id) set('instructor_id', f.instructor_id);
+
+  // Time fields
+  ['total_duration','dual_received','dual_given','pic','sic','solo',
+   'cross_country','night','actual_instrument','instrument'].forEach(name => {
+    const v = f[name] || f['simulated_instrument' === name ? 'simulated_instrument' : name];
+    // instrument column is returned as simulated_instrument in the API
+    const apiKey = name === 'instrument' ? 'simulated_instrument' : name;
+    if (f[apiKey] > 0) set(name, parseFloat(f[apiKey]).toFixed(1));
+  });
+
+  // Operations
+  ['takeoffs','landings','night_takeoffs','night_landings','holds'].forEach(name => {
+    if (f[name] > 0) set(name, f[name]);
+  });
+  if (f.distance_nm) set('distance_nm', f.distance_nm);
+
+  // Hobbs/Tach — expand section if values present
+  if (f.hobbs_start || f.hobbs_end || f.tach_start || f.tach_end) {
+    const fields = document.getElementById('hobbs-fields');
+    const icon = document.getElementById('hobbs-toggle-icon');
+    if (fields) fields.style.display = 'grid';
+    if (icon) icon.textContent = '▾ collapse';
+    set('hobbs_start', f.hobbs_start);
+    set('hobbs_end', f.hobbs_end);
+    set('tach_start', f.tach_start);
+    set('tach_end', f.tach_end);
+  }
+
+  // Remarks
+  if (f.remarks) set('remarks', f.remarks);
+
+  // Approaches
+  for (const ap of f.approaches || []) {
+    const row = addApproachRow();
+    row.querySelector('.ap-type').value = ap.approach_type || '';
+    row.querySelector('.ap-icao').value = ap.airport_icao || '';
+    row.querySelector('.ap-rwy').value = ap.runway || '';
+    row.querySelector('.ap-ctl').checked = !!ap.circle_to_land;
+  }
 }
 
 async function handleFlightSubmit(e) {
@@ -2132,9 +2232,15 @@ async function handleFlightSubmit(e) {
     approaches,
   };
 
+  const editFlightId = g('edit_flight_id');
+  const isEdit = !!editFlightId;
+  const url = isEdit ? `/api/flights/${editFlightId}` : '/api/flights';
+  const method = isEdit ? 'PUT' : 'POST';
+  const btnLabel = isEdit ? 'Save Changes' : 'Log Flight';
+
   try {
-    const res = await fetch('/api/flights', {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -2143,12 +2249,16 @@ async function handleFlightSubmit(e) {
       throw new Error(d.error || `Server error ${res.status}`);
     }
     await loadFlights();
-    navigate('logbook');
+    if (isEdit) {
+      navigate('flight', editFlightId);
+    } else {
+      navigate('logbook');
+    }
   } catch(err) {
     errEl.textContent = err.message;
     errEl.style.display = 'block';
     submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i> Log Flight';
+    submitBtn.innerHTML = `<i class="ph-bold ph-paper-plane-tilt"></i> ${btnLabel}`;
   }
 }
 

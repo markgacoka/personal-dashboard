@@ -2743,26 +2743,31 @@ async function addAircraftToDB() {
 async function onStep1Continue() {
   _m.date = document.getElementById('ms-date').value;
   _m.dep  = document.getElementById('ms-dep').value.trim().toUpperCase();
-  const tail = (_m.aircraft?.tail_number||'').toUpperCase();
+  const tail     = (_m.aircraft?.tail_number||'').toUpperCase();
+  const modeS    = _m.aircraft?.mode_s_hex || null;
 
-  // Search existing logbook entries matching date + aircraft + departure
-  let matches = [];
-  if (tail && _m.date && _m.dep) {
-    try {
-      const params = new URLSearchParams({ date: _m.date, departure: _m.dep });
-      if (tail) params.set('tail', tail);
-      const r = await fetch('/api/flights?'+params).then(r=>r.ok?r.json():[]).catch(()=>[]);
-      matches = Array.isArray(r) ? r : [];
-    } catch(_) {}
-  }
-  _m._matches = matches;
-  renderModalStep2(matches);
+  // Fetch logbook entries + OpenSky detected flights in parallel
+  const dbPromise = (tail && _m.date && _m.dep)
+    ? fetch('/api/flights?'+new URLSearchParams({ date:_m.date, departure:_m.dep, tail })).then(r=>r.ok?r.json():[]).catch(()=>[])
+    : Promise.resolve([]);
+
+  const oskyPromise = (modeS && _m.date && _m.dep)
+    ? fetch('/api/external/flights-detected?'+new URLSearchParams({ departure:_m.dep, date:_m.date, icao24:modeS })).then(r=>r.ok?r.json():{flights:[]}).catch(()=>({flights:[]}))
+    : Promise.resolve({flights:[]});
+
+  const [dbFlights, oskyResult] = await Promise.all([dbPromise, oskyPromise]);
+
+  _m._matches   = Array.isArray(dbFlights) ? dbFlights : [];
+  _m._detected  = oskyResult.flights || [];
+  _m._oskyAuth  = oskyResult.needs_auth || false;
+
+  renderModalStep2(_m._matches, _m._detected);
 }
 
 // Step 2 ──────────────────────────────────────────────────────────────────────
-function renderModalStep2FromCache() { renderModalStep2(_m._matches||[]); }
+function renderModalStep2FromCache() { renderModalStep2(_m._matches||[], _m._detected||[]); }
 
-function renderModalStep2(flights) {
+function renderModalStep2(flights, detected = []) {
   _m.step = 2; showModalSteps(2);
   document.getElementById('modal-ft').style.display = 'none';
   if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
@@ -2770,9 +2775,10 @@ function renderModalStep2(flights) {
   const dateLabel = new Date(_m.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const tail = _m.aircraft?.tail_number || '';
 
-  const listHTML = flights.map(f => {
+  // Logbook entries (already in DB)
+  const dbHTML = flights.map(f => {
     const col = typeColor(f.training_type);
-    return `<div class="fpl-item" data-fid="${f.id}">
+    return `<div class="fpl-item" data-fid="${f.id}" data-src="db">
       <span class="fl-type-dot" style="background:${col}"></span>
       <div style="flex:1;min-width:0">
         <div class="fpl-route">${esc(routeLabel(f))}</div>
@@ -2780,10 +2786,40 @@ function renderModalStep2(flights) {
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:13px;font-weight:500;color:var(--body-text)">${fmtHrs(f.total_duration)}</div>
-        <div style="font-size:11px;color:var(--faint)">${esc(f.aircraft?.tail_number||tail)}</div>
+        <div style="font-size:11px;color:var(--faint)">in logbook</div>
       </div>
     </div>`;
   }).join('');
+
+  // OpenSky-detected flights not already in DB (filter by arrival icao to avoid dupes)
+  const dbArrivals = new Set(flights.map(f=>f.arrival_icao));
+  const newDetected = detected.filter(d => !dbArrivals.has(d.arrival_icao));
+  const detectedHTML = newDetected.map((d, i) => {
+    const dep = d.departure_time ? new Date(d.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'}) : '';
+    const dur = d.duration_min != null ? `${Math.floor(d.duration_min/60)}h ${d.duration_min%60}m` : '';
+    const arr = d.arrival_icao || 'Unknown arrival';
+    return `<div class="fpl-item fpl-detected" data-did="${i}" data-src="osky"
+              onclick="onOskyFlightSelected(${JSON.stringify(JSON.stringify(d)).slice(1,-1)})">
+      <span class="fl-type-dot" style="background:var(--patina-text)"></span>
+      <div style="flex:1;min-width:0">
+        <div class="fpl-route">${esc(_m.dep)} → ${esc(arr)}</div>
+        <div class="fpl-meta">ADS-B detected${dep?' · '+dep+' local':''} ${dur?'· '+dur:''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;color:var(--patina-text);font-weight:500">Import</div>
+        <div style="font-size:10px;color:var(--faint)">OpenSky</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const hasAny = flights.length > 0 || newDetected.length > 0;
+  const oskyNote = _m._oskyAuth
+    ? `<div style="margin-top:12px;padding:10px 12px;background:var(--graphite);border-radius:6px;font-size:11px;color:var(--faint)">
+         <i class="ph-bold ph-info"></i>
+         Add <code>OPENSKY_USER</code> and <code>OPENSKY_PASS</code> to your .env for historical ADS-B flight detection.
+         Register free at <a href="https://opensky-network.org" target="_blank" style="color:var(--patina-text)">opensky-network.org</a>
+       </div>`
+    : (newDetected.length > 0 ? `<div style="font-size:11px;color:var(--faint);margin-top:8px;padding:0 4px"><i class="ph-bold ph-broadcast"></i> ADS-B routes detected via OpenSky Network — click to import</div>` : '');
 
   document.getElementById('modal-bd').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
@@ -2795,26 +2831,29 @@ function renderModalStep2(flights) {
         on <strong style="color:var(--champagne)">${esc(dateLabel)}</strong>
       </div>
     </div>
-    ${flights.length ? `
-      <div id="modal-preview-map"></div>
+    ${hasAny ? `
+      ${flights.length ? `<div id="modal-preview-map"></div>` : ''}
       <div class="fpl">
-        ${listHTML}
+        ${dbHTML}
+        ${detectedHTML}
         <div class="fpl-new" onclick="onModalNewFlight()">
           <i class="ph-bold ph-plus-circle"></i> Log a new flight on this date
         </div>
-      </div>` :
-    `<div style="padding:36px 0 20px;text-align:center">
+      </div>
+      ${oskyNote}` :
+    `<div style="padding:24px 0 16px;text-align:center">
        <i class="ph-bold ph-airplane-landing" style="font-size:36px;color:var(--faint);display:block;margin-bottom:12px"></i>
        <div style="color:var(--muted);font-size:13px">No existing entries found for this aircraft on ${esc(dateLabel)}.</div>
      </div>
-     <button class="btn-primary" onclick="onModalNewFlight()">
+     ${oskyNote}
+     <button class="btn-primary" style="margin-top:16px" onclick="onModalNewFlight()">
        <i class="ph-bold ph-plus"></i> Log this flight
      </button>`
     }`;
 
   if (flights.length) {
     requestAnimationFrame(() => initPreviewMap(flights));
-    document.querySelectorAll('.fpl-item').forEach(item => {
+    document.querySelectorAll('.fpl-item[data-src="db"]').forEach(item => {
       item.addEventListener('click', () => {
         document.querySelectorAll('.fpl-item').forEach(i=>i.classList.remove('sel'));
         item.classList.add('sel');
@@ -2826,6 +2865,26 @@ function renderModalStep2(flights) {
       item.addEventListener('mouseleave', () => highlightRoute(null));
     });
   }
+}
+
+async function onOskyFlightSelected(detectedJson) {
+  const d = JSON.parse(detectedJson);
+  document.querySelectorAll('.fpl-item').forEach(i=>i.classList.remove('sel'));
+  document.querySelector(`.fpl-detected[data-did="${d._idx||0}"]`)?.classList.add('sel');
+
+  // Fetch GPS track in background
+  if (d.icao24 && d.first_seen_unix) {
+    fetch(`/api/external/flight-track?icao24=${encodeURIComponent(d.icao24)}&time=${d.first_seen_unix}`)
+      .then(r=>r.ok?r.json():null)
+      .then(tr => { if (tr?.track?.path?.length) _m._oskyTrack = tr.track; })
+      .catch(()=>{});
+  }
+
+  // Pre-populate Step 3 as a new flight with detected values
+  _m.editId = null;
+  _m._oskyDetected = d;
+  document.getElementById('modal-title').textContent = 'Log Detected Flight';
+  renderModalStep3(null, d);
 }
 
 function initPreviewMap(flights) {
@@ -2892,7 +2951,7 @@ function onModalNewFlight() { _m.editId = null; document.getElementById('modal-t
 function onModalFlightSelected(f) { _m.editId = String(f.id); document.getElementById('modal-title').textContent='Edit Flight'; renderModalStep3(f); }
 
 // Step 3 ──────────────────────────────────────────────────────────────────────
-async function renderModalStep3(existing) {
+async function renderModalStep3(existing, detected = null) {
   _m.step = 3; showModalSteps(3);
   if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
 
@@ -2925,7 +2984,7 @@ async function renderModalStep3(existing) {
       <div class="form-field">
         <label class="form-label">Departure</label>
         <input class="form-input" type="text" name="departure_icao" placeholder="KSQL"
-          value="${existing?.departure?.icao||_m.dep||''}" maxlength="6" style="text-transform:uppercase"
+          value="${existing?.departure?.icao||detected?.departure_icao||_m.dep||''}" maxlength="6" style="text-transform:uppercase"
           id="mf-dep" oninput="onMFRouteChange()">
       </div>
       <div class="form-field">
@@ -2942,10 +3001,15 @@ async function renderModalStep3(existing) {
       <div class="form-field">
         <label class="form-label">Arrival</label>
         <input class="form-input" type="text" name="arrival_icao" placeholder="KWVI"
-          value="${existing?.arrival?.icao||''}" maxlength="6" style="text-transform:uppercase"
+          value="${existing?.arrival?.icao||(detected?.arrival_icao||'')}" maxlength="6" style="text-transform:uppercase"
           id="mf-arr" oninput="onMFRouteChange()">
       </div>
     </div>
+    ${detected ? `<div style="margin-top:8px;padding:8px 12px;background:var(--graphite);border-radius:6px;font-size:11px;color:var(--patina-text)">
+      <i class="ph-bold ph-broadcast"></i>
+      ADS-B detected via OpenSky · Dep ${detected.departure_time ? new Date(detected.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'})+' local' : ''}${detected.duration_min?' · '+Math.floor(detected.duration_min/60)+'h '+detected.duration_min%60+'m':''}
+      — verify and complete the fields below
+    </div>` : ''}
 
     <!-- Airport info cards (async) -->
     <div id="mf-airport-strip" class="info-strip" style="margin-bottom:20px"></div>
@@ -3038,26 +3102,42 @@ async function renderModalStep3(existing) {
     <button class="btn-ghost" onclick="closeFlightModal()">Cancel</button>
     <div id="mf-save-status" style="margin-left:auto;font-size:12px;color:var(--faint)"></div>`;
 
-  // Pre-populate existing flight data
-  if (existing) populateMFForm(existing, allAc, allIns);
-  else {
+  // Pre-populate existing flight data or detected flight data
+  if (existing) {
+    populateMFForm(existing, allAc, allIns);
+  } else {
     // Pre-fill aircraft from step 1
     if (_m.aircraft?.id) {
       const sel = document.querySelector('[name="aircraft_id"]');
       if (sel) sel.value = _m.aircraft.id;
     }
+    // Pre-fill duration from detected flight
+    if (detected?.duration_min) {
+      const hrs = (detected.duration_min / 60).toFixed(1);
+      const dur = document.querySelector('[name="total_duration"]');
+      if (dur) dur.value = hrs;
+    }
+    // Pre-fill times from detected flight
+    if (detected?.departure_time) {
+      const tout = document.querySelector('[name="time_out"]');
+      if (tout) tout.value = detected.departure_time;
+    }
+    if (detected?.arrival_time) {
+      const tin = document.querySelector('[name="time_in"]');
+      if (tin) tin.value = detected.arrival_time;
+    }
   }
 
-  // Show aircraft card from step 1 or from existing flight
+  // Show aircraft card with performance data from step 1 registry lookup
   const acToShow = existing?.aircraft || (_m.aircraft?.id ? _m.aircraft : null);
   if (acToShow) {
-    document.getElementById('mf-ac-enrich').innerHTML = buildSmallAircraftCard(acToShow);
+    document.getElementById('mf-ac-enrich').innerHTML = buildSmallAircraftCard(acToShow, _m.aircraft?.performance);
   } else {
     document.getElementById('mf-ac-enrich').remove?.();
   }
 
   // Load enrichment asynchronously
-  loadMFEnrichment(existing);
+  loadMFEnrichment(existing || (detected ? { departure: { icao: _m.dep }, arrival: { icao: detected.arrival_icao }, date: _m.date, time_out: detected.departure_time } : null));
 }
 
 function mfNum(name, label, req='') {
@@ -3104,20 +3184,52 @@ function addMFApproach(data={}) {
   container.appendChild(row);
 }
 
-function buildSmallAircraftCard(ac) {
+function buildSmallAircraftCard(ac, perf) {
   if (!ac) return '';
+  const p = perf || ac._perf || null;
   const specs = [
-    ac.engine_type && `<span class="ac-spec-k">Engine</span> <span class="ac-spec-v">${esc(ac.engine_type)}${ac.engine_hp?' ('+ac.engine_hp+' HP)':''}</span>`,
-    ac.seats && `<span class="ac-spec-k">Seats</span> <span class="ac-spec-v">${ac.seats}</span>`,
+    ac.engine_type && `<span class="ac-spec-k">Engine</span> <span class="ac-spec-v">${esc(ac.engine_type)}${ac.engine_hp?' · '+ac.engine_hp+' HP':p?.engine_hp?' · '+p.engine_hp+' HP':''}</span>`,
+    (ac.seats||p) && `<span class="ac-spec-k">Seats</span> <span class="ac-spec-v">${ac.seats||'—'}</span>`,
     ac.aircraft_class && `<span class="ac-spec-k">Class</span> <span class="ac-spec-v">${esc(ac.aircraft_class)}</span>`,
+    ac.type_code && `<span class="ac-spec-k">ICAO</span> <span class="ac-spec-v">${esc(ac.type_code)}</span>`,
+    ac.gear_type && `<span class="ac-spec-k">Gear</span> <span class="ac-spec-v">${esc(ac.gear_type.replace(/_/g,' '))}</span>`,
+    p?.mtow_lbs && `<span class="ac-spec-k">MTOW</span> <span class="ac-spec-v">${p.mtow_lbs.toLocaleString()} lbs</span>`,
+    p?.cruise_ktas && `<span class="ac-spec-k">Cruise</span> <span class="ac-spec-v">${p.cruise_ktas} KTAS</span>`,
+    p?.service_ceiling_ft && `<span class="ac-spec-k">Ceiling</span> <span class="ac-spec-v">${p.service_ceiling_ft.toLocaleString()} ft</span>`,
+    p?.range_nm && `<span class="ac-spec-k">Range</span> <span class="ac-spec-v">${p.range_nm} nm</span>`,
+    p?.fuel_gal && `<span class="ac-spec-k">Fuel</span> <span class="ac-spec-v">${p.fuel_gal} gal · ~${p.fuel_burn_gph} GPH</span>`,
     ac.ifr_equipped!=null && `<span class="ac-spec-k">IFR</span> <span class="ac-spec-v">${ac.ifr_equipped?'Equipped':'VFR only'}</span>`,
+    ac.is_complex && `<span class="ac-spec-k">Complex</span> <span class="ac-spec-v">Yes</span>`,
   ].filter(Boolean);
+
+  // V-speeds table (from POH reference)
+  const vSpeeds = p ? [
+    p.vs0_kts && `Vs0: ${p.vs0_kts}`,
+    p.vs1_kts && `Vs1: ${p.vs1_kts}`,
+    p.vx_kts  && `Vx: ${p.vx_kts}`,
+    p.vy_kts  && `Vy: ${p.vy_kts}`,
+    p.va_kts  && `Va: ${p.va_kts}`,
+    p.vno_kts && `Vno: ${p.vno_kts}`,
+    p.vne_kts && `Vne: ${p.vne_kts}`,
+  ].filter(Boolean) : [];
+
+  const photoUrl = ac.photo_url || ac._photoUrl || null;
+
   return `<div class="ac-enrich">
-    <div class="ac-enrich-title">
-      <i class="ph-bold ph-airplane-tilt" style="color:var(--patina-text)"></i>
-      ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      ${photoUrl ? `<img src="${esc(photoUrl)}" alt="${esc(ac.tail_number)}" style="width:80px;height:52px;object-fit:cover;border-radius:4px;flex-shrink:0;opacity:0.9">` : ''}
+      <div style="flex:1;min-width:0">
+        <div class="ac-enrich-title">
+          <i class="ph-bold ph-airplane-tilt" style="color:var(--patina-text)"></i>
+          ${esc(ac.tail_number)}${ac.make&&ac.model?' — '+esc(ac.make)+' '+esc(ac.model):''}${ac.year?' '+ac.year:''}
+        </div>
+        ${specs.length?`<div class="ac-enrich-specs" style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px">${specs.map(s=>`<div>${s}</div>`).join('')}</div>`:''}
+      </div>
     </div>
-    ${specs.length?`<div class="ac-enrich-specs" style="display:flex;flex-wrap:wrap;gap:8px 20px">${specs.map(s=>`<div>${s}</div>`).join('')}</div>`:''}
+    ${vSpeeds.length ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:4px 16px">
+      <span style="font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:0.05em;align-self:center">V-speeds (kts)</span>
+      ${vSpeeds.map(v=>`<span style="font-size:11px;font-family:var(--mono);color:var(--muted)">${v}</span>`).join('')}
+    </div>` : ''}
     ${ac.notes?`<div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(ac.notes)}</div>`:''}
   </div>`;
 }

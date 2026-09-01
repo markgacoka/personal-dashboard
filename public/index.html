@@ -2614,30 +2614,42 @@ async function onTailLookup(tail) {
     updateStep1Btn(); return;
   }
 
-  // 2. FAA registry via proxy
+  // 2. FAA registry + adsbdb via proxy
   status.textContent = 'Searching FAA registry…'; status.style.color = 'var(--faint)';
   try {
     const reg = await fetch('/api/external/aircraft/'+encodeURIComponent(tail)).then(r=>r.ok?r.json():null).catch(()=>null);
-    if (reg) {
+    if (reg && reg.make) {
       const ac = {
         id: null, tail_number: tail, _fromReg: true,
-        make: reg.mfr || reg.manufacturer || '—',
-        model: reg.model || '—',
-        year: reg.year_mfr || null,
-        engine_type: reg.eng_mfr_mdl || null,
-        engine_hp: null, seats: null, ifr_equipped: null,
-        type_code: null, aircraft_class: null,
-        notes: reg.cert_issue_date ? `Cert issued: ${reg.cert_issue_date}` : null,
+        make: reg.make,
+        model: reg.model,
+        year: reg.year || null,
+        engine_type: reg.engine_type || null,
+        engine_hp: null,
+        seats: reg.seats || null,
+        ifr_equipped: null,
+        glass_cockpit: null,
+        type_code: reg.type_code || null,
+        category: reg.category || 'Airplane',
+        aircraft_class: reg.aircraft_class || 'ASEL',
+        gear_type: reg.gear_type || 'fixed_tricycle',
+        is_complex: reg.is_complex || false,
+        is_high_performance: reg.is_high_performance || false,
+        is_pressurized: false,
+        mode_s_hex: reg.mode_s_hex || null,
+        owner: reg.owner || null,
+        photo_url: reg.photo_url || null,
+        status: reg.status || null,
+        _sources: reg.sources || [],
       };
       _m.aircraft = _tailCache[tail] = ac;
-      status.textContent = '✓ FAA registry'; status.style.color = 'oklch(65% 0.16 145)';
+      const srcLabel = ac._sources.includes('faa_html') ? '✓ FAA registry' : '✓ found';
+      status.textContent = srcLabel; status.style.color = 'oklch(65% 0.16 145)';
       renderAircraftEnrichCard(ac, true);
     } else {
-      status.textContent = 'Not found'; status.style.color = 'var(--faint)';
-      _m.aircraft = null;
+      status.textContent = 'Not found in registry'; status.style.color = 'var(--faint)';
       document.getElementById('ms-ac-card').innerHTML =
-        `<div style="font-size:12px;color:var(--faint);padding:10px 0">Aircraft not found. Continuing will let you manually fill all fields.</div>`;
-      // still allow user to proceed (aircraft_id will be null)
+        `<div style="font-size:12px;color:var(--faint);padding:10px 0">Not found. You can still continue and fill all fields manually.</div>`;
       _m.aircraft = { id:null, tail_number:tail, make:'', model:'', _unknown:true };
     }
   } catch(_) {
@@ -2650,28 +2662,45 @@ function renderAircraftEnrichCard(ac, fromReg = false) {
   const card = document.getElementById('ms-ac-card');
   if (!card) return;
   const specs = [
-    ac.engine_type && ['Engine', ac.engine_type+(ac.engine_hp?' ('+ac.engine_hp+' HP)':'')],
-    ac.seats && ['Seats', ac.seats],
+    ac.engine_type && ['Engine', ac.engine_type + (ac.engine_hp ? ' · ' + ac.engine_hp + ' HP' : '')],
+    ac.seats       && ['Seats',  ac.seats],
+    ac.type_code   && ['ICAO Type', ac.type_code],
     ac.aircraft_class && ['Class', ac.aircraft_class],
-    ac.type_code && ['Type', ac.type_code],
-    ac.ifr_equipped!=null && ['IFR', ac.ifr_equipped ? 'Equipped' : 'VFR only'],
-    ac.is_complex && ['Complex', 'Yes'],
-    ac.notes && ['Notes', ac.notes],
+    ac.gear_type   && ['Gear', ac.gear_type.replace(/_/g,' ')],
+    ac.is_complex  && ['Complex', 'Yes'],
+    ac.ifr_equipped != null && ['IFR', ac.ifr_equipped ? 'Equipped' : 'VFR only'],
+    ac.glass_cockpit && ['Avionics', 'Glass cockpit'],
+    ac.owner       && ['Owner', ac.owner],
+    ac.status      && ac.status !== 'Valid' && ['Status', ac.status],
   ].filter(Boolean);
+
+  const srcBadge = fromReg
+    ? `<span style="font-size:10px;font-weight:400;color:var(--faint);margin-left:6px">
+         ${(ac._sources||[]).join(' + ') || 'FAA registry'}
+       </span>`
+    : '';
+  const unknownBadge = ac._unknown
+    ? `<span style="font-size:10px;font-weight:400;color:var(--warn);margin-left:6px">specs unknown</span>`
+    : '';
+
+  const photoHtml = ac.photo_url
+    ? `<img src="${esc(ac.photo_url)}" alt="Aircraft photo" style="max-width:100%;border-radius:4px;margin-top:8px;opacity:0.85">`
+    : '';
 
   card.innerHTML = `
     <div class="ac-enrich">
       <div class="ac-enrich-title">
         <i class="ph-bold ph-airplane-tilt" style="color:var(--patina-text)"></i>
-        ${esc(ac.tail_number)}${ac.make&&ac.model ? ' — '+esc(ac.make)+' '+esc(ac.model) : ''}${ac.year?' '+ac.year:''}
-        ${fromReg ? '<span style="font-size:10px;font-weight:400;color:var(--faint);margin-left:6px">FAA registry</span>' : ''}
-        ${ac._unknown ? '<span style="font-size:10px;font-weight:400;color:var(--warn);margin-left:6px">specs unknown</span>' : ''}
+        ${esc(ac.tail_number)}${ac.make && ac.model ? ' — ' + esc(ac.make) + ' ' + esc(ac.model) : ''}${ac.year ? ' ' + ac.year : ''}
+        ${srcBadge}${unknownBadge}
       </div>
-      ${specs.length ? `<div class="ac-enrich-specs">${specs.map(([k,v])=>`<div><span class="ac-spec-k">${k}</span> <span class="ac-spec-v">${esc(String(v))}</span></div>`).join('')}</div>` : ''}
+      ${specs.length ? `<div class="ac-enrich-specs">${specs.map(([k,v]) => `<div><span class="ac-spec-k">${k}</span> <span class="ac-spec-v">${esc(String(v))}</span></div>`).join('')}</div>` : ''}
+      ${photoHtml}
       ${fromReg && !ac.id ? `<div style="margin-top:10px">
         <button class="btn-link" onclick="addAircraftToDB()">
           <i class="ph-bold ph-plus-circle"></i> Add to my aircraft list
         </button>
+        <span style="font-size:11px;color:var(--faint);margin-left:8px">HP, IFR, glass cockpit — fill in the form</span>
       </div>` : ''}
     </div>`;
 }
@@ -2681,17 +2710,31 @@ async function addAircraftToDB() {
   const ac = _m.aircraft;
   try {
     const res = await fetch('/api/aircraft', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tail_number: ac.tail_number, make: ac.make||'Unknown', model: ac.model||'Unknown',
-        year: ac.year||null, engine_type: ac.engine_type||null,
+        tail_number:       ac.tail_number,
+        make:              ac.make || 'Unknown',
+        model:             ac.model || 'Unknown',
+        year:              ac.year || null,
+        engine_type:       ac.engine_type || null,
+        engine_hp:         ac.engine_hp || null,
+        seats:             ac.seats || null,
+        ifr_equipped:      ac.ifr_equipped || false,
+        glass_cockpit:     ac.glass_cockpit || false,
+        type_code:         ac.type_code || null,
+        category:          ac.category || 'Airplane',
+        aircraft_class:    ac.aircraft_class || 'ASEL',
+        gear_type:         ac.gear_type || 'fixed_tricycle',
+        is_complex:        ac.is_complex || false,
+        is_high_performance: ac.is_high_performance || false,
+        notes: ac.owner ? `Owner: ${ac.owner}` : null,
       }),
     });
     if (!res.ok) throw new Error();
     const created = await res.json();
     _m.aircraft = _tailCache[ac.tail_number] = created;
     const status = document.getElementById('ms-tail-status');
-    if (status) { status.textContent = '✓ added'; status.style.color = 'var(--run)'; }
+    if (status) { status.textContent = '✓ added to logbook'; status.style.color = 'var(--run)'; }
     renderAircraftEnrichCard(created);
     updateStep1Btn();
   } catch(_) {}

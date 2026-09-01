@@ -1,4 +1,6 @@
 // External API proxy — avoids CORS issues and centralises external calls
+import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
+
 export default async function proxyRoutes(fastify) {
   const xfetch = (url, ms = 7000) => {
     const ctrl = new AbortController()
@@ -7,20 +9,25 @@ export default async function proxyRoutes(fastify) {
       .finally(() => clearTimeout(tid))
   }
 
-  // ── Aircraft registration via AviationAPI (wraps FAA N-Number registry) ──────
+  // ── Aircraft registration: FAA HTML + adsbdb + ACFTREF seats ─────────────────
   fastify.get('/api/external/aircraft/:n', async (req, reply) => {
     const n = req.params.n.toUpperCase().replace(/[^A-Z0-9]/g, '')
     try {
-      const r = await xfetch(`https://api.aviationapi.com/v1/aircraft?nnumber=${encodeURIComponent(n)}`)
-      if (!r.ok) return reply.status(404).send({ error: 'Not found in registry' })
-      const d = await r.json()
-      const keys = Object.keys(d)
-      if (!keys.length) return reply.status(404).send({ error: 'Not found in registry' })
-      return d[keys[0]] // unwrap keyed response
+      const data = await lookupAircraft(n)
+      if (!data) return reply.status(404).send({ error: 'Not found in FAA registry' })
+      return data
     } catch (e) {
-      fastify.log.warn({ n, err: e.message }, 'Aircraft registry lookup failed')
+      fastify.log.warn({ n, err: e.message }, 'Aircraft lookup failed')
       return reply.status(502).send({ error: 'Registry temporarily unavailable' })
     }
+  })
+
+  // ── Trigger ACFTREF re-sync (admin) ───────────────────────────────────────────
+  fastify.post('/api/admin/faa-sync', async (req, reply) => {
+    reply.status(202).send({ message: 'FAA ACFTREF sync started' })
+    importAcftref(msg => fastify.log.info(msg))
+      .then(n => fastify.log.info({ rows: n }, 'FAA ACFTREF manual sync done'))
+      .catch(err => fastify.log.warn({ err }, 'FAA ACFTREF manual sync failed'))
   })
 
   // ── Aircraft POST — create new aircraft record ────────────────────────────────

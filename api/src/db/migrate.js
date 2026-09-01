@@ -268,6 +268,27 @@ export async function migrateV2() {
   }
 }
 
+// V5: FAA aircraft reference table (ACFTREF.txt) — seats, engine count, speed per type
+export async function migrateV5() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS faa_acftref (
+        code         TEXT PRIMARY KEY,
+        mfr          TEXT,
+        model        TEXT,
+        type_aircraft TEXT,
+        type_engine  TEXT,
+        no_engines   SMALLINT,
+        no_seats     SMALLINT,
+        speed_kt     SMALLINT
+      )
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V4: remove the 20 seed flights inserted by migrate(), keep showcase + manual entries
 export async function migrateV4() {
   const client = await pool.connect()

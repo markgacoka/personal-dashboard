@@ -11,7 +11,8 @@ import statsRoutes from './routes/stats.js'
 import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
-import { migrate, migrateV2, migrateV3, migrateV4 } from './db/migrate.js'
+import { migrate, migrateV2, migrateV3, migrateV4, migrateV5 } from './db/migrate.js'
+import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -55,9 +56,18 @@ if (process.env.DATABASE_URL) {
     await migrateV2()
     await migrateV3()
     await migrateV4()
+    await migrateV5()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)
+    // Seed ACFTREF (8K rows) on first boot — runs in background, non-blocking
+    isAcftrefEmpty().then(empty => {
+      if (empty) {
+        importAcftref(msg => fastify.log.info(msg))
+          .then(n => fastify.log.info({ rows: n }, 'FAA ACFTREF import done'))
+          .catch(err => fastify.log.warn({ err }, 'FAA ACFTREF import failed'))
+      }
+    }).catch(() => {})
   } catch (err) {
     fastify.log.warn({ err }, 'DB unavailable — flight routes disabled')
   }

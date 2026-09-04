@@ -547,12 +547,13 @@
       margin-bottom: 16px;
       gap: 0;
     }
-    .dp { display: flex; flex-direction: column; padding: 0 20px; flex-shrink: 0; }
+    .dp { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 0 16px; }
     .dp:first-child { padding-left: 0; }
+    .dp:last-child  { padding-right: 0; }
     .dp-n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
     .dp-u { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
-    .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; }
-    .dp-div { width: 1px; align-self: stretch; background: var(--rule); flex-shrink: 0; margin: 0 4px; }
+    .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dp-div { width: 1px; align-self: stretch; background: var(--rule); flex-shrink: 0; margin: 0; }
 
     .fl-list {
       border-radius: var(--r-sm); overflow: hidden;
@@ -2349,7 +2350,8 @@ function buildActivityDetailHTML(a, detail) {
 
 // ─── logbook ──────────────────────────────────────────────────────────────────
 function renderLogbookStats(s) {
-  const h = v => parseFloat(v||0) > 0 ? parseFloat(v).toFixed(1)+'h' : '0h';
+  const h   = v => parseFloat(v||0) > 0 ? parseFloat(v).toFixed(1)+'h' : '—';
+  const hc  = (v, clr) => parseFloat(v||0) > 0 ? clr : 'var(--faint)';
   document.getElementById('logbook-stats').innerHTML = `
     <div class="dp">
       <span class="dp-n">${h(s.total_hours)}</span>
@@ -2358,31 +2360,31 @@ function renderLogbookStats(s) {
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:#5db87c">${h(s.dual_received)}</span>
+      <span class="dp-n" style="color:${hc(s.dual_received,'#5db87c')}">${h(s.dual_received)}</span>
       <span class="dp-u">Dual rcvd</span>
       <span class="dp-s">${h(s.dual_given)} given</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:#c99c3a">${h(s.solo)}</span>
+      <span class="dp-n" style="color:${hc(s.solo,'#c99c3a')}">${h(s.solo)}</span>
       <span class="dp-u">Solo</span>
       <span class="dp-s">${h(s.pic)} PIC total</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:#5a88c0">${h(s.cross_country)}</span>
+      <span class="dp-n" style="color:${hc(s.cross_country,'#5a88c0')}">${h(s.cross_country)}</span>
       <span class="dp-u">X-country</span>
       <span class="dp-s">${s.airports_visited||0} airports</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:#9080c0">${h(s.night)}</span>
+      <span class="dp-n" style="color:${hc(s.night,'#9080c0')}">${h(s.night)}</span>
       <span class="dp-u">Night</span>
       <span class="dp-s">${s.night_landings||0} ldg</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:var(--patina-text)">${h(s.actual_instrument)}</span>
+      <span class="dp-n" style="color:${hc(s.actual_instrument,'var(--patina-text)')}">${h(s.actual_instrument)}</span>
       <span class="dp-u">Actual IFR</span>
       <span class="dp-s">${h(s.simulated_instrument)} sim inst</span>
     </div>
@@ -2422,7 +2424,7 @@ function renderFlights(flights) {
             <div class="fl-kpi-v">${f.takeoffs}/${f.landings}</div>
             <div class="fl-kpi-l">T/O · Lnd</div>
           </div>` : ''}
-          ${f.cross_country > 0 ? `<div class="fl-kpi">
+          ${f.cross_country > 0 && parseFloat(f.cross_country) < parseFloat(f.total_duration) * 0.95 ? `<div class="fl-kpi">
             <div class="fl-kpi-v" style="color:#5a88c0">${fmtHrs(f.cross_country)}</div>
             <div class="fl-kpi-l">x-country</div>
           </div>` : ''}

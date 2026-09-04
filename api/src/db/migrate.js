@@ -278,6 +278,62 @@ export async function migrateV7() {
   }
 }
 
+// V9: Financial data — Plaid-linked accounts, daily balance snapshots, holdings
+export async function migrateV9() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS plaid_items (
+        id           SERIAL PRIMARY KEY,
+        item_id      TEXT UNIQUE NOT NULL,
+        access_token TEXT NOT NULL,
+        institution  TEXT,
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS fin_accounts (
+        account_id    TEXT PRIMARY KEY,
+        item_id       TEXT REFERENCES plaid_items(item_id) ON DELETE CASCADE,
+        name          TEXT NOT NULL,
+        official_name TEXT,
+        type          TEXT,
+        subtype       TEXT,
+        mask          TEXT,
+        institution   TEXT,
+        balance       NUMERIC DEFAULT 0,
+        available     NUMERIC,
+        currency      TEXT DEFAULT 'USD',
+        synced_at     TIMESTAMPTZ
+      );
+
+      CREATE TABLE IF NOT EXISTS fin_snapshots (
+        id         SERIAL PRIMARY KEY,
+        account_id TEXT REFERENCES fin_accounts(account_id) ON DELETE CASCADE,
+        date       DATE NOT NULL,
+        balance    NUMERIC NOT NULL,
+        UNIQUE(account_id, date)
+      );
+
+      CREATE TABLE IF NOT EXISTS fin_holdings (
+        id          SERIAL PRIMARY KEY,
+        account_id  TEXT REFERENCES fin_accounts(account_id) ON DELETE CASCADE,
+        security_id TEXT NOT NULL,
+        name        TEXT,
+        ticker      TEXT,
+        type        TEXT,
+        quantity    NUMERIC,
+        price       NUMERIC,
+        value       NUMERIC,
+        cost_basis  NUMERIC,
+        synced_at   TIMESTAMPTZ,
+        UNIQUE(account_id, security_id)
+      );
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V8: Airport detail cache — runway + frequency data from OurAirports (static, rarely changes)
 export async function migrateV8() {
   const client = await pool.connect()

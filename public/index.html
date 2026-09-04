@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin></script>
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -990,6 +991,42 @@
       .view-scroller { padding: 20px 16px 40px; }
       .flight-route-label { font-size: 24px; }
     }
+
+    /* ── Finance ──────────────────────────────────────────── */
+    .fin-nw-hero { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .fin-nw-amt  { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
+    .fin-nw-delta { font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
+    .fin-nw-delta.pos { background: #0e1f18; color: #4aaa80; }
+    .fin-nw-delta.neg { background: #221414; color: #cc5050; }
+    [data-theme="light"] .fin-nw-delta.pos { background: #e8f5ee; color: #237a50; }
+    [data-theme="light"] .fin-nw-delta.neg { background: #fde8e8; color: #b03030; }
+    .fin-acct-list { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; }
+    .fin-acct-row  { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+    .fin-acct-row:last-child { border-bottom: none; }
+    .fin-acct-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .fin-acct-name { flex: 1; font-size: 13px; color: var(--body-text); }
+    .fin-acct-inst { font-size: 11px; color: var(--faint); }
+    .fin-acct-bal  { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .fin-acct-sub  { font-size: 10px; color: var(--faint); text-align: right; margin-top: 1px; }
+    .fin-hold-row  { display: grid; grid-template-columns: 60px 1fr 90px 70px; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--rule); font-size: 12px; }
+    .fin-hold-row:last-child { border-bottom: none; }
+    .fin-hold-ticker { font-weight: 700; color: var(--champagne); font-size: 11px; letter-spacing: .02em; }
+    .fin-hold-name  { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fin-hold-val   { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
+    .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+    .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
+    .fin-items-list { display: flex; flex-direction: column; gap: 8px; }
+    .fin-item-row   { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); }
+    .fin-item-name  { flex: 1; font-size: 13px; }
+    .fin-item-date  { font-size: 11px; color: var(--faint); }
+    .fin-link-btn   { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 14px; border-radius: var(--r-sm); background: var(--gold); color: var(--deep); border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
+    .fin-link-btn:hover { opacity: .88; }
+    /* Overview finance strip */
+    .fin-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .fin-strip-tile { flex: 1; min-width: 120px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 8px 12px; }
+    .fin-strip-amt  { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .fin-strip-lbl  { font-size: 10px; color: var(--faint); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
   </style>
 </head>
 <body>
@@ -1008,17 +1045,18 @@
     </div>
 
     <div class="sb-nav">
+      <div class="sb-item" data-view="overview" style="margin:2px 4px">
+        <i class="ph-bold ph-squares-four"></i>
+        <span class="sb-lbl">Overview</span>
+      </div>
+
       <div class="sb-group-hdr" id="sbh-fitness">
         <span>Fitness</span>
         <i class="ph-bold ph-caret-down sb-caret"></i>
       </div>
       <div class="sb-group-items" id="sbi-fitness">
-        <div class="sb-item" data-view="overview">
-          <i class="ph-bold ph-squares-four"></i>
-          <span class="sb-lbl">Overview</span>
-        </div>
         <div class="sb-item" data-view="activities">
-          <i class="ph-bold ph-list-bullets"></i>
+          <i class="ph-bold ph-activity"></i>
           <span class="sb-lbl">Activities</span>
         </div>
       </div>
@@ -1031,6 +1069,21 @@
         <div class="sb-item" data-view="logbook">
           <i class="ph-bold ph-book-open"></i>
           <span class="sb-lbl">Logbook</span>
+        </div>
+      </div>
+
+      <div class="sb-group-hdr" id="sbh-finances">
+        <span>Finances</span>
+        <i class="ph-bold ph-caret-down sb-caret"></i>
+      </div>
+      <div class="sb-group-items" id="sbi-finances">
+        <div class="sb-item" data-view="finances">
+          <i class="ph-bold ph-chart-line-up"></i>
+          <span class="sb-lbl">Dashboard</span>
+        </div>
+        <div class="sb-item" data-view="fin-accounts">
+          <i class="ph-bold ph-plugs"></i>
+          <span class="sb-lbl">Link Accounts</span>
         </div>
       </div>
     </div>
@@ -1094,6 +1147,14 @@
             </div>
           </div>
         </div>
+
+        <!-- Finance overview strip (hidden until data loads) -->
+        <div class="section" id="fin-overview-section" style="display:none">
+          <div class="section-label">Net Worth</div>
+          <div id="fin-overview-content">
+            <div class="skel" style="height:80px;border-radius:4px"></div>
+          </div>
+        </div>
       </div>
 
       <!-- ACTIVITIES LIST ──────────────────────────────────── -->
@@ -1142,6 +1203,38 @@
       <div class="view" id="view-log-flight">
         <div class="section-first" id="log-flight-content">
           <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- FINANCE DASHBOARD ────────────────────────────────────── -->
+      <div class="view" id="view-finances">
+        <div class="section-first">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Finances</span>
+            <span class="data-note" id="fin-sync-status" style="flex:1"></span>
+            <button class="btn-ghost" onclick="finSync()" style="padding:5px 12px;font-size:12px" id="fin-sync-btn">
+              <i class="ph-bold ph-arrows-clockwise"></i> Sync
+            </button>
+          </div>
+          <div id="fin-dashboard-content">
+            <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINK ACCOUNTS ─────────────────────────────────────────── -->
+      <div class="view" id="view-fin-accounts">
+        <div class="section-first">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:13px;color:var(--muted)">Linked Accounts</span>
+            <span style="flex:1"></span>
+            <button class="fin-link-btn" onclick="openPlaidLink()">
+              <i class="ph-bold ph-plus"></i> Link Account
+            </button>
+          </div>
+          <div id="fin-items-content">
+            <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+          </div>
         </div>
       </div>
 
@@ -1218,6 +1311,7 @@ const VIEW_TITLES = {
   overview: 'Overview', activities: 'Activities',
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
   'log-flight': 'Log Flight',
+  finances: 'Finances', 'fin-accounts': 'Linked Accounts',
 };
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
@@ -1348,7 +1442,7 @@ function showView(viewId, opts = {}) {
   const el = document.getElementById('view-' + viewId);
   if (el) el.classList.add('active');
 
-  const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook' }[viewId] || viewId;
+  const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook', 'fin-accounts': 'fin-accounts' }[viewId] || viewId;
   // log-flight is its own sidebar item — keep active highlight on it
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll(`.sb-item[data-view="${sidebarKey}"]`).forEach(n => n.classList.add('active'));
@@ -1409,6 +1503,14 @@ function route(view, id) {
     case 'log-flight':
       showLogFlightView(id);
       break;
+    case 'finances':
+      showView('finances', { title: 'Finances' });
+      if (!window._finLoaded) { window._finLoaded = true; loadFinanceDashboard(); }
+      break;
+    case 'fin-accounts':
+      showView('fin-accounts', { title: 'Linked Accounts' });
+      loadFinanceAccounts();
+      break;
     default:
       showView('overview', { title: 'Overview' });
   }
@@ -1421,7 +1523,7 @@ document.querySelectorAll('.sb-item').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
-['fitness','flights'].forEach(grp => {
+['fitness','flights','finances'].forEach(grp => {
   const hdr   = document.getElementById('sbh-' + grp);
   const items = document.getElementById('sbi-' + grp);
   if (!hdr||!items) return;
@@ -4062,6 +4164,266 @@ async function handleMFSubmit(e) {
   }
 }
 
+// ─── finance ──────────────────────────────────────────────────────────────────
+function fmtDollars(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(n);
+  const s = abs >= 1000000 ? '$' + (abs/1000000).toFixed(2) + 'M'
+          : abs >= 1000    ? '$' + (abs/1000).toFixed(1) + 'k'
+          : '$' + Math.round(abs);
+  return n < 0 ? '-' + s : s;
+}
+
+function fmtDollarsExact(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-' : '') + '$' + abs;
+}
+
+const ACCT_COLORS = { depository:'#5a88c0', investment:'#5db87c', credit:'#c04040', loan:'#c07030', other:'#7a8a98' };
+function acctDot(type, subtype) {
+  const retire = ['401k','ira','roth','403b','pension','457b'];
+  return retire.includes(subtype) ? '#b07cc0' : (ACCT_COLORS[type] || ACCT_COLORS.other);
+}
+
+async function loadFinanceOverview() {
+  const sect = document.getElementById('fin-overview-section');
+  const el   = document.getElementById('fin-overview-content');
+  if (!sect || !el) return;
+  try {
+    const d = await fetch('/api/finance/net-worth').then(r => r.ok ? r.json() : null);
+    if (!d || !d.total) return;
+    sect.style.display = 'block';
+    const delta = d.delta || 0;
+    const dSign = delta >= 0 ? '+' : '';
+    const dCls  = delta >= 0 ? 'pos' : 'neg';
+    el.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <span class="fin-nw-amt">${fmtDollarsExact(d.total)}</span>
+        <span class="fin-nw-delta ${dCls}">${dSign}${fmtDollars(delta)} / 30d</span>
+      </div>
+      <div class="fin-strip">
+        <div class="fin-strip-tile">
+          <div class="fin-strip-amt" style="color:#5a88c0">${fmtDollars(d.byType.liquid)}</div>
+          <div class="fin-strip-lbl">Cash &amp; Checking</div>
+        </div>
+        <div class="fin-strip-tile">
+          <div class="fin-strip-amt" style="color:#5db87c">${fmtDollars(d.byType.invested)}</div>
+          <div class="fin-strip-lbl">Brokerage &amp; Investing</div>
+        </div>
+        <div class="fin-strip-tile">
+          <div class="fin-strip-amt" style="color:#b07cc0">${fmtDollars(d.byType.retirement)}</div>
+          <div class="fin-strip-lbl">Retirement</div>
+        </div>
+      </div>`;
+  } catch(_) {}
+}
+
+async function loadFinanceDashboard() {
+  const el = document.getElementById('fin-dashboard-content');
+  if (!el) return;
+  try {
+    const [nw, holdings] = await Promise.all([
+      fetch('/api/finance/net-worth?days=30').then(r => r.ok ? r.json() : null),
+      fetch('/api/finance/holdings').then(r => r.ok ? r.json() : []),
+    ]);
+    if (!nw) {
+      el.innerHTML = `<div style="text-align:center;padding:48px 20px;color:var(--muted)">
+        No financial data. <a href="#fin-accounts" onclick="navigate('fin-accounts');return false" style="color:var(--patina-text)">Link an account</a> to get started.</div>`;
+      return;
+    }
+    const delta = nw.delta || 0;
+    const dSign = delta >= 0 ? '+' : '';
+    const dCls  = delta >= 0 ? 'pos' : 'neg';
+    const totalRetire = nw.byType.retirement || 0;
+    const retirePct   = Math.min(100, totalRetire / 1500000 * 100);
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:10px">
+        <div class="fin-nw-hero">
+          <span class="fin-nw-amt">${fmtDollarsExact(nw.total)}</span>
+          <span class="fin-nw-delta ${dCls}">${dSign}${fmtDollars(delta)} / 30d</span>
+        </div>
+        <div class="fin-strip" style="margin-top:0">
+          <div class="fin-strip-tile">
+            <div class="fin-strip-amt" style="color:#5a88c0">${fmtDollars(nw.byType.liquid)}</div>
+            <div class="fin-strip-lbl">Cash &amp; Checking</div>
+          </div>
+          <div class="fin-strip-tile">
+            <div class="fin-strip-amt" style="color:#5db87c">${fmtDollars(nw.byType.invested)}</div>
+            <div class="fin-strip-lbl">Brokerage</div>
+          </div>
+          <div class="fin-strip-tile">
+            <div class="fin-strip-amt" style="color:#b07cc0">${fmtDollars(nw.byType.retirement)}</div>
+            <div class="fin-strip-lbl">Retirement</div>
+          </div>
+        </div>
+        <div class="chart-card" style="margin-top:14px;padding:10px 12px 8px">
+          <div class="chart-label">30-day net worth trend</div>
+          <div id="fin-nw-chart"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div class="section-label" style="margin-bottom:10px">Accounts</div>
+        <div class="fin-acct-list">${renderAccountRows(nw.accounts)}</div>
+      </div>
+
+      ${holdings.length ? `
+      <div style="margin-bottom:10px">
+        <div class="section-label" style="margin-bottom:10px">Holdings</div>
+        ${renderHoldingsTable(holdings)}
+      </div>` : ''}
+
+      ${totalRetire > 0 ? `
+      <div>
+        <div class="section-label" style="margin-bottom:10px">Retirement Progress</div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+            <span style="font-size:13px;color:var(--muted)">Toward $1.5M target</span>
+            <span style="font-size:13px;font-weight:600;color:var(--champagne)">${retirePct.toFixed(1)}%</span>
+          </div>
+          <div class="fin-ret-bar"><div class="fin-ret-fill" style="width:${retirePct}%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--faint)">
+            <span>${fmtDollars(totalRetire)} saved</span><span>$1.5M goal</span>
+          </div>
+        </div>
+      </div>` : ''}`;
+    buildNetWorthChart(nw.history);
+  } catch(err) {
+    el.innerHTML = `<div style="color:var(--warn);padding:16px">${esc(err.message)}</div>`;
+  }
+}
+
+function renderAccountRows(accounts) {
+  if (!accounts || !accounts.length) return '<div style="padding:16px;color:var(--faint);font-size:13px">No accounts</div>';
+  return accounts.map(a => {
+    const dot = acctDot(a.type, a.subtype);
+    const sub = a.subtype ? a.subtype.replace(/_/g,' ') : a.type;
+    const avail = a.available != null ? fmtDollarsExact(a.available) + ' avail' : '';
+    return `<div class="fin-acct-row">
+      <div class="fin-acct-dot" style="background:${dot}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="fin-acct-name">${esc(a.name)}</div>
+        <div class="fin-acct-inst">${esc(a.institution||'')} · ${esc(sub)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="fin-acct-bal">${fmtDollarsExact(a.balance)}</div>
+        ${avail ? `<div class="fin-acct-sub">${avail}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHoldingsTable(holdings) {
+  const header = `<div class="fin-hold-row" style="font-size:10px;color:var(--faint);letter-spacing:.05em;text-transform:uppercase;background:var(--graphite);border-bottom:1px solid var(--rule)">
+    <div>Ticker</div><div>Name</div><div style="text-align:right">Value</div><div style="text-align:right">Return</div></div>`;
+  const rows = holdings.slice(0,20).map(h => {
+    const ret = (h.cost_basis && h.value) ? ((h.value - h.cost_basis) / h.cost_basis * 100) : null;
+    const retStr   = ret != null ? (ret >= 0 ? '+' : '') + ret.toFixed(1) + '%' : '';
+    const retColor = ret == null ? '' : ret >= 0 ? '#4aaa80' : '#cc5050';
+    return `<div class="fin-hold-row">
+      <div class="fin-hold-ticker">${esc(h.ticker || '—')}</div>
+      <div class="fin-hold-name">${esc(h.name || '—')}</div>
+      <div class="fin-hold-val">${fmtDollarsExact(h.value)}</div>
+      <div class="fin-hold-ret" style="color:${retColor}">${retStr}</div>
+    </div>`;
+  }).join('');
+  return `<div class="fin-acct-list">${header}${rows}</div>`;
+}
+
+function buildNetWorthChart(history) {
+  if (!history || history.length < 2) return;
+  const cfg = getChartCfg();
+  const labels = history.map(h => new Date(h.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const data   = history.map(h => parseFloat(h.total));
+  _cjsRender(document.getElementById('fin-nw-chart'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Net Worth', data,
+      borderColor: '#5db87c', backgroundColor: 'rgba(93,184,124,0.10)',
+      pointRadius: 2, pointHoverRadius: 4, tension: 0.3, fill: true, borderWidth: 2,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: { label: c => fmtDollarsExact(c.raw) }}},
+      scales: { x: cfg.scaleX, y: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => fmtDollars(v) }}},
+    }
+  }, 160);
+}
+
+async function loadFinanceAccounts() {
+  const el = document.getElementById('fin-items-content');
+  if (!el) return;
+  try {
+    const items = await fetch('/api/finance/items').then(r => r.ok ? r.json() : []);
+    if (!items.length) {
+      el.innerHTML = `<div style="text-align:center;padding:48px 20px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">No accounts linked yet.</div>
+        <button class="fin-link-btn" onclick="openPlaidLink()"><i class="ph-bold ph-plugs"></i> Link your first account</button></div>`;
+      return;
+    }
+    el.innerHTML = `<div class="fin-items-list">${items.map(item => `
+      <div class="fin-item-row">
+        <i class="ph-bold ph-bank" style="color:var(--patina-text);flex-shrink:0"></i>
+        <span class="fin-item-name">${esc(item.institution || item.item_id)}</span>
+        <span class="fin-item-date">${new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+        <button class="row-btn danger" title="Unlink" onclick="finUnlink('${esc(item.item_id)}',this)">
+          <i class="ph-bold ph-trash-simple"></i>
+        </button>
+      </div>`).join('')}</div>`;
+  } catch(err) {
+    el.innerHTML = `<div style="color:var(--warn);padding:16px">${esc(err.message)}</div>`;
+  }
+}
+
+async function finUnlink(itemId, btn) {
+  if (!confirm('Unlink this institution? Balance history will be removed.')) return;
+  btn.disabled = true;
+  try {
+    await fetch(`/api/finance/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+    loadFinanceAccounts();
+  } catch(err) { alert(err.message); btn.disabled = false; }
+}
+
+async function finSync() {
+  const btn    = document.getElementById('fin-sync-btn');
+  const status = document.getElementById('fin-sync-status');
+  btn.disabled = true;
+  if (status) status.textContent = 'Syncing…';
+  try {
+    const r = await fetch('/api/finance/sync', { method: 'POST' }).then(r => r.json());
+    if (status) status.textContent = `Synced ${r.synced} item${r.synced !== 1 ? 's' : ''}`;
+    window._finLoaded = false;
+    loadFinanceDashboard();
+    loadFinanceOverview();
+  } catch(_) { if (status) status.textContent = 'Sync failed'; }
+  btn.disabled = false;
+}
+
+function openPlaidLink() {
+  if (!window.Plaid) { alert('Plaid Link not available'); return; }
+  fetch('/api/finance/link/token', { method: 'POST' })
+    .then(r => r.json())
+    .then(({ link_token }) => {
+      const handler = Plaid.create({
+        token: link_token,
+        onSuccess: async (public_token) => {
+          await fetch('/api/finance/link/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_token }),
+          });
+          window._finLoaded = false;
+          loadFinanceAccounts();
+          loadFinanceDashboard();
+          loadFinanceOverview();
+        },
+        onExit: () => {},
+      });
+      handler.open();
+    })
+    .catch(err => alert('Could not open Plaid Link: ' + err.message));
+}
+
 // ─── load flights ─────────────────────────────────────────────────────────────
 async function loadFlights() {
   const [statsRes, flightsRes] = await Promise.allSettled([
@@ -4112,6 +4474,8 @@ async function loadFlights() {
       '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No flight data</div>';
     window._flights = [];
   });
+
+  loadFinanceOverview().catch(() => {});
 
   route();
 })().catch(err => {

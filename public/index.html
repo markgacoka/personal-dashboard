@@ -243,10 +243,10 @@
     }
     .icon-btn:hover { color: var(--muted); border-color: var(--rule-strong); }
 
-    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 28px 28px 56px; }
+    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px 22px 36px; }
     .view { display: none; }
     .view.active { display: block; }
-    .section { margin-top: 32px; }
+    .section { margin-top: 14px; }
     .section-first { margin-top: 0; }
 
     /* ── Card ────────────────────────────────────────────── */
@@ -281,8 +281,10 @@
     .divider { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 
     /* ── Grid helpers ────────────────────────────────────── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+    .flight-row { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; align-items: start; }
+    @media (max-width: 900px) { .flight-row { grid-template-columns: 1fr; } }
 
     /* ── Weekly ledger ───────────────────────────────────── */
     #weekly-ledger {
@@ -321,18 +323,18 @@
     /* ── Overview cards ─────────────────────────────── */
     .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 800px) { .ov-grid { grid-template-columns: 1fr; } }
-    .ov-card { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 16px; }
-    .ov-card-hd { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .ov-card { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 12px 14px; }
+    .ov-card-hd { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
     .ov-card-hd button { font-size: 11px; color: var(--faint); background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; }
     .ov-card-hd button:hover { color: var(--champagne); }
 
     /* ── Weather card ───────────────────────────────────────── */
-    .wx-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--rule); }
+    .wx-header { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
     .wx-header-left { flex:1; min-width:0; }
-    .wx-airport { font-size:15px; font-weight:600; color:var(--champagne); }
-    .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:3px; }
-    .wx-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
-    .wx-verdict { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.04em; }
+    .wx-airport { font-size:13px; font-weight:600; color:var(--champagne); }
+    .wx-airport-meta { font-size:11px; color:var(--muted); margin-top:2px; }
+    .wx-pills { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+    .wx-verdict { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.04em; }
     .wx-verdict.go   { background:oklch(19% 0.05 155); color:oklch(70% 0.11 155); }
     .wx-verdict.caut { background:oklch(21% 0.06 70);  color:oklch(74% 0.11 70);  }
     .wx-verdict.nogo { background:oklch(19% 0.05 20);  color:oklch(68% 0.09 20);  }
@@ -343,16 +345,16 @@
     .wx-cat-pill.LIFR { background:oklch(18% 0.04 330); color:oklch(66% 0.08 330); }
     .wx-body { display:grid; grid-template-columns:140px 1fr 1fr; gap:0; }
     @media (max-width:680px) { .wx-body { grid-template-columns:1fr; } }
-    .wx-col { padding:0 20px; border-right:1px solid var(--rule); }
+    .wx-col { padding:0 14px; border-right:1px solid var(--rule); }
     .wx-col:first-child { padding-left:0; }
     .wx-col:last-child  { border-right:none; padding-right:0; }
-    .wx-col-title { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:10px; }
-    .wx-row { display:flex; gap:6px; padding:5px 0; border-bottom:1px solid var(--rule); align-items:baseline; font-size:13px; }
+    .wx-col-title { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:7px; }
+    .wx-row { display:flex; gap:6px; padding:4px 0; border-bottom:1px solid var(--rule); align-items:baseline; font-size:12px; }
     .wx-row:last-child { border-bottom:none; }
-    .wx-lbl { color:var(--muted); font-size:11px; width:80px; flex-shrink:0; }
-    .wx-val { color:var(--body-text); flex:1; }
-    .wx-sub { color:var(--faint); font-size:11px; }
-    .wx-footer { display:flex; align-items:center; gap:0; margin-top:14px; padding-top:12px; border-top:1px solid var(--rule); flex-wrap:wrap; }
+    .wx-lbl { color:var(--muted); font-size:10px; width:70px; flex-shrink:0; }
+    .wx-val { color:var(--body-text); flex:1; font-size:12px; }
+    .wx-sub { color:var(--faint); font-size:10px; }
+    .wx-footer { display:flex; align-items:center; gap:0; margin-top:10px; padding-top:8px; border-top:1px solid var(--rule); flex-wrap:wrap; }
     .wx-footer-link { font-size:12px; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-right:1px solid var(--rule); }
     .wx-footer-link:first-child { padding-left:0; }
     .wx-footer-link:hover { color:var(--champagne); }
@@ -362,12 +364,12 @@
 
     /* currency */
     .cur-rows { display: flex; flex-direction: column; gap: 0; }
-    .cur-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+    .cur-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
     .cur-row:last-child { border-bottom: none; }
-    .cur-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .cur-name { font-size: 13px; color: var(--body-text); flex: 1; }
-    .cur-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
-    .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; }
+    .cur-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .cur-name { font-size: 12px; color: var(--body-text); flex: 1; }
+    .cur-badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+    .cur-days { font-size: 10px; color: var(--faint); white-space: nowrap; }
 
     /* readiness */
 
@@ -692,31 +694,31 @@
       background: var(--raised);
       border: 1px solid var(--rule);
       border-radius: var(--r-lg);
-      padding: 18px 20px;
+      padding: 10px 12px 8px;
     }
     .chart-label {
-      font-size: 13px; color: var(--body-text);
-      margin-bottom: 12px; font-weight: 500;
-      letter-spacing: -0.01em;
+      font-size: 12px; color: var(--muted);
+      margin-bottom: 6px; font-weight: 500;
+      letter-spacing: 0.01em; text-transform: uppercase;
     }
-    .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; }
+    .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; text-transform: none; letter-spacing: 0; }
 
     /* ── Tremor-style KPI tiles (readiness card) ──────────── */
-    .kpi-tiles { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 16px; }
+    .kpi-tiles { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 10px; }
     @media (max-width: 680px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
-    .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 11px 13px; }
-    .kpi-big { font-size: 21px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--champagne); }
-    .kpi-lbl { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
-    .kpi-sub { font-size: 11px; color: var(--faint); margin-top: 4px; }
+    .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 8px 10px; }
+    .kpi-big { font-size: 18px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .kpi-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .kpi-sub { font-size: 10px; color: var(--faint); margin-top: 2px; }
 
     /* ── ACWR progress bar (readiness card) ──────────────── */
-    .acwr-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-    .acwr-status-txt { font-size: 15px; font-weight: 600; }
+    .acwr-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .acwr-status-txt { font-size: 14px; font-weight: 600; }
     .acwr-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .acwr-bar-wrap { position: relative; height: 5px; background: var(--graphite-2); border-radius: 3px; }
-    .acwr-bar-zone { position: absolute; height: 5px; left: 28.57%; width: 35.71%; background: oklch(35% 0.10 145 / 0.4); border-radius: 3px; }
-    .acwr-bar-pip  { position: absolute; top: -4.5px; width: 4px; height: 14px; border-radius: 2px; transform: translateX(-50%); }
-    .acwr-bar-labs { position: relative; height: 18px; margin-top: 4px; }
+    .acwr-bar-wrap { position: relative; height: 4px; background: var(--graphite-2); border-radius: 3px; }
+    .acwr-bar-zone { position: absolute; height: 4px; left: 28.57%; width: 35.71%; background: rgba(94,184,124,0.25); border-radius: 3px; }
+    .acwr-bar-pip  { position: absolute; top: -4px; width: 3px; height: 12px; border-radius: 2px; transform: translateX(-50%); }
+    .acwr-bar-labs { position: relative; height: 16px; margin-top: 3px; }
 
     /* ── Data note ───────────────────────────────────────── */
     .data-note { font-size: 12px; color: var(--faint); }
@@ -1038,30 +1040,30 @@
 
         <!-- Training Readiness -->
         <div class="section-first">
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
-            <span style="font-size:13px;color:var(--muted)">Today</span>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--faint);font-weight:500;letter-spacing:.06em;text-transform:uppercase">Today</span>
             <span id="data-date" class="data-note"></span>
           </div>
-          <div id="readiness-card" class="ov-card skel" style="min-height:88px"></div>
+          <div id="readiness-card" class="ov-card skel" style="min-height:80px"></div>
         </div>
 
-        <!-- Flight status -->
+        <!-- Flight status: weather left, currency right -->
         <div class="section">
-          <div id="weather-card" class="ov-card skel" style="min-height:220px"></div>
-        </div>
-        <div class="section" style="margin-top:0;padding-top:0">
-          <div id="currency-card" class="ov-card skel" style="min-height:100px"></div>
+          <div class="flight-row">
+            <div id="weather-card" class="ov-card skel" style="min-height:160px"></div>
+            <div id="currency-card" class="ov-card skel" style="min-height:80px"></div>
+          </div>
         </div>
 
         <!-- Trend charts 2×2 -->
         <div class="section">
           <div class="grid-2">
             <div class="chart-card">
-              <div class="chart-label">30-day volume <span style="color:var(--faint)">(miles)</span></div>
+              <div class="chart-label">30-day volume <span class="chart-sublabel">(miles)</span></div>
               <div id="chart-volume"></div>
             </div>
             <div class="chart-card">
-              <div class="chart-label">30-day training load</div>
+              <div class="chart-label">30-day load <span class="chart-sublabel">by sport · — 7d avg</span></div>
               <div id="chart-load"></div>
             </div>
             <div class="chart-card">
@@ -1069,7 +1071,7 @@
               <div id="chart-hr"></div>
             </div>
             <div class="chart-card">
-              <div class="chart-label">Last activity — HR zones <span id="zones-label" style="color:var(--faint)"></span></div>
+              <div class="chart-label">HR zones <span id="zones-label" class="chart-sublabel"></span></div>
               <div id="chart-zones"></div>
             </div>
           </div>
@@ -1159,19 +1161,19 @@
 const M_TO_MI = 0.000621371;
 
 const SPORT_CFG = {
-  running:  { color: 'oklch(65% 0.16 145)', icon: 'ph-person-simple-run',  label: 'Running'  },
-  cycling:  { color: 'oklch(80% 0.17 85)',  icon: 'ph-bicycle',             label: 'Cycling'  },
-  swimming: { color: 'oklch(68% 0.15 235)', icon: 'ph-waves',               label: 'Swimming' },
-  rowing:   { color: 'oklch(65% 0.15 350)', icon: 'ph-rowing',              label: 'Rowing'   },
-  other:    { color: 'oklch(62% 0 0)',       icon: 'ph-activity',            label: 'Other'    },
+  running:  { color: '#5db87c', icon: 'ph-person-simple-run',  label: 'Running'  },
+  cycling:  { color: '#c99c3a', icon: 'ph-bicycle',             label: 'Cycling'  },
+  swimming: { color: '#5a88c0', icon: 'ph-waves',               label: 'Swimming' },
+  rowing:   { color: '#b85e7a', icon: 'ph-rowing',              label: 'Rowing'   },
+  other:    { color: '#7a8a98', icon: 'ph-activity',            label: 'Other'    },
 };
 
 const HR_ZONES = [
-  { name: 'Z1 Recovery',  color: 'oklch(68% 0.15 235)' },
-  { name: 'Z2 Base',      color: 'oklch(65% 0.16 145)' },
-  { name: 'Z3 Tempo',     color: 'oklch(80% 0.17 85)'  },
-  { name: 'Z4 Threshold', color: 'oklch(72% 0.17 55)'  },
-  { name: 'Z5 VO2Max',    color: 'oklch(65% 0.18 25)'  },
+  { name: 'Z1 Recovery',  color: '#5a88c0' },
+  { name: 'Z2 Base',      color: '#5db87c' },
+  { name: 'Z3 Tempo',     color: '#c99c3a' },
+  { name: 'Z4 Threshold', color: '#c07030' },
+  { name: 'Z5 VO2Max',    color: '#c04040' },
 ];
 
 const SPLIT_META = {
@@ -1274,20 +1276,22 @@ function routeLabel(f) {
 const { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
         XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } = Recharts;
 const h = React.createElement.bind(React);
-const RC_GRID   = { strokeDasharray: '4 4', stroke: 'oklch(17% 0.004 95)', vertical: false };
-const RC_TICK   = { fontSize: 10, fill: 'oklch(60% 0 0)', fontFamily: 'Albert Sans, sans-serif' };
-const RC_MARGIN = { top: 6, right: 8, bottom: 0, left: -20 };
-const RC_CURSOR = { stroke: 'oklch(100% 0 0 / 0.06)', strokeWidth: 1 };
+const RC_GRID   = { strokeDasharray: '3 6', stroke: '#252520', vertical: false };
+const RC_TICK   = { fontSize: 10, fill: '#888880', fontFamily: 'Albert Sans, sans-serif' };
+const RC_MARGIN = { top: 4, right: 6, bottom: 0, left: -22 };
+const RC_CURSOR = { stroke: 'rgba(255,255,255,0.05)', strokeWidth: 1 };
 
 function rcTooltip(label, payload, fmtVal) {
   if (!payload?.length) return null;
+  const visible = payload.filter(p => p.value != null && p.value !== 0);
+  if (!visible.length) return null;
   return h('div', {
-    style: { background:'oklch(12% 0.005 95)', border:'1px solid oklch(22% 0.006 95)',
-             borderRadius:6, padding:'8px 12px', fontSize:11, fontFamily:'Albert Sans,sans-serif',
-             color:'oklch(80% 0 0)', lineHeight:1.6, pointerEvents:'none' }
+    style: { background:'#18180f', border:'1px solid #2e2e28',
+             borderRadius:5, padding:'6px 10px', fontSize:11, fontFamily:'Albert Sans,sans-serif',
+             color:'#ccccbb', lineHeight:1.6, pointerEvents:'none' }
   },
-    h('div', { style:{ color:'oklch(55% 0 0)', marginBottom:4, fontSize:10 } }, label),
-    ...payload.map(p => h('div', { key:p.name, style:{ color: p.color||'oklch(80% 0 0)' } },
+    label ? h('div', { style:{ color:'#787870', marginBottom:2, fontSize:10 } }, label) : null,
+    ...visible.map(p => h('div', { key:p.name, style:{ color: p.color||'#aaaaaa' } },
       `${p.name}: ${fmtVal ? fmtVal(p.value, p.name) : p.value}`
     ))
   );
@@ -1935,21 +1939,21 @@ function buildVolumeChart(activities) {
   }));
   const sports = ['running','cycling','swimming','rowing','other'].filter(sp => data.some(r => r[sp] > 0));
   const gradients = sports.map(sp => h('linearGradient', { key:sp, id:`vg-${sp}`, x1:0, y1:0, x2:0, y2:1 },
-    h('stop', { offset:'5%',  stopColor: SPORT_CFG[sp].color, stopOpacity: 0.65 }),
-    h('stop', { offset:'95%', stopColor: SPORT_CFG[sp].color, stopOpacity: 0.05 }),
+    h('stop', { offset:'0%',  stopColor: SPORT_CFG[sp].color, stopOpacity: 0.45 }),
+    h('stop', { offset:'100%', stopColor: SPORT_CFG[sp].color, stopOpacity: 0.03 }),
   ));
   const areas = sports.map(sp => h(Area, { key:sp, type:'monotone', dataKey:sp, name:SPORT_CFG[sp].label,
     stackId:'1', stroke:SPORT_CFG[sp].color, strokeWidth:1.5,
     fill:`url(#vg-${sp})`, dot:false, activeDot:{ r:3 } }));
   const el = document.getElementById('chart-volume');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
     h(AreaChart, { data, margin:RC_MARGIN },
       h('defs', null, ...gradients),
       h(CartesianGrid, RC_GRID),
       h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
       h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter: v => v.toFixed(1) }),
       h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v => v.toFixed(2)+' mi') }),
-      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
+      h(Legend, { wrapperStyle:{ fontSize:10, fontFamily:'Albert Sans,sans-serif', paddingTop:4 } }),
       ...areas,
     )
   ));
@@ -1971,18 +1975,17 @@ function buildLoadChart(activities) {
   });
   const merged = data.map((d,i) => ({ ...d, avg: avg7[i].avg }));
   const el = document.getElementById('chart-load');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
     h(ComposedChart, { data:merged, margin:RC_MARGIN },
       h(CartesianGrid, RC_GRID),
       h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
       h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false }),
       h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload) }),
-      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
-      h(Bar, { dataKey:'load', name:'Load', radius:[2,2,0,0], maxBarSize:20 },
+      h(Bar, { dataKey:'load', name:'Load', radius:[2,2,0,0], maxBarSize:18 },
         merged.map((d,i) => h(Cell, { key:i, fill:SPORT_CFG[d.sport].color, fillOpacity:0.85 }))
       ),
-      h(Line, { dataKey:'avg', name:'7d avg', type:'monotone', stroke:'oklch(62% 0 0)',
-        strokeWidth:2, dot:false, strokeDasharray:'4 2' }),
+      h(Line, { dataKey:'avg', name:'7d avg', type:'monotone', stroke:'#666660',
+        strokeWidth:1.5, dot:false, strokeDasharray:'4 2' }),
     )
   ));
 }
@@ -1998,17 +2001,17 @@ function buildHRChart(activities) {
     maxHR:  Math.round(a.maxHR||0),
   }));
   const el = document.getElementById('chart-hr');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
     h(LineChart, { data, margin:RC_MARGIN },
       h(CartesianGrid, RC_GRID),
       h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
-      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v+' bpm' }),
+      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v }),
       h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' bpm') }),
-      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
+      h(Legend, { wrapperStyle:{ fontSize:10, fontFamily:'Albert Sans,sans-serif', paddingTop:4 } }),
       h(Line, { dataKey:'avgHR', name:'Avg HR', type:'monotone',
-        stroke:'oklch(65% 0.15 350)', strokeWidth:2.5, dot:{ r:3 }, activeDot:{ r:4 } }),
+        stroke:'#b85e7a', strokeWidth:2.5, dot:{ r:2.5, fill:'#b85e7a' }, activeDot:{ r:4 } }),
       h(Line, { dataKey:'maxHR', name:'Max HR', type:'monotone',
-        stroke:'oklch(72% 0.17 55)', strokeWidth:1.5, strokeDasharray:'4 3', dot:false }),
+        stroke:'#c99c3a', strokeWidth:1.5, strokeDasharray:'4 3', dot:false }),
     )
   ));
 }
@@ -2021,14 +2024,14 @@ function buildZonesChart(activity) {
     .filter(z => z.mins > 0);
   const el = document.getElementById('chart-zones');
   if (!zones.length) { el.textContent = 'No zone data'; return; }
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
     h(BarChart, { data:zones, margin:RC_MARGIN },
       h(CartesianGrid, RC_GRID),
-      h(XAxis, { dataKey:'name', tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(XAxis, { dataKey:'name', tick:{...RC_TICK, fontSize:9}, axisLine:false, tickLine:false }),
       h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v+'m' }),
       h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' min') }),
-      h(Bar, { dataKey:'mins', name:'Minutes', radius:[3,3,0,0], maxBarSize:36 },
-        zones.map((z,i) => h(Cell, { key:i, fill:z.color, fillOpacity:0.9 }))
+      h(Bar, { dataKey:'mins', name:'Minutes', radius:[3,3,0,0], maxBarSize:40 },
+        zones.map((z,i) => h(Cell, { key:i, fill:z.color, fillOpacity:0.88 }))
       ),
     )
   ));

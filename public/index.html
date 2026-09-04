@@ -659,14 +659,22 @@
 
     /* ── Readiness status pill + delta badge ─────────────── */
     .rd-pill { display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.03em; }
-    .rd-pill.nogo  { background:#221616;color:#b05050; }
-    .rd-pill.caut  { background:#22190c;color:#b08030; }
-    .rd-pill.go    { background:#0e1f18;color:#3d9470; }
-    .rd-pill.muted { background:#1c1c1a;color:#777770; }
+    .rd-pill.nogo  { background:#221616;color:#cc6060; }
+    .rd-pill.caut  { background:#22190c;color:#c09030; }
+    .rd-pill.go    { background:#0e1f18;color:#4aaa80; }
+    .rd-pill.muted { background:#1c1c1a;color:#999990; }
     .rd-delta { display:inline-block;font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px; }
-    .rd-delta.neg { background:#221414;color:#a04040; }
-    .rd-delta.pos { background:#0e1e16;color:#2d8060; }
-    .rd-delta.neu { background:#1c1c1a;color:#666660; }
+    .rd-delta.neg { background:#221414;color:#cc5050; }
+    .rd-delta.pos { background:#0e1e16;color:#3aaa70; }
+    .rd-delta.neu { background:#1c1c1a;color:#888880; }
+    /* light-mode overrides */
+    [data-theme="light"] .rd-pill.nogo  { background:#fde8e8;color:#b03030; }
+    [data-theme="light"] .rd-pill.caut  { background:#fef5e4;color:#8a6010; }
+    [data-theme="light"] .rd-pill.go    { background:#e8f5ee;color:#237a50; }
+    [data-theme="light"] .rd-pill.muted { background:#ededea;color:#666660; }
+    [data-theme="light"] .rd-delta.neg  { background:#fde8e8;color:#b03030; }
+    [data-theme="light"] .rd-delta.pos  { background:#e8f5ee;color:#237a50; }
+    [data-theme="light"] .rd-delta.neu  { background:#ededea;color:#666660; }
 
     /* ── MapLibre overrides ──────────────────────────────── */
     .maplibregl-popup-content {
@@ -1064,7 +1072,7 @@
         <div class="section">
           <div class="grid-2">
             <div class="chart-card">
-              <div class="chart-label">30-day volume <span class="chart-sublabel">(miles)</span></div>
+              <div class="chart-label">30-day volume <span class="chart-sublabel">(hours)</span></div>
               <div id="chart-volume"></div>
             </div>
             <div class="chart-card">
@@ -1928,14 +1936,21 @@ function renderFlightCurrency(flights) {
 
   const dayDays = dayCur ? daysToLapse(flights,'day_takeoffs','day_landings_full_stop') : null;
 
+  function getBadgeStyle(type) {
+    const light = document.documentElement.getAttribute('data-theme') === 'light';
+    if (type === 'expiring') return light ? 'background:#fef5e4;color:#8a6010' : 'background:#271f0b;color:#c09030';
+    if (type === 'current')  return light ? 'background:#e8f5ee;color:#237a50' : 'background:#0e2222;color:#3d9494';
+    return light ? 'background:#fde8e8;color:#b03030' : 'background:#221414;color:#cc5050';
+  }
+
   function row(name, current, daysLeft, detail) {
     let dotColor, badgeStyle, badgeText;
     if (current && daysLeft!==null && daysLeft<=15) {
-      dotColor='#b08030'; badgeStyle='background:#271f0b;color:#b08030'; badgeText=`exp in ${daysLeft}d`;
+      dotColor='#b08030'; badgeStyle=getBadgeStyle('expiring'); badgeText=`exp in ${daysLeft}d`;
     } else if (current) {
-      dotColor='#3d9494'; badgeStyle='background:#0e2222;color:#3d9494'; badgeText='current';
+      dotColor='#3d9494'; badgeStyle=getBadgeStyle('current'); badgeText='current';
     } else {
-      dotColor='#b05050'; badgeStyle='background:#221414;color:#b05050'; badgeText='lapsed';
+      dotColor='#b05050'; badgeStyle=getBadgeStyle('lapsed'); badgeText='lapsed';
     }
     return `<div class="cur-row">
       <div class="cur-dot" style="background:${dotColor}"></div>
@@ -1966,10 +1981,11 @@ function buildVolumeChart(activities) {
   const days = {}, cutoff = Date.now() - 30*86400000;
   for (const a of activities) {
     const ts = new Date(a.startTimeLocal||0).getTime();
-    if (ts < cutoff || !a.distance) continue;
+    const dur = (a.movingDuration || a.duration || 0) / 3600;
+    if (ts < cutoff || dur <= 0) continue;
     const day = new Date(ts).toISOString().slice(0,10);
     if (!days[day]) days[day] = { running:0, cycling:0, swimming:0, rowing:0, other:0 };
-    days[day][normSport(a.activityType?.typeKey)] += a.distance * M_TO_MI;
+    days[day][normSport(a.activityType?.typeKey)] += dur;
   }
   const sorted = Object.keys(days).sort();
   const step = Math.max(1, Math.floor(sorted.length / 6));
@@ -1995,7 +2011,7 @@ function buildVolumeChart(activities) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { ...cfg.tt, callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(2)} mi` } },
+        tooltip: { ...cfg.tt, callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(2)} hr` } },
       },
       scales: { x: cfg.scaleX, y: { ...cfg.scaleY, stacked: true, ticks: { ...cfg.scaleY.ticks, callback: v => v.toFixed(1) } } },
     }

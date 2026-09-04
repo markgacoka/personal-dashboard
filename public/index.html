@@ -538,16 +538,21 @@
     }
 
     /* ── Logbook ─────────────────────────────────────────── */
-    /* logbook-stats is now a data-strip like wellness */
     #logbook-stats {
       display: flex; align-items: center; flex-wrap: wrap;
       background: var(--raised);
       border: 1px solid var(--rule);
       border-radius: var(--r-sm);
-      padding: 16px 24px;
+      padding: 14px 20px;
       margin-bottom: 16px;
       gap: 0;
     }
+    .dp { display: flex; flex-direction: column; padding: 0 20px; flex-shrink: 0; }
+    .dp:first-child { padding-left: 0; }
+    .dp-n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
+    .dp-u { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
+    .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; }
+    .dp-div { width: 1px; align-self: stretch; background: var(--rule); flex-shrink: 0; margin: 0 4px; }
 
     .fl-list {
       border-radius: var(--r-sm); overflow: hidden;
@@ -2344,39 +2349,42 @@ function buildActivityDetailHTML(a, detail) {
 
 // ─── logbook ──────────────────────────────────────────────────────────────────
 function renderLogbookStats(s) {
+  const h = v => parseFloat(v||0) > 0 ? parseFloat(v).toFixed(1)+'h' : '0h';
   document.getElementById('logbook-stats').innerHTML = `
     <div class="dp">
-      <span class="dp-n">${fmtHrs(s.total_hours)}</span>
-      <span class="dp-u">total</span>
-      <span class="dp-s">${s.total_flights} flights</span>
+      <span class="dp-n">${h(s.total_hours)}</span>
+      <span class="dp-u">Total time</span>
+      <span class="dp-s">${s.total_flights||0} flight${s.total_flights!==1?'s':''} · ${s.total_takeoffs||0} T/O</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:oklch(65% 0.16 145)">${fmtHrs(s.pic)}</span>
-      <span class="dp-u">PIC</span>
-      <span class="dp-s">${fmtHrs(s.solo)} solo</span>
+      <span class="dp-n" style="color:#5db87c">${h(s.dual_received)}</span>
+      <span class="dp-u">Dual rcvd</span>
+      <span class="dp-s">${h(s.dual_given)} given</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:oklch(68% 0.15 235)">${fmtHrs(s.cross_country)}</span>
+      <span class="dp-n" style="color:#c99c3a">${h(s.solo)}</span>
+      <span class="dp-u">Solo</span>
+      <span class="dp-s">${h(s.pic)} PIC total</span>
+    </div>
+    <div class="dp-div"></div>
+    <div class="dp">
+      <span class="dp-n" style="color:#5a88c0">${h(s.cross_country)}</span>
       <span class="dp-u">X-country</span>
-      <span class="dp-s">${s.airports_visited} airports</span>
+      <span class="dp-s">${s.airports_visited||0} airports</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:oklch(80% 0.17 85)">${fmtHrs(s.night)}</span>
-      <span class="dp-u">night</span>
+      <span class="dp-n" style="color:#9080c0">${h(s.night)}</span>
+      <span class="dp-u">Night</span>
       <span class="dp-s">${s.night_landings||0} ldg</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
-      <span class="dp-n" style="color:var(--patina-text)">${fmtHrs(s.actual_instrument)}</span>
-      <span class="dp-u">actual IFR</span>
-    </div>
-    <div class="dp-div"></div>
-    <div class="dp">
-      <span class="dp-n" style="color:var(--patina-text)">${fmtHrs(s.simulated_instrument)}</span>
-      <span class="dp-u">sim inst</span>
+      <span class="dp-n" style="color:var(--patina-text)">${h(s.actual_instrument)}</span>
+      <span class="dp-u">Actual IFR</span>
+      <span class="dp-s">${h(s.simulated_instrument)} sim inst</span>
     </div>
   `;
   document.getElementById('fl-subtitle').textContent = `· ${s.total_hours}h · PPL training`;
@@ -2414,13 +2422,16 @@ function renderFlights(flights) {
             <div class="fl-kpi-v">${f.takeoffs}/${f.landings}</div>
             <div class="fl-kpi-l">T/O · Lnd</div>
           </div>` : ''}
-          ${f.dual_given > 0 ? `<div class="fl-kpi">
-            <div class="fl-kpi-v" style="color:var(--patina-text)">${fmtHrs(f.dual_given)}</div>
-            <div class="fl-kpi-l">dual given</div>
+          ${f.cross_country > 0 ? `<div class="fl-kpi">
+            <div class="fl-kpi-v" style="color:#5a88c0">${fmtHrs(f.cross_country)}</div>
+            <div class="fl-kpi-l">x-country</div>
           </div>` : ''}
           ${f.dual_received > 0 ? `<div class="fl-kpi">
             <div class="fl-kpi-v" style="color:var(--patina-text)">${fmtHrs(f.dual_received)}</div>
-            <div class="fl-kpi-l">dual rcvd</div>
+            <div class="fl-kpi-l">dual</div>
+          </div>` : f.solo > 0 ? `<div class="fl-kpi">
+            <div class="fl-kpi-v" style="color:#c99c3a">${fmtHrs(f.solo)}</div>
+            <div class="fl-kpi-l">solo</div>
           </div>` : ''}
         </div>
         <div class="row-actions" id="ra-${id}">

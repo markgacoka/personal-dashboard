@@ -278,6 +278,22 @@ export async function migrateV7() {
   }
 }
 
+// V8: Airport detail cache — runway + frequency data from OurAirports (static, rarely changes)
+export async function migrateV8() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS airport_detail_cache (
+        icao        TEXT PRIMARY KEY,
+        detail_json JSONB NOT NULL,
+        fetched_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V6: OpenSky response cache — avoid re-spending credits on immutable historical data
 export async function migrateV6() {
   const client = await pool.connect()

@@ -2,6 +2,38 @@
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
 import { pool } from '../db/client.js'
 
+// ── OurAirports CSV parser ────────────────────────────────────────────────────
+function parseCsvLine(line) {
+  const fields = []
+  let cur = '', inQ = false
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ }
+    else if (ch === ',' && !inQ) { fields.push(cur); cur = '' }
+    else cur += ch
+  }
+  fields.push(cur)
+  return fields
+}
+
+// Filter CSV text to rows matching a specific airport_ident.
+// Avoids parsing the full 10 MB file — only parses lines containing the ICAO string.
+function filterAirportCsv(text, icao) {
+  const lines = text.split('\n')
+  if (!lines.length) return []
+  const headers = parseCsvLine(lines[0])
+  const identIdx = headers.indexOf('airport_ident')
+  if (identIdx < 0) return []
+  const rows = []
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line || !line.includes(icao)) continue  // fast string scan before full parse
+    const vals = parseCsvLine(line)
+    if (vals[identIdx] !== icao) continue
+    rows.push(Object.fromEntries(headers.map((h, j) => [h, vals[j] ?? ''])))
+  }
+  return rows
+}
+
 async function dbQuery(sql, params) {
   try { return (await pool.query(sql, params)).rows } catch { return null }
 }
@@ -232,6 +264,69 @@ export default async function proxyRoutes(fastify) {
     } catch (e) {
       return reply.status(200).send({ track: null })
     }
+  })
+
+  // ── Airport detail: runways + frequencies from OurAirports ───────────────────
+  // OurAirports publishes ACUK-licensed CSVs on GitHub. Data is static and cached in DB.
+  fastify.get('/api/external/airport-detail/:icao', async (req, reply) => {
+    const icao = req.params.icao.toUpperCase()
+
+    // Cache hit — airport runway/frequency data is effectively static
+    const cached = await dbQuery(
+      'SELECT detail_json FROM airport_detail_cache WHERE icao=$1',
+      [icao]
+    )
+    if (cached?.length) return cached[0].detail_json
+
+    const OA = 'https://davidmegginson.github.io/ourairports-data'
+    const [rwyRes, frqRes] = await Promise.allSettled([
+      xfetch(`${OA}/runways.csv`, 25000).then(r => r.ok ? r.text() : ''),
+      xfetch(`${OA}/airport-frequencies.csv`, 25000).then(r => r.ok ? r.text() : ''),
+    ])
+
+    const runways = []
+    if (rwyRes.status === 'fulfilled' && rwyRes.value) {
+      for (const row of filterAirportCsv(rwyRes.value, icao)) {
+        if (row.closed === '1') continue
+        const leId  = row.le_ident  || ''
+        const heId  = row.he_ident  || ''
+        const leNum = parseInt(leId.replace(/[LRC]/i, ''), 10)
+        const heNum = parseInt(heId.replace(/[LRC]/i, ''), 10)
+        if (!leNum || !heNum) continue
+        runways.push({
+          id:        `${leId}-${heId}`,
+          length_ft: parseInt(row.length_ft) || null,
+          width_ft:  parseInt(row.width_ft)  || null,
+          surface:   row.surface || null,
+          lighted:   row.lighted === '1',
+          le_ident:  leId,
+          le_hdg:    leNum * 10,   // magnetic heading from runway number
+          he_ident:  heId,
+          he_hdg:    heNum * 10,
+        })
+      }
+    }
+
+    const frequencies = []
+    if (frqRes.status === 'fulfilled' && frqRes.value) {
+      for (const row of filterAirportCsv(frqRes.value, icao)) {
+        if (!row.frequency_mhz) continue
+        frequencies.push({
+          type:        row.type        || '',
+          description: row.description || '',
+          freq_mhz:    row.frequency_mhz,
+        })
+      }
+    }
+
+    const result = { icao, runways, frequencies }
+    await dbQuery(
+      `INSERT INTO airport_detail_cache (icao, detail_json)
+       VALUES ($1, $2)
+       ON CONFLICT (icao) DO UPDATE SET detail_json=$2, fetched_at=NOW()`,
+      [icao, JSON.stringify(result)]
+    )
+    return result
   })
 
   // ── Airport info from Aviation Weather Center ─────────────────────────────────

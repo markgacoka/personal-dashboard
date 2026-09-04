@@ -331,14 +331,14 @@
     .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:3px; }
     .wx-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
     .wx-verdict { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.04em; }
-    .wx-verdict.go   { background:oklch(22% 0.09 145); color:oklch(74% 0.20 145); }
-    .wx-verdict.caut { background:oklch(25% 0.10 75);  color:oklch(82% 0.18 75);  }
-    .wx-verdict.nogo { background:oklch(22% 0.10 25);  color:oklch(72% 0.18 25);  }
+    .wx-verdict.go   { background:oklch(19% 0.05 155); color:oklch(70% 0.11 155); }
+    .wx-verdict.caut { background:oklch(21% 0.06 70);  color:oklch(74% 0.11 70);  }
+    .wx-verdict.nogo { background:oklch(19% 0.05 20);  color:oklch(68% 0.09 20);  }
     .wx-cat-pill { display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; letter-spacing:.04em; }
-    .wx-cat-pill.VFR  { background:oklch(22% 0.06 145); color:oklch(65% 0.16 145); }
-    .wx-cat-pill.MVFR { background:oklch(22% 0.06 235); color:oklch(65% 0.15 235); }
-    .wx-cat-pill.IFR  { background:oklch(22% 0.08 25);  color:oklch(65% 0.17 25);  }
-    .wx-cat-pill.LIFR { background:oklch(22% 0.08 330); color:oklch(65% 0.17 330); }
+    .wx-cat-pill.VFR  { background:oklch(18% 0.03 145); color:oklch(66% 0.09 145); }
+    .wx-cat-pill.MVFR { background:oklch(18% 0.03 225); color:oklch(66% 0.08 225); }
+    .wx-cat-pill.IFR  { background:oklch(18% 0.04 20);  color:oklch(66% 0.09 20);  }
+    .wx-cat-pill.LIFR { background:oklch(18% 0.04 330); color:oklch(66% 0.08 330); }
     .wx-body { display:grid; grid-template-columns:140px 1fr 1fr; gap:0; }
     @media (max-width:680px) { .wx-body { grid-template-columns:1fr; } }
     .wx-col { padding:0 20px; border-right:1px solid var(--rule); }
@@ -1488,66 +1488,105 @@ async function loadWeatherWidget() {
   document.getElementById('weather-card').innerHTML =
     `<div class="ov-card-hd">${esc(icao)} Weather</div><div class="skel" style="height:180px;border-radius:6px"></div>`;
   try {
-    const [metarRes, airportRes, notamRes] = await Promise.allSettled([
+    const [metarRes, airportRes, notamRes, detailRes] = await Promise.allSettled([
       fetch(`/api/external/metar/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
       fetch(`/api/external/airport/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
       fetch(`/api/external/notam/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{count:0,notams:[]}),
+      fetch(`/api/external/airport-detail/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{runways:[],frequencies:[]}),
     ]);
     renderWeatherCard(
       metarRes.value?.metar || null,
       airportRes.value || null,
       notamRes.value || {count:0,notams:[]},
-      icao
+      icao,
+      detailRes.value || {runways:[],frequencies:[]}
     );
   } catch(_) {
-    renderWeatherCard(null, null, {count:0,notams:[]}, icao);
+    renderWeatherCard(null, null, {count:0,notams:[]}, icao, {runways:[],frequencies:[]});
   }
 }
 
-function windCompassSvg(wdir, wspd, wgst, rwyHdg) {
+// runways: [{le_ident, le_hdg, he_ident, he_hdg}] from OurAirports airport-detail
+// bestHdg: magnetic heading of the preferred landing direction (or null)
+function windCompassSvg(wdir, wspd, wgst, runways, bestHdg) {
   const R = 48, size = 120;
   const isCalm = !wspd || wspd < 2;
   const isVRB  = wdir === 'VRB' || wdir == null;
 
-  // Tick marks
-  const ticks = Array.from({length:36},(_,i) => {
-    const a = i*10*Math.PI/180;
-    const o = R, inn = i%9===0?R-8:i%3===0?R-5:R-3;
-    const sw = i%9===0?1.5:0.8;
+  // ── Tick marks ───────────────────────────────────────────────────────────────
+  const ticks = Array.from({length:36}, (_, i) => {
+    const a = i * 10 * Math.PI / 180;
+    const o = R, inn = i%9===0 ? R-9 : i%3===0 ? R-5 : R-3;
+    const sw = i%9===0 ? 1.5 : 0.8;
     return `<line x1="${+(Math.sin(a)*o).toFixed(2)}" y1="${+(-Math.cos(a)*o).toFixed(2)}" x2="${+(Math.sin(a)*inn).toFixed(2)}" y2="${+(-Math.cos(a)*inn).toFixed(2)}" stroke="var(--rule)" stroke-width="${sw}"/>`;
   }).join('');
 
-  // Runway rectangle
-  const rwy = rwyHdg != null ? `
-    <g transform="rotate(${rwyHdg})">
-      <rect x="-5" y="${-R+5}" width="10" height="${(R-5)*2}" fill="oklch(28% 0.05 85)" stroke="oklch(52% 0.10 85)" stroke-width="1" rx="2"/>
-      <line x1="0" y1="${-R+5}" x2="0" y2="${R-5}" stroke="oklch(52% 0.10 85)" stroke-width="0.7" stroke-dasharray="5 3"/>
-      <text y="${-R-4}" text-anchor="middle" fill="oklch(52% 0.10 85)" font-size="7" font-family="Albert Sans,sans-serif">${Math.round(rwyHdg/10).toString().padStart(2,'0')}</text>
-      <text y="${R+11}" text-anchor="middle" fill="oklch(52% 0.10 85)" font-size="7" font-family="Albert Sans,sans-serif">${Math.round(((rwyHdg+180)%360)/10).toString().padStart(2,'0')}</text>
-    </g>` : '';
+  // ── Group parallel runways (same canonical heading ±10°) ─────────────────────
+  const rwyList = runways || [];
+  const assigned = new Set();
+  const groups = [];
+  for (let i = 0; i < rwyList.length; i++) {
+    if (assigned.has(i)) continue;
+    const rwy = rwyList[i];
+    const canon = ((rwy.le_hdg - 1) % 180 + 180) % 180;
+    const group = [{ rwy, i }];
+    assigned.add(i);
+    for (let j = i + 1; j < rwyList.length; j++) {
+      if (assigned.has(j)) continue;
+      const other = rwyList[j];
+      const otherCanon = ((other.le_hdg - 1) % 180 + 180) % 180;
+      const diff = Math.abs(canon - otherCanon);
+      if (diff < 12 || diff > 168) { group.push({ rwy: other, i: j }); assigned.add(j); }
+    }
+    groups.push(group);
+  }
 
-  // Wind indicator
+  // ── Draw runway rectangles ───────────────────────────────────────────────────
+  const rwyElems = [];
+  for (const group of groups) {
+    const n = group.length;
+    group.forEach(({ rwy }, gi) => {
+      const perpOff = n > 1 ? (gi - (n - 1) / 2) * 13 : 0;
+      const drawHdg = rwy.he_hdg;   // rotate so top = he_end, bottom = le_end
+      const rLen    = R - 7;
+      const isBest  = (rwy.le_hdg === bestHdg || rwy.he_hdg === bestHdg);
+      const fill    = isBest ? 'oklch(23% 0.07 80)'  : 'oklch(15% 0.02 95)';
+      const stroke  = isBest ? 'oklch(58% 0.12 82)'  : 'oklch(30% 0.03 95)';
+      const sw      = isBest ? 1.5 : 0.8;
+      const heNum   = Math.round(rwy.he_hdg / 10).toString().padStart(2, '0');
+      const leNum   = Math.round(rwy.le_hdg / 10).toString().padStart(2, '0');
+      rwyElems.push(
+        `<g transform="rotate(${drawHdg}) translate(${perpOff} 0)">` +
+        `<rect x="-5" y="${-rLen}" width="10" height="${rLen*2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" rx="1.5"/>` +
+        (isBest ? `<line x1="0" y1="${-rLen}" x2="0" y2="${rLen}" stroke="${stroke}" stroke-width="0.5" stroke-dasharray="4 3"/>` : '') +
+        `<text y="${-rLen-5}" text-anchor="middle" fill="${stroke}" font-size="7" font-family="Albert Sans,sans-serif">${heNum}</text>` +
+        `<text y="${rLen+12}" text-anchor="middle" fill="${stroke}" font-size="7" font-family="Albert Sans,sans-serif">${leNum}</text>` +
+        `</g>`
+      );
+    });
+  }
+
+  // ── Wind indicator ───────────────────────────────────────────────────────────
   let windEl;
   if (isCalm) {
-    windEl = `<circle r="6" fill="none" stroke="oklch(65% 0.16 145)" stroke-width="2"/>
-              <circle r="2.5" fill="oklch(65% 0.16 145)"/>`;
+    windEl = `<circle r="6" fill="none" stroke="oklch(65% 0.14 145)" stroke-width="2"/>` +
+             `<circle r="2.5" fill="oklch(65% 0.14 145)"/>`;
   } else if (isVRB) {
-    windEl = [0,90,180,270].map(a=>`<g transform="rotate(${a})">
-      <line x1="0" y1="18" x2="0" y2="-20" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"/>
-      <polygon points="0,-26 -4,-19 4,-19" fill="var(--muted)"/>
-    </g>`).join('');
+    windEl = [0,90,180,270].map(a =>
+      `<g transform="rotate(${a})"><line x1="0" y1="18" x2="0" y2="-20" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"/><polygon points="0,-26 -4,-19 4,-19" fill="var(--muted)"/></g>`
+    ).join('');
   } else {
-    windEl = `<g transform="rotate(${wdir})">
-      <line x1="0" y1="10" x2="0" y2="-31" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-      <polygon points="0,-40 -6,-29 6,-29" fill="white"/>
-      ${wgst?`<circle r="4" cx="0" cy="14" fill="none" stroke="oklch(80% 0.18 75)" stroke-width="1.5"/>`:''}
-    </g>`;
+    windEl = `<g transform="rotate(${wdir})">` +
+      `<line x1="0" y1="11" x2="0" y2="-31" stroke="white" stroke-width="2.5" stroke-linecap="round"/>` +
+      `<polygon points="0,-40 -6,-29 6,-29" fill="white"/>` +
+      (wgst ? `<circle r="4" cx="0" cy="15" fill="none" stroke="oklch(76% 0.13 75)" stroke-width="1.5"/>` : '') +
+      `</g>`;
   }
 
   const spd = isCalm
-    ? `<text text-anchor="middle" y="4" fill="oklch(65% 0.16 145)" font-size="9" font-family="Albert Sans,sans-serif">calm</text>`
-    : `<text text-anchor="middle" y="3" fill="white" font-size="13" font-weight="700" font-family="Albert Sans,sans-serif">${wspd}</text>
-       <text text-anchor="middle" y="14" fill="var(--faint)" font-size="8" font-family="Albert Sans,sans-serif">kt${wgst?' G'+wgst:''}</text>`;
+    ? `<text text-anchor="middle" y="4" fill="oklch(65% 0.14 145)" font-size="9" font-family="Albert Sans,sans-serif">calm</text>`
+    : `<text text-anchor="middle" y="3" fill="white" font-size="13" font-weight="700" font-family="Albert Sans,sans-serif">${wspd}</text>` +
+      `<text text-anchor="middle" y="14" fill="var(--faint)" font-size="8" font-family="Albert Sans,sans-serif">kt${wgst ? ' G'+wgst : ''}</text>`;
 
   return `<svg width="${size}" height="${size}" viewBox="${-size/2} ${-size/2} ${size} ${size}" style="overflow:visible;flex-shrink:0">
     <circle r="${R}" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
@@ -1556,7 +1595,8 @@ function windCompassSvg(wdir, wspd, wgst, rwyHdg) {
     <text text-anchor="middle" y="${R+13}" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">S</text>
     <text x="${-R-10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">W</text>
     <text x="${R+10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">E</text>
-    ${rwy}
+    ${rwyElems.join('')}
+    <circle r="18" fill="oklch(9% 0.002 95 / 0.85)"/>
     ${windEl}
     ${spd}
   </svg>`;
@@ -1571,15 +1611,15 @@ function parseMetarObsTime(rawOb) {
   return obs;
 }
 
-function renderWeatherCard(metar, airport, notamData, icao) {
+function renderWeatherCard(metar, airport, notamData, icao, detail) {
   const el = document.getElementById('weather-card');
+  const runways = detail?.runways || [];
 
   // ── Airport header info ─────────────────────────────────────────────────────
   const aptName = airport?.name || icao;
   const aptCity = airport ? `${airport.city || ''}, ${airport.state || ''}`.replace(/^, |, $/g,'') : '';
   const aptElev = airport?.elev != null ? `${airport.elev} ft MSL` : '';
-  const aptCoord = airport ? `${Math.abs(+airport.lat).toFixed(2)}°${airport.lat>=0?'N':'S'} ${Math.abs(+airport.lon).toFixed(2)}°${airport.lon>=0?'E':'W'}` : '';
-  const aptMeta = [aptCity, aptElev, aptCoord].filter(Boolean).join(' · ');
+  const aptMeta = [aptCity, aptElev].filter(Boolean).join(' · ');
 
   if (!metar) {
     el.innerHTML = `
@@ -1590,19 +1630,19 @@ function renderWeatherCard(metar, airport, notamData, icao) {
   }
 
   // ── Parse METAR fields ──────────────────────────────────────────────────────
-  const raw    = metar.rawOb || metar.raw || '';
-  const cat    = (metar.fltcat||'').toUpperCase() || 'VFR';
-  const wdir   = metar.wdir;
-  const wspd   = metar.wspd || 0;
-  const wgst   = metar.wgst || null;
-  const vis    = metar.visib;
-  const ceil   = metar.ceil;
-  const temp   = metar.temp;
-  const dewp   = metar.dewp;
+  const raw      = metar.rawOb || metar.raw || '';
+  const cat      = (metar.fltcat||'').toUpperCase() || 'VFR';
+  const wdir     = metar.wdir;
+  const wspd     = metar.wspd || 0;
+  const wgst     = metar.wgst || null;
+  const vis      = metar.visib;
+  const ceil     = metar.ceil;
+  const temp     = metar.temp;
+  const dewp     = metar.dewp;
   const altimHpa = metar.altim;
   const altimInhg = altimHpa ? (altimHpa / 33.8639).toFixed(2) : null;
 
-  // Obs time from rawOb (fixes the parse bug)
+  // Obs time from rawOb (AWC obsTime field is not a reliable ISO string)
   const obsDate = parseMetarObsTime(raw) || (metar.obsTime ? new Date(metar.obsTime) : null);
   let ageStr = '';
   if (obsDate && !isNaN(obsDate)) {
@@ -1610,57 +1650,88 @@ function renderWeatherCard(metar, airport, notamData, icao) {
     ageStr = mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
   }
 
-  // ── Derived values ──────────────────────────────────────────────────────────
-  // Crosswind at KRHV (runways 133°/313°) — computed for home airport runways
-  let xwind = null, headwind = null;
-  if (typeof wdir === 'number' && wspd) {
-    const rwyHeadings = [133, 313];
-    let minAngle = 180;
-    let bestHead = 0;
-    for (const h of rwyHeadings) {
-      let a = Math.abs(wdir - h); if (a > 180) a = 360 - a;
-      if (a < minAngle) { minAngle = a; bestHead = h; }
+  // ── Best runway & wind components ──────────────────────────────────────────
+  let xwind = null, headwind = null, bestRwyId = null, bestHdg = null;
+  if (typeof wdir === 'number' && wspd && runways.length) {
+    let bestScore = -Infinity;
+    for (const rwy of runways) {
+      for (const [hdg, ident] of [[rwy.le_hdg, rwy.le_ident], [rwy.he_hdg, rwy.he_ident]]) {
+        if (!hdg) continue;
+        const a   = ((wdir - hdg) % 360 + 360) % 360;
+        const rad = a * Math.PI / 180;
+        const hw  = Math.round(wspd * Math.cos(rad));
+        const xw  = Math.round(Math.abs(wspd * Math.sin(rad)));
+        const score = hw - xw * 0.5;
+        if (score > bestScore) {
+          bestScore = score; bestHdg = hdg; bestRwyId = ident; xwind = xw; headwind = hw;
+        }
+      }
     }
-    xwind   = Math.round(Math.abs(wspd * Math.sin(minAngle * Math.PI / 180)));
-    headwind= Math.round(wspd * Math.cos(minAngle * Math.PI / 180));
+  } else if (typeof wdir === 'number' && wspd) {
+    // No runway data — just report raw wind, no crosswind analysis
   }
 
-  // Density altitude
+  // ── Density altitude ────────────────────────────────────────────────────────
   let da = null;
   if (airport?.elev != null && altimHpa && temp != null) {
-    const altimIhg = altimHpa / 33.8639;
-    const pa = airport.elev + (29.92 - altimIhg) * 1000;
-    const isa = 15 - 2 * (pa / 1000);
+    const aIhg = altimHpa / 33.8639;
+    const pa   = airport.elev + (29.92 - aIhg) * 1000;
+    const isa  = 15 - 2 * (pa / 1000);
     da = Math.round(pa + 118.8 * (temp - isa));
   }
 
   // ── Go/No-Go verdict ────────────────────────────────────────────────────────
-  let verdict, verdictClass;
   const xwindHigh = xwind !== null && xwind > 10;
-  const gusty = wgst && wgst > 20;
-  if (cat === 'LIFR' || cat === 'IFR') { verdict = 'NO-GO';   verdictClass = 'nogo'; }
-  else if (cat === 'MVFR' || xwindHigh || gusty) { verdict = 'CAUTION'; verdictClass = 'caut'; }
-  else { verdict = 'GO';     verdictClass = 'go'; }
+  const gusty     = wgst && wgst > 20;
+  let verdict, verdictClass;
+  if (cat === 'LIFR' || cat === 'IFR')            { verdict = 'NO-GO';   verdictClass = 'nogo'; }
+  else if (cat === 'MVFR' || xwindHigh || gusty)  { verdict = 'CAUTION'; verdictClass = 'caut'; }
+  else                                              { verdict = 'GO';     verdictClass = 'go';   }
 
   // ── Formatted strings ───────────────────────────────────────────────────────
-  const windLine  = wdir === 'VRB'   ? `Variable ${wspd} kt` :
-                    typeof wdir==='number' ? `${String(wdir).padStart(3,'0')}° at ${wspd} kt${wgst ? ` · gust ${wgst} kt` : ''}` :
-                    wspd === 0         ? 'Calm' : '—';
-  const xwindLine = xwind !== null ? `${xwind} kt crosswind${headwind!==null ? ` · ${Math.abs(headwind)} kt ${headwind>=0?'head':'tail'}wind` : ''}` : '';
-  const visLine   = vis ? (String(vis)==='10+'?'10+ SM':`${vis} SM`) : '—';
-  const ceilLine  = ceil ? `${ceil.toLocaleString()} ft AGL` : cat === 'VFR' ? 'Clear / Unlimited' : '—';
-  const spreadVal = temp != null && dewp != null ? temp - dewp : null;
-  const spreadLine = spreadVal != null ? `${temp}° / ${dewp}° C · ${spreadVal}° spread${spreadVal <= 3 ? ' · fog risk' : ''}` : '—';
-  const altLine   = altimInhg ? `${altimInhg} inHg (${Math.round(altimHpa)} hPa)` : '—';
-  const daLine    = da != null ? `${da > 0 ? '+' : ''}${(da - (airport?.elev||0)).toLocaleString()} ft above field (${da.toLocaleString()} ft MSL)` : '—';
+  const windLine  = wdir === 'VRB'         ? `Variable ${wspd} kt`
+                  : typeof wdir==='number' ? `${String(wdir).padStart(3,'0')}° at ${wspd} kt${wgst ? ` · gust ${wgst} kt` : ''}`
+                  : wspd === 0             ? 'Calm' : '—';
+  const xwindLine = xwind !== null
+    ? `${xwind} kt crosswind${bestRwyId ? ` (rwy ${bestRwyId})` : ''} · ${Math.abs(headwind)} kt ${headwind>=0?'headwind':'tailwind'}`
+    : '';
+  const visLine    = vis ? (String(vis)==='10+'?'10+ SM':`${vis} SM`) : '—';
+  const ceilLine   = ceil ? `${ceil.toLocaleString()} ft AGL` : cat === 'VFR' ? 'Clear / Unlimited' : '—';
+  const spreadVal  = temp != null && dewp != null ? temp - dewp : null;
+  const spreadLine = spreadVal != null
+    ? `${temp}° / ${dewp}° C · ${spreadVal}° spread${spreadVal <= 3 ? ' · fog risk' : ''}` : '—';
+  const altLine    = altimInhg ? `${altimInhg} inHg (${Math.round(altimHpa)} hPa)` : '—';
+  const daLine     = da != null
+    ? `${(da - (airport?.elev||0)) >= 0 ? '+' : ''}${(da - (airport?.elev||0)).toLocaleString()} ft above field (${da.toLocaleString()} ft)` : '—';
 
-  // NOTAM count badge
+  // ── Runway summary for the airport column ───────────────────────────────────
+  const rwyRows = runways.map(rwy => {
+    const isBest = rwy.le_hdg === bestHdg || rwy.he_hdg === bestHdg;
+    const rwyName = `${rwy.le_ident}/${rwy.he_ident}`;
+    const rwyLen  = rwy.length_ft ? `${rwy.length_ft.toLocaleString()} ft` : '';
+    const rwyInfo = [rwyLen, rwy.surface?.split('-')[0]].filter(Boolean).join(' · ');
+    return `<div class="wx-row" style="${isBest?'color:oklch(66% 0.10 82)':''}">` +
+      `<span class="wx-lbl" style="${isBest?'color:oklch(58% 0.10 82)':''}">Rwy ${esc(rwyName)}</span>` +
+      `<span class="wx-val" style="font-size:12px">${rwyInfo || '—'}${isBest?' ←':''}</span></div>`;
+  }).join('');
+
+  // ── Radio frequencies (priority: ATIS/AWOS, then TWR/CTAF, then GND) ───────
+  const freqOrder = ['ATIS','AWOS','ASOS','A/G','TWR','CTAF','GND','APP','DEP','CLD'];
+  const shownFreqs = (detail?.frequencies || [])
+    .filter(f => freqOrder.includes(f.type))
+    .sort((a,b) => freqOrder.indexOf(a.type) - freqOrder.indexOf(b.type))
+    .slice(0, 5);
+  const freqRows = shownFreqs.map(f =>
+    `<div class="wx-row"><span class="wx-lbl">${esc(f.type)}</span>` +
+    `<span class="wx-val" style="font-size:12px;font-variant-numeric:tabular-nums">${esc(f.freq_mhz)} MHz</span></div>`
+  ).join('');
+
+  // ── NOTAM count badge ────────────────────────────────────────────────────────
   const nCount = notamData?.count || 0;
   const nBadge = nCount > 0 ? `<span class="wx-notam-count">${nCount}</span>` : '';
 
-  // ── Compass SVG ─────────────────────────────────────────────────────────────
-  // KRHV runway heading from airport (or derive from icao)
-  const compass = windCompassSvg(wdir, wspd, wgst, 313);
+  // ── Compass SVG (multi-runway) ───────────────────────────────────────────────
+  const compass = windCompassSvg(wdir, wspd, wgst, runways, bestHdg);
 
   el.innerHTML = `
     <div class="ov-card-hd" style="display:flex;align-items:center">
@@ -1681,7 +1752,7 @@ function renderWeatherCard(metar, airport, notamData, icao) {
     </div>
 
     <div class="wx-body">
-      <!-- Column 1: Wind compass -->
+      <!-- Column 1: Multi-runway wind compass -->
       <div class="wx-col" style="display:flex;flex-direction:column;align-items:center;gap:10px">
         ${compass}
         <div style="text-align:center;line-height:1.5">
@@ -1700,25 +1771,25 @@ function renderWeatherCard(metar, airport, notamData, icao) {
         <div class="wx-row"><span class="wx-lbl">Density Alt</span><span class="wx-val">${daLine}</span></div>
       </div>
 
-      <!-- Column 3: Airport + links -->
+      <!-- Column 3: Airport info (runways + frequencies + links) -->
       <div class="wx-col">
         <div class="wx-col-title">Airport</div>
         ${airport?.elev!=null?`<div class="wx-row"><span class="wx-lbl">Elevation</span><span class="wx-val">${airport.elev} ft MSL</span></div>`:''}
-        <div class="wx-row" style="border-bottom:none;padding-top:10px">
-          <div style="display:flex;flex-direction:column;gap:8px;width:100%">
-            <a class="wx-footer-link" style="padding:0;border:none" href="https://notams.aim.faa.gov/notamSearch/nsapp.html#/" target="_blank" rel="noopener">
-              <i class="ph-bold ph-warning"></i> NOTAMs ${nBadge}
-            </a>
-            <a class="wx-footer-link" style="padding:0;border:none" href="https://tfr.faa.gov/tfr2/list.jsp" target="_blank" rel="noopener">
-              <i class="ph-bold ph-airplane"></i> TFRs
-            </a>
-            <a class="wx-footer-link" style="padding:0;border:none" href="https://www.airnav.com/airport/${esc(icao)}" target="_blank" rel="noopener">
-              <i class="ph-bold ph-info"></i> AirNav ${esc(icao)}
-            </a>
-            <a class="wx-footer-link" style="padding:0;border:none" href="https://aviationweather.gov/taf/board?ids=${esc(icao)}" target="_blank" rel="noopener">
-              <i class="ph-bold ph-cloud"></i> TAF forecast
-            </a>
-          </div>
+        ${rwyRows}
+        ${freqRows ? `<div class="wx-col-title" style="margin-top:10px">Radio</div>${freqRows}` : ''}
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+          <a class="wx-footer-link" style="padding:0;border:none" href="https://notams.aim.faa.gov/notamSearch/nsapp.html#/" target="_blank" rel="noopener">
+            <i class="ph-bold ph-warning"></i> NOTAMs ${nBadge}
+          </a>
+          <a class="wx-footer-link" style="padding:0;border:none" href="https://tfr.faa.gov/tfr2/list.jsp" target="_blank" rel="noopener">
+            <i class="ph-bold ph-airplane"></i> TFRs
+          </a>
+          <a class="wx-footer-link" style="padding:0;border:none" href="https://www.airnav.com/airport/${esc(icao)}" target="_blank" rel="noopener">
+            <i class="ph-bold ph-info"></i> AirNav
+          </a>
+          <a class="wx-footer-link" style="padding:0;border:none" href="https://aviationweather.gov/taf/board?ids=${esc(icao)}" target="_blank" rel="noopener">
+            <i class="ph-bold ph-cloud"></i> TAF
+          </a>
         </div>
       </div>
     </div>
@@ -1800,11 +1871,11 @@ function renderFlightCurrency(flights) {
   function row(name, current, daysLeft, detail) {
     let dotColor, badgeStyle, badgeText;
     if (current && daysLeft!==null && daysLeft<=15) {
-      dotColor='oklch(78% 0.18 75)'; badgeStyle=`background:oklch(24% 0.10 75);color:oklch(78% 0.18 75)`; badgeText=`exp in ${daysLeft}d`;
+      dotColor='oklch(72% 0.11 70)'; badgeStyle=`background:oklch(21% 0.05 70);color:oklch(72% 0.11 70)`; badgeText=`exp in ${daysLeft}d`;
     } else if (current) {
-      dotColor='var(--patina-text)'; badgeStyle=`background:oklch(22% 0.08 145);color:oklch(72% 0.20 145)`; badgeText='current';
+      dotColor='var(--patina-text)'; badgeStyle=`background:oklch(19% 0.04 188);color:oklch(67% 0.09 188)`; badgeText='current';
     } else {
-      dotColor='var(--warn)'; badgeStyle=`background:oklch(22% 0.10 25);color:oklch(70% 0.18 25)`; badgeText='lapsed';
+      dotColor='var(--warn)'; badgeStyle=`background:oklch(19% 0.04 20);color:oklch(65% 0.08 20)`; badgeText='lapsed';
     }
     return `<div class="cur-row">
       <div class="cur-dot" style="background:${dotColor}"></div>

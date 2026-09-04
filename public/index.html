@@ -1008,12 +1008,15 @@
     .fin-acct-inst { font-size: 11px; color: var(--faint); }
     .fin-acct-bal  { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--champagne); }
     .fin-acct-sub  { font-size: 10px; color: var(--faint); text-align: right; margin-top: 1px; }
-    .fin-hold-row  { display: grid; grid-template-columns: 60px 1fr 90px 70px; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--rule); font-size: 12px; }
+    .fin-hold-row  { display: grid; grid-template-columns: 66px 1fr 110px 108px 88px 76px; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--rule); font-size: 12px; }
     .fin-hold-row:last-child { border-bottom: none; }
+    @media (max-width: 800px) { .fin-hold-row { grid-template-columns: 60px 1fr 100px 85px; } .fin-hold-platform,.fin-hold-ytd { display: none; } }
     .fin-hold-ticker { font-weight: 700; color: var(--champagne); font-size: 11px; letter-spacing: .02em; }
     .fin-hold-name  { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fin-hold-platform { color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .fin-hold-val   { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
     .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
+    .fin-hold-ytd   { text-align: right; font-size: 11px; font-weight: 600; }
     .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
     .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
     /* ── Linked accounts grid ───────────────────────────────── */
@@ -4295,7 +4298,8 @@ async function loadFinanceDashboard() {
     const dSign = delta >= 0 ? '+' : '';
     const dCls  = delta >= 0 ? 'pos' : 'neg';
     const totalRetire = nw.byType.retirement || 0;
-    const retirePct   = Math.min(100, totalRetire / 1500000 * 100);
+    const totalAssets = nw.total || 0;
+    const retirePct   = Math.min(100, totalAssets / 1500000 * 100);
     el.innerHTML = `
       <div class="card" style="margin-bottom:10px">
         <div class="fin-nw-hero">
@@ -4333,7 +4337,6 @@ async function loadFinanceDashboard() {
         ${renderHoldingsTable(holdings)}
       </div>` : ''}
 
-      ${totalRetire > 0 ? `
       <div>
         <div class="section-label" style="margin-bottom:10px">Retirement Progress</div>
         <div class="card">
@@ -4342,12 +4345,14 @@ async function loadFinanceDashboard() {
             <span style="font-size:13px;font-weight:600;color:var(--champagne)">${retirePct.toFixed(1)}%</span>
           </div>
           <div class="fin-ret-bar"><div class="fin-ret-fill" style="width:${retirePct}%"></div></div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--faint)">
-            <span>${fmtDollars(totalRetire)} saved</span><span>$1.5M goal</span>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:4px">
+            <span>${fmtDollarsExact(totalAssets)} total assets</span>
+            <span>${fmtDollars(totalRetire)} in retirement · $1.5M goal</span>
           </div>
         </div>
-      </div>` : ''}`;
+      </div>`;
     buildNetWorthChart(nw.history);
+    if (holdings.length) fetchHoldingsYTD(holdings);
   } catch(err) {
     el.innerHTML = `<div style="color:var(--warn);padding:16px">${esc(err.message)}</div>`;
   }
@@ -4373,21 +4378,72 @@ function renderAccountRows(accounts) {
   }).join('');
 }
 
+function retColor(pct) { return pct == null ? 'var(--faint)' : pct >= 0 ? '#4aaa80' : '#cc5050'; }
+function retStr(pct)  { return pct == null ? '—' : (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
+function retDollar(h) {
+  if (!h.cost_basis || !h.value) return '';
+  const g = h.value - h.cost_basis;
+  return (g >= 0 ? '+' : '') + fmtDollars(g);
+}
+
 function renderHoldingsTable(holdings) {
-  const header = `<div class="fin-hold-row" style="font-size:10px;color:var(--faint);letter-spacing:.05em;text-transform:uppercase;background:var(--graphite);border-bottom:1px solid var(--rule)">
-    <div>Ticker</div><div>Name</div><div style="text-align:right">Value</div><div style="text-align:right">Return</div></div>`;
-  const rows = holdings.slice(0,20).map(h => {
-    const ret = (h.cost_basis && h.value) ? ((h.value - h.cost_basis) / h.cost_basis * 100) : null;
-    const retStr   = ret != null ? (ret >= 0 ? '+' : '') + ret.toFixed(1) + '%' : '';
-    const retColor = ret == null ? '' : ret >= 0 ? '#4aaa80' : '#cc5050';
-    return `<div class="fin-hold-row">
-      <div class="fin-hold-ticker">${esc(h.ticker || '—')}</div>
-      <div class="fin-hold-name">${esc(h.name || '—')}</div>
-      <div class="fin-hold-val">${fmtDollarsExact(h.value)}</div>
-      <div class="fin-hold-ret" style="color:${retColor}">${retStr}</div>
+  const hdrStyle = 'font-size:10px;color:var(--faint);letter-spacing:.05em;text-transform:uppercase;background:var(--graphite);border-bottom:1px solid var(--rule)';
+  const header = `<div class="fin-hold-row" style="${hdrStyle}">
+    <div>Ticker</div>
+    <div>Name</div>
+    <div class="fin-hold-platform">Platform</div>
+    <div style="text-align:right">Value</div>
+    <div class="fin-hold-ret" style="font-weight:500">All-time</div>
+    <div class="fin-hold-ytd" style="font-weight:500">YTD</div>
+  </div>`;
+  const rows = holdings.map((h, i) => {
+    const allTimePct = (h.cost_basis && h.value) ? ((h.value - h.cost_basis) / h.cost_basis * 100) : null;
+    const dollar     = retDollar(h);
+    const platform   = h.institution || h.account_name || '—';
+    const ticker     = h.ticker || '';
+    const validTicker = ticker && !ticker.startsWith('CUR:') && ticker !== '';
+    return `<div class="fin-hold-row" data-ticker="${esc(ticker)}" data-row="${i}">
+      <div class="fin-hold-ticker">${esc(ticker || '—')}</div>
+      <div class="fin-hold-name" title="${esc(h.name || '')}">${esc(h.name || '—')}</div>
+      <div class="fin-hold-platform">${esc(platform)}</div>
+      <div class="fin-hold-val">
+        ${fmtDollarsExact(h.value)}
+        ${dollar ? `<div style="font-size:10px;color:${retColor(allTimePct)};margin-top:1px">${dollar}</div>` : ''}
+      </div>
+      <div class="fin-hold-ret" style="color:${retColor(allTimePct)}">${retStr(allTimePct)}</div>
+      <div class="fin-hold-ytd" id="ytd-${i}" style="color:var(--faint)">${validTicker ? '<span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>' : '—'}</div>
     </div>`;
   }).join('');
   return `<div class="fin-acct-list">${header}${rows}</div>`;
+}
+
+async function fetchHoldingsYTD(holdings) {
+  const indexed = holdings.map((h, i) => ({ ticker: h.ticker, i }))
+    .filter(({ ticker }) => ticker && !ticker.startsWith('CUR:'));
+  if (!indexed.length) return;
+  const tickers = [...new Set(indexed.map(x => x.ticker))];
+  try {
+    const res = await fetch('/api/finance/ytd-prices?tickers=' + encodeURIComponent(tickers.join(',')));
+    if (!res.ok) return;
+    const data = await res.json();
+    indexed.forEach(({ ticker, i }) => {
+      const el = document.getElementById('ytd-' + i);
+      if (!el) return;
+      const d = data[ticker];
+      if (d?.ytd != null) {
+        el.style.color = retColor(d.ytd * 100);
+        el.textContent = retStr(d.ytd * 100);
+      } else {
+        el.style.color = 'var(--faint)';
+        el.textContent = '—';
+      }
+    });
+  } catch(_) {
+    indexed.forEach(({ i }) => {
+      const el = document.getElementById('ytd-' + i);
+      if (el) { el.textContent = '—'; el.style.color = 'var(--faint)'; }
+    });
+  }
 }
 
 function buildNetWorthChart(history) {

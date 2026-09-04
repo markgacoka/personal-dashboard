@@ -167,4 +167,39 @@ export default async function financeRoutes(fastify) {
     await Promise.allSettled(rows.map(r => syncItem(r.access_token, r.item_id)))
     return { ok: true, synced: rows.length }
   })
+
+  // YTD price returns via Yahoo Finance (unofficial, best-effort)
+  fastify.get('/api/finance/ytd-prices', async (req) => {
+    const raw = (req.query.tickers || '').split(',')
+      .map(t => t.trim().toUpperCase())
+      .filter(t => /^[A-Z0-9.\-^]{1,20}$/.test(t))
+      .slice(0, 60)
+    if (!raw.length) return {}
+
+    const now  = Math.floor(Date.now() / 1000)
+    const jan1 = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000)
+
+    const results = {}
+    await Promise.allSettled(raw.map(async ticker => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+                    `?period1=${jan1}&period2=${now}&interval=1mo`
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(6000),
+        })
+        if (!res.ok) return
+        const json = await res.json()
+        const result = json?.chart?.result?.[0]
+        if (!result) return
+        const closes = result.indicators?.quote?.[0]?.close || []
+        const startPrice = closes.find(p => p != null)
+        const currentPrice = result.meta?.regularMarketPrice
+        if (startPrice && currentPrice) {
+          results[ticker] = { ytd: (currentPrice - startPrice) / startPrice }
+        }
+      } catch (_) {}
+    }))
+    return results
+  })
 }

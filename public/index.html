@@ -1017,6 +1017,10 @@
     .fin-hold-val   { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
     .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
     .fin-hold-ytd   { text-align: right; font-size: 11px; font-weight: 600; }
+    /* privacy mask */
+    .fin-mask-txt { display: none; color: var(--muted); letter-spacing: .06em; }
+    .fin-view-masked .fin-real { display: none; }
+    .fin-view-masked .fin-mask-txt { display: inline; }
     .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
     .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
     /* ── Linked accounts grid ───────────────────────────────── */
@@ -1275,9 +1279,12 @@
       <!-- FINANCE DASHBOARD ────────────────────────────────────── -->
       <div class="view" id="view-finances">
         <div class="section-first">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Finances</span>
             <span class="data-note" id="fin-sync-status" style="flex:1"></span>
+            <button class="icon-btn" id="fin-eye-btn" onclick="toggleFinMask()" title="Show/hide balances">
+              <i class="ph-bold ph-eye-slash" id="fin-eye-icon"></i>
+            </button>
             <button class="btn-ghost" onclick="finSync()" style="padding:5px 12px;font-size:12px" id="fin-sync-btn">
               <i class="ph-bold ph-arrows-clockwise"></i> Sync
             </button>
@@ -4226,6 +4233,26 @@ async function handleMFSubmit(e) {
   }
 }
 
+// ─── finance privacy mask ─────────────────────────────────────────────────────
+let _finMasked = localStorage.getItem('fin-masked') !== '0'; // hidden by default
+
+function fd(formatted) {
+  return `<span class="fin-dollar"><span class="fin-real">${formatted}</span><span class="fin-mask-txt">•••</span></span>`;
+}
+
+function applyFinMask() {
+  const ids = ['fin-dashboard-content', 'fin-overview-content'];
+  ids.forEach(id => document.getElementById(id)?.classList.toggle('fin-view-masked', _finMasked));
+  const icon = document.getElementById('fin-eye-icon');
+  if (icon) icon.className = `ph-bold ${_finMasked ? 'ph-eye-slash' : 'ph-eye'}`;
+}
+
+function toggleFinMask() {
+  _finMasked = !_finMasked;
+  localStorage.setItem('fin-masked', _finMasked ? '1' : '0');
+  applyFinMask();
+}
+
 // ─── finance ──────────────────────────────────────────────────────────────────
 function fmtDollars(n) {
   if (n == null) return '—';
@@ -4261,23 +4288,24 @@ async function loadFinanceOverview() {
     const dCls  = delta >= 0 ? 'pos' : 'neg';
     el.innerHTML = `
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <span class="fin-nw-amt">${fmtDollarsExact(d.total)}</span>
-        <span class="fin-nw-delta ${dCls}">${dSign}${fmtDollars(delta)} / 30d</span>
+        <span class="fin-nw-amt">${fd(fmtDollarsExact(d.total))}</span>
+        <span class="fin-nw-delta ${dCls}">${dSign}${fd(fmtDollars(delta))} / 30d</span>
       </div>
       <div class="fin-strip">
         <div class="fin-strip-tile">
-          <div class="fin-strip-amt" style="color:#5a88c0">${fmtDollars(d.byType.liquid)}</div>
+          <div class="fin-strip-amt" style="color:#5a88c0">${fd(fmtDollars(d.byType.liquid))}</div>
           <div class="fin-strip-lbl">Cash &amp; Checking</div>
         </div>
         <div class="fin-strip-tile">
-          <div class="fin-strip-amt" style="color:#5db87c">${fmtDollars(d.byType.invested)}</div>
+          <div class="fin-strip-amt" style="color:#5db87c">${fd(fmtDollars(d.byType.invested))}</div>
           <div class="fin-strip-lbl">Brokerage &amp; Investing</div>
         </div>
         <div class="fin-strip-tile">
-          <div class="fin-strip-amt" style="color:#b07cc0">${fmtDollars(d.byType.retirement)}</div>
+          <div class="fin-strip-amt" style="color:#b07cc0">${fd(fmtDollars(d.byType.retirement))}</div>
           <div class="fin-strip-lbl">Retirement</div>
         </div>
       </div>`;
+    applyFinMask();
   } catch(_) {}
 }
 
@@ -4303,20 +4331,20 @@ async function loadFinanceDashboard() {
     el.innerHTML = `
       <div class="card" style="margin-bottom:10px">
         <div class="fin-nw-hero">
-          <span class="fin-nw-amt">${fmtDollarsExact(nw.total)}</span>
-          <span class="fin-nw-delta ${dCls}">${dSign}${fmtDollars(delta)} / 30d</span>
+          <span class="fin-nw-amt">${fd(fmtDollarsExact(nw.total))}</span>
+          <span class="fin-nw-delta ${dCls}">${dSign}${fd(fmtDollars(delta))} / 30d</span>
         </div>
         <div class="fin-strip" style="margin-top:0">
           <div class="fin-strip-tile">
-            <div class="fin-strip-amt" style="color:#5a88c0">${fmtDollars(nw.byType.liquid)}</div>
+            <div class="fin-strip-amt" style="color:#5a88c0">${fd(fmtDollars(nw.byType.liquid))}</div>
             <div class="fin-strip-lbl">Cash &amp; Checking</div>
           </div>
           <div class="fin-strip-tile">
-            <div class="fin-strip-amt" style="color:#5db87c">${fmtDollars(nw.byType.invested)}</div>
+            <div class="fin-strip-amt" style="color:#5db87c">${fd(fmtDollars(nw.byType.invested))}</div>
             <div class="fin-strip-lbl">Brokerage</div>
           </div>
           <div class="fin-strip-tile">
-            <div class="fin-strip-amt" style="color:#b07cc0">${fmtDollars(nw.byType.retirement)}</div>
+            <div class="fin-strip-amt" style="color:#b07cc0">${fd(fmtDollars(nw.byType.retirement))}</div>
             <div class="fin-strip-lbl">Retirement</div>
           </div>
         </div>
@@ -4346,11 +4374,12 @@ async function loadFinanceDashboard() {
           </div>
           <div class="fin-ret-bar"><div class="fin-ret-fill" style="width:${retirePct}%"></div></div>
           <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:4px">
-            <span>${fmtDollarsExact(totalAssets)} total assets</span>
-            <span>${fmtDollars(totalRetire)} in retirement · $1.5M goal</span>
+            <span>${fd(fmtDollarsExact(totalAssets))} total assets</span>
+            <span>${fd(fmtDollars(totalRetire))} in retirement · $1.5M goal</span>
           </div>
         </div>
       </div>`;
+    applyFinMask();
     buildNetWorthChart(nw.history);
     if (holdings.length) fetchHoldingsYTD(holdings);
   } catch(err) {
@@ -4363,7 +4392,7 @@ function renderAccountRows(accounts) {
   return accounts.map(a => {
     const dot = acctDot(a.type, a.subtype);
     const sub = a.subtype ? a.subtype.replace(/_/g,' ') : a.type;
-    const avail = a.available != null ? fmtDollarsExact(a.available) + ' avail' : '';
+    const hasAvail = a.available != null;
     return `<div class="fin-acct-row">
       <div class="fin-acct-dot" style="background:${dot}"></div>
       <div style="flex:1;min-width:0">
@@ -4371,8 +4400,8 @@ function renderAccountRows(accounts) {
         <div class="fin-acct-inst">${esc(a.institution||'')} · ${esc(sub)}</div>
       </div>
       <div style="text-align:right">
-        <div class="fin-acct-bal">${fmtDollarsExact(a.balance)}</div>
-        ${avail ? `<div class="fin-acct-sub">${avail}</div>` : ''}
+        <div class="fin-acct-bal">${fd(fmtDollarsExact(a.balance))}</div>
+        ${hasAvail ? `<div class="fin-acct-sub">${fd(fmtDollarsExact(a.available))} avail</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -4407,8 +4436,8 @@ function renderHoldingsTable(holdings) {
       <div class="fin-hold-name" title="${esc(h.name || '')}">${esc(h.name || '—')}</div>
       <div class="fin-hold-platform">${esc(platform)}</div>
       <div class="fin-hold-val">
-        ${fmtDollarsExact(h.value)}
-        ${dollar ? `<div style="font-size:10px;color:${retColor(allTimePct)};margin-top:1px">${dollar}</div>` : ''}
+        ${fd(fmtDollarsExact(h.value))}
+        ${dollar ? `<div style="font-size:10px;color:${retColor(allTimePct)};margin-top:1px">${fd(dollar)}</div>` : ''}
       </div>
       <div class="fin-hold-ret" style="color:${retColor(allTimePct)}">${retStr(allTimePct)}</div>
       <div class="fin-hold-ytd" id="ytd-${i}" style="color:var(--faint)">${validTicker ? '<span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>' : '—'}</div>

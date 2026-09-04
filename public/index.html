@@ -282,44 +282,6 @@
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
 
-    /* ── Wellness strip ──────────────────────────────────── */
-    #wellness-strip {
-      display: flex; align-items: center; flex-wrap: wrap;
-      background: var(--raised);
-      border: 1px solid var(--rule);
-      border-radius: var(--r-sm);
-      padding: 16px 24px;
-      gap: 0;
-    }
-    .dp {
-      display: flex; align-items: baseline; gap: 5px;
-      padding: 6px 20px 6px 0;
-      flex-shrink: 0;
-    }
-    .dp:first-child { padding-left: 0; }
-    .dp-n {
-      font-size: 20px; font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.02em;
-      color: var(--champagne);
-      line-height: 1;
-    }
-    .dp-u {
-      font-size: 12px; color: var(--muted);
-      font-weight: 400; letter-spacing: 0.01em;
-    }
-    .dp-s {
-      font-size: 11px; color: var(--faint);
-      margin-left: 2px;
-    }
-    .dp-div {
-      width: 1px; height: 28px;
-      background: var(--rule);
-      flex-shrink: 0;
-      margin-right: 20px;
-    }
-    #wellness-strip.skel-strip { height: 64px; }
-
     /* ── Weekly ledger ───────────────────────────────────── */
     #weekly-ledger {
       background: var(--raised);
@@ -353,6 +315,49 @@
       padding: 16px 20px;
       font-size: 13px; color: var(--faint);
     }
+
+    /* ── Overview cards ─────────────────────────────── */
+    .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 800px) { .ov-grid { grid-template-columns: 1fr; } }
+    .ov-card { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 16px; }
+    .ov-card-hd { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .ov-card-hd button { font-size: 11px; color: var(--faint); background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; }
+    .ov-card-hd button:hover { color: var(--champagne); }
+
+    /* weather */
+    .wx-verdict { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; margin-bottom: 12px; }
+    .wx-verdict.go   { background: oklch(22% 0.08 145); color: oklch(72% 0.20 145); }
+    .wx-verdict.caut { background: oklch(24% 0.10 75);  color: oklch(78% 0.18 75);  }
+    .wx-verdict.nogo { background: oklch(22% 0.10 25);  color: oklch(70% 0.18 25);  }
+    .wx-cat { font-size: 11px; opacity: 0.7; }
+    .wx-rows { display: flex; flex-direction: column; gap: 0; }
+    .wx-row { display: flex; align-items: baseline; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+    .wx-row:last-child { border-bottom: none; }
+    .wx-lbl { color: var(--muted); font-size: 11px; width: 68px; flex-shrink: 0; }
+    .wx-val { color: var(--body-text); flex: 1; }
+    .wx-sub { color: var(--faint); font-size: 11px; }
+    .wx-age { font-size: 11px; color: var(--faint); margin-top: 10px; }
+
+    /* currency */
+    .cur-rows { display: flex; flex-direction: column; gap: 0; }
+    .cur-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+    .cur-row:last-child { border-bottom: none; }
+    .cur-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .cur-name { font-size: 13px; color: var(--body-text); flex: 1; }
+    .cur-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
+    .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; }
+
+    /* readiness */
+    .rd-status { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+    .rd-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .rd-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .rd-kpi-n { font-size: 20px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .rd-kpi-u { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .rd-kpi-s { font-size: 11px; color: var(--faint); margin-top: 1px; }
+    .acwr-track { height: 3px; background: var(--rule); border-radius: 2px; position: relative; margin: 10px 0 4px; }
+    .acwr-zone { position: absolute; height: 3px; background: oklch(40% 0.12 145); border-radius: 2px; left: 25%; width: 31.25%; }
+    .acwr-pip { position: absolute; top: -4px; width: 3px; height: 11px; border-radius: 1px; transform: translateX(-50%); }
+    .acwr-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); margin-top: 2px; }
 
     /* ── Section label (no eyebrow, just a quiet rule line) ── */
     .section-label {
@@ -1019,21 +1024,21 @@
       <!-- OVERVIEW ──────────────────────────────────────────── -->
       <div class="view active" id="view-overview">
 
-        <!-- Today's wellness strip -->
+        <!-- Training Readiness -->
         <div class="section-first">
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
             <span style="font-size:13px;color:var(--muted)">Today</span>
             <span id="data-date" class="data-note"></span>
           </div>
-          <div id="wellness-strip" class="skel" style="height:64px"></div>
+          <div id="readiness-card" class="ov-card skel" style="min-height:88px"></div>
         </div>
 
-        <!-- 7-day ledger -->
+        <!-- Flight status row -->
         <div class="section">
-          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
-            <span style="font-size:13px;color:var(--muted)">Last 7 days</span>
+          <div class="ov-grid">
+            <div id="weather-card" class="ov-card skel" style="min-height:180px"></div>
+            <div id="currency-card" class="ov-card skel" style="min-height:180px"></div>
           </div>
-          <div id="weekly-ledger" class="skel" style="height:120px"></div>
         </div>
 
         <!-- Trend charts 2×2 -->
@@ -1363,99 +1368,281 @@ document.getElementById('sb-toggle').addEventListener('click', () => {
   localStorage.setItem('dash-sidebar', sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded');
 });
 
-// ─── wellness ─────────────────────────────────────────────────────────────────
-function renderWellness(daily) {
-  const d = daily;
-  const steps = d.steps;
-  const rhr   = d.heart_rate?.restingHeartRate;
-  const avgRhr = d.heart_rate?.lastSevenDaysAvgRestingHeartRate;
-  const maxHR  = d.heart_rate?.maxHeartRate;
-  const sleep  = d.sleep?.dailySleepDTO?.sleepTimeSeconds;
-  const deep   = d.sleep?.dailySleepDTO?.deepSleepSeconds;
-  const rem    = d.sleep?.dailySleepDTO?.remSleepSeconds;
-  const spo2   = d.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
+// ─── readiness ────────────────────────────────────────────────────────────────
+function renderReadiness(activities, daily) {
+  const now = Date.now();
+  // Acute load: last 7 days
+  const acute = activities
+    .filter(a => now - new Date(a.startTimeLocal).getTime() < 7*86400000)
+    .reduce((s,a) => s + (a.activityTrainingLoad||0), 0);
+  // Chronic load: 4-week avg weekly load
+  const chronic = activities
+    .filter(a => now - new Date(a.startTimeLocal).getTime() < 28*86400000)
+    .reduce((s,a) => s + (a.activityTrainingLoad||0), 0) / 4;
+  const acwr = chronic > 10 ? +(acute/chronic).toFixed(2) : null;
+  // Prior week
+  const prev = activities
+    .filter(a => { const age=now-new Date(a.startTimeLocal).getTime(); return age>=7*86400000&&age<14*86400000; })
+    .reduce((s,a) => s + (a.activityTrainingLoad||0), 0);
+  const trendPct = prev > 0 ? Math.round((acute-prev)/prev*100) : null;
 
-  if (d.date) {
+  const d = daily;
+  if (d?.date) {
     const el = document.getElementById('data-date');
     const isToday = d.date === new Date().toISOString().slice(0,10);
-    el.textContent = isToday ? '' : '· as of ' + new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    el.textContent = isToday ? '' : '· as of '+new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  const rhr    = d?.heart_rate?.restingHeartRate;
+  const avgRhr = d?.heart_rate?.lastSevenDaysAvgRestingHeartRate;
+  const rhrDelta = (rhr&&avgRhr) ? rhr-avgRhr : null;
+  const sleep  = d?.sleep?.dailySleepDTO;
+  const sleepHrs = sleep?.sleepTimeSeconds ? (sleep.sleepTimeSeconds/3600).toFixed(1) : null;
+  const deepPct  = (sleep?.deepSleepSeconds&&sleep?.sleepTimeSeconds) ? Math.round(sleep.deepSleepSeconds/sleep.sleepTimeSeconds*100) : null;
+  const spo2 = d?.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
+
+  // Status synthesis
+  let statusText, statusColor;
+  if (acwr===null) { statusText='No training load data'; statusColor='var(--faint)'; }
+  else if (acwr>1.5) { statusText='High load — recovery priority'; statusColor='var(--warn)'; }
+  else if (acwr>1.3) { statusText='Approaching overreach'; statusColor='oklch(78% 0.18 75)'; }
+  else if (acwr>=0.8) {
+    if (trendPct!==null&&trendPct>15) { statusText='Building'; statusColor='var(--patina-text)'; }
+    else if (trendPct!==null&&trendPct<-15) { statusText='Tapering'; statusColor='oklch(68% 0.15 235)'; }
+    else { statusText='Maintaining'; statusColor='var(--patina-text)'; }
+  } else { statusText='Light week / deload'; statusColor='var(--faint)'; }
+
+  // Recovery signal from RHR
+  let rhrSignal='', rhrColor='var(--faint)';
+  if (rhrDelta!==null) {
+    if (rhrDelta>4){ rhrSignal='↑ elevated'; rhrColor='var(--warn)'; }
+    else if (rhrDelta>1){ rhrSignal='↑ slightly elevated'; rhrColor='oklch(78% 0.18 75)'; }
+    else if (rhrDelta<=-2){ rhrSignal='↓ well recovered'; rhrColor='var(--patina-text)'; }
+    else { rhrSignal='at baseline'; rhrColor='var(--faint)'; }
   }
 
-  const stepSub = steps ? (steps>=10000 ? 'goal reached' : `${(10000-steps).toLocaleString()} to go`) : '';
-  const rhrSub  = avgRhr&&rhr ? (rhr<=avgRhr?`↓${avgRhr-rhr} avg`:`↑${rhr-avgRhr} avg`) : '';
-  const sleepHrs = sleep ? (sleep/3600).toFixed(1) : null;
-  const spo2pct  = spo2 ? Math.round(spo2)+'%' : null;
+  // ACWR bar position (0.4 – 1.8 range)
+  const acwrMin=0.4, acwrMax=1.8;
+  const pipPct = acwr!==null ? Math.min(100,Math.max(0,(acwr-acwrMin)/(acwrMax-acwrMin)*100)) : null;
 
-  document.getElementById('wellness-strip').innerHTML = `
-    <div class="dp">
-      <span class="dp-n">${steps ? steps.toLocaleString() : '—'}</span>
-      <span class="dp-u">steps</span>
-      ${stepSub ? `<span class="dp-s">${stepSub}</span>` : ''}
+  const trendStr = trendPct!==null ? (trendPct>0?`+${trendPct}%`:`${trendPct}%`) : '—';
+
+  document.getElementById('readiness-card').innerHTML = `
+    <div class="ov-card-hd">Training Readiness</div>
+    <div class="rd-status" style="color:${statusColor}">${esc(statusText)}</div>
+    <div class="rd-sub">ACWR ${acwr??'—'} · ${trendPct!==null?`${trendStr} vs prior week`:'load tracking'}</div>
+    ${acwr!==null?`
+    <div class="acwr-track">
+      <div class="acwr-zone"></div>
+      <div class="acwr-pip" style="left:${pipPct}%;background:${statusColor}"></div>
     </div>
-    <div class="dp-div"></div>
-    <div class="dp">
-      <span class="dp-n" style="color:var(--patina-text)">${rhr || '—'}</span>
-      <span class="dp-u">bpm rhr</span>
-      ${rhrSub ? `<span class="dp-s">${rhrSub}</span>` : ''}
-    </div>
-    <div class="dp-div"></div>
-    <div class="dp">
-      <span class="dp-n">${maxHR || '—'}</span>
-      <span class="dp-u">bpm max</span>
-    </div>
-    <div class="dp-div"></div>
-    <div class="dp">
-      <span class="dp-n">${sleepHrs || '—'}</span>
-      <span class="dp-u">hrs sleep</span>
-      ${(deep&&rem) ? `<span class="dp-s">${(deep/3600).toFixed(1)}h deep</span>` : ''}
-    </div>
-    <div class="dp-div"></div>
-    <div class="dp">
-      <span class="dp-n" style="${spo2&&spo2<95?'color:var(--warn)':''}">${spo2pct || '—'}</span>
-      <span class="dp-u">SpO₂</span>
+    <div class="acwr-labels"><span>0.4</span><span style="margin-left:25%">0.8</span><span style="margin-left:31.25%">1.3</span><span>1.8</span></div>
+    `:''}
+    <div class="rd-kpis" style="margin-top:14px">
+      <div>
+        <div class="rd-kpi-n" style="color:var(--champagne)">${Math.round(acute)||'—'}</div>
+        <div class="rd-kpi-u">7d load</div>
+        <div class="rd-kpi-s">${Math.round(chronic)||'—'} wk avg</div>
+      </div>
+      <div>
+        <div class="rd-kpi-n">${sleepHrs||'—'}</div>
+        <div class="rd-kpi-u">hrs sleep</div>
+        ${deepPct?`<div class="rd-kpi-s">${deepPct}% deep</div>`:''}
+      </div>
+      <div>
+        <div class="rd-kpi-n" style="color:oklch(65% 0.15 350)">${rhr||'—'}</div>
+        <div class="rd-kpi-u">bpm rhr</div>
+        <div class="rd-kpi-s" style="color:${rhrColor}">${rhrSignal||'—'}</div>
+      </div>
+      <div>
+        <div class="rd-kpi-n" style="${spo2&&spo2<95?'color:var(--warn)':''}">${spo2?Math.round(spo2)+'%':'—'}</div>
+        <div class="rd-kpi-u">SpO₂</div>
+        <div class="rd-kpi-s">${spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':''}</div>
+      </div>
     </div>
   `;
 }
 
-// ─── weekly ───────────────────────────────────────────────────────────────────
-function renderWeekly(bySport) {
-  const buckets = { running:null, cycling:null, swimming:null, rowing:null };
-  for (const [key,val] of Object.entries(bySport)) {
-    const b = normSport(key);
-    if (b in buckets) {
-      if (!buckets[b]) buckets[b] = { count:0, distance_m:0, moving_time_s:0, calories:0 };
-      buckets[b].count += val.count;
-      buckets[b].distance_m += val.distance_m;
-      buckets[b].moving_time_s += val.moving_time_s;
-      buckets[b].calories += val.calories;
-    }
+// ─── weather widget ───────────────────────────────────────────────────────────
+async function loadWeatherWidget() {
+  const icao = localStorage.getItem('home-airport') || 'KRHV';
+  renderWeatherCard(null, null, icao, true); // loading state
+  try {
+    const res = await fetch(`/api/external/metar/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null);
+    renderWeatherCard(res?.metar || null, res?.source || null, icao, false);
+  } catch(_) {
+    renderWeatherCard(null, null, icao, false);
+  }
+}
+
+function renderWeatherCard(metar, source, icao, loading) {
+  const el = document.getElementById('weather-card');
+  if (loading) { el.innerHTML = `<div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i></button></div><div class="skel" style="height:140px;border-radius:6px"></div>`; return; }
+
+  if (!metar) {
+    el.innerHTML = `<div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i></button></div><div style="color:var(--faint);font-size:13px;padding:8px 0">Weather data unavailable</div>`;
+    return;
   }
 
-  const sports = ['running','cycling','swimming','rowing'];
-  const rows = sports.filter(sp => buckets[sp]?.count).map(sp => {
-    const s = buckets[sp];
-    const { color, label } = SPORT_CFG[sp];
-    const count = s.count;
-    const dist  = s.distance_m ? fmtDist(s.distance_m) : '—';
-    const time  = s.moving_time_s ? fmtTime(s.moving_time_s) : '—';
-    const calories = s.calories ? Math.round(s.calories).toLocaleString() + ' kcal' : '—';
-    return `
-      <div class="sl-row">
-        <span class="sl-dot" style="background:${color}"></span>
-        <span class="sl-name">${label}</span>
-        <span class="sl-val">${count} session${count>1?'s':''}</span>
-        <span class="sl-val">${dist}</span>
-        <span class="sl-val">${time}</span>
-        <span class="sl-val">${calories}</span>
-      </div>`;
-  });
+  const cat    = (metar.fltcat || '').toUpperCase() || (metar.rawOb?.match(/\b(VFR|MVFR|IFR|LIFR)\b/)?.[0] || 'VFR');
+  const wdir   = metar.wdir;
+  const wspd   = metar.wspd || 0;
+  const wgst   = metar.wgst;
+  const vis    = metar.visib;
+  const ceil   = metar.ceil;
+  const temp   = metar.temp;
+  const dewp   = metar.dewp;
+  const altim  = metar.altim;
+  const obsTime = metar.obsTime || metar.observation_time;
 
-  if (!rows.length) {
-    document.getElementById('weekly-ledger').innerHTML =
-      '<div class="sl-empty">No sessions recorded this week.</div>';
+  // Crosswind at KRHV (runways 133°/313°)
+  let xwind = null;
+  if (typeof wdir === 'number' && wspd) {
+    const angles = [133, 313].map(r => { let a=Math.abs(wdir-r); return a>180?360-a:a; });
+    xwind = Math.round(wspd * Math.sin(Math.min(...angles) * Math.PI/180));
+  }
+
+  // GO / CAUTION / NO-GO
+  let verdict, verdictClass;
+  if (cat==='LIFR'||cat==='IFR') {
+    verdict='NO-GO'; verdictClass='nogo';
+  } else if (cat==='MVFR'||(xwind!==null&&xwind>10)||(wgst&&wgst>25)) {
+    verdict='CAUTION'; verdictClass='caut';
   } else {
-    document.getElementById('weekly-ledger').innerHTML = rows.join('');
+    verdict='GO'; verdictClass='go';
   }
+
+  // Age of obs
+  let ageStr='';
+  if (obsTime) {
+    const mins = Math.round((Date.now()-new Date(obsTime).getTime())/60000);
+    ageStr = mins<2?'just now':mins<60?`${mins} min ago`:`${Math.round(mins/60)}h ago`;
+  }
+
+  const windStr = wdir==='VRB'?`Variable ${wspd} kt`:
+    typeof wdir==='number'?`${String(wdir).padStart(3,'0')}° at ${wspd} kt${wgst?` (gust ${wgst})`:''}`:
+    wspd===0?'Calm':'—';
+  const visStr  = vis ? (String(vis)==='10+'?'10+ SM':`${vis} SM`) : '—';
+  const ceilStr = ceil ? `${ceil.toLocaleString()} ft` : (cat==='VFR'?'Clear':'—');
+  const spreadStr = (temp!=null&&dewp!=null) ? `${temp}° / ${dewp}° C (${temp-dewp}° spread${(temp-dewp)<3?' · fog risk':''})` : '—';
+  const altStr  = altim ? `${(+altim).toFixed(2)} inHg` : '—';
+
+  el.innerHTML = `
+    <div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i> edit</button></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span class="wx-verdict ${verdictClass}"><i class="ph-bold ph-${verdict==='GO'?'check-circle':verdict==='CAUTION'?'warning':'x-circle'}"></i> ${verdict}</span>
+      <span class="wx-cat">${cat}</span>
+    </div>
+    <div class="wx-rows">
+      <div class="wx-row"><span class="wx-lbl">Wind</span><span class="wx-val">${windStr}${xwind!==null?` <span class="wx-sub">· ${xwind} kt xwind</span>`:''}</span></div>
+      <div class="wx-row"><span class="wx-lbl">Visibility</span><span class="wx-val">${visStr}</span></div>
+      <div class="wx-row"><span class="wx-lbl">Ceiling</span><span class="wx-val">${ceilStr}</span></div>
+      <div class="wx-row"><span class="wx-lbl">Temp / DP</span><span class="wx-val">${spreadStr}</span></div>
+      <div class="wx-row"><span class="wx-lbl">Altimeter</span><span class="wx-val">${altStr}</span></div>
+    </div>
+    ${ageStr?`<div class="wx-age">Obs ${ageStr}${source==='mesonet'?' · Mesonet':''}</div>`:''}
+  `;
+}
+
+function editHomeAirport() {
+  const cur = localStorage.getItem('home-airport') || 'KRHV';
+  const input = prompt('Home airport ICAO:', cur);
+  if (input && /^[A-Za-z0-9]{3,4}$/.test(input.trim())) {
+    localStorage.setItem('home-airport', input.trim().toUpperCase());
+    loadWeatherWidget();
+  }
+}
+
+// ─── flight currency ──────────────────────────────────────────────────────────
+function renderFlightCurrency(flights) {
+  const el = document.getElementById('currency-card');
+  if (!flights || !flights.length) {
+    el.innerHTML = `<div class="ov-card-hd">FAA Currency</div><div style="color:var(--faint);font-size:13px;padding:8px 0">No flight data</div>`;
+    return;
+  }
+
+  const now = Date.now();
+  const d90  = 90  * 86400000;
+  const d24mo = 730 * 86400000; // ~24 calendar months
+
+  // Sum T/O + landings in a time window
+  function sumIn(ms, toField, lndField) {
+    return flights
+      .filter(f => now - new Date(f.date+'T12:00:00').getTime() < ms)
+      .reduce((acc,f) => ({
+        to:  acc.to  + (f[toField]||0),
+        lnd: acc.lnd + (f[lndField]||0),
+      }), {to:0, lnd:0});
+  }
+
+  const day90   = sumIn(d90, 'day_takeoffs', 'day_landings_full_stop');
+  // Fallback: if no ForeFlight-style fields, use generic takeoffs/landings
+  const dayTO   = day90.to  || sumIn(d90, 'takeoffs', 'landings').to;
+  const dayLnd  = day90.lnd || sumIn(d90, 'takeoffs', 'landings').lnd;
+  const dayCur  = dayTO>=3 && dayLnd>=3;
+
+  const ngt90   = sumIn(d90, 'night_takeoffs', 'night_landings_full_stop');
+  const ngtTO   = ngt90.to;
+  const ngtLnd  = ngt90.lnd;
+  const ngtCur  = ngtTO>=3 && ngtLnd>=3;
+
+  const lastBFR = flights
+    .filter(f => f.flight_review)
+    .sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+  const bfrAge  = lastBFR ? now - new Date(lastBFR.date+'T12:00:00').getTime() : null;
+  const bfrCur  = bfrAge!==null && bfrAge < d24mo;
+  const bfrDays = bfrAge!==null ? Math.floor((d24mo - bfrAge)/86400000) : null;
+
+  // Days until day currency lapses (when 3rd most recent T/O falls out of 90d window)
+  function daysToLapse(flts, toF, lndF) {
+    // Collect individual T/O events by date, sorted newest first
+    const ops = [];
+    for (const f of flts) {
+      const n = (f[toF]||0) + (f[lndF]||0);
+      if (n > 0) ops.push({ date: new Date(f.date+'T12:00:00').getTime(), n });
+    }
+    ops.sort((a,b) => b.date-a.date);
+    let cum=0;
+    for (const op of ops) {
+      cum += op.n;
+      if (cum >= 6) { // 3 T/O + 3 landings = at minimum 6 ops
+        return Math.floor((op.date + d90 - now) / 86400000);
+      }
+    }
+    return null;
+  }
+
+  const dayDays = dayCur ? daysToLapse(flights,'day_takeoffs','day_landings_full_stop') : null;
+
+  function row(name, current, daysLeft, detail) {
+    let dotColor, badgeStyle, badgeText;
+    if (current && daysLeft!==null && daysLeft<=15) {
+      dotColor='oklch(78% 0.18 75)'; badgeStyle=`background:oklch(24% 0.10 75);color:oklch(78% 0.18 75)`; badgeText=`exp in ${daysLeft}d`;
+    } else if (current) {
+      dotColor='var(--patina-text)'; badgeStyle=`background:oklch(22% 0.08 145);color:oklch(72% 0.20 145)`; badgeText='current';
+    } else {
+      dotColor='var(--warn)'; badgeStyle=`background:oklch(22% 0.10 25);color:oklch(70% 0.18 25)`; badgeText='lapsed';
+    }
+    return `<div class="cur-row">
+      <div class="cur-dot" style="background:${dotColor}"></div>
+      <div class="cur-name">${name}</div>
+      <span class="cur-badge" style="${badgeStyle}">${badgeText}</span>
+      ${detail?`<div class="cur-days">${detail}</div>`:''}
+    </div>`;
+  }
+
+  const dayDetail  = dayCur  ? (dayDays!==null?`${dayDays}d`:'') : `${dayTO} T/O · ${dayLnd} lnd`;
+  const ngtDetail  = ngtCur  ? '' : `${ngtTO} T/O · ${ngtLnd} lnd`;
+  const bfrDetail  = bfrDays!==null ? (bfrCur?`${bfrDays}d`:`${-bfrDays}d ago`) : 'none logged';
+
+  el.innerHTML = `
+    <div class="ov-card-hd">FAA Currency <span style="font-size:10px;color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none">§61.57</span></div>
+    <div class="cur-rows">
+      ${row('Day VFR', dayCur, dayDays, dayDetail)}
+      ${row('Night VFR', ngtCur, null, ngtDetail)}
+      ${row('Flight Review', bfrCur, bfrDays!==null&&bfrDays<60?bfrDays:null, bfrDetail)}
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--faint)">Based on ${flights.length} logged flight${flights.length!==1?'s':''}</div>
+  `;
 }
 
 // ─── charts ───────────────────────────────────────────────────────────────────
@@ -3476,14 +3663,14 @@ async function loadFlights() {
 
   window._flights = Array.isArray(flights) ? flights : [];
   renderFlights(window._flights);
+  renderFlightCurrency(window._flights);
 }
 
 // ─── bootstrap ────────────────────────────────────────────────────────────────
 (async function main() {
-  const [athlete, activities, weekly, daily] = await Promise.all([
+  const [athlete, activities, daily] = await Promise.all([
     fetch('/api/athlete').then(r => r.json()),
     fetch('/api/activities?limit=200').then(r => r.json()),
-    fetch('/api/stats/weekly').then(r => r.json()),
     fetch('/api/stats/daily').then(r => r.json()).catch(() => ({})),
   ]);
 
@@ -3495,8 +3682,8 @@ async function loadFlights() {
   }
 
   window._actsArr = Array.isArray(activities) ? activities : [];
-  renderWellness(daily || {});
-  renderWeekly((weekly && weekly.by_sport) || {});
+  renderReadiness(window._actsArr, daily || {});
+  loadWeatherWidget();
   renderActivities(window._actsArr);
 
   buildVolumeChart(window._actsArr);

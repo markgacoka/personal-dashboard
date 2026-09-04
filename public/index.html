@@ -1016,47 +1016,75 @@
     .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
     .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
     .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
-    .fin-inst-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    @media (max-width: 700px) { .fin-inst-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 420px) { .fin-inst-grid { grid-template-columns: 1fr; } }
-    .fin-inst-card  {
-      background: var(--graphite); border: 1px solid var(--rule);
-      border-radius: var(--r-md); padding: 20px 16px 14px;
-      display: flex; flex-direction: column; align-items: center;
-      gap: 0; position: relative; transition: border-color 0.15s;
+    /* ── Linked accounts grid ───────────────────────────────── */
+    .fin-inst-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    @media (max-width: 560px) { .fin-inst-grid { grid-template-columns: 1fr; } }
+    .fin-inst-card {
+      background: var(--raised); border: 1px solid var(--rule);
+      border-radius: var(--r-md); padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      position: relative; transition: border-color 0.15s, background 0.15s;
     }
     .fin-inst-card:hover { border-color: var(--rule-strong); }
-    .fin-inst-logo  {
-      width: 52px; height: 52px; border-radius: 12px;
-      object-fit: contain; background: #fff;
-      border: 1px solid var(--rule); margin-bottom: 10px;
+    .fin-inst-avatar {
+      width: 44px; height: 44px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      overflow: hidden; flex-shrink: 0;
+      flex-shrink: 0; overflow: hidden; border: 1px solid rgba(0,0,0,0.08);
     }
-    .fin-inst-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
-    .fin-inst-logo-fb {
-      font-size: 22px; font-weight: 700; font-family: 'Alumni Sans', sans-serif;
-      line-height: 1; color: var(--champagne);
+    .fin-inst-avatar img {
+      width: 26px; height: 26px; object-fit: contain;
     }
-    .fin-inst-name  { font-size: 13px; font-weight: 600; color: var(--champagne); text-align: center; margin-bottom: 3px; }
-    .fin-inst-date  { font-size: 11px; color: var(--faint); margin-bottom: 14px; }
-    .fin-inst-unlink {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
-      background: none; border: 1px solid var(--rule); border-radius: var(--r-sm);
-      color: var(--faint); font-size: 11px; font-family: inherit;
-      padding: 5px 0; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    .fin-inst-avatar-letter {
+      font-size: 18px; font-weight: 700;
+      font-family: 'Alumni Sans', sans-serif;
+      color: #fff; line-height: 1; letter-spacing: -0.01em;
     }
-    .fin-inst-unlink:hover { color: var(--warn); border-color: var(--warn); }
-    .fin-link-btn   { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 14px; border-radius: var(--r-sm); background: var(--gold); color: var(--deep); border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
+    .fin-inst-body { flex: 1; min-width: 0; }
+    .fin-inst-name {
+      font-size: 13px; font-weight: 600; color: var(--champagne);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .fin-inst-type { font-size: 11px; color: var(--faint); margin-top: 1px; }
+    .fin-inst-connected {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600; color: #4aaa80;
+      margin-top: 5px; letter-spacing: 0.02em; text-transform: uppercase;
+    }
+    .fin-inst-connected::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%;
+      background: #4aaa80; flex-shrink: 0;
+    }
+    [data-theme="light"] .fin-inst-connected { color: #237a50; }
+    [data-theme="light"] .fin-inst-connected::before { background: #237a50; }
+    .fin-inst-rm {
+      background: none; border: none; color: var(--faint);
+      cursor: pointer; padding: 6px; border-radius: var(--r-sm);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: color 0.15s, background 0.15s;
+    }
+    .fin-inst-rm:hover { color: var(--warn); background: var(--graphite); }
+    .fin-link-btn {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+      padding: 6px 14px; border-radius: var(--r-sm);
+      background: var(--gold); color: var(--deep); border: none;
+      cursor: pointer; font-weight: 600; font-family: inherit;
+    }
     .fin-link-btn:hover { opacity: .88; }
-    .fin-add-card   {
-      background: none; border: 1px dashed var(--rule); border-radius: var(--r-md);
-      padding: 20px 16px 14px; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 8px;
-      cursor: pointer; transition: border-color 0.15s, color 0.15s;
-      color: var(--faint); font-size: 12px; min-height: 140px;
+    .fin-add-card {
+      background: none; border: 1px dashed var(--rule);
+      border-radius: var(--r-md); padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; color: var(--faint); font-family: inherit;
+      font-size: 13px; transition: border-color 0.15s, color 0.15s;
     }
     .fin-add-card:hover { border-color: var(--patina); color: var(--patina-text); }
+    .fin-add-icon {
+      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+      border: 1px dashed var(--rule); display: flex; align-items: center;
+      justify-content: center; font-size: 20px; transition: border-color 0.15s;
+    }
+    .fin-add-card:hover .fin-add-icon { border-color: var(--patina); }
     /* Overview finance strip */
     .fin-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .fin-strip-tile { flex: 1; min-width: 120px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 8px 12px; }
@@ -4381,46 +4409,51 @@ function buildNetWorthChart(history) {
   }, 160);
 }
 
-const INST_DOMAIN = {
-  'wealthfront':          'wealthfront.com',
-  'fidelity':             'fidelity.com',
-  'fidelity investments': 'fidelity.com',
-  'sofi':                 'sofi.com',
-  'sofi bank':            'sofi.com',
-  'chase':                'chase.com',
-  'bank of america':      'bankofamerica.com',
-  'wells fargo':          'wellsfargo.com',
-  'vanguard':             'vanguard.com',
-  'schwab':               'schwab.com',
-  'charles schwab':       'schwab.com',
-  'robinhood':            'robinhood.com',
-  'betterment':           'betterment.com',
-  'apple':                'apple.com',
-  'ally':                 'ally.com',
-  'ally bank':            'ally.com',
-  'marcus':               'marcus.com',
-  'american express':     'americanexpress.com',
-  'citi':                 'citi.com',
-  'citibank':             'citi.com',
-  'usaa':                 'usaa.com',
-  'navy federal':         'navyfederal.org',
-  'td bank':              'td.com',
-  'us bank':              'usbank.com',
+const INST_META = {
+  'wealthfront':                    { color: '#00a0dc', bg: '#003d54', domain: 'wealthfront.com',      type: 'Automated Investing' },
+  'fidelity':                       { color: '#82bc00', bg: '#2a3d00', domain: 'fidelity.com',         type: 'Brokerage · 401k'    },
+  'fidelity investments':           { color: '#82bc00', bg: '#2a3d00', domain: 'fidelity.com',         type: 'Brokerage · 401k'    },
+  'sofi':                           { color: '#5c6ce8', bg: '#1a1f50', domain: 'sofi.com',             type: 'Banking · Investing'  },
+  'sofi bank':                      { color: '#5c6ce8', bg: '#1a1f50', domain: 'sofi.com',             type: 'Banking'              },
+  'e*trade':                        { color: '#b44aee', bg: '#32104a', domain: 'etrade.com',           type: 'Brokerage'            },
+  'e*trade from morgan stanley':    { color: '#b44aee', bg: '#32104a', domain: 'etrade.com',           type: 'Brokerage'            },
+  'morgan stanley':                 { color: '#1c3c6e', bg: '#0d1e38', domain: 'morganstanley.com',    type: 'Wealth Management'    },
+  'chase':                          { color: '#117aca', bg: '#0a2f4a', domain: 'chase.com',            type: 'Banking'              },
+  'bank of america':                { color: '#e31837', bg: '#4a0610', domain: 'bankofamerica.com',    type: 'Banking'              },
+  'wells fargo':                    { color: '#d71e28', bg: '#4a0a0a', domain: 'wellsfargo.com',       type: 'Banking'              },
+  'vanguard':                       { color: '#ac1931', bg: '#3d0a12', domain: 'vanguard.com',        type: 'Brokerage · Retirement'},
+  'schwab':                         { color: '#00a9ce', bg: '#003d4a', domain: 'schwab.com',           type: 'Brokerage'            },
+  'charles schwab':                 { color: '#00a9ce', bg: '#003d4a', domain: 'schwab.com',           type: 'Brokerage'            },
+  'robinhood':                      { color: '#00c805', bg: '#004a02', domain: 'robinhood.com',        type: 'Brokerage'            },
+  'betterment':                     { color: '#0a7ec2', bg: '#03243d', domain: 'betterment.com',       type: 'Robo Advisor'         },
+  'ally':                           { color: '#8a2be2', bg: '#2a0a4a', domain: 'ally.com',             type: 'Banking'              },
+  'ally bank':                      { color: '#8a2be2', bg: '#2a0a4a', domain: 'ally.com',             type: 'Banking'              },
+  'american express':               { color: '#2e77bc', bg: '#0a1e38', domain: 'americanexpress.com',  type: 'Credit Card'          },
+  'usaa':                           { color: '#002d70', bg: '#001a42', domain: 'usaa.com',             type: 'Banking'              },
 };
 
-function instLogoEl(name) {
-  const key  = (name||'').toLowerCase().trim();
-  const domain = Object.entries(INST_DOMAIN).find(([k]) => key.includes(k))?.[1];
+function instMeta(name) {
+  const key = (name||'').toLowerCase().trim();
+  return Object.entries(INST_META).find(([k]) => key.includes(k))?.[1]
+    || { color: '#5a6a7a', bg: '#1a2030', domain: null, type: 'Financial Institution' };
+}
+
+function instAvatarEl(name) {
+  const meta   = instMeta(name);
   const letter = (name||'?')[0].toUpperCase();
-  if (domain) {
-    return `<div class="fin-inst-logo">
-      <img src="https://logo.clearbit.com/${domain}" alt="${esc(name)}"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="fin-inst-logo-fb" style="display:none">${esc(letter)}</div>
+  const favicon = meta.domain
+    ? `https://www.google.com/s2/favicons?domain_url=https://${meta.domain}&sz=64`
+    : null;
+  const bg = `background:${meta.bg}`;
+  if (favicon) {
+    return `<div class="fin-inst-avatar" style="${bg}">
+      <img src="${favicon}" alt=""
+           onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="fin-inst-avatar-letter" style="display:none;color:#fff">${esc(letter)}</span>
     </div>`;
   }
-  return `<div class="fin-inst-logo" style="background:var(--graphite-2)">
-    <div class="fin-inst-logo-fb">${esc(letter)}</div>
+  return `<div class="fin-inst-avatar" style="${bg}">
+    <span class="fin-inst-avatar-letter">${esc(letter)}</span>
   </div>`;
 }
 
@@ -4432,29 +4465,39 @@ async function loadFinanceAccounts() {
     if (!items.length) {
       el.innerHTML = `<div class="fin-inst-grid">
         <button class="fin-add-card" onclick="openPlaidLink()">
-          <i class="ph-bold ph-plus-circle" style="font-size:28px"></i>
-          <span>Link your first account</span>
+          <div class="fin-add-icon"><i class="ph-bold ph-plus"></i></div>
+          <div>
+            <div style="font-size:13px;font-weight:500">Link your first account</div>
+            <div style="font-size:11px;margin-top:2px">Connect banks, brokerages &amp; 401k</div>
+          </div>
         </button>
       </div>`;
       return;
     }
     const cards = items.map(item => {
       const name = item.institution || item.item_id;
+      const meta = instMeta(name);
       const date = new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
       return `<div class="fin-inst-card">
-        ${instLogoEl(name)}
-        <div class="fin-inst-name">${esc(name)}</div>
-        <div class="fin-inst-date">Linked ${date}</div>
-        <button class="fin-inst-unlink" onclick="finUnlink('${esc(item.item_id)}',this)">
-          <i class="ph-bold ph-trash-simple"></i> Unlink
+        ${instAvatarEl(name)}
+        <div class="fin-inst-body">
+          <div class="fin-inst-name">${esc(name)}</div>
+          <div class="fin-inst-type">${esc(meta.type)}</div>
+          <div class="fin-inst-connected">Connected · ${date}</div>
+        </div>
+        <button class="fin-inst-rm" title="Unlink ${esc(name)}" onclick="finUnlink('${esc(item.item_id)}',this)">
+          <i class="ph-bold ph-dots-three-vertical"></i>
         </button>
       </div>`;
     }).join('');
     el.innerHTML = `<div class="fin-inst-grid">
       ${cards}
       <button class="fin-add-card" onclick="openPlaidLink()">
-        <i class="ph-bold ph-plus-circle" style="font-size:28px"></i>
-        <span>Add account</span>
+        <div class="fin-add-icon"><i class="ph-bold ph-plus"></i></div>
+        <div>
+          <div style="font-size:13px;font-weight:500">Add account</div>
+          <div style="font-size:11px;margin-top:2px">Connect another institution</div>
+        </div>
       </button>
     </div>`;
   } catch(err) {

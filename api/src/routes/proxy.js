@@ -65,18 +65,20 @@ export default async function proxyRoutes(fastify) {
       seats = 4, ifr_equipped = false, glass_cockpit = false, notes = null,
       type_code = null, category = 'Airplane', aircraft_class = 'ASEL',
       gear_type = 'fixed_tricycle', is_complex = false, is_high_performance = false,
+      mode_s_hex = null,
     } = req.body
-    const { rows } = await (await import('../db/client.js')).pool.query(
+    const { rows } = await pool.query(
       `INSERT INTO aircraft
          (tail_number,make,model,year,engine_type,engine_hp,seats,ifr_equipped,glass_cockpit,
-          notes,type_code,category,aircraft_class,gear_type,is_complex,is_high_performance)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          notes,type_code,category,aircraft_class,gear_type,is_complex,is_high_performance,mode_s_hex)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (tail_number) DO UPDATE SET
-         make=EXCLUDED.make, model=EXCLUDED.model
+         make=EXCLUDED.make, model=EXCLUDED.model,
+         mode_s_hex=COALESCE(EXCLUDED.mode_s_hex, aircraft.mode_s_hex)
        RETURNING *`,
       [tail_number, make, model, year, engine_type, engine_hp, seats, ifr_equipped,
        glass_cockpit, notes, type_code, category, aircraft_class, gear_type,
-       is_complex, is_high_performance]
+       is_complex, is_high_performance, mode_s_hex]
     )
     return reply.status(201).send(rows[0])
   })

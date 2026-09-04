@@ -268,6 +268,16 @@ export async function migrateV2() {
   }
 }
 
+// V7: add mode_s_hex to aircraft table so OpenSky lookup works for DB aircraft
+export async function migrateV7() {
+  const client = await pool.connect()
+  try {
+    await client.query(`ALTER TABLE aircraft ADD COLUMN IF NOT EXISTS mode_s_hex TEXT`)
+  } finally {
+    client.release()
+  }
+}
+
 // V6: OpenSky response cache — avoid re-spending credits on immutable historical data
 export async function migrateV6() {
   const client = await pool.connect()

@@ -2611,7 +2611,19 @@ async function onTailLookup(tail) {
     _m.aircraft = _tailCache[tail] = found;
     status.textContent = '✓ in logbook'; status.style.color = 'var(--run)';
     renderAircraftEnrichCard(found);
-    updateStep1Btn(); return;
+    updateStep1Btn();
+    // Background: enrich with mode_s_hex + performance if not already stored
+    if (!found.mode_s_hex) {
+      fetch('/api/external/aircraft/'+encodeURIComponent(tail))
+        .then(r=>r.ok?r.json():null).then(reg => {
+          if (!reg?.mode_s_hex) return;
+          _m.aircraft.mode_s_hex = reg.mode_s_hex;
+          _m.aircraft.performance = reg.performance || null;
+          _m.aircraft.photo_url   = _m.aircraft.photo_url || reg.photo_url || null;
+          _tailCache[tail] = _m.aircraft;
+        }).catch(()=>{});
+    }
+    return;
   }
 
   // 2. FAA registry + adsbdb via proxy
@@ -2727,6 +2739,7 @@ async function addAircraftToDB() {
         gear_type:         ac.gear_type || 'fixed_tricycle',
         is_complex:        ac.is_complex || false,
         is_high_performance: ac.is_high_performance || false,
+        mode_s_hex:        ac.mode_s_hex || null,
         notes: ac.owner ? `Owner: ${ac.owner}` : null,
       }),
     });

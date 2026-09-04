@@ -8,7 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@100;300;400;600&family=Albert+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3/dist/apexcharts.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <style>
@@ -368,16 +370,6 @@
     .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; }
 
     /* readiness */
-    .rd-status { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
-    .rd-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
-    .rd-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    .rd-kpi-n { font-size: 20px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .rd-kpi-u { font-size: 11px; color: var(--muted); margin-top: 2px; }
-    .rd-kpi-s { font-size: 11px; color: var(--faint); margin-top: 1px; }
-    .acwr-track { height: 3px; background: var(--rule); border-radius: 2px; position: relative; margin: 10px 0 4px; }
-    .acwr-zone { position: absolute; height: 3px; background: oklch(40% 0.12 145); border-radius: 2px; left: 25%; width: 31.25%; }
-    .acwr-pip { position: absolute; top: -4px; width: 3px; height: 11px; border-radius: 1px; transform: translateX(-50%); }
-    .acwr-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); margin-top: 2px; }
 
     /* ── Section label (no eyebrow, just a quiet rule line) ── */
     .section-label {
@@ -665,28 +657,9 @@
       border: 1px solid currentColor; opacity: 0.85;
     }
 
-    /* ── Charts overrides ────────────────────────────────── */
-    .apexcharts-tooltip {
-      background: var(--raised) !important;
-      border: 1px solid var(--rule-strong) !important;
-      color: var(--body-text) !important;
-      font-family: 'Albert Sans', sans-serif !important;
-      font-size: 12px !important;
-    }
-    .apexcharts-tooltip-title {
-      background: var(--graphite) !important;
-      border-bottom: 1px solid var(--rule) !important;
-      font-weight: 600 !important; color: var(--champagne) !important;
-    }
-    .apexcharts-xaxistooltip {
-      background: var(--raised) !important;
-      border-color: var(--rule-strong) !important;
-      color: var(--body-text) !important;
-    }
-    .apexcharts-xaxistooltip-bottom::before,
-    .apexcharts-xaxistooltip-bottom::after {
-      border-bottom-color: var(--rule-strong) !important;
-    }
+    /* ── Recharts overrides ──────────────────────────────── */
+    .recharts-surface { overflow: visible; }
+    .recharts-legend-item-text { color: var(--muted) !important; font-size: 11px !important; }
 
     /* ── MapLibre overrides ──────────────────────────────── */
     .maplibregl-popup-content {
@@ -718,13 +691,32 @@
     .chart-card {
       background: var(--raised);
       border: 1px solid var(--rule);
-      border-radius: var(--r-sm);
+      border-radius: var(--r-lg);
       padding: 18px 20px;
     }
     .chart-label {
-      font-size: 12px; color: var(--muted);
-      margin-bottom: 12px; font-weight: 400;
+      font-size: 13px; color: var(--body-text);
+      margin-bottom: 12px; font-weight: 500;
+      letter-spacing: -0.01em;
     }
+    .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; }
+
+    /* ── Tremor-style KPI tiles (readiness card) ──────────── */
+    .kpi-tiles { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 16px; }
+    @media (max-width: 680px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
+    .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 11px 13px; }
+    .kpi-big { font-size: 21px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .kpi-lbl { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .kpi-sub { font-size: 11px; color: var(--faint); margin-top: 4px; }
+
+    /* ── ACWR progress bar (readiness card) ──────────────── */
+    .acwr-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .acwr-status-txt { font-size: 15px; font-weight: 600; }
+    .acwr-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .acwr-bar-wrap { position: relative; height: 5px; background: var(--graphite-2); border-radius: 3px; }
+    .acwr-bar-zone { position: absolute; height: 5px; left: 28.57%; width: 35.71%; background: oklch(35% 0.10 145 / 0.4); border-radius: 3px; }
+    .acwr-bar-pip  { position: absolute; top: -4.5px; width: 4px; height: 14px; border-radius: 2px; transform: translateX(-50%); }
+    .acwr-bar-labs { position: relative; height: 18px; margin-top: 4px; }
 
     /* ── Data note ───────────────────────────────────────── */
     .data-note { font-size: 12px; color: var(--faint); }
@@ -1209,7 +1201,6 @@ const VIEW_TITLES = {
 };
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
-let _chartsBuilt = false;
 let _fdMap = null;
 
 // ─── theme ────────────────────────────────────────────────────────────────────
@@ -1279,18 +1270,28 @@ function routeLabel(f) {
   return stops.join(' → ');
 }
 
-// ─── chart defaults ───────────────────────────────────────────────────────────
-const CHART_OPTS = {
-  chart: {
-    background: 'transparent',
-    toolbar: { show: false },
-    fontFamily: 'Albert Sans, system-ui, sans-serif',
-    foreColor: 'oklch(72% 0 0)',
+// ─── Recharts shared config ───────────────────────────────────────────────────
+const { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
+        XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } = Recharts;
+const h = React.createElement.bind(React);
+const RC_GRID   = { strokeDasharray: '4 4', stroke: 'oklch(17% 0.004 95)', vertical: false };
+const RC_TICK   = { fontSize: 10, fill: 'oklch(60% 0 0)', fontFamily: 'Albert Sans, sans-serif' };
+const RC_MARGIN = { top: 6, right: 8, bottom: 0, left: -20 };
+const RC_CURSOR = { stroke: 'oklch(100% 0 0 / 0.06)', strokeWidth: 1 };
+
+function rcTooltip(label, payload, fmtVal) {
+  if (!payload?.length) return null;
+  return h('div', {
+    style: { background:'oklch(12% 0.005 95)', border:'1px solid oklch(22% 0.006 95)',
+             borderRadius:6, padding:'8px 12px', fontSize:11, fontFamily:'Albert Sans,sans-serif',
+             color:'oklch(80% 0 0)', lineHeight:1.6, pointerEvents:'none' }
   },
-  grid:  { borderColor: 'oklch(15% 0.008 95)', strokeDashArray: 3 },
-  tooltip: { theme: 'dark' },
-  stroke: { curve: 'smooth' },
-};
+    h('div', { style:{ color:'oklch(55% 0 0)', marginBottom:4, fontSize:10 } }, label),
+    ...payload.map(p => h('div', { key:p.name, style:{ color: p.color||'oklch(80% 0 0)' } },
+      `${p.name}: ${fmtVal ? fmtVal(p.value, p.name) : p.value}`
+    ))
+  );
+}
 
 // ─── view / router ────────────────────────────────────────────────────────────
 function showView(viewId, opts = {}) {
@@ -1440,43 +1441,53 @@ function renderReadiness(activities, daily) {
     else { rhrSignal='at baseline'; rhrColor='var(--faint)'; }
   }
 
-  // ACWR bar position (0.4 – 1.8 range)
+  // ACWR bar (scale 0.4–1.8; optimal zone 0.8–1.3 = 28.57%–64.29% of bar)
   const acwrMin=0.4, acwrMax=1.8;
   const pipPct = acwr!==null ? Math.min(100,Math.max(0,(acwr-acwrMin)/(acwrMax-acwrMin)*100)) : null;
-
-  const trendStr = trendPct!==null ? (trendPct>0?`+${trendPct}%`:`${trendPct}%`) : '—';
+  const trendStr = trendPct!==null ? (trendPct>0?`+${trendPct}%`:`${trendPct}%`) : null;
+  const trendArrow = trendPct!==null ? (trendPct>0?'↑':'↓') : '';
 
   document.getElementById('readiness-card').innerHTML = `
     <div class="ov-card-hd">Training Readiness</div>
-    <div class="rd-status" style="color:${statusColor}">${esc(statusText)}</div>
-    <div class="rd-sub">ACWR ${acwr??'—'} · ${trendPct!==null?`${trendStr} vs prior week`:'load tracking'}</div>
-    ${acwr!==null?`
-    <div class="acwr-track">
-      <div class="acwr-zone"></div>
-      <div class="acwr-pip" style="left:${pipPct}%;background:${statusColor}"></div>
+
+    <div class="acwr-row">
+      <div class="acwr-status-txt" style="color:${statusColor}">${esc(statusText)}</div>
+      <div class="acwr-meta">ACWR ${acwr??'—'}${trendStr?` · ${trendArrow} ${trendStr} vs last week`:''}</div>
     </div>
-    <div class="acwr-labels"><span>0.4</span><span style="margin-left:25%">0.8</span><span style="margin-left:31.25%">1.3</span><span>1.8</span></div>
-    `:''}
-    <div class="rd-kpis" style="margin-top:14px">
-      <div>
-        <div class="rd-kpi-n" style="color:var(--champagne)">${Math.round(acute)||'—'}</div>
-        <div class="rd-kpi-u">7d load</div>
-        <div class="rd-kpi-s">${Math.round(chronic)||'—'} wk avg</div>
+
+    ${acwr!==null ? `
+    <div class="acwr-bar-wrap">
+      <div class="acwr-bar-zone"></div>
+      <div class="acwr-bar-pip" style="left:${pipPct}%;background:${statusColor}"></div>
+    </div>
+    <div class="acwr-bar-labs" style="font-size:10px;color:var(--faint)">
+      <span style="position:absolute;left:0">0.4</span>
+      <span style="position:absolute;left:28.57%;transform:translateX(-50%)">0.8</span>
+      <span style="position:absolute;left:64.29%;transform:translateX(-50%)">1.3</span>
+      <span style="position:absolute;right:0">1.8</span>
+    </div>
+    ` : ''}
+
+    <div class="kpi-tiles">
+      <div class="kpi-tile">
+        <div class="kpi-big">${Math.round(acute)||'—'}</div>
+        <div class="kpi-lbl">7-day load</div>
+        <div class="kpi-sub">${Math.round(chronic)||'—'} wk avg</div>
       </div>
-      <div>
-        <div class="rd-kpi-n">${sleepHrs||'—'}</div>
-        <div class="rd-kpi-u">hrs sleep</div>
-        ${deepPct?`<div class="rd-kpi-s">${deepPct}% deep</div>`:''}
+      <div class="kpi-tile">
+        <div class="kpi-big">${sleepHrs||'—'}</div>
+        <div class="kpi-lbl">Sleep hrs</div>
+        <div class="kpi-sub">${deepPct?`${deepPct}% deep`:''}</div>
       </div>
-      <div>
-        <div class="rd-kpi-n" style="color:oklch(65% 0.15 350)">${rhr||'—'}</div>
-        <div class="rd-kpi-u">bpm rhr</div>
-        <div class="rd-kpi-s" style="color:${rhrColor}">${rhrSignal||'—'}</div>
+      <div class="kpi-tile">
+        <div class="kpi-big" style="color:oklch(65% 0.13 350)">${rhr||'—'}</div>
+        <div class="kpi-lbl">RHR bpm</div>
+        <div class="kpi-sub" style="color:${rhrColor}">${rhrSignal||'—'}</div>
       </div>
-      <div>
-        <div class="rd-kpi-n" style="${spo2&&spo2<95?'color:var(--warn)':''}">${spo2?Math.round(spo2)+'%':'—'}</div>
-        <div class="rd-kpi-u">SpO₂</div>
-        <div class="rd-kpi-s">${spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':''}</div>
+      <div class="kpi-tile">
+        <div class="kpi-big" style="${spo2&&spo2<95?'color:oklch(65% 0.09 20)':''}">${spo2?Math.round(spo2)+'%':'—'}</div>
+        <div class="kpi-lbl">SpO₂</div>
+        <div class="kpi-sub">${spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':''}</div>
       </div>
     </div>
   `;
@@ -1901,6 +1912,12 @@ function renderFlightCurrency(flights) {
 }
 
 // ─── charts ───────────────────────────────────────────────────────────────────
+function _rcRender(el, component) {
+  if (!el) return;
+  const root = el._rcRoot || (el._rcRoot = ReactDOM.createRoot(el));
+  root.render(component);
+}
+
 function buildVolumeChart(activities) {
   const days = {}, cutoff = Date.now() - 30*86400000;
   for (const a of activities) {
@@ -1911,86 +1928,110 @@ function buildVolumeChart(activities) {
     days[day][normSport(a.activityType?.typeKey)] += a.distance * M_TO_MI;
   }
   const sorted = Object.keys(days).sort();
-  new ApexCharts(document.getElementById('chart-volume'), {
-    ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type: 'area', height: 180, stacked: true },
-    series: ['running','cycling','swimming','rowing','other'].map(sp => ({
-      name: SPORT_CFG[sp].label,
-      data: sorted.map(d => parseFloat(((days[d]||{})[sp]||0).toFixed(2))),
-    })),
-    xaxis: { categories: sorted.map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'})),
-      labels: { style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' }, formatter:(v,i)=>{ const step=Math.max(1,Math.floor(sorted.length/6)); return i%step===0?v:''; } } },
-    yaxis: { labels: { formatter: v => v.toFixed(1), style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' } } },
-    colors: ['oklch(65% 0.16 145)','oklch(80% 0.17 85)','oklch(68% 0.15 235)','oklch(65% 0.15 350)','oklch(62% 0 0)'],
-    fill:  { type:'gradient', gradient:{ opacityFrom:0.65, opacityTo:0.1 } },
-    stroke: { width: 1.5, curve: 'smooth' },
-    dataLabels: { enabled: false },
-    legend: { show: true, fontSize: '11px', fontFamily: 'Albert Sans, sans-serif', offsetY: 4 },
-    tooltip: { ...CHART_OPTS.tooltip, y: { formatter: v => v.toFixed(2)+' mi' } },
-  }).render();
+  const step = Math.max(1, Math.floor(sorted.length / 6));
+  const data = sorted.map((d, i) => ({
+    day: i % step === 0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
+    ...days[d],
+  }));
+  const sports = ['running','cycling','swimming','rowing','other'].filter(sp => data.some(r => r[sp] > 0));
+  const gradients = sports.map(sp => h('linearGradient', { key:sp, id:`vg-${sp}`, x1:0, y1:0, x2:0, y2:1 },
+    h('stop', { offset:'5%',  stopColor: SPORT_CFG[sp].color, stopOpacity: 0.65 }),
+    h('stop', { offset:'95%', stopColor: SPORT_CFG[sp].color, stopOpacity: 0.05 }),
+  ));
+  const areas = sports.map(sp => h(Area, { key:sp, type:'monotone', dataKey:sp, name:SPORT_CFG[sp].label,
+    stackId:'1', stroke:SPORT_CFG[sp].color, strokeWidth:1.5,
+    fill:`url(#vg-${sp})`, dot:false, activeDot:{ r:3 } }));
+  const el = document.getElementById('chart-volume');
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+    h(AreaChart, { data, margin:RC_MARGIN },
+      h('defs', null, ...gradients),
+      h(CartesianGrid, RC_GRID),
+      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter: v => v.toFixed(1) }),
+      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v => v.toFixed(2)+' mi') }),
+      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
+      ...areas,
+    )
+  ));
 }
 
 function buildLoadChart(activities) {
   const cutoff = Date.now() - 30*86400000;
-  const recent = activities.filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
+  const recent = activities
+    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
     .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
-  const loads  = recent.map(a => Math.round(a.activityTrainingLoad));
-  const avg7   = loads.map((_,i) => { const sl=loads.slice(Math.max(0,i-6),i+1); return Math.round(sl.reduce((s,v)=>s+v,0)/sl.length); });
-  const sports = recent.map(a => normSport(a.activityType?.typeKey));
-  new ApexCharts(document.getElementById('chart-load'), {
-    ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type: 'bar', height: 180 },
-    series: [{ name:'Load', type:'bar', data:loads }, { name:'7d avg', type:'line', data:avg7 }],
-    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{ style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
-    yaxis: { labels: { style:{ fontSize:'11px', fontFamily:'Albert Sans, sans-serif' } } },
-    colors: sports.map(sp => SPORT_CFG[sp].color).concat(['oklch(62% 0 0)']),
-    plotOptions: { bar: { borderRadius:2, columnWidth:'65%' } },
-    stroke: { width:[0,2], curve:'smooth' },
-    dataLabels: { enabled:false },
-    legend: { show:true, fontSize:'11px', fontFamily:'Albert Sans, sans-serif', offsetY:4 },
-    fill: { opacity:[0.85,1] },
-  }).render();
+  const data = recent.map(a => ({
+    day:  fmtDate(a.startTimeLocal),
+    load: Math.round(a.activityTrainingLoad),
+    sport: normSport(a.activityType?.typeKey),
+  }));
+  const avg7 = data.map((_,i) => {
+    const sl = data.slice(Math.max(0,i-6),i+1);
+    return { day: data[i].day, avg: Math.round(sl.reduce((s,v)=>s+v.load,0)/sl.length) };
+  });
+  const merged = data.map((d,i) => ({ ...d, avg: avg7[i].avg }));
+  const el = document.getElementById('chart-load');
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+    h(ComposedChart, { data:merged, margin:RC_MARGIN },
+      h(CartesianGrid, RC_GRID),
+      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload) }),
+      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
+      h(Bar, { dataKey:'load', name:'Load', radius:[2,2,0,0], maxBarSize:20 },
+        merged.map((d,i) => h(Cell, { key:i, fill:SPORT_CFG[d.sport].color, fillOpacity:0.85 }))
+      ),
+      h(Line, { dataKey:'avg', name:'7d avg', type:'monotone', stroke:'oklch(62% 0 0)',
+        strokeWidth:2, dot:false, strokeDasharray:'4 2' }),
+    )
+  ));
 }
 
 function buildHRChart(activities) {
   const cutoff = Date.now() - 7*86400000;
-  const recent = activities.filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
+  const recent = activities
+    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
     .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
-  new ApexCharts(document.getElementById('chart-hr'), {
-    ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type:'line', height:180 },
-    series: [
-      { name:'Avg HR', data: recent.map(a => Math.round(a.averageHR)) },
-      { name:'Max HR', data: recent.map(a => Math.round(a.maxHR||0)) },
-    ],
-    xaxis: { categories: recent.map(a => fmtDate(a.startTimeLocal)), labels:{style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'}} },
-    yaxis: { labels: { formatter: v => v+' bpm', style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
-    colors: ['oklch(65% 0.15 350)','oklch(72% 0.17 55)'],
-    stroke: { width:[2.5,1.5], dashArray:[0,4] },
-    markers: { size:3 },
-    dataLabels: { enabled:false },
-    legend: { show:true, fontSize:'11px', fontFamily:'Albert Sans, sans-serif', offsetY:4 },
-    tooltip: { ...CHART_OPTS.tooltip, y:{ formatter:v => v+' bpm' } },
-  }).render();
+  const data = recent.map(a => ({
+    day:    fmtDate(a.startTimeLocal),
+    avgHR:  Math.round(a.averageHR),
+    maxHR:  Math.round(a.maxHR||0),
+  }));
+  const el = document.getElementById('chart-hr');
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+    h(LineChart, { data, margin:RC_MARGIN },
+      h(CartesianGrid, RC_GRID),
+      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v+' bpm' }),
+      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' bpm') }),
+      h(Legend, { wrapperStyle:{ fontSize:11, fontFamily:'Albert Sans,sans-serif', paddingTop:6 } }),
+      h(Line, { dataKey:'avgHR', name:'Avg HR', type:'monotone',
+        stroke:'oklch(65% 0.15 350)', strokeWidth:2.5, dot:{ r:3 }, activeDot:{ r:4 } }),
+      h(Line, { dataKey:'maxHR', name:'Max HR', type:'monotone',
+        stroke:'oklch(72% 0.17 55)', strokeWidth:1.5, strokeDasharray:'4 3', dot:false }),
+    )
+  ));
 }
 
 function buildZonesChart(activity) {
   if (!activity) return;
   document.getElementById('zones-label').textContent = '· ' + fmtDate(activity.startTimeLocal);
-  const zones = HR_ZONES.map((z,i) => ({ ...z, mins: Math.round((activity['hrTimeInZone_'+(i+1)]||0)/60) })).filter(z => z.mins > 0);
-  if (!zones.length) { document.getElementById('chart-zones').textContent = 'No zone data'; return; }
-  new ApexCharts(document.getElementById('chart-zones'), {
-    ...CHART_OPTS,
-    chart: { ...CHART_OPTS.chart, type:'bar', height:180 },
-    series: [{ name:'Minutes', data:zones.map(z=>z.mins) }],
-    xaxis: { categories: zones.map(z=>z.name), labels:{style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'}} },
-    yaxis: { labels: { formatter:v=>v+'m', style:{fontSize:'11px', fontFamily:'Albert Sans, sans-serif'} } },
-    colors: zones.map(z=>z.color),
-    plotOptions: { bar:{ distributed:true, borderRadius:2, columnWidth:'55%' } },
-    dataLabels: { enabled:false },
-    legend: { show:false },
-    tooltip: { ...CHART_OPTS.tooltip, y:{ formatter:v=>v+' min' } },
-  }).render();
+  const zones = HR_ZONES
+    .map((z,i) => ({ ...z, mins: Math.round((activity['hrTimeInZone_'+(i+1)]||0)/60) }))
+    .filter(z => z.mins > 0);
+  const el = document.getElementById('chart-zones');
+  if (!zones.length) { el.textContent = 'No zone data'; return; }
+  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:180 },
+    h(BarChart, { data:zones, margin:RC_MARGIN },
+      h(CartesianGrid, RC_GRID),
+      h(XAxis, { dataKey:'name', tick:RC_TICK, axisLine:false, tickLine:false }),
+      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v+'m' }),
+      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' min') }),
+      h(Bar, { dataKey:'mins', name:'Minutes', radius:[3,3,0,0], maxBarSize:36 },
+        zones.map((z,i) => h(Cell, { key:i, fill:z.color, fillOpacity:0.9 }))
+      ),
+    )
+  ));
 }
 
 // ─── activity list ────────────────────────────────────────────────────────────

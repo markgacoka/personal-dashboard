@@ -11,7 +11,7 @@ import statsRoutes from './routes/stats.js'
 import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
-import { migrate, migrateV2, migrateV3, migrateV4, migrateV5 } from './db/migrate.js'
+import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6 } from './db/migrate.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -57,6 +57,7 @@ if (process.env.DATABASE_URL) {
     await migrateV3()
     await migrateV4()
     await migrateV5()
+    await migrateV6()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)

@@ -1,5 +1,10 @@
 // External API proxy — avoids CORS issues and centralises external calls
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
+import { pool } from '../db/client.js'
+
+async function dbQuery(sql, params) {
+  try { return (await pool.query(sql, params)).rows } catch { return null }
+}
 
 // ── OpenSky OAuth token cache ─────────────────────────────────────────────────
 // OpenSky v2 uses client_credentials (clientId + clientSecret → bearer token).
@@ -79,22 +84,44 @@ export default async function proxyRoutes(fastify) {
   // ── OpenSky Network: detected flights by departure airport + date ─────────────
   // Requires OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET in .env (free account).
   // Without credentials, only the last ~2 hours of data is accessible.
+  // Results are cached in opensky_departures_cache for completed days (free of credits on repeat).
   fastify.get('/api/external/flights-detected', async (req, reply) => {
     const { departure, date, icao24 } = req.query
     if (!departure || !date) return reply.status(400).send({ error: 'departure and date required' })
 
+    const dep = departure.toUpperCase()
     // Cover full Pacific day in UTC (UTC-8 worst case, +1h buffer each side)
     const dayStart = new Date(date + 'T07:00:00Z')
     const begin    = Math.floor(dayStart.getTime() / 1000)
     const end      = begin + 115200 // 32-hour window to catch late Pacific flights
 
+    // A day's data is immutable once the window has fully closed (+ 1h settle buffer)
+    const windowClosed = end < Math.floor(Date.now() / 1000) - 3600
+
+    // ── Cache read ────────────────────────────────────────────────────────────
+    if (windowClosed) {
+      const cached = await dbQuery(
+        'SELECT flights_json FROM opensky_departures_cache WHERE departure_icao=$1 AND date_str=$2',
+        [dep, date]
+      )
+      if (cached?.length) {
+        let flights = cached[0].flights_json
+        if (icao24) {
+          const hex = icao24.toLowerCase().replace(/[^0-9a-f]/g, '')
+          flights = flights.filter(f => f.icao24?.toLowerCase() === hex)
+        }
+        return { flights, needs_auth: false, source: 'opensky_cache' }
+      }
+    }
+
+    // ── Live OpenSky call ─────────────────────────────────────────────────────
     let token = null
     try { token = await getOskyToken() } catch (e) { fastify.log.warn({ err: e.message }, 'OpenSky token failed') }
     const headers = { 'User-Agent': 'personal-dashboard/1.0' }
     if (token) headers.Authorization = `Bearer ${token}`
 
     try {
-      const url = `https://opensky-network.org/api/flights/departure?airport=${encodeURIComponent(departure.toUpperCase())}&begin=${begin}&end=${end}`
+      const url = `https://opensky-network.org/api/flights/departure?airport=${encodeURIComponent(dep)}&begin=${begin}&end=${end}`
       const r = await fetch(url, { headers, signal: AbortSignal.timeout(12000) })
 
       if (r.status === 401 || r.status === 403) {
@@ -107,29 +134,39 @@ export default async function proxyRoutes(fastify) {
       if (r.status === 404) return reply.status(200).send({ flights: [], needs_auth: false })
       if (!r.ok) throw new Error(`OpenSky returned ${r.status}`)
 
-      let flights = await r.json()
-      if (!Array.isArray(flights)) flights = []
+      let raw = await r.json()
+      if (!Array.isArray(raw)) raw = []
 
-      // Filter by aircraft icao24 (mode_s_hex) if provided
-      if (icao24) {
-        const hex = icao24.toLowerCase().replace(/[^0-9a-f]/g, '')
-        flights = flights.filter(f => f.icao24?.toLowerCase() === hex)
-      }
-
-      // Enrich and shape the response
-      const shaped = flights.map(f => ({
-        icao24:           f.icao24,
-        callsign:         f.callsign?.trim() || null,
-        departure_icao:   f.estDepartureAirport || departure.toUpperCase(),
-        arrival_icao:     f.estArrivalAirport || null,
-        departure_time:   f.firstSeen ? new Date(f.firstSeen * 1000).toISOString() : null,
-        arrival_time:     f.lastSeen  ? new Date(f.lastSeen  * 1000).toISOString() : null,
-        duration_min:     f.firstSeen && f.lastSeen ? Math.round((f.lastSeen - f.firstSeen) / 60) : null,
-        first_seen_unix:  f.firstSeen || null,
-        last_seen_unix:   f.lastSeen || null,
+      // Shape all flights (store unfiltered so cache serves any icao24 filter)
+      const shaped = raw.map(f => ({
+        icao24:          f.icao24,
+        callsign:        f.callsign?.trim() || null,
+        departure_icao:  f.estDepartureAirport || dep,
+        arrival_icao:    f.estArrivalAirport || null,
+        departure_time:  f.firstSeen ? new Date(f.firstSeen * 1000).toISOString() : null,
+        arrival_time:    f.lastSeen  ? new Date(f.lastSeen  * 1000).toISOString() : null,
+        duration_min:    f.firstSeen && f.lastSeen ? Math.round((f.lastSeen - f.firstSeen) / 60) : null,
+        first_seen_unix: f.firstSeen || null,
+        last_seen_unix:  f.lastSeen  || null,
       }))
 
-      return { flights: shaped, needs_auth: false, source: 'opensky' }
+      // ── Cache write (only for completed windows) ──────────────────────────
+      if (windowClosed) {
+        await dbQuery(
+          `INSERT INTO opensky_departures_cache (departure_icao, date_str, flights_json)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (departure_icao, date_str)
+           DO UPDATE SET flights_json=$3, fetched_at=NOW()`,
+          [dep, date, JSON.stringify(shaped)]
+        )
+      }
+
+      let flights = shaped
+      if (icao24) {
+        const hex = icao24.toLowerCase().replace(/[^0-9a-f]/g, '')
+        flights = shaped.filter(f => f.icao24?.toLowerCase() === hex)
+      }
+      return { flights, needs_auth: false, source: 'opensky' }
     } catch (e) {
       fastify.log.warn({ err: e.message }, 'OpenSky flights-detected failed')
       return reply.status(502).send({ error: e.message })
@@ -137,10 +174,24 @@ export default async function proxyRoutes(fastify) {
   })
 
   // ── OpenSky Network: GPS track for a specific flight ─────────────────────────
+  // Tracks are immutable for completed flights — always cached after first fetch.
   fastify.get('/api/external/flight-track', async (req, reply) => {
     const { icao24, time } = req.query  // time = Unix timestamp near flight start
     if (!icao24 || !time) return reply.status(400).send({ error: 'icao24 and time required' })
 
+    const hex = icao24.toLowerCase().replace(/[^0-9a-f]/g, '')
+    const ts  = parseInt(time)
+
+    // ── Cache read ────────────────────────────────────────────────────────────
+    const cached = await dbQuery(
+      'SELECT callsign, path_json FROM opensky_tracks_cache WHERE icao24=$1 AND first_seen_unix=$2',
+      [hex, ts]
+    )
+    if (cached?.length) {
+      return { track: { icao24: hex, callsign: cached[0].callsign, path: cached[0].path_json }, source: 'opensky_cache' }
+    }
+
+    // ── Live OpenSky call ─────────────────────────────────────────────────────
     let token = null
     try { token = await getOskyToken() } catch (_) {}
     const headers = { 'User-Agent': 'personal-dashboard/1.0' }
@@ -148,22 +199,34 @@ export default async function proxyRoutes(fastify) {
 
     try {
       const r = await fetch(
-        `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(icao24.toLowerCase())}&time=${parseInt(time)}`,
+        `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(hex)}&time=${ts}`,
         { headers, signal: AbortSignal.timeout(12000) }
       )
       if (r.status === 401 || r.status === 403) return reply.status(200).send({ track: null, needs_auth: true })
       if (!r.ok) return reply.status(200).send({ track: null })
       const d = await r.json()
       // path: [[time, lat, lon, baro_alt_m, true_track, on_ground], ...]
-      const path = (d.path || []).map(([ts, lat, lon, alt, trk, grnd]) => ({
-        ts:    new Date(ts * 1000).toISOString(),
-        lat:   lat,
-        lon:   lon,
-        alt_ft: alt != null ? Math.round(alt * 3.28084) : null,
-        track: trk,
+      const path = (d.path || []).map(([t, lat, lon, alt, trk, grnd]) => ({
+        ts:        new Date(t * 1000).toISOString(),
+        lat,
+        lon,
+        alt_ft:    alt != null ? Math.round(alt * 3.28084) : null,
+        track:     trk,
         on_ground: grnd,
       }))
-      return { track: { icao24: d.icao24, callsign: d.callsign?.trim(), path }, source: 'opensky' }
+      const callsign = d.callsign?.trim() || null
+
+      // ── Cache write ───────────────────────────────────────────────────────
+      if (path.length) {
+        await dbQuery(
+          `INSERT INTO opensky_tracks_cache (icao24, first_seen_unix, callsign, path_json)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (icao24, first_seen_unix) DO NOTHING`,
+          [hex, ts, callsign, JSON.stringify(path)]
+        )
+      }
+
+      return { track: { icao24: d.icao24, callsign, path }, source: 'opensky' }
     } catch (e) {
       return reply.status(200).send({ track: null })
     }

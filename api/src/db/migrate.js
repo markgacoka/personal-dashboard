@@ -268,6 +268,33 @@ export async function migrateV2() {
   }
 }
 
+// V6: OpenSky response cache — avoid re-spending credits on immutable historical data
+export async function migrateV6() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS opensky_departures_cache (
+        departure_icao  TEXT    NOT NULL,
+        date_str        TEXT    NOT NULL,
+        flights_json    JSONB   NOT NULL,
+        fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (departure_icao, date_str)
+      );
+
+      CREATE TABLE IF NOT EXISTS opensky_tracks_cache (
+        icao24          TEXT    NOT NULL,
+        first_seen_unix BIGINT  NOT NULL,
+        callsign        TEXT,
+        path_json       JSONB   NOT NULL,
+        fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (icao24, first_seen_unix)
+      );
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V5: FAA aircraft reference table (ACFTREF.txt) — seats, engine count, speed per type
 export async function migrateV5() {
   const client = await pool.connect()

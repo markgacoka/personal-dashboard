@@ -539,21 +539,20 @@
 
     /* ── Logbook ─────────────────────────────────────────── */
     #logbook-stats {
-      display: flex; align-items: center; flex-wrap: wrap;
+      display: flex; align-items: stretch;
       background: var(--raised);
       border: 1px solid var(--rule);
       border-radius: var(--r-sm);
-      padding: 14px 20px;
+      padding: 0;
       margin-bottom: 16px;
-      gap: 0;
     }
-    .dp { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 0 16px; }
-    .dp:first-child { padding-left: 0; }
-    .dp:last-child  { padding-right: 0; }
+    .dp { display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; padding: 14px 16px; }
+    .dp:first-child { padding-left: 20px; }
+    .dp:last-child  { padding-right: 20px; }
     .dp-n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
     .dp-u { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
-    .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dp-div { width: 1px; align-self: stretch; background: var(--rule); flex-shrink: 0; margin: 0; }
+    .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
+    .dp-div { width: 1px; background: var(--rule); flex-shrink: 0; }
 
     .fl-list {
       border-radius: var(--r-sm); overflow: hidden;
@@ -2352,6 +2351,7 @@ function buildActivityDetailHTML(a, detail) {
 function renderLogbookStats(s) {
   const h   = v => parseFloat(v||0) > 0 ? parseFloat(v).toFixed(1)+'h' : '—';
   const hc  = (v, clr) => parseFloat(v||0) > 0 ? clr : 'var(--faint)';
+  const sub = (v, label) => parseFloat(v||0) > 0 ? `${parseFloat(v).toFixed(1)}h ${label}` : '&nbsp;';
   document.getElementById('logbook-stats').innerHTML = `
     <div class="dp">
       <span class="dp-n">${h(s.total_hours)}</span>
@@ -2362,13 +2362,13 @@ function renderLogbookStats(s) {
     <div class="dp">
       <span class="dp-n" style="color:${hc(s.dual_received,'#5db87c')}">${h(s.dual_received)}</span>
       <span class="dp-u">Dual rcvd</span>
-      <span class="dp-s">${h(s.dual_given)} given</span>
+      <span class="dp-s">${sub(s.dual_given,'given')}</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
       <span class="dp-n" style="color:${hc(s.solo,'#c99c3a')}">${h(s.solo)}</span>
       <span class="dp-u">Solo</span>
-      <span class="dp-s">${h(s.pic)} PIC total</span>
+      <span class="dp-s">${parseFloat(s.pic||0) > parseFloat(s.solo||0) ? parseFloat(s.pic).toFixed(1)+'h PIC' : '&nbsp;'}</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
@@ -2380,13 +2380,13 @@ function renderLogbookStats(s) {
     <div class="dp">
       <span class="dp-n" style="color:${hc(s.night,'#9080c0')}">${h(s.night)}</span>
       <span class="dp-u">Night</span>
-      <span class="dp-s">${s.night_landings||0} ldg</span>
+      <span class="dp-s">${s.night_landings > 0 ? s.night_landings+' ldg' : '&nbsp;'}</span>
     </div>
     <div class="dp-div"></div>
     <div class="dp">
       <span class="dp-n" style="color:${hc(s.actual_instrument,'var(--patina-text)')}">${h(s.actual_instrument)}</span>
       <span class="dp-u">Actual IFR</span>
-      <span class="dp-s">${h(s.simulated_instrument)} sim inst</span>
+      <span class="dp-s">${sub(s.simulated_instrument,'sim inst')}</span>
     </div>
   `;
   document.getElementById('fl-subtitle').textContent = `· ${s.total_hours}h · PPL training`;

@@ -8,9 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@100;300;400;600&family=Albert+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin></script>
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin></script>
   <style>
@@ -659,9 +657,16 @@
       border: 1px solid currentColor; opacity: 0.85;
     }
 
-    /* ── Recharts overrides ──────────────────────────────── */
-    .recharts-surface { overflow: visible; }
-    .recharts-legend-item-text { color: var(--muted) !important; font-size: 11px !important; }
+    /* ── Readiness status pill + delta badge ─────────────── */
+    .rd-pill { display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.03em; }
+    .rd-pill.nogo  { background:#221616;color:#b05050; }
+    .rd-pill.caut  { background:#22190c;color:#b08030; }
+    .rd-pill.go    { background:#0e1f18;color:#3d9470; }
+    .rd-pill.muted { background:#1c1c1a;color:#777770; }
+    .rd-delta { display:inline-block;font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px; }
+    .rd-delta.neg { background:#221414;color:#a04040; }
+    .rd-delta.pos { background:#0e1e16;color:#2d8060; }
+    .rd-delta.neu { background:#1c1c1a;color:#666660; }
 
     /* ── MapLibre overrides ──────────────────────────────── */
     .maplibregl-popup-content {
@@ -1272,33 +1277,30 @@ function routeLabel(f) {
   return stops.join(' → ');
 }
 
-// ─── Recharts shared config ───────────────────────────────────────────────────
-let AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend;
-if (window.Recharts) {
-  ({ AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
-     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } = window.Recharts);
-}
-const h = window.React ? React.createElement.bind(React) : () => null;
-const RC_GRID   = { strokeDasharray: '3 6', stroke: '#252520', vertical: false };
-const RC_TICK   = { fontSize: 10, fill: '#888880', fontFamily: 'Albert Sans, sans-serif' };
-const RC_MARGIN = { top: 4, right: 6, bottom: 0, left: -22 };
-const RC_CURSOR = { stroke: 'rgba(255,255,255,0.05)', strokeWidth: 1 };
+// ─── Chart.js shared config ──────────────────────────────────────────────────
+const CJ_FONT = { family: 'Albert Sans, sans-serif', size: 10 };
+const CJ_TICK = { color: '#787870', font: CJ_FONT };
+const CJ_GRID = { color: '#252520', drawBorder: false };
+const CJ_TT   = {
+  backgroundColor: '#18180f', borderColor: '#2e2e28', borderWidth: 1,
+  titleColor: '#787870', bodyColor: '#ccccbb', padding: 8,
+  titleFont: { ...CJ_FONT }, bodyFont: { ...CJ_FONT, size: 11 },
+  callbacks: {},
+};
+const CJ_SCALE = {
+  x: { grid: CJ_GRID, ticks: CJ_TICK, border: { display: false } },
+  y: { grid: CJ_GRID, ticks: CJ_TICK, border: { display: false } },
+};
 
-function rcTooltip(label, payload, fmtVal) {
-  if (!payload?.length) return null;
-  const visible = payload.filter(p => p.value != null && p.value !== 0);
-  if (!visible.length) return null;
-  return h('div', {
-    style: { background:'#18180f', border:'1px solid #2e2e28',
-             borderRadius:5, padding:'6px 10px', fontSize:11, fontFamily:'Albert Sans,sans-serif',
-             color:'#ccccbb', lineHeight:1.6, pointerEvents:'none' }
-  },
-    label ? h('div', { style:{ color:'#787870', marginBottom:2, fontSize:10 } }, label) : null,
-    ...visible.map(p => h('div', { key:p.name, style:{ color: p.color||'#aaaaaa' } },
-      `${p.name}: ${fmtVal ? fmtVal(p.value, p.name) : p.value}`
-    ))
-  );
+function _cjsRender(el, config, height = 150) {
+  if (!el || !window.Chart) return;
+  if (el._cjs) { el._cjs.destroy(); el._cjs = null; }
+  el.innerHTML = '';
+  el.style.height = height + 'px';
+  el.style.position = 'relative';
+  const canvas = document.createElement('canvas');
+  el.appendChild(canvas);
+  el._cjs = new Chart(canvas, config);
 }
 
 // ─── view / router ────────────────────────────────────────────────────────────
@@ -1429,48 +1431,61 @@ function renderReadiness(activities, daily) {
   const deepPct  = (sleep?.deepSleepSeconds&&sleep?.sleepTimeSeconds) ? Math.round(sleep.deepSleepSeconds/sleep.sleepTimeSeconds*100) : null;
   const spo2 = d?.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
 
-  // Status synthesis
-  let statusText, statusColor;
-  if (acwr===null) { statusText='No training load data'; statusColor='var(--faint)'; }
-  else if (acwr>1.5) { statusText='High load — recovery priority'; statusColor='var(--warn)'; }
-  else if (acwr>1.3) { statusText='Approaching overreach'; statusColor='oklch(78% 0.18 75)'; }
+  // Status synthesis → actionable recommendation
+  let pillClass, pillText, pillColor;
+  if (acwr===null) { pillClass='muted'; pillText='No data'; pillColor='#777770'; }
+  else if (acwr>1.5) { pillClass='nogo'; pillText='Rest today'; pillColor='#b05050'; }
+  else if (acwr>1.3) { pillClass='caut'; pillText='Easy session'; pillColor='#b08030'; }
   else if (acwr>=0.8) {
-    if (trendPct!==null&&trendPct>15) { statusText='Building'; statusColor='var(--patina-text)'; }
-    else if (trendPct!==null&&trendPct<-15) { statusText='Tapering'; statusColor='oklch(68% 0.15 235)'; }
-    else { statusText='Maintaining'; statusColor='var(--patina-text)'; }
-  } else { statusText='Light week / deload'; statusColor='var(--faint)'; }
+    pillClass='go'; pillColor='#3d9470';
+    if (trendPct!==null&&trendPct>15) pillText='Build';
+    else if (trendPct!==null&&trendPct<-15) pillText='Taper';
+    else pillText='Maintain';
+  } else { pillClass='caut'; pillText='Increase load'; pillColor='#b08030'; }
 
   // Recovery signal from RHR
-  let rhrSignal='', rhrColor='var(--faint)';
+  let rhrSignal='', rhrSubColor='#666660';
   if (rhrDelta!==null) {
-    if (rhrDelta>4){ rhrSignal='↑ elevated'; rhrColor='var(--warn)'; }
-    else if (rhrDelta>1){ rhrSignal='↑ slightly elevated'; rhrColor='oklch(78% 0.18 75)'; }
-    else if (rhrDelta<=-2){ rhrSignal='↓ well recovered'; rhrColor='var(--patina-text)'; }
-    else { rhrSignal='at baseline'; rhrColor='var(--faint)'; }
+    if (rhrDelta>4)      { rhrSignal='↑ elevated';         rhrSubColor='#b05050'; }
+    else if (rhrDelta>1) { rhrSignal='↑ slightly elevated'; rhrSubColor='#b08030'; }
+    else if (rhrDelta<=-2){ rhrSignal='↓ well recovered';  rhrSubColor='#3d9470'; }
+    else                  { rhrSignal='at baseline';        rhrSubColor='#666660'; }
   }
 
   // ACWR bar (scale 0.4–1.8; optimal zone 0.8–1.3 = 28.57%–64.29% of bar)
   const acwrMin=0.4, acwrMax=1.8;
   const pipPct = acwr!==null ? Math.min(100,Math.max(0,(acwr-acwrMin)/(acwrMax-acwrMin)*100)) : null;
   const trendStr = trendPct!==null ? (trendPct>0?`+${trendPct}%`:`${trendPct}%`) : null;
-  const trendArrow = trendPct!==null ? (trendPct>0?'↑':'↓') : '';
+
+  // Delta badge: positive ACWR trend = more load = bad if already high
+  const deltaClass = trendPct===null ? '' : (acwr!==null&&acwr>1.0 ? (trendPct>0?'neg':'pos') : (trendPct>0?'pos':'neg'));
+  const deltaArrow = trendPct!==null ? (trendPct>0?'↑':'↓') : '';
+
+  // RHR tile color
+  const rhrBigColor = rhrDelta!==null&&rhrDelta>4 ? '#b05050' : rhrDelta!==null&&rhrDelta>1 ? '#b08030' : '#ccccbb';
+  // SpO₂ tile color + label
+  const spo2Color = spo2&&spo2<95 ? '#b05050' : '#ccccbb';
+  const spo2Lbl   = spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':'';
 
   document.getElementById('readiness-card').innerHTML = `
     <div class="ov-card-hd">Training Readiness</div>
 
-    <div class="acwr-row">
-      <div class="acwr-status-txt" style="color:${statusColor}">${esc(statusText)}</div>
-      <div class="acwr-meta">ACWR ${acwr??'—'}${trendStr?` · ${trendArrow} ${trendStr} vs last week`:''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+      <div class="rd-pill ${pillClass}">● ${esc(pillText)}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${acwr!==null?`<span style="font-size:20px;font-weight:700;color:${pillColor};font-variant-numeric:tabular-nums">${acwr}</span><span style="font-size:10px;color:#666660;margin-left:-4px">ACWR</span>`:''}
+        ${trendStr?`<div class="rd-delta ${deltaClass}">${deltaArrow} ${trendStr} / wk</div>`:''}
+      </div>
     </div>
 
     ${acwr!==null ? `
     <div class="acwr-bar-wrap">
       <div class="acwr-bar-zone"></div>
-      <div class="acwr-bar-pip" style="left:${pipPct}%;background:${statusColor}"></div>
+      <div class="acwr-bar-pip" style="left:${pipPct}%;background:${pillColor}"></div>
     </div>
-    <div class="acwr-bar-labs" style="font-size:10px;color:var(--faint)">
+    <div class="acwr-bar-labs" style="font-size:10px;color:#666660">
       <span style="position:absolute;left:0">0.4</span>
-      <span style="position:absolute;left:28.57%;transform:translateX(-50%)">0.8</span>
+      <span style="position:absolute;left:28.57%;transform:translateX(-50%)">0.8 optimal</span>
       <span style="position:absolute;left:64.29%;transform:translateX(-50%)">1.3</span>
       <span style="position:absolute;right:0">1.8</span>
     </div>
@@ -1479,23 +1494,23 @@ function renderReadiness(activities, daily) {
     <div class="kpi-tiles">
       <div class="kpi-tile">
         <div class="kpi-big">${Math.round(acute)||'—'}</div>
-        <div class="kpi-lbl">7-day load</div>
-        <div class="kpi-sub">${Math.round(chronic)||'—'} wk avg</div>
+        <div class="kpi-lbl">ATL (Acute)</div>
+        <div class="kpi-sub">${Math.round(chronic)||'—'} CTL · ${acwr??'—'} ratio</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big">${sleepHrs||'—'}</div>
-        <div class="kpi-lbl">Sleep hrs</div>
-        <div class="kpi-sub">${deepPct?`${deepPct}% deep`:''}</div>
+        <div class="kpi-big">${sleepHrs||'—'}<span style="font-size:12px;font-weight:400;color:#666660">h</span></div>
+        <div class="kpi-lbl">Sleep</div>
+        <div class="kpi-sub">${deepPct?`${deepPct}% deep · `:''} ${sleepHrs&&parseFloat(sleepHrs)<7?'<span style="color:#b08030">low</span>':sleepHrs?'ok':''}</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big" style="color:oklch(65% 0.13 350)">${rhr||'—'}</div>
-        <div class="kpi-lbl">RHR bpm</div>
-        <div class="kpi-sub" style="color:${rhrColor}">${rhrSignal||'—'}</div>
+        <div class="kpi-big" style="color:${rhrBigColor}">${rhr||'—'}<span style="font-size:11px;font-weight:400;color:#666660"> bpm</span></div>
+        <div class="kpi-lbl">RHR</div>
+        <div class="kpi-sub" style="color:${rhrSubColor}">${rhrSignal||'—'}</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big" style="${spo2&&spo2<95?'color:oklch(65% 0.09 20)':''}">${spo2?Math.round(spo2)+'%':'—'}</div>
+        <div class="kpi-big" style="color:${spo2Color}">${spo2?Math.round(spo2)+'%':'—'}</div>
         <div class="kpi-lbl">SpO₂</div>
-        <div class="kpi-sub">${spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':''}</div>
+        <div class="kpi-sub">${spo2Lbl}</div>
       </div>
     </div>
   `;
@@ -1890,11 +1905,11 @@ function renderFlightCurrency(flights) {
   function row(name, current, daysLeft, detail) {
     let dotColor, badgeStyle, badgeText;
     if (current && daysLeft!==null && daysLeft<=15) {
-      dotColor='oklch(72% 0.11 70)'; badgeStyle=`background:oklch(21% 0.05 70);color:oklch(72% 0.11 70)`; badgeText=`exp in ${daysLeft}d`;
+      dotColor='#b08030'; badgeStyle='background:#271f0b;color:#b08030'; badgeText=`exp in ${daysLeft}d`;
     } else if (current) {
-      dotColor='var(--patina-text)'; badgeStyle=`background:oklch(19% 0.04 188);color:oklch(67% 0.09 188)`; badgeText='current';
+      dotColor='#3d9494'; badgeStyle='background:#0e2222;color:#3d9494'; badgeText='current';
     } else {
-      dotColor='var(--warn)'; badgeStyle=`background:oklch(19% 0.04 20);color:oklch(65% 0.08 20)`; badgeText='lapsed';
+      dotColor='#b05050'; badgeStyle='background:#221414;color:#b05050'; badgeText='lapsed';
     }
     return `<div class="cur-row">
       <div class="cur-dot" style="background:${dotColor}"></div>
@@ -1920,14 +1935,6 @@ function renderFlightCurrency(flights) {
 }
 
 // ─── charts ───────────────────────────────────────────────────────────────────
-function _rcRender(el, component) {
-  if (!el || !window.ReactDOM || !window.React) return;
-  try {
-    const root = el._rcRoot || (el._rcRoot = ReactDOM.createRoot(el));
-    root.render(component);
-  } catch(e) { console.warn('chart render error', e); }
-}
-
 function buildVolumeChart(activities) {
   const days = {}, cutoff = Date.now() - 30*86400000;
   for (const a of activities) {
@@ -1939,30 +1946,30 @@ function buildVolumeChart(activities) {
   }
   const sorted = Object.keys(days).sort();
   const step = Math.max(1, Math.floor(sorted.length / 6));
-  const data = sorted.map((d, i) => ({
-    day: i % step === 0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '',
-    ...days[d],
-  }));
-  const sports = ['running','cycling','swimming','rowing','other'].filter(sp => data.some(r => r[sp] > 0));
-  const gradients = sports.map(sp => h('linearGradient', { key:sp, id:`vg-${sp}`, x1:0, y1:0, x2:0, y2:1 },
-    h('stop', { offset:'0%',  stopColor: SPORT_CFG[sp].color, stopOpacity: 0.45 }),
-    h('stop', { offset:'100%', stopColor: SPORT_CFG[sp].color, stopOpacity: 0.03 }),
-  ));
-  const areas = sports.map(sp => h(Area, { key:sp, type:'monotone', dataKey:sp, name:SPORT_CFG[sp].label,
-    stackId:'1', stroke:SPORT_CFG[sp].color, strokeWidth:1.5,
-    fill:`url(#vg-${sp})`, dot:false, activeDot:{ r:3 } }));
-  const el = document.getElementById('chart-volume');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
-    h(AreaChart, { data, margin:RC_MARGIN },
-      h('defs', null, ...gradients),
-      h(CartesianGrid, RC_GRID),
-      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
-      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter: v => v.toFixed(1) }),
-      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v => v.toFixed(2)+' mi') }),
-      h(Legend, { wrapperStyle:{ fontSize:10, fontFamily:'Albert Sans,sans-serif', paddingTop:4 } }),
-      ...areas,
-    )
-  ));
+  const labels = sorted.map((d,i) => i%step===0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
+  const sports = ['running','cycling','swimming','rowing','other'].filter(sp => sorted.some(d => days[d][sp] > 0));
+  _cjsRender(document.getElementById('chart-volume'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: sports.map(sp => ({
+        label: SPORT_CFG[sp].label,
+        data: sorted.map(d => parseFloat((days[d][sp]||0).toFixed(2))),
+        borderColor: SPORT_CFG[sp].color,
+        backgroundColor: SPORT_CFG[sp].color + '44',
+        fill: true, tension: 0.3, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#787870', font: CJ_FONT, boxWidth: 9, padding: 10 } },
+        tooltip: { ...CJ_TT, callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(2)} mi` } },
+      },
+      scales: { x: CJ_SCALE.x, y: { ...CJ_SCALE.y, stacked: true, ticks: { ...CJ_TICK, callback: v => v.toFixed(1) } } },
+    }
+  });
 }
 
 function buildLoadChart(activities) {
@@ -1970,30 +1977,25 @@ function buildLoadChart(activities) {
   const recent = activities
     .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
     .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
-  const data = recent.map(a => ({
-    day:  fmtDate(a.startTimeLocal),
-    load: Math.round(a.activityTrainingLoad),
-    sport: normSport(a.activityType?.typeKey),
-  }));
-  const avg7 = data.map((_,i) => {
-    const sl = data.slice(Math.max(0,i-6),i+1);
-    return { day: data[i].day, avg: Math.round(sl.reduce((s,v)=>s+v.load,0)/sl.length) };
+  const loads  = recent.map(a => Math.round(a.activityTrainingLoad));
+  const avg7   = loads.map((_,i) => { const sl=loads.slice(Math.max(0,i-6),i+1); return Math.round(sl.reduce((s,v)=>s+v,0)/sl.length); });
+  const colors = recent.map(a => SPORT_CFG[normSport(a.activityType?.typeKey)].color + 'cc');
+  _cjsRender(document.getElementById('chart-load'), {
+    type: 'bar',
+    data: {
+      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      datasets: [
+        { label: 'Load', data: loads, backgroundColor: colors, borderRadius: 2, maxBarThickness: 18, order: 2 },
+        { label: '7d avg', data: avg7, type: 'line', borderColor: '#666660', borderWidth: 1.5, borderDash: [4,2], pointRadius: 0, fill: false, order: 1 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: CJ_TT },
+      scales: CJ_SCALE,
+    }
   });
-  const merged = data.map((d,i) => ({ ...d, avg: avg7[i].avg }));
-  const el = document.getElementById('chart-load');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
-    h(ComposedChart, { data:merged, margin:RC_MARGIN },
-      h(CartesianGrid, RC_GRID),
-      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
-      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false }),
-      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload) }),
-      h(Bar, { dataKey:'load', name:'Load', radius:[2,2,0,0], maxBarSize:18 },
-        merged.map((d,i) => h(Cell, { key:i, fill:SPORT_CFG[d.sport].color, fillOpacity:0.85 }))
-      ),
-      h(Line, { dataKey:'avg', name:'7d avg', type:'monotone', stroke:'#666660',
-        strokeWidth:1.5, dot:false, strokeDasharray:'4 2' }),
-    )
-  ));
 }
 
 function buildHRChart(activities) {
@@ -2001,25 +2003,25 @@ function buildHRChart(activities) {
   const recent = activities
     .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
     .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
-  const data = recent.map(a => ({
-    day:    fmtDate(a.startTimeLocal),
-    avgHR:  Math.round(a.averageHR),
-    maxHR:  Math.round(a.maxHR||0),
-  }));
-  const el = document.getElementById('chart-hr');
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
-    h(LineChart, { data, margin:RC_MARGIN },
-      h(CartesianGrid, RC_GRID),
-      h(XAxis, { dataKey:'day', tick:RC_TICK, axisLine:false, tickLine:false }),
-      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v }),
-      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' bpm') }),
-      h(Legend, { wrapperStyle:{ fontSize:10, fontFamily:'Albert Sans,sans-serif', paddingTop:4 } }),
-      h(Line, { dataKey:'avgHR', name:'Avg HR', type:'monotone',
-        stroke:'#b85e7a', strokeWidth:2.5, dot:{ r:2.5, fill:'#b85e7a' }, activeDot:{ r:4 } }),
-      h(Line, { dataKey:'maxHR', name:'Max HR', type:'monotone',
-        stroke:'#c99c3a', strokeWidth:1.5, strokeDasharray:'4 3', dot:false }),
-    )
-  ));
+  _cjsRender(document.getElementById('chart-hr'), {
+    type: 'line',
+    data: {
+      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      datasets: [
+        { label: 'Avg HR', data: recent.map(a => Math.round(a.averageHR)), borderColor: '#b85e7a', backgroundColor: '#b85e7a22', fill: false, borderWidth: 2.5, tension: 0.3, pointRadius: 2.5, pointBackgroundColor: '#b85e7a' },
+        { label: 'Max HR', data: recent.map(a => Math.round(a.maxHR||0)), borderColor: '#c99c3a', fill: false, borderWidth: 1.5, borderDash: [4,3], tension: 0.3, pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#787870', font: CJ_FONT, boxWidth: 9, padding: 10 } },
+        tooltip: { ...CJ_TT, callbacks: { label: c => `${c.dataset.label}: ${c.raw} bpm` } },
+      },
+      scales: CJ_SCALE,
+    }
+  });
 }
 
 function buildZonesChart(activity) {
@@ -2029,18 +2031,19 @@ function buildZonesChart(activity) {
     .map((z,i) => ({ ...z, mins: Math.round((activity['hrTimeInZone_'+(i+1)]||0)/60) }))
     .filter(z => z.mins > 0);
   const el = document.getElementById('chart-zones');
-  if (!zones.length) { el.textContent = 'No zone data'; return; }
-  _rcRender(el, h(ResponsiveContainer, { width:'100%', height:150 },
-    h(BarChart, { data:zones, margin:RC_MARGIN },
-      h(CartesianGrid, RC_GRID),
-      h(XAxis, { dataKey:'name', tick:{...RC_TICK, fontSize:9}, axisLine:false, tickLine:false }),
-      h(YAxis, { tick:RC_TICK, axisLine:false, tickLine:false, tickFormatter:v=>v+'m' }),
-      h(Tooltip, { cursor:RC_CURSOR, content: ({label,payload}) => rcTooltip(label, payload, v=>v+' min') }),
-      h(Bar, { dataKey:'mins', name:'Minutes', radius:[3,3,0,0], maxBarSize:40 },
-        zones.map((z,i) => h(Cell, { key:i, fill:z.color, fillOpacity:0.88 }))
-      ),
-    )
-  ));
+  if (!zones.length) { el.style.height = 'auto'; el.textContent = 'No zone data'; return; }
+  _cjsRender(el, {
+    type: 'bar',
+    data: {
+      labels: zones.map(z => z.name),
+      datasets: [{ label: 'Minutes', data: zones.map(z => z.mins), backgroundColor: zones.map(z => z.color + 'cc'), borderRadius: 3, maxBarThickness: 40 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { ...CJ_TT, callbacks: { label: c => `${c.raw} min` } } },
+      scales: CJ_SCALE,
+    }
+  });
 }
 
 // ─── activity list ────────────────────────────────────────────────────────────

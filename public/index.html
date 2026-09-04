@@ -2816,8 +2816,8 @@ function renderModalStep2(flights, detected = []) {
   const oskyNote = _m._oskyAuth
     ? `<div style="margin-top:12px;padding:10px 12px;background:var(--graphite);border-radius:6px;font-size:11px;color:var(--faint)">
          <i class="ph-bold ph-info"></i>
-         Add <code>OPENSKY_USER</code> and <code>OPENSKY_PASS</code> to your .env for historical ADS-B flight detection.
-         Register free at <a href="https://opensky-network.org" target="_blank" style="color:var(--patina-text)">opensky-network.org</a>
+         Add <code>OPENSKY_CLIENT_ID</code> and <code>OPENSKY_CLIENT_SECRET</code> to your .env for historical ADS-B flight detection.
+         Get credentials at <a href="https://opensky-network.org" target="_blank" style="color:var(--patina-text)">opensky-network.org</a> → My OpenSky → API Access
        </div>`
     : (newDetected.length > 0 ? `<div style="font-size:11px;color:var(--faint);margin-top:8px;padding:0 4px"><i class="ph-bold ph-broadcast"></i> ADS-B routes detected via OpenSky Network — click to import</div>` : '');
 

@@ -1,6 +1,29 @@
 // External API proxy — avoids CORS issues and centralises external calls
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
 
+// ── OpenSky OAuth token cache ─────────────────────────────────────────────────
+// OpenSky v2 uses client_credentials (clientId + clientSecret → bearer token).
+// Env vars: OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET
+const OSKY_TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token'
+let _oskyToken = null  // { value, expiresAt }
+
+async function getOskyToken() {
+  const id  = process.env.OPENSKY_CLIENT_ID
+  const sec = process.env.OPENSKY_CLIENT_SECRET
+  if (!id || !sec) return null
+  if (_oskyToken && _oskyToken.expiresAt > Date.now() + 30_000) return _oskyToken.value
+  const r = await fetch(OSKY_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: sec }),
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!r.ok) throw new Error(`OpenSky token fetch failed: ${r.status}`)
+  const d = await r.json()
+  _oskyToken = { value: d.access_token, expiresAt: Date.now() + (d.expires_in ?? 3600) * 1000 }
+  return _oskyToken.value
+}
+
 export default async function proxyRoutes(fastify) {
   const xfetch = (url, ms = 7000) => {
     const ctrl = new AbortController()
@@ -54,7 +77,7 @@ export default async function proxyRoutes(fastify) {
   })
 
   // ── OpenSky Network: detected flights by departure airport + date ─────────────
-  // Requires OPENSKY_USER + OPENSKY_PASS in .env for historical data (free account).
+  // Requires OPENSKY_CLIENT_ID + OPENSKY_CLIENT_SECRET in .env (free account).
   // Without credentials, only the last ~2 hours of data is accessible.
   fastify.get('/api/external/flights-detected', async (req, reply) => {
     const { departure, date, icao24 } = req.query
@@ -65,24 +88,20 @@ export default async function proxyRoutes(fastify) {
     const begin    = Math.floor(dayStart.getTime() / 1000)
     const end      = begin + 115200 // 32-hour window to catch late Pacific flights
 
-    const user = process.env.OPENSKY_USER
-    const pass = process.env.OPENSKY_PASS
-    const authHeader = user && pass
-      ? 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64')
-      : null
-
+    let token = null
+    try { token = await getOskyToken() } catch (e) { fastify.log.warn({ err: e.message }, 'OpenSky token failed') }
     const headers = { 'User-Agent': 'personal-dashboard/1.0' }
-    if (authHeader) headers.Authorization = authHeader
+    if (token) headers.Authorization = `Bearer ${token}`
 
     try {
       const url = `https://opensky-network.org/api/flights/departure?airport=${encodeURIComponent(departure.toUpperCase())}&begin=${begin}&end=${end}`
       const r = await fetch(url, { headers, signal: AbortSignal.timeout(12000) })
 
-      if (r.status === 403) {
+      if (r.status === 401 || r.status === 403) {
         return reply.status(200).send({
           flights: [],
           needs_auth: true,
-          message: 'OpenSky historical data requires a free account. Add OPENSKY_USER and OPENSKY_PASS to .env.'
+          message: 'OpenSky historical data requires credentials. Add OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET to .env.'
         })
       }
       if (r.status === 404) return reply.status(200).send({ flights: [], needs_auth: false })
@@ -122,21 +141,17 @@ export default async function proxyRoutes(fastify) {
     const { icao24, time } = req.query  // time = Unix timestamp near flight start
     if (!icao24 || !time) return reply.status(400).send({ error: 'icao24 and time required' })
 
-    const user = process.env.OPENSKY_USER
-    const pass = process.env.OPENSKY_PASS
-    const authHeader = user && pass
-      ? 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64')
-      : null
-
+    let token = null
+    try { token = await getOskyToken() } catch (_) {}
     const headers = { 'User-Agent': 'personal-dashboard/1.0' }
-    if (authHeader) headers.Authorization = authHeader
+    if (token) headers.Authorization = `Bearer ${token}`
 
     try {
       const r = await fetch(
         `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(icao24.toLowerCase())}&time=${parseInt(time)}`,
         { headers, signal: AbortSignal.timeout(12000) }
       )
-      if (r.status === 403) return reply.status(200).send({ track: null, needs_auth: true })
+      if (r.status === 401 || r.status === 403) return reply.status(200).send({ track: null, needs_auth: true })
       if (!r.ok) return reply.status(200).send({ track: null })
       const d = await r.json()
       // path: [[time, lat, lon, baro_alt_m, true_track, on_ground], ...]

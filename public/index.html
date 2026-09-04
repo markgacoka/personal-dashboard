@@ -1016,12 +1016,47 @@
     .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
     .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
     .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
-    .fin-items-list { display: flex; flex-direction: column; gap: 8px; }
-    .fin-item-row   { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); }
-    .fin-item-name  { flex: 1; font-size: 13px; }
-    .fin-item-date  { font-size: 11px; color: var(--faint); }
+    .fin-inst-grid  { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 700px) { .fin-inst-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 420px) { .fin-inst-grid { grid-template-columns: 1fr; } }
+    .fin-inst-card  {
+      background: var(--graphite); border: 1px solid var(--rule);
+      border-radius: var(--r-md); padding: 20px 16px 14px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0; position: relative; transition: border-color 0.15s;
+    }
+    .fin-inst-card:hover { border-color: var(--rule-strong); }
+    .fin-inst-logo  {
+      width: 52px; height: 52px; border-radius: 12px;
+      object-fit: contain; background: #fff;
+      border: 1px solid var(--rule); margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .fin-inst-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .fin-inst-logo-fb {
+      font-size: 22px; font-weight: 700; font-family: 'Alumni Sans', sans-serif;
+      line-height: 1; color: var(--champagne);
+    }
+    .fin-inst-name  { font-size: 13px; font-weight: 600; color: var(--champagne); text-align: center; margin-bottom: 3px; }
+    .fin-inst-date  { font-size: 11px; color: var(--faint); margin-bottom: 14px; }
+    .fin-inst-unlink {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
+      background: none; border: 1px solid var(--rule); border-radius: var(--r-sm);
+      color: var(--faint); font-size: 11px; font-family: inherit;
+      padding: 5px 0; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    }
+    .fin-inst-unlink:hover { color: var(--warn); border-color: var(--warn); }
     .fin-link-btn   { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 14px; border-radius: var(--r-sm); background: var(--gold); color: var(--deep); border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
     .fin-link-btn:hover { opacity: .88; }
+    .fin-add-card   {
+      background: none; border: 1px dashed var(--rule); border-radius: var(--r-md);
+      padding: 20px 16px 14px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      cursor: pointer; transition: border-color 0.15s, color 0.15s;
+      color: var(--faint); font-size: 12px; min-height: 140px;
+    }
+    .fin-add-card:hover { border-color: var(--patina); color: var(--patina-text); }
     /* Overview finance strip */
     .fin-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .fin-strip-tile { flex: 1; min-width: 120px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 8px 12px; }
@@ -1225,12 +1260,8 @@
       <!-- LINK ACCOUNTS ─────────────────────────────────────────── -->
       <div class="view" id="view-fin-accounts">
         <div class="section-first">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="margin-bottom:14px">
             <span style="font-size:13px;color:var(--muted)">Linked Accounts</span>
-            <span style="flex:1"></span>
-            <button class="fin-link-btn" onclick="openPlaidLink()">
-              <i class="ph-bold ph-plus"></i> Link Account
-            </button>
           </div>
           <div id="fin-items-content">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
@@ -4350,26 +4381,82 @@ function buildNetWorthChart(history) {
   }, 160);
 }
 
+const INST_DOMAIN = {
+  'wealthfront':          'wealthfront.com',
+  'fidelity':             'fidelity.com',
+  'fidelity investments': 'fidelity.com',
+  'sofi':                 'sofi.com',
+  'sofi bank':            'sofi.com',
+  'chase':                'chase.com',
+  'bank of america':      'bankofamerica.com',
+  'wells fargo':          'wellsfargo.com',
+  'vanguard':             'vanguard.com',
+  'schwab':               'schwab.com',
+  'charles schwab':       'schwab.com',
+  'robinhood':            'robinhood.com',
+  'betterment':           'betterment.com',
+  'apple':                'apple.com',
+  'ally':                 'ally.com',
+  'ally bank':            'ally.com',
+  'marcus':               'marcus.com',
+  'american express':     'americanexpress.com',
+  'citi':                 'citi.com',
+  'citibank':             'citi.com',
+  'usaa':                 'usaa.com',
+  'navy federal':         'navyfederal.org',
+  'td bank':              'td.com',
+  'us bank':              'usbank.com',
+};
+
+function instLogoEl(name) {
+  const key  = (name||'').toLowerCase().trim();
+  const domain = Object.entries(INST_DOMAIN).find(([k]) => key.includes(k))?.[1];
+  const letter = (name||'?')[0].toUpperCase();
+  if (domain) {
+    return `<div class="fin-inst-logo">
+      <img src="https://logo.clearbit.com/${domain}" alt="${esc(name)}"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="fin-inst-logo-fb" style="display:none">${esc(letter)}</div>
+    </div>`;
+  }
+  return `<div class="fin-inst-logo" style="background:var(--graphite-2)">
+    <div class="fin-inst-logo-fb">${esc(letter)}</div>
+  </div>`;
+}
+
 async function loadFinanceAccounts() {
   const el = document.getElementById('fin-items-content');
   if (!el) return;
   try {
     const items = await fetch('/api/finance/items').then(r => r.ok ? r.json() : []);
     if (!items.length) {
-      el.innerHTML = `<div style="text-align:center;padding:48px 20px">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">No accounts linked yet.</div>
-        <button class="fin-link-btn" onclick="openPlaidLink()"><i class="ph-bold ph-plugs"></i> Link your first account</button></div>`;
+      el.innerHTML = `<div class="fin-inst-grid">
+        <button class="fin-add-card" onclick="openPlaidLink()">
+          <i class="ph-bold ph-plus-circle" style="font-size:28px"></i>
+          <span>Link your first account</span>
+        </button>
+      </div>`;
       return;
     }
-    el.innerHTML = `<div class="fin-items-list">${items.map(item => `
-      <div class="fin-item-row">
-        <i class="ph-bold ph-bank" style="color:var(--patina-text);flex-shrink:0"></i>
-        <span class="fin-item-name">${esc(item.institution || item.item_id)}</span>
-        <span class="fin-item-date">${new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
-        <button class="row-btn danger" title="Unlink" onclick="finUnlink('${esc(item.item_id)}',this)">
-          <i class="ph-bold ph-trash-simple"></i>
+    const cards = items.map(item => {
+      const name = item.institution || item.item_id;
+      const date = new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      return `<div class="fin-inst-card">
+        ${instLogoEl(name)}
+        <div class="fin-inst-name">${esc(name)}</div>
+        <div class="fin-inst-date">Linked ${date}</div>
+        <button class="fin-inst-unlink" onclick="finUnlink('${esc(item.item_id)}',this)">
+          <i class="ph-bold ph-trash-simple"></i> Unlink
         </button>
-      </div>`).join('')}</div>`;
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="fin-inst-grid">
+      ${cards}
+      <button class="fin-add-card" onclick="openPlaidLink()">
+        <i class="ph-bold ph-plus-circle" style="font-size:28px"></i>
+        <span>Add account</span>
+      </button>
+    </div>`;
   } catch(err) {
     el.innerHTML = `<div style="color:var(--warn);padding:16px">${esc(err.message)}</div>`;
   }

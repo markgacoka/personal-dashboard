@@ -8,11 +8,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@100;300;400;600&family=Albert+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1273,9 +1273,13 @@ function routeLabel(f) {
 }
 
 // ─── Recharts shared config ───────────────────────────────────────────────────
-const { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
-        XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } = Recharts;
-const h = React.createElement.bind(React);
+let AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend;
+if (window.Recharts) {
+  ({ AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart,
+     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } = window.Recharts);
+}
+const h = window.React ? React.createElement.bind(React) : () => null;
 const RC_GRID   = { strokeDasharray: '3 6', stroke: '#252520', vertical: false };
 const RC_TICK   = { fontSize: 10, fill: '#888880', fontFamily: 'Albert Sans, sans-serif' };
 const RC_MARGIN = { top: 4, right: 6, bottom: 0, left: -22 };
@@ -1917,9 +1921,11 @@ function renderFlightCurrency(flights) {
 
 // ─── charts ───────────────────────────────────────────────────────────────────
 function _rcRender(el, component) {
-  if (!el) return;
-  const root = el._rcRoot || (el._rcRoot = ReactDOM.createRoot(el));
-  root.render(component);
+  if (!el || !window.ReactDOM || !window.React) return;
+  try {
+    const root = el._rcRoot || (el._rcRoot = ReactDOM.createRoot(el));
+    root.render(component);
+  } catch(e) { console.warn('chart render error', e); }
 }
 
 function buildVolumeChart(activities) {

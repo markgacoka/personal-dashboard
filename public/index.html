@@ -728,9 +728,9 @@
     .acwr-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
     .acwr-status-txt { font-size: 14px; font-weight: 600; }
     .acwr-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .acwr-bar-wrap { position: relative; height: 4px; background: var(--graphite-2); border-radius: 3px; }
-    .acwr-bar-zone { position: absolute; height: 4px; left: 28.57%; width: 35.71%; background: rgba(94,184,124,0.25); border-radius: 3px; }
-    .acwr-bar-pip  { position: absolute; top: -4px; width: 3px; height: 12px; border-radius: 2px; transform: translateX(-50%); }
+    .acwr-bar-wrap { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(to right, rgba(176,128,48,0.40) 0% 28.57%, rgba(61,148,112,0.35) 28.57% 64.29%, rgba(176,128,48,0.40) 64.29% 78.57%, rgba(176,80,80,0.52) 78.57% 100%); }
+    .acwr-bar-zone { display: none; }
+    .acwr-bar-pip  { position: absolute; top: -3px; width: 3px; height: 12px; border-radius: 2px; transform: translateX(-50%); }
     .acwr-bar-labs { position: relative; height: 16px; margin-top: 3px; }
 
     /* ── Data note ───────────────────────────────────────── */
@@ -1334,7 +1334,7 @@ function rebuildCharts() {
   buildVolumeChart(window._actsArr);
   buildLoadChart(window._actsArr);
   buildHRChart(window._actsArr);
-  if (window._actsArr[0]) buildZonesChart(window._actsArr[0]);
+  buildZonesChart(window._actsArr);
 }
 
 // ─── view / router ────────────────────────────────────────────────────────────
@@ -1992,18 +1992,16 @@ function buildVolumeChart(activities) {
   const labels = sorted.map((d,i) => i%step===0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
   const sports = ['running','cycling','swimming','rowing','other'].filter(sp => sorted.some(d => days[d][sp] > 0));
   _cjsRender(document.getElementById('chart-volume'), {
-    type: 'line',
+    type: 'bar',
     data: {
       labels,
       datasets: sports.map(sp => ({
         label: SPORT_CFG[sp].label,
         data: sorted.map(d => parseFloat((days[d][sp]||0).toFixed(2))),
-        borderColor: SPORT_CFG[sp].color,
-        backgroundColor: SPORT_CFG[sp].color + '28',
-        fill: true, tension: 0.4, borderWidth: 1.5,
-        pointRadius: 0, pointHoverRadius: 4,
-        pointHoverBackgroundColor: SPORT_CFG[sp].color,
-        pointHoverBorderWidth: 0,
+        backgroundColor: SPORT_CFG[sp].color + 'c8',
+        borderRadius: 2,
+        maxBarThickness: 22,
+        stack: 'vol',
       }))
     },
     options: {
@@ -2011,7 +2009,10 @@ function buildVolumeChart(activities) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { ...cfg.tt, callbacks: { label: c => `${c.dataset.label}: ${c.raw.toFixed(2)} hr` } },
+        tooltip: { ...cfg.tt, callbacks: {
+          label: c => c.raw > 0 ? `${c.dataset.label}: ${c.raw.toFixed(1)} hr` : null,
+          footer: items => { const t = items.reduce((s,c)=>s+c.raw,0); return t > 0 ? `Total: ${t.toFixed(1)} hr` : null; },
+        }},
       },
       scales: { x: cfg.scaleX, y: { ...cfg.scaleY, stacked: true, ticks: { ...cfg.scaleY.ticks, callback: v => v.toFixed(1) } } },
     }
@@ -2021,27 +2022,38 @@ function buildVolumeChart(activities) {
 function buildLoadChart(activities) {
   const cfg = getChartCfg();
   const cutoff = Date.now() - 30*86400000;
-  const recent = activities
-    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.activityTrainingLoad)
-    .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
-  const loads  = recent.map(a => Math.round(a.activityTrainingLoad));
+  const dayMap = {};
+  for (const a of activities) {
+    const ts = new Date(a.startTimeLocal).getTime();
+    if (ts < cutoff || !a.activityTrainingLoad) continue;
+    const day = new Date(ts).toISOString().slice(0,10);
+    if (!dayMap[day]) dayMap[day] = { load: 0, sport: 'other', topLoad: 0 };
+    dayMap[day].load += a.activityTrainingLoad;
+    if (a.activityTrainingLoad > dayMap[day].topLoad) {
+      dayMap[day].topLoad = a.activityTrainingLoad;
+      dayMap[day].sport = normSport(a.activityType?.typeKey);
+    }
+  }
+  const sorted = Object.keys(dayMap).sort();
+  const loads  = sorted.map(d => Math.round(dayMap[d].load));
+  const colors = sorted.map(d => SPORT_CFG[dayMap[d].sport].color + 'c8');
+  const step   = Math.max(1, Math.floor(sorted.length / 6));
+  const labels = sorted.map((d,i) => i%step===0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
   const avg7   = loads.map((_,i) => { const sl=loads.slice(Math.max(0,i-6),i+1); return Math.round(sl.reduce((s,v)=>s+v,0)/sl.length); });
-  const colors = recent.map(a => SPORT_CFG[normSport(a.activityType?.typeKey)].color + 'b0');
-  const avgLineColor = cfg.tickColor;
   _cjsRender(document.getElementById('chart-load'), {
     type: 'bar',
     data: {
-      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      labels,
       datasets: [
-        { label: 'Load', data: loads, backgroundColor: colors, borderRadius: 3, maxBarThickness: 16, order: 2 },
-        { label: '7d avg', data: avg7, type: 'line', borderColor: avgLineColor, borderWidth: 1.5,
+        { label: 'Load', data: loads, backgroundColor: colors, borderRadius: 3, maxBarThickness: 22, order: 2 },
+        { label: '7d avg', data: avg7, type: 'line', borderColor: cfg.tickColor, borderWidth: 1.5,
           borderDash: [3,3], pointRadius: 0, fill: false, order: 1, tension: 0.3 },
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false }, tooltip: cfg.tt },
+      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: { label: c => c.dataset.label === '7d avg' ? `7d avg: ${c.raw}` : `Load: ${c.raw}` } } },
       scales: { x: cfg.scaleX, y: cfg.scaleY },
     }
   });
@@ -2050,21 +2062,30 @@ function buildLoadChart(activities) {
 function buildHRChart(activities) {
   const cfg = getChartCfg();
   const cutoff = Date.now() - 7*86400000;
-  const recent = activities
-    .filter(a => new Date(a.startTimeLocal).getTime() >= cutoff && a.averageHR)
-    .sort((a,b) => new Date(a.startTimeLocal)-new Date(b.startTimeLocal));
+  const dayMap = {};
+  for (const a of activities) {
+    const ts = new Date(a.startTimeLocal).getTime();
+    if (ts < cutoff || !a.averageHR) continue;
+    const day = new Date(ts).toISOString().slice(0,10);
+    if (!dayMap[day]) dayMap[day] = { avgHRs: [], maxHR: 0 };
+    dayMap[day].avgHRs.push(a.averageHR);
+    dayMap[day].maxHR = Math.max(dayMap[day].maxHR, a.maxHR||0);
+  }
+  const sorted = Object.keys(dayMap).sort();
+  const labels = sorted.map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const avgHRs = sorted.map(d => Math.round(dayMap[d].avgHRs.reduce((s,v)=>s+v,0)/dayMap[d].avgHRs.length));
+  const maxHRs = sorted.map(d => dayMap[d].maxHR || null);
   _cjsRender(document.getElementById('chart-hr'), {
     type: 'line',
     data: {
-      labels: recent.map(a => fmtDate(a.startTimeLocal)),
+      labels,
       datasets: [
-        { label: 'Avg HR', data: recent.map(a => Math.round(a.averageHR)),
-          borderColor: '#b85e7a', fill: false, borderWidth: 2, tension: 0.4,
-          pointRadius: 3, pointBackgroundColor: '#b85e7a', pointBorderWidth: 0,
-          pointHoverRadius: 5 },
-        { label: 'Max HR', data: recent.map(a => Math.round(a.maxHR||0)),
+        { label: 'Avg HR', data: avgHRs,
+          borderColor: '#b85e7a', fill: false, borderWidth: 2, tension: 0.3,
+          pointRadius: 4, pointBackgroundColor: '#b85e7a', pointBorderWidth: 0, pointHoverRadius: 6 },
+        { label: 'Max HR', data: maxHRs,
           borderColor: '#c99c3a', fill: false, borderWidth: 1.5,
-          borderDash: [4,3], tension: 0.4, pointRadius: 0 },
+          borderDash: [4,3], tension: 0.3, pointRadius: 2, pointBackgroundColor: '#c99c3a', pointBorderWidth: 0 },
       ]
     },
     options: {
@@ -2072,38 +2093,50 @@ function buildHRChart(activities) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'line' } },
-        tooltip: { ...cfg.tt, callbacks: { label: c => `${c.dataset.label}: ${c.raw} bpm` } },
+        tooltip: { ...cfg.tt, callbacks: { label: c => c.raw !== null ? `${c.dataset.label}: ${c.raw} bpm` : null } },
       },
       scales: { x: cfg.scaleX, y: cfg.scaleY },
     }
   });
 }
 
-function buildZonesChart(activity) {
+function buildZonesChart(activities) {
   const cfg = getChartCfg();
-  if (!activity) return;
-  document.getElementById('zones-label').textContent = '· ' + fmtDate(activity.startTimeLocal);
-  const zones = HR_ZONES
-    .map((z,i) => ({ ...z, mins: Math.round((activity['hrTimeInZone_'+(i+1)]||0)/60) }))
-    .filter(z => z.mins > 0);
+  document.getElementById('zones-label').textContent = '· last 7d';
+  const cutoff = Date.now() - 7*86400000;
+  const zoneMins = [0, 0, 0, 0, 0];
+  let hasData = false;
+  const arr = Array.isArray(activities) ? activities : (activities ? [activities] : []);
+  for (const a of arr) {
+    const ts = new Date(a.startTimeLocal||0).getTime();
+    if (ts < cutoff) continue;
+    for (let i = 0; i < 5; i++) {
+      const secs = a['hrTimeInZone_'+(i+1)] || 0;
+      zoneMins[i] += Math.round(secs / 60);
+      if (secs > 0) hasData = true;
+    }
+  }
   const el = document.getElementById('chart-zones');
-  if (!zones.length) { el.style.height = 'auto'; el.textContent = 'No zone data'; return; }
+  if (!hasData) { el.style.height = 'auto'; el.textContent = 'No zone data'; return; }
   _cjsRender(el, {
     type: 'bar',
     data: {
-      labels: zones.map(z => z.name.replace(/^Z\d /, '')),
-      datasets: [{ label: 'Minutes', data: zones.map(z => z.mins),
-        backgroundColor: zones.map(z => z.color + 'b8'), borderRadius: 4, maxBarThickness: 44 }]
+      labels: HR_ZONES.map(z => z.name),
+      datasets: [{ label: 'Minutes', data: zoneMins,
+        backgroundColor: HR_ZONES.map(z => z.color + 'c8'), borderRadius: 3, maxBarThickness: 18 }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: { label: c => `${c.raw} min` } } },
+      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: {
+        label: c => { const m = c.raw; return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`; }
+      }}},
       scales: {
-        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, font: { ...CJ_FONT, size: 11 } } },
-        y: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => v + 'm' } },
+        x: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => v >= 60 ? Math.floor(v/60)+'h' : v+'m' } },
+        y: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, font: { ...CJ_FONT, size: 10 } } },
       },
     }
-  });
+  }, 160);
 }
 
 // ─── activity list ────────────────────────────────────────────────────────────
@@ -4057,7 +4090,7 @@ async function loadFlights() {
   buildVolumeChart(window._actsArr);
   buildLoadChart(window._actsArr);
   buildHRChart(window._actsArr);
-  buildZonesChart(window._actsArr[0]);
+  buildZonesChart(window._actsArr);
 
   loadFlights().catch(err => {
     document.getElementById('logbook-stats').innerHTML =

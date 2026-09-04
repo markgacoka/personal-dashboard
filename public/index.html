@@ -324,19 +324,39 @@
     .ov-card-hd button { font-size: 11px; color: var(--faint); background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; }
     .ov-card-hd button:hover { color: var(--champagne); }
 
-    /* weather */
-    .wx-verdict { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; margin-bottom: 12px; }
-    .wx-verdict.go   { background: oklch(22% 0.08 145); color: oklch(72% 0.20 145); }
-    .wx-verdict.caut { background: oklch(24% 0.10 75);  color: oklch(78% 0.18 75);  }
-    .wx-verdict.nogo { background: oklch(22% 0.10 25);  color: oklch(70% 0.18 25);  }
-    .wx-cat { font-size: 11px; opacity: 0.7; }
-    .wx-rows { display: flex; flex-direction: column; gap: 0; }
-    .wx-row { display: flex; align-items: baseline; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
-    .wx-row:last-child { border-bottom: none; }
-    .wx-lbl { color: var(--muted); font-size: 11px; width: 68px; flex-shrink: 0; }
-    .wx-val { color: var(--body-text); flex: 1; }
-    .wx-sub { color: var(--faint); font-size: 11px; }
-    .wx-age { font-size: 11px; color: var(--faint); margin-top: 10px; }
+    /* ── Weather card ───────────────────────────────────────── */
+    .wx-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--rule); }
+    .wx-header-left { flex:1; min-width:0; }
+    .wx-airport { font-size:15px; font-weight:600; color:var(--champagne); }
+    .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:3px; }
+    .wx-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .wx-verdict { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.04em; }
+    .wx-verdict.go   { background:oklch(22% 0.09 145); color:oklch(74% 0.20 145); }
+    .wx-verdict.caut { background:oklch(25% 0.10 75);  color:oklch(82% 0.18 75);  }
+    .wx-verdict.nogo { background:oklch(22% 0.10 25);  color:oklch(72% 0.18 25);  }
+    .wx-cat-pill { display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; letter-spacing:.04em; }
+    .wx-cat-pill.VFR  { background:oklch(22% 0.06 145); color:oklch(65% 0.16 145); }
+    .wx-cat-pill.MVFR { background:oklch(22% 0.06 235); color:oklch(65% 0.15 235); }
+    .wx-cat-pill.IFR  { background:oklch(22% 0.08 25);  color:oklch(65% 0.17 25);  }
+    .wx-cat-pill.LIFR { background:oklch(22% 0.08 330); color:oklch(65% 0.17 330); }
+    .wx-body { display:grid; grid-template-columns:140px 1fr 1fr; gap:0; }
+    @media (max-width:680px) { .wx-body { grid-template-columns:1fr; } }
+    .wx-col { padding:0 20px; border-right:1px solid var(--rule); }
+    .wx-col:first-child { padding-left:0; }
+    .wx-col:last-child  { border-right:none; padding-right:0; }
+    .wx-col-title { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:10px; }
+    .wx-row { display:flex; gap:6px; padding:5px 0; border-bottom:1px solid var(--rule); align-items:baseline; font-size:13px; }
+    .wx-row:last-child { border-bottom:none; }
+    .wx-lbl { color:var(--muted); font-size:11px; width:80px; flex-shrink:0; }
+    .wx-val { color:var(--body-text); flex:1; }
+    .wx-sub { color:var(--faint); font-size:11px; }
+    .wx-footer { display:flex; align-items:center; gap:0; margin-top:14px; padding-top:12px; border-top:1px solid var(--rule); flex-wrap:wrap; }
+    .wx-footer-link { font-size:12px; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-right:1px solid var(--rule); }
+    .wx-footer-link:first-child { padding-left:0; }
+    .wx-footer-link:hover { color:var(--champagne); }
+    .wx-raw { font-size:10px; color:var(--faint); font-family:var(--mono,monospace); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:10px; }
+    .wx-notam-count { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:1px 6px; border-radius:3px; font-size:10px; font-weight:700; margin-left:4px; }
+    .wx-age { font-size:11px; color:var(--faint); }
 
     /* currency */
     .cur-rows { display: flex; flex-direction: column; gap: 0; }
@@ -1033,12 +1053,12 @@
           <div id="readiness-card" class="ov-card skel" style="min-height:88px"></div>
         </div>
 
-        <!-- Flight status row -->
+        <!-- Flight status -->
         <div class="section">
-          <div class="ov-grid">
-            <div id="weather-card" class="ov-card skel" style="min-height:180px"></div>
-            <div id="currency-card" class="ov-card skel" style="min-height:180px"></div>
-          </div>
+          <div id="weather-card" class="ov-card skel" style="min-height:220px"></div>
+        </div>
+        <div class="section" style="margin-top:0;padding-top:0">
+          <div id="currency-card" class="ov-card skel" style="min-height:100px"></div>
         </div>
 
         <!-- Trend charts 2×2 -->
@@ -1465,89 +1485,253 @@ function renderReadiness(activities, daily) {
 // ─── weather widget ───────────────────────────────────────────────────────────
 async function loadWeatherWidget() {
   const icao = localStorage.getItem('home-airport') || 'KRHV';
-  renderWeatherCard(null, null, icao, true); // loading state
+  document.getElementById('weather-card').innerHTML =
+    `<div class="ov-card-hd">${esc(icao)} Weather</div><div class="skel" style="height:180px;border-radius:6px"></div>`;
   try {
-    const res = await fetch(`/api/external/metar/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null);
-    renderWeatherCard(res?.metar || null, res?.source || null, icao, false);
+    const [metarRes, airportRes, notamRes] = await Promise.allSettled([
+      fetch(`/api/external/metar/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
+      fetch(`/api/external/airport/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
+      fetch(`/api/external/notam/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{count:0,notams:[]}),
+    ]);
+    renderWeatherCard(
+      metarRes.value?.metar || null,
+      airportRes.value || null,
+      notamRes.value || {count:0,notams:[]},
+      icao
+    );
   } catch(_) {
-    renderWeatherCard(null, null, icao, false);
+    renderWeatherCard(null, null, {count:0,notams:[]}, icao);
   }
 }
 
-function renderWeatherCard(metar, source, icao, loading) {
+function windCompassSvg(wdir, wspd, wgst, rwyHdg) {
+  const R = 48, size = 120;
+  const isCalm = !wspd || wspd < 2;
+  const isVRB  = wdir === 'VRB' || wdir == null;
+
+  // Tick marks
+  const ticks = Array.from({length:36},(_,i) => {
+    const a = i*10*Math.PI/180;
+    const o = R, inn = i%9===0?R-8:i%3===0?R-5:R-3;
+    const sw = i%9===0?1.5:0.8;
+    return `<line x1="${+(Math.sin(a)*o).toFixed(2)}" y1="${+(-Math.cos(a)*o).toFixed(2)}" x2="${+(Math.sin(a)*inn).toFixed(2)}" y2="${+(-Math.cos(a)*inn).toFixed(2)}" stroke="var(--rule)" stroke-width="${sw}"/>`;
+  }).join('');
+
+  // Runway rectangle
+  const rwy = rwyHdg != null ? `
+    <g transform="rotate(${rwyHdg})">
+      <rect x="-5" y="${-R+5}" width="10" height="${(R-5)*2}" fill="oklch(28% 0.05 85)" stroke="oklch(52% 0.10 85)" stroke-width="1" rx="2"/>
+      <line x1="0" y1="${-R+5}" x2="0" y2="${R-5}" stroke="oklch(52% 0.10 85)" stroke-width="0.7" stroke-dasharray="5 3"/>
+      <text y="${-R-4}" text-anchor="middle" fill="oklch(52% 0.10 85)" font-size="7" font-family="Albert Sans,sans-serif">${Math.round(rwyHdg/10).toString().padStart(2,'0')}</text>
+      <text y="${R+11}" text-anchor="middle" fill="oklch(52% 0.10 85)" font-size="7" font-family="Albert Sans,sans-serif">${Math.round(((rwyHdg+180)%360)/10).toString().padStart(2,'0')}</text>
+    </g>` : '';
+
+  // Wind indicator
+  let windEl;
+  if (isCalm) {
+    windEl = `<circle r="6" fill="none" stroke="oklch(65% 0.16 145)" stroke-width="2"/>
+              <circle r="2.5" fill="oklch(65% 0.16 145)"/>`;
+  } else if (isVRB) {
+    windEl = [0,90,180,270].map(a=>`<g transform="rotate(${a})">
+      <line x1="0" y1="18" x2="0" y2="-20" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"/>
+      <polygon points="0,-26 -4,-19 4,-19" fill="var(--muted)"/>
+    </g>`).join('');
+  } else {
+    windEl = `<g transform="rotate(${wdir})">
+      <line x1="0" y1="10" x2="0" y2="-31" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+      <polygon points="0,-40 -6,-29 6,-29" fill="white"/>
+      ${wgst?`<circle r="4" cx="0" cy="14" fill="none" stroke="oklch(80% 0.18 75)" stroke-width="1.5"/>`:''}
+    </g>`;
+  }
+
+  const spd = isCalm
+    ? `<text text-anchor="middle" y="4" fill="oklch(65% 0.16 145)" font-size="9" font-family="Albert Sans,sans-serif">calm</text>`
+    : `<text text-anchor="middle" y="3" fill="white" font-size="13" font-weight="700" font-family="Albert Sans,sans-serif">${wspd}</text>
+       <text text-anchor="middle" y="14" fill="var(--faint)" font-size="8" font-family="Albert Sans,sans-serif">kt${wgst?' G'+wgst:''}</text>`;
+
+  return `<svg width="${size}" height="${size}" viewBox="${-size/2} ${-size/2} ${size} ${size}" style="overflow:visible;flex-shrink:0">
+    <circle r="${R}" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
+    ${ticks}
+    <text text-anchor="middle" y="${-R-6}" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">N</text>
+    <text text-anchor="middle" y="${R+13}" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">S</text>
+    <text x="${-R-10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">W</text>
+    <text x="${R+10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">E</text>
+    ${rwy}
+    ${windEl}
+    ${spd}
+  </svg>`;
+}
+
+function parseMetarObsTime(rawOb) {
+  const m = rawOb?.match(/\b(\d{2})(\d{2})(\d{2})Z\b/);
+  if (!m) return null;
+  const now = new Date();
+  const obs = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), +m[1], +m[2], +m[3]));
+  if (obs > now) obs.setUTCMonth(obs.getUTCMonth()-1);
+  return obs;
+}
+
+function renderWeatherCard(metar, airport, notamData, icao) {
   const el = document.getElementById('weather-card');
-  if (loading) { el.innerHTML = `<div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i></button></div><div class="skel" style="height:140px;border-radius:6px"></div>`; return; }
+
+  // ── Airport header info ─────────────────────────────────────────────────────
+  const aptName = airport?.name || icao;
+  const aptCity = airport ? `${airport.city || ''}, ${airport.state || ''}`.replace(/^, |, $/g,'') : '';
+  const aptElev = airport?.elev != null ? `${airport.elev} ft MSL` : '';
+  const aptCoord = airport ? `${Math.abs(+airport.lat).toFixed(2)}°${airport.lat>=0?'N':'S'} ${Math.abs(+airport.lon).toFixed(2)}°${airport.lon>=0?'E':'W'}` : '';
+  const aptMeta = [aptCity, aptElev, aptCoord].filter(Boolean).join(' · ');
 
   if (!metar) {
-    el.innerHTML = `<div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i></button></div><div style="color:var(--faint);font-size:13px;padding:8px 0">Weather data unavailable</div>`;
+    el.innerHTML = `
+      <div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()" style="font-size:11px;color:var(--faint);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-left:auto"><i class="ph-bold ph-pencil-simple"></i> edit</button></div>
+      <div class="wx-header"><div class="wx-header-left"><div class="wx-airport">${esc(aptName)}</div><div class="wx-airport-meta">${esc(aptMeta)}</div></div></div>
+      <div style="color:var(--faint);font-size:13px;padding:8px 0">Weather data unavailable</div>`;
     return;
   }
 
-  const cat    = (metar.fltcat || '').toUpperCase() || (metar.rawOb?.match(/\b(VFR|MVFR|IFR|LIFR)\b/)?.[0] || 'VFR');
+  // ── Parse METAR fields ──────────────────────────────────────────────────────
+  const raw    = metar.rawOb || metar.raw || '';
+  const cat    = (metar.fltcat||'').toUpperCase() || 'VFR';
   const wdir   = metar.wdir;
   const wspd   = metar.wspd || 0;
-  const wgst   = metar.wgst;
+  const wgst   = metar.wgst || null;
   const vis    = metar.visib;
   const ceil   = metar.ceil;
   const temp   = metar.temp;
   const dewp   = metar.dewp;
-  const altim  = metar.altim;
-  const obsTime = metar.obsTime || metar.observation_time;
+  const altimHpa = metar.altim;
+  const altimInhg = altimHpa ? (altimHpa / 33.8639).toFixed(2) : null;
 
-  // Crosswind at KRHV (runways 133°/313°)
-  let xwind = null;
+  // Obs time from rawOb (fixes the parse bug)
+  const obsDate = parseMetarObsTime(raw) || (metar.obsTime ? new Date(metar.obsTime) : null);
+  let ageStr = '';
+  if (obsDate && !isNaN(obsDate)) {
+    const mins = Math.round((Date.now() - obsDate.getTime()) / 60000);
+    ageStr = mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
+  }
+
+  // ── Derived values ──────────────────────────────────────────────────────────
+  // Crosswind at KRHV (runways 133°/313°) — computed for home airport runways
+  let xwind = null, headwind = null;
   if (typeof wdir === 'number' && wspd) {
-    const angles = [133, 313].map(r => { let a=Math.abs(wdir-r); return a>180?360-a:a; });
-    xwind = Math.round(wspd * Math.sin(Math.min(...angles) * Math.PI/180));
+    const rwyHeadings = [133, 313];
+    let minAngle = 180;
+    let bestHead = 0;
+    for (const h of rwyHeadings) {
+      let a = Math.abs(wdir - h); if (a > 180) a = 360 - a;
+      if (a < minAngle) { minAngle = a; bestHead = h; }
+    }
+    xwind   = Math.round(Math.abs(wspd * Math.sin(minAngle * Math.PI / 180)));
+    headwind= Math.round(wspd * Math.cos(minAngle * Math.PI / 180));
   }
 
-  // GO / CAUTION / NO-GO
+  // Density altitude
+  let da = null;
+  if (airport?.elev != null && altimHpa && temp != null) {
+    const altimIhg = altimHpa / 33.8639;
+    const pa = airport.elev + (29.92 - altimIhg) * 1000;
+    const isa = 15 - 2 * (pa / 1000);
+    da = Math.round(pa + 118.8 * (temp - isa));
+  }
+
+  // ── Go/No-Go verdict ────────────────────────────────────────────────────────
   let verdict, verdictClass;
-  if (cat==='LIFR'||cat==='IFR') {
-    verdict='NO-GO'; verdictClass='nogo';
-  } else if (cat==='MVFR'||(xwind!==null&&xwind>10)||(wgst&&wgst>25)) {
-    verdict='CAUTION'; verdictClass='caut';
-  } else {
-    verdict='GO'; verdictClass='go';
-  }
+  const xwindHigh = xwind !== null && xwind > 10;
+  const gusty = wgst && wgst > 20;
+  if (cat === 'LIFR' || cat === 'IFR') { verdict = 'NO-GO';   verdictClass = 'nogo'; }
+  else if (cat === 'MVFR' || xwindHigh || gusty) { verdict = 'CAUTION'; verdictClass = 'caut'; }
+  else { verdict = 'GO';     verdictClass = 'go'; }
 
-  // Age of obs
-  let ageStr='';
-  if (obsTime) {
-    const mins = Math.round((Date.now()-new Date(obsTime).getTime())/60000);
-    ageStr = mins<2?'just now':mins<60?`${mins} min ago`:`${Math.round(mins/60)}h ago`;
-  }
+  // ── Formatted strings ───────────────────────────────────────────────────────
+  const windLine  = wdir === 'VRB'   ? `Variable ${wspd} kt` :
+                    typeof wdir==='number' ? `${String(wdir).padStart(3,'0')}° at ${wspd} kt${wgst ? ` · gust ${wgst} kt` : ''}` :
+                    wspd === 0         ? 'Calm' : '—';
+  const xwindLine = xwind !== null ? `${xwind} kt crosswind${headwind!==null ? ` · ${Math.abs(headwind)} kt ${headwind>=0?'head':'tail'}wind` : ''}` : '';
+  const visLine   = vis ? (String(vis)==='10+'?'10+ SM':`${vis} SM`) : '—';
+  const ceilLine  = ceil ? `${ceil.toLocaleString()} ft AGL` : cat === 'VFR' ? 'Clear / Unlimited' : '—';
+  const spreadVal = temp != null && dewp != null ? temp - dewp : null;
+  const spreadLine = spreadVal != null ? `${temp}° / ${dewp}° C · ${spreadVal}° spread${spreadVal <= 3 ? ' · fog risk' : ''}` : '—';
+  const altLine   = altimInhg ? `${altimInhg} inHg (${Math.round(altimHpa)} hPa)` : '—';
+  const daLine    = da != null ? `${da > 0 ? '+' : ''}${(da - (airport?.elev||0)).toLocaleString()} ft above field (${da.toLocaleString()} ft MSL)` : '—';
 
-  const windStr = wdir==='VRB'?`Variable ${wspd} kt`:
-    typeof wdir==='number'?`${String(wdir).padStart(3,'0')}° at ${wspd} kt${wgst?` (gust ${wgst})`:''}`:
-    wspd===0?'Calm':'—';
-  const visStr  = vis ? (String(vis)==='10+'?'10+ SM':`${vis} SM`) : '—';
-  const ceilStr = ceil ? `${ceil.toLocaleString()} ft` : (cat==='VFR'?'Clear':'—');
-  const spreadStr = (temp!=null&&dewp!=null) ? `${temp}° / ${dewp}° C (${temp-dewp}° spread${(temp-dewp)<3?' · fog risk':''})` : '—';
-  const altStr  = altim ? `${(+altim).toFixed(2)} inHg` : '—';
+  // NOTAM count badge
+  const nCount = notamData?.count || 0;
+  const nBadge = nCount > 0 ? `<span class="wx-notam-count">${nCount}</span>` : '';
+
+  // ── Compass SVG ─────────────────────────────────────────────────────────────
+  // KRHV runway heading from airport (or derive from icao)
+  const compass = windCompassSvg(wdir, wspd, wgst, 313);
 
   el.innerHTML = `
-    <div class="ov-card-hd">${esc(icao)} Weather <button onclick="editHomeAirport()"><i class="ph-bold ph-pencil-simple"></i> edit</button></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <span class="wx-verdict ${verdictClass}"><i class="ph-bold ph-${verdict==='GO'?'check-circle':verdict==='CAUTION'?'warning':'x-circle'}"></i> ${verdict}</span>
-      <span class="wx-cat">${cat}</span>
+    <div class="ov-card-hd" style="display:flex;align-items:center">
+      <span>Airport Brief</span>
+      <button onclick="editHomeAirport()" style="font-size:11px;color:var(--faint);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-left:auto;letter-spacing:0;text-transform:none"><i class="ph-bold ph-pencil-simple"></i> ${esc(icao)}</button>
     </div>
-    <div class="wx-rows">
-      <div class="wx-row"><span class="wx-lbl">Wind</span><span class="wx-val">${windStr}${xwind!==null?` <span class="wx-sub">· ${xwind} kt xwind</span>`:''}</span></div>
-      <div class="wx-row"><span class="wx-lbl">Visibility</span><span class="wx-val">${visStr}</span></div>
-      <div class="wx-row"><span class="wx-lbl">Ceiling</span><span class="wx-val">${ceilStr}</span></div>
-      <div class="wx-row"><span class="wx-lbl">Temp / DP</span><span class="wx-val">${spreadStr}</span></div>
-      <div class="wx-row"><span class="wx-lbl">Altimeter</span><span class="wx-val">${altStr}</span></div>
+
+    <div class="wx-header">
+      <div class="wx-header-left">
+        <div class="wx-airport">${esc(aptName)}</div>
+        <div class="wx-airport-meta">${esc(aptMeta)}</div>
+        <div class="wx-pills">
+          <span class="wx-verdict ${verdictClass}"><i class="ph-bold ph-${verdict==='GO'?'check-circle':verdict==='CAUTION'?'warning-circle':'x-circle'}"></i> ${verdict}</span>
+          <span class="wx-cat-pill ${cat}">${cat}</span>
+          ${ageStr?`<span class="wx-age">obs ${ageStr}</span>`:''}
+        </div>
+      </div>
     </div>
-    ${ageStr?`<div class="wx-age">Obs ${ageStr}${source==='mesonet'?' · Mesonet':''}</div>`:''}
+
+    <div class="wx-body">
+      <!-- Column 1: Wind compass -->
+      <div class="wx-col" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        ${compass}
+        <div style="text-align:center;line-height:1.5">
+          <div style="font-size:12px;color:var(--body-text)">${windLine}</div>
+          ${xwindLine?`<div class="wx-sub">${xwindLine}</div>`:''}
+        </div>
+      </div>
+
+      <!-- Column 2: Sky conditions -->
+      <div class="wx-col">
+        <div class="wx-col-title">Conditions</div>
+        <div class="wx-row"><span class="wx-lbl">Ceiling</span><span class="wx-val">${ceilLine}</span></div>
+        <div class="wx-row"><span class="wx-lbl">Visibility</span><span class="wx-val">${visLine}</span></div>
+        <div class="wx-row"><span class="wx-lbl">Temp / DP</span><span class="wx-val">${spreadLine}</span></div>
+        <div class="wx-row"><span class="wx-lbl">Altimeter</span><span class="wx-val">${altLine}</span></div>
+        <div class="wx-row"><span class="wx-lbl">Density Alt</span><span class="wx-val">${daLine}</span></div>
+      </div>
+
+      <!-- Column 3: Airport + links -->
+      <div class="wx-col">
+        <div class="wx-col-title">Airport</div>
+        ${airport?.elev!=null?`<div class="wx-row"><span class="wx-lbl">Elevation</span><span class="wx-val">${airport.elev} ft MSL</span></div>`:''}
+        <div class="wx-row" style="border-bottom:none;padding-top:10px">
+          <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+            <a class="wx-footer-link" style="padding:0;border:none" href="https://notams.aim.faa.gov/notamSearch/nsapp.html#/" target="_blank" rel="noopener">
+              <i class="ph-bold ph-warning"></i> NOTAMs ${nBadge}
+            </a>
+            <a class="wx-footer-link" style="padding:0;border:none" href="https://tfr.faa.gov/tfr2/list.jsp" target="_blank" rel="noopener">
+              <i class="ph-bold ph-airplane"></i> TFRs
+            </a>
+            <a class="wx-footer-link" style="padding:0;border:none" href="https://www.airnav.com/airport/${esc(icao)}" target="_blank" rel="noopener">
+              <i class="ph-bold ph-info"></i> AirNav ${esc(icao)}
+            </a>
+            <a class="wx-footer-link" style="padding:0;border:none" href="https://aviationweather.gov/taf/board?ids=${esc(icao)}" target="_blank" rel="noopener">
+              <i class="ph-bold ph-cloud"></i> TAF forecast
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${raw?`<div class="wx-footer"><div class="wx-raw">${esc(raw)}</div></div>`:''}
   `;
 }
 
 function editHomeAirport() {
   const cur = localStorage.getItem('home-airport') || 'KRHV';
-  const input = prompt('Home airport ICAO:', cur);
-  if (input && /^[A-Za-z0-9]{3,4}$/.test(input.trim())) {
-    localStorage.setItem('home-airport', input.trim().toUpperCase());
+  const val = prompt('Home airport ICAO (3–4 characters):', cur);
+  if (val && /^[A-Za-z0-9]{3,4}$/.test(val.trim())) {
+    localStorage.setItem('home-airport', val.trim().toUpperCase());
     loadWeatherWidget();
   }
 }

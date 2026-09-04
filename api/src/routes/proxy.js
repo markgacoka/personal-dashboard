@@ -290,4 +290,30 @@ export default async function proxyRoutes(fastify) {
       return reply.status(502).send({ error: e.message || 'METAR unavailable' })
     }
   })
+
+  // ── NOTAMs via Aviation Weather Center ────────────────────────────────────────
+  fastify.get('/api/external/notam/:icao', async (req, reply) => {
+    const icao = req.params.icao.toUpperCase()
+    try {
+      const r = await xfetch(`https://aviationweather.gov/api/data/notam?ids=${icao}&format=json`, 10000)
+      if (!r.ok) return reply.status(200).send({ notams: [], count: 0, icao })
+      const data = await r.json()
+      const notams = Array.isArray(data) ? data : []
+      // Return first 10 with key fields only
+      return {
+        notams: notams.slice(0, 10).map(n => ({
+          id:       n.notamID || n.id,
+          type:     n.type,
+          text:     n.traditionalMessage || n.icaoMessage || n.text || '',
+          startDate: n.effectiveStart || n.startDate,
+          endDate:   n.effectiveEnd   || n.endDate,
+        })),
+        count: notams.length,
+        icao,
+      }
+    } catch (e) {
+      fastify.log.warn({ icao, err: e.message }, 'NOTAM lookup failed')
+      return reply.status(200).send({ notams: [], count: 0, icao })
+    }
+  })
 }

@@ -3554,7 +3554,7 @@ async function openRoutePicker(flightId) {
   const overlay = document.getElementById('route-picker-overlay');
   const bd = document.getElementById('route-picker-bd');
   overlay.style.display = 'flex';
-  bd.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+  bd.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Checking Gmail schedule…</div></div>';
 
   const f = (window._flights || []).find(x => String(x.id) === String(flightId));
   if (!f) { closeRoutePicker(); return; }
@@ -3563,7 +3563,6 @@ async function openRoutePicker(flightId) {
   const dateStr = String(f.date).slice(0, 10);
   const depIcao = f.departure?.icao || 'KRHV';
   const tail = f.aircraft?.tail_number || '';
-  const logDurMin = Math.round(parseFloat(f.total_duration || 0) * 60);
 
   if (!hex) {
     bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">
@@ -3574,17 +3573,9 @@ async function openRoutePicker(flightId) {
   }
 
   try {
-    // Fetch ADS-B candidates and NICE AIR Gmail schedules in parallel
-    const [adsRes, gmailRes] = await Promise.allSettled([
-      fetch(`/api/external/flights-detected?departure=${encodeURIComponent(depIcao)}&date=${dateStr}&icao24=${hex}`)
-        .then(r => r.ok ? r.json() : { flights: [] }),
-      fetch('/api/gmail/nice-air').then(r => r.ok ? r.json() : { schedules: [] }),
-    ]);
-    const candidates = adsRes.status === 'fulfilled' ? (adsRes.value.flights || []) : [];
-    const schedules  = gmailRes.status === 'fulfilled' ? (gmailRes.value.schedules || []) : [];
-
-    // Find the best matching NICE AIR schedule for this flight:
-    // same date + same aircraft, last non-cancelled entry wins
+    // Find the matching NICE AIR Gmail schedule for exact departure time
+    const gmailRes = await fetch('/api/gmail/nice-air').then(r => r.ok ? r.json() : { schedules: [] }).catch(() => ({ schedules: [] }));
+    const schedules = gmailRes.schedules || [];
     const tailShort = tail.replace(/^N/, '');
     const matched = schedules
       .filter(s => s.date_str === dateStr && (s.tail === tail || s.tail === tailShort || s.tail.replace(/^N/,'') === tailShort))
@@ -3592,103 +3583,93 @@ async function openRoutePicker(flightId) {
       .sort((a, b) => (b.received || '').localeCompare(a.received || ''));
     const sched = matched[0] || null;
 
-    // Score candidates against the schedule time (if known) and logbook duration
-    function scoreCandidate(c) {
-      let score = 0;
-      if (sched?.start_unix && c.first_seen_unix) {
-        const diffMin = Math.abs(c.first_seen_unix - sched.start_unix) / 60;
-        if (diffMin <= 10) score += 3;
-        else if (diffMin <= 20) score += 2;
-        else if (diffMin <= 40) score += 1;
-      }
-      if (typeof c.duration_min === 'number') {
-        const diff = Math.abs(c.duration_min - logDurMin);
-        if (diff <= 8) score += 2;
-        else if (diff <= 18) score += 1;
-      }
-      return score;
-    }
-
-    const ranked = [...candidates].sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
-    const bestScore = ranked.length ? scoreCandidate(ranked[0]) : 0;
-
-    let schedHtml = '';
-    if (sched) {
-      const cancelCount = schedules.filter(s => s.date_str === dateStr && s.type === 'cancelled' &&
-        (s.tail === tail || s.tail.replace(/^N/,'') === tailShort)).length;
-      schedHtml = `
-        <div style="background:var(--graphite);border:1px solid var(--rule-strong);border-radius:6px;padding:10px 14px;margin-bottom:14px">
-          <div style="font-size:10px;color:var(--patina-text);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">
-            <i class="ph-bold ph-envelope-open"></i> Matched NICE AIR Reservation
-          </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <div><span style="font-size:11px;color:var(--faint)">Aircraft</span><br><span style="font-size:13px;color:var(--champagne)">${esc(sched.tail)}</span></div>
-            <div><span style="font-size:11px;color:var(--faint)">Scheduled start</span><br><span style="font-size:13px;color:var(--champagne)">${esc(sched.start_local||'—')}</span></div>
-            <div><span style="font-size:11px;color:var(--faint)">End</span><br><span style="font-size:13px">${esc(sched.end_local||'—')}</span></div>
-            ${sched.cfi ? `<div><span style="font-size:11px;color:var(--faint)">CFI</span><br><span style="font-size:13px">${esc(sched.cfi)}</span></div>` : ''}
-            ${sched.type === 'changed' ? `<div style="align-self:center"><span style="font-size:11px;color:oklch(80% 0.17 85)">Schedule was modified</span></div>` : ''}
-            ${cancelCount ? `<div style="align-self:center"><span style="font-size:11px;color:var(--warn)">${cancelCount} cancellation(s) on this date</span></div>` : ''}
-          </div>
-        </div>`;
-    }
-
-    if (!ranked.length) {
-      bd.innerHTML = `
-        ${schedHtml}
-        <div style="padding:16px;text-align:center">
-          <div style="font-size:13px;color:var(--muted);margin-bottom:8px">No ADS-B departures found from ${esc(depIcao)} for ${esc(tail)} on ${dateStr}.</div>
-          <div style="font-size:12px;color:var(--faint)">OpenSky retains ~30 days of history on the free tier. Older flights require credentials.</div>
-        </div>`;
+    if (!sched) {
+      bd.innerHTML = `<div style="padding:20px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+          No NICE AIR reservation email found for ${esc(tail)} on ${dateStr}.
+        </div>
+        <div style="font-size:12px;color:var(--faint)">
+          Without the scheduled start time, ADS-B track matching cannot be confirmed with certainty.<br>
+          If you know the approximate departure time, the track can still be attached manually from the logbook admin.
+        </div>
+      </div>`;
       return;
     }
 
-    const rows = ranked.map((c) => {
-      const s = scoreCandidate(c);
-      const depTime = c.departure_time ? new Date(c.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Los_Angeles'}) : '—';
-      const arrTime = c.arrival_time   ? new Date(c.arrival_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Los_Angeles'}) : '—';
-      const durMin = c.duration_min ?? '?';
-      const badge = s >= 4 ? ['✓ best match','var(--patina-text)']
-                  : s >= 2 ? ['~ likely','oklch(80% 0.17 85)']
-                  : s >= 1 ? ['possible','var(--muted)']
-                  : ['', 'var(--faint)'];
-      return `<div style="border:1px solid var(--rule);border-radius:6px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:background 0.12s"
-        onclick="confirmRouteMatch(${flightId}, '${esc(hex)}', ${c.first_seen_unix}, '${esc(c.arrival_icao||'')}', this)"
-        onmouseover="this.style.background='var(--graphite)'" onmouseout="this.style.background=''">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--champagne)">${esc(depIcao)} → ${esc(c.arrival_icao||'?')}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:3px">${depTime} – ${arrTime} PDT · ${durMin} min</div>
-            ${c.callsign ? `<div style="font-size:11px;color:var(--faint);margin-top:2px">Callsign: ${esc(c.callsign)}</div>` : ''}
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            ${badge[0] ? `<div style="font-size:11px;color:${badge[1]}">${badge[0]}</div>` : ''}
-            <div style="font-size:11px;color:var(--faint);margin-top:2px">log: ${logDurMin} min</div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    // Show what we found and auto-attach
+    const cancelCount = schedules.filter(s => s.date_str === dateStr && s.type === 'cancelled' &&
+      (s.tail === tail || s.tail.replace(/^N/,'') === tailShort)).length;
 
     bd.innerHTML = `
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-        Logbook: <strong style="color:var(--champagne)">${esc(tail)}</strong>
-        ${esc(depIcao)}→${esc(f.arrival?.icao||'?')} · ${logDurMin} min · ${dateStr}
+      <div style="background:var(--graphite);border:1px solid var(--rule-strong);border-radius:6px;padding:12px 16px;margin-bottom:16px">
+        <div style="font-size:10px;color:var(--patina-text);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">
+          <i class="ph-bold ph-envelope-open"></i> NICE AIR Reservation Found
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">
+          <div><div style="font-size:11px;color:var(--faint)">Aircraft</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.tail)}</div></div>
+          <div><div style="font-size:11px;color:var(--faint)">Departs</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.start_local||'—')}</div></div>
+          <div><div style="font-size:11px;color:var(--faint)">Returns</div><div style="font-size:13px">${esc(sched.end_local||'—')}</div></div>
+          ${sched.cfi ? `<div><div style="font-size:11px;color:var(--faint)">CFI</div><div style="font-size:13px">${esc(sched.cfi)}</div></div>` : ''}
+        </div>
+        ${sched.type === 'changed' ? `<div style="font-size:11px;color:oklch(80% 0.17 85);margin-top:8px">Schedule was modified — showing final times.</div>` : ''}
+        ${cancelCount ? `<div style="font-size:11px;color:var(--warn);margin-top:4px">${cancelCount} cancellation email(s) also found for this date.</div>` : ''}
       </div>
-      ${schedHtml}
-      <div style="font-size:11px;color:var(--faint);margin-bottom:12px">Select the ADS-B track that matches your flight to save the GPS route.</div>
-      ${rows}
-      <div style="font-size:11px;color:var(--faint);margin-top:10px;text-align:center">
-        ${ranked.length} candidate${ranked.length!==1?'s':''} · sorted by match confidence
+      <div id="rp-status" style="padding:12px;text-align:center">
+        <div class="spinner" style="margin:0 auto 10px"></div>
+        <div style="font-size:12px;color:var(--muted)">Searching ADS-B network for GPS track…</div>
       </div>`;
+
+    // Now query OpenSky using the exact schedule start time as the anchor
+    const adsRes = await fetch(`/api/external/flights-detected?departure=${encodeURIComponent(depIcao)}&date=${dateStr}&icao24=${hex}`)
+      .then(r => r.ok ? r.json() : { flights: [] }).catch(() => ({ flights: [] }));
+    const candidates = adsRes.flights || [];
+
+    // Pick the candidate closest to the scheduled departure time
+    const logDurMin = Math.round(parseFloat(f.total_duration || 0) * 60);
+    let best = null;
+    if (sched.start_unix && candidates.length) {
+      best = candidates.reduce((prev, cur) => {
+        const pd = Math.abs((prev.first_seen_unix || 0) - sched.start_unix);
+        const cd = Math.abs((cur.first_seen_unix || 0) - sched.start_unix);
+        return cd < pd ? cur : prev;
+      });
+      // Reject if more than 45 min off from scheduled time (probably a different flight)
+      if (Math.abs((best.first_seen_unix || 0) - sched.start_unix) > 2700) best = null;
+    }
+
+    const statusEl = document.getElementById('rp-status');
+    if (!statusEl) return;
+
+    if (!best) {
+      const reason = !candidates.length
+        ? 'No departures found in ADS-B data. OpenSky retains ~30 days of free history.'
+        : `${candidates.length} departure(s) found but none within 45 min of scheduled time.`;
+      statusEl.innerHTML = `<div style="font-size:13px;color:var(--muted)">${reason}</div>
+        <div style="font-size:12px;color:var(--faint);margin-top:6px">GPS route could not be attached automatically.</div>`;
+      return;
+    }
+
+    const depTime = best.departure_time ? new Date(best.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Los_Angeles'}) : '—';
+    const diffMin = sched.start_unix ? Math.round(Math.abs((best.first_seen_unix||0) - sched.start_unix)/60) : '?';
+    statusEl.innerHTML = `
+      <div style="border:1px solid var(--patina-text);border-radius:6px;padding:12px 14px;margin-bottom:12px;text-align:left">
+        <div style="font-size:12px;color:var(--patina-text);margin-bottom:6px">ADS-B match found</div>
+        <div style="font-size:13px;color:var(--champagne)">${esc(depIcao)} → ${esc(best.arrival_icao||'?')}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Departed ${depTime} PDT · ${best.duration_min ?? '?'} min · ${diffMin} min from schedule</div>
+      </div>
+      <button onclick="autoAttachTrack(${flightId},'${esc(hex)}',${best.first_seen_unix})"
+        style="background:var(--patina-text);color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:13px;cursor:pointer;font-weight:500;width:100%">
+        Attach GPS Track to Flight
+      </button>`;
   } catch (e) {
     bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">Error: ${esc(e.message)}</div>`;
   }
 }
 
-async function confirmRouteMatch(flightId, icao24, firstSeenUnix, arrivalIcao, rowEl) {
-  rowEl.style.opacity = '0.5';
-  rowEl.style.pointerEvents = 'none';
-  rowEl.innerHTML += '<div style="font-size:11px;color:var(--patina-text);margin-top:6px">Fetching GPS track…</div>';
-
+async function autoAttachTrack(flightId, icao24, firstSeenUnix) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Attaching…';
   try {
     const res = await fetch('/api/external/attach-track', {
       method: 'POST',
@@ -3698,18 +3679,15 @@ async function confirmRouteMatch(flightId, icao24, firstSeenUnix, arrivalIcao, r
 
     if (res.error) throw new Error(res.error);
 
-    // Update local flight record
     const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
     if (fi >= 0) window._flights[fi].has_track = true;
 
     closeRoutePicker();
-    // Refresh the detail view to show the track
     showFlightDetail(flightId);
   } catch (e) {
-    rowEl.style.opacity = '';
-    rowEl.style.pointerEvents = '';
-    rowEl.querySelector('div:last-child')?.remove();
-    rowEl.innerHTML += `<div style="font-size:11px;color:var(--warn);margin-top:6px">Error: ${esc(e.message)}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Attach GPS Track to Flight';
+    btn.insertAdjacentHTML('afterend', `<div style="font-size:12px;color:var(--warn);margin-top:8px">Error: ${esc(e.message)}</div>`);
   }
 }
 

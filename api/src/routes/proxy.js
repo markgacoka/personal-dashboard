@@ -2,6 +2,7 @@
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
 import { pool } from '../db/client.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
+import { fetchNiceAirSchedules } from '../services/gmail.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
 function parseCsvLine(line) {
@@ -509,6 +510,30 @@ export default async function proxyRoutes(fastify) {
       )
     }
     return { success: true, points_saved: insertVals.length, total_points: path.length }
+  })
+
+  // ── NICE AIR schedule emails from Gmail ──────────────────────────────────────
+  // Reads all "NICE AIR" schedule emails and returns parsed reservations.
+  // Cached in memory for 10 min to avoid hammering IMAP on repeated calls.
+  let _niceAirCache = null // { ts, data }
+  fastify.get('/api/gmail/nice-air', async (req, reply) => {
+    try {
+      if (_niceAirCache && Date.now() - _niceAirCache.ts < 600_000) {
+        return { schedules: _niceAirCache.data, source: 'cache' }
+      }
+      const schedules = await fetchNiceAirSchedules()
+      _niceAirCache = { ts: Date.now(), data: schedules }
+      return { schedules, source: 'gmail' }
+    } catch (e) {
+      fastify.log.warn({ err: e.message }, 'NICE AIR Gmail fetch failed')
+      return reply.status(502).send({ error: e.message })
+    }
+  })
+
+  // ── Bust the NICE AIR email cache ─────────────────────────────────────────────
+  fastify.post('/api/gmail/nice-air/refresh', async (req, reply) => {
+    _niceAirCache = null
+    return { ok: true }
   })
 
   // ── TAF via Aviation Weather Center ───────────────────────────────────────────

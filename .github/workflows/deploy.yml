@@ -83,6 +83,9 @@ jobs:
           ls -1dt "${DEPLOY_PATH}/releases"/*/ 2>/dev/null | tail -n +6 | xargs rm -rf || true
           EOF
 
+      - name: Wait for API startup
+        run: sleep 20
+
       - name: Health check
         run: |
           for i in 1 2 3 4 5; do
@@ -92,6 +95,10 @@ jobs:
             sleep 10
           done
           echo "::error::Health check failed after 5 attempts"
+          # Dump container logs to help diagnose crashes
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" \
+            "docker logs current-api-1 --tail 60" 2>&1 || true
           exit 1
 
       - name: Cleanup SSH

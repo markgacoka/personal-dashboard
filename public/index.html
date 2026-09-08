@@ -746,6 +746,66 @@
     }
     .ac-spec-key { font-weight: 500; color: var(--body-text); }
 
+    /* ── Flight detail two-column grid ──────────────────── */
+    .fd-two-col {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+      margin: 0 0 24px;
+      align-items: start;
+    }
+    @media (max-width: 680px) { .fd-two-col { grid-template-columns: 1fr; } }
+
+    /* Aircraft card redesign */
+    .fd-ac-card {
+      background: var(--graphite);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+    }
+    .fd-ac-photo-wrap {
+      width: 100%; aspect-ratio: 16/9;
+      background: var(--raised);
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fd-ac-photo-wrap img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .fd-ac-photo-credit {
+      position: absolute; bottom: 6px; right: 8px;
+      font-size: 10px; color: oklch(90% 0 0 / 0.7);
+      text-shadow: 0 1px 3px oklch(0% 0 0 / 0.8);
+    }
+    .fd-ac-body { padding: 14px 16px; }
+    .fd-ac-reg {
+      font-size: 18px; font-weight: 700;
+      color: var(--patina-text); letter-spacing: 0.04em;
+      margin-bottom: 2px;
+    }
+    .fd-ac-name { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .fd-ac-specs {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px 16px; margin-bottom: 14px;
+    }
+    .fd-ac-spec-label { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-ac-spec-val { font-size: 13px; color: var(--body-text); font-weight: 500; }
+    .fd-perf-section {
+      border-top: 1px solid var(--rule);
+      padding-top: 12px; margin-top: 4px;
+    }
+    .fd-perf-label {
+      font-size: 10px; color: var(--faint); text-transform: uppercase;
+      letter-spacing: 0.06em; margin-bottom: 8px;
+    }
+    .fd-perf-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 8px;
+    }
+    .fd-perf-item { }
+    .fd-pk { font-size: 10px; color: var(--faint); }
+    .fd-pv { font-size: 13px; color: var(--champagne); font-weight: 600; }
+
     .approach-tag {
       display: inline-flex; align-items: center;
       font-size: 12px; font-weight: 400; padding: 3px 10px;
@@ -3429,26 +3489,23 @@ async function showFlightDetail(id) {
   ].filter(Boolean);
 
   const ac = f.aircraft;
-  const acHTML = ac ? `
-    <hr class="detail-rule">
-    <div class="ac-card">
-      <div style="display:flex;gap:14px;align-items:flex-start">
-        <div id="ac-photo-wrap" style="flex-shrink:0;width:120px;height:75px;border-radius:6px;overflow:hidden;background:var(--graphite);display:flex;align-items:center;justify-content:center">
-          <i class="ph-bold ph-airplane" style="font-size:24px;color:var(--disabled)"></i>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="ac-title"><i class="ph-bold ph-airplane-tilt"></i> ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}</div>
-          <div class="ac-specs">
-            ${ac.engine_type ? `<div><span class="ac-spec-key">Engine</span> ${esc(ac.engine_type)}${ac.engine_hp?' ('+ac.engine_hp+' HP)':''}</div>` : ''}
-            ${ac.seats ? `<div><span class="ac-spec-key">Seats</span> ${ac.seats}</div>` : ''}
-            <div><span class="ac-spec-key">IFR</span> ${ac.ifr_equipped?'Equipped':'Not equipped'}</div>
-            ${ac.glass_cockpit ? `<div><span class="ac-spec-key">Avionics</span> Glass cockpit</div>` : ''}
-            ${ac.is_complex ? `<div><span class="ac-spec-key">Complex</span> Yes</div>` : ''}
-            ${ac.notes ? `<div style="grid-column:1/-1;color:var(--muted);font-size:13px;margin-top:4px">${esc(ac.notes)}</div>` : ''}
-          </div>
+  const acCardPlaceholder = ac ? `
+    <div id="fd-ac-card" class="fd-ac-card">
+      <div class="fd-ac-photo-wrap">
+        <i class="ph-bold ph-airplane" style="font-size:32px;color:var(--disabled)"></i>
+      </div>
+      <div class="fd-ac-body">
+        <div class="fd-ac-reg">${esc(ac.tail_number)}</div>
+        <div class="fd-ac-name">${esc(ac.make||'')} ${esc(ac.model||'')}${ac.year ? ' · '+ac.year : ''}</div>
+        <div style="display:flex;align-items:center;gap:6px;color:var(--faint);font-size:12px">
+          <div class="spinner" style="width:12px;height:12px;border-width:2px;flex-shrink:0"></div>
+          Loading aircraft data…
         </div>
       </div>
-    </div>` : '';
+    </div>` : `
+    <div id="fd-ac-card" style="background:var(--graphite);border:1px solid var(--rule);border-radius:var(--r-sm);padding:20px;display:flex;align-items:center;justify-content:center;color:var(--disabled);font-size:12px">
+      No aircraft on record
+    </div>`;
 
   const allMetrics = [
     ['Total',        fmtHrs(f.total_duration),              'var(--champagne)'],
@@ -3510,6 +3567,11 @@ async function showFlightDetail(id) {
       <div id="fd-map"></div>
     </div>
 
+    <div class="fd-two-col">
+      ${acCardPlaceholder}
+      <div id="fd-schedule-wrap"></div>
+    </div>
+
     <div class="section-label" style="margin-bottom:10px">Flight Time Breakdown</div>
     <div class="perf-dl" style="margin-bottom:24px">
       ${allMetrics.map(([l,v,c]) => `<div class="perf-entry">
@@ -3517,8 +3579,6 @@ async function showFlightDetail(id) {
         <span class="perf-val" ${c?`style="color:${c}"`:''}>${esc(String(v))}</span>
       </div>`).join('')}
     </div>
-
-    ${acHTML}
 
     ${(f.approaches&&f.approaches.length) ? `
     <hr class="detail-rule">
@@ -3539,8 +3599,6 @@ async function showFlightDetail(id) {
     ${f.remarks ? `
     <hr class="detail-rule">
     <div class="desc-block">${esc(f.remarks)}</div>` : ''}
-
-    <div id="fd-schedule-wrap"></div>
 
     ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
   `;
@@ -3569,43 +3627,135 @@ async function showFlightDetail(id) {
       const actualOut = fmtLocal(f.time_out);
       const actualIn  = fmtLocal(f.time_in);
       fdSchedWrap.innerHTML = `
-        <hr class="detail-rule">
-        <div class="section-label" style="margin-bottom:10px">NICE AIR Reservation</div>
-        <div style="background:var(--graphite);border:1px solid var(--rule-strong);border-radius:6px;padding:12px 16px;margin-bottom:24px">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
-            <div><div style="font-size:11px;color:var(--faint)">Aircraft</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.tail)}</div></div>
-            <div><div style="font-size:11px;color:var(--faint)">Scheduled Depart</div><div style="font-size:13px">${esc(schedOut)} PT</div></div>
-            <div><div style="font-size:11px;color:var(--faint)">Scheduled Return</div><div style="font-size:13px">${esc(schedIn)} PT</div></div>
-            ${sched.cfi ? `<div><div style="font-size:11px;color:var(--faint)">CFI</div><div style="font-size:13px">${esc(sched.cfi)}</div></div>` : ''}
-            ${actualOut ? `<div><div style="font-size:11px;color:var(--faint)">Block Out</div><div style="font-size:13px;color:var(--patina-text)">${esc(actualOut)} PT</div></div>` : ''}
-            ${actualIn  ? `<div><div style="font-size:11px;color:var(--faint)">Block In</div><div style="font-size:13px;color:var(--patina-text)">${esc(actualIn)} PT</div></div>` : ''}
+        <div class="fd-ac-card" style="height:100%">
+          <div style="background:oklch(45% 0.1 188 / 0.12);border-bottom:1px solid var(--rule);padding:10px 16px;display:flex;align-items:center;gap:8px">
+            <i class="ph-bold ph-envelope-open" style="color:var(--patina-text);font-size:14px"></i>
+            <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--patina-text)">NICE AIR Reservation</span>
           </div>
-          ${sched.type === 'changed' ? `<div style="font-size:11px;color:oklch(80% 0.17 85);margin-top:8px">Schedule was modified — showing final reservation times.</div>` : ''}
-          <div style="font-size:11px;color:var(--faint);margin-top:8px">Reservation email only — logbook entry is the source of truth.</div>
+          <div class="fd-ac-body">
+            <div class="fd-ac-specs">
+              <div>
+                <div class="fd-ac-spec-label">Aircraft</div>
+                <div class="fd-ac-spec-val" style="color:var(--champagne)">${esc(sched.tail)}</div>
+              </div>
+              ${sched.cfi ? `<div>
+                <div class="fd-ac-spec-label">CFI</div>
+                <div class="fd-ac-spec-val">${esc(sched.cfi)}</div>
+              </div>` : ''}
+              <div>
+                <div class="fd-ac-spec-label">Sched. Depart</div>
+                <div class="fd-ac-spec-val">${esc(schedOut)} PT</div>
+              </div>
+              <div>
+                <div class="fd-ac-spec-label">Sched. Return</div>
+                <div class="fd-ac-spec-val">${esc(schedIn)} PT</div>
+              </div>
+              ${actualOut ? `<div>
+                <div class="fd-ac-spec-label">Block Out</div>
+                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualOut)} PT</div>
+              </div>` : ''}
+              ${actualIn ? `<div>
+                <div class="fd-ac-spec-label">Block In</div>
+                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualIn)} PT</div>
+              </div>` : ''}
+            </div>
+            ${sched.type === 'changed' ? `<div style="margin-top:10px;font-size:11px;color:oklch(80% 0.17 85)">
+              <i class="ph-bold ph-warning"></i> Schedule was modified — showing final times.
+            </div>` : ''}
+            <div style="margin-top:10px;font-size:11px;color:var(--disabled)">Logbook entry is the source of truth.</div>
+          </div>
         </div>`;
     }
   }
 
-  // Load aircraft photo asynchronously
+  // Load comprehensive aircraft data and render full card
   if (ac?.tail_number) {
-    fetch('/api/external/aircraft-photo/' + encodeURIComponent(ac.tail_number))
+    fetch('/api/external/aircraft/' + encodeURIComponent(ac.tail_number.replace(/^N/i, '')))
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        const wrap = document.getElementById('ac-photo-wrap');
-        if (!wrap) return;
-        const src = d?.thumbnail_large || d?.thumbnail;
-        if (src) {
-          const link = d?.link ? `href="${esc(d.link)}" target="_blank" rel="noopener"` : '';
-          wrap.innerHTML = `<a ${link} style="display:block;width:100%;height:100%">
-            <img src="${esc(src)}" alt="${esc(ac.tail_number)}"
-              style="width:100%;height:100%;object-fit:cover;border-radius:6px"
-              onerror="this.parentElement.parentElement.innerHTML='<i class=\\'ph-bold ph-airplane\\' style=\\'font-size:24px;color:var(--disabled)\\'></i>'">
-          </a>`;
-          if (d?.photographer) {
-            wrap.title = 'Photo: ' + d.photographer;
-          }
-        }
-      }).catch(() => {});
+        const card = document.getElementById('fd-ac-card');
+        if (!card) return;
+
+        const photoUrl = d?.photo_url || null;
+        const photoHtml = photoUrl
+          ? `<div class="fd-ac-photo-wrap">
+               <img src="${esc(photoUrl)}" alt="${esc(ac.tail_number)}"
+                 onerror="this.parentElement.innerHTML='<i class=\\'ph-bold ph-airplane\\' style=\\'font-size:32px;color:var(--disabled)\\'></i>'">
+               ${d?.owner ? `<div class="fd-ac-photo-credit">${esc(d.owner)}</div>` : ''}
+             </div>`
+          : `<div class="fd-ac-photo-wrap">
+               <i class="ph-bold ph-airplane" style="font-size:32px;color:var(--disabled)"></i>
+             </div>`;
+
+        const make  = d?.make  || ac.make  || '';
+        const model = d?.model || ac.model || '';
+        const year  = d?.year  || ac.year  || null;
+        const specRows = [
+          d?.serial       ? ['Serial',    d.serial]                                  : null,
+          d?.engine_type  ? ['Engine',    d.engine_type + (d.engine_hp ? ' · ' + d.engine_hp + ' HP' : '')] : null,
+          d?.category     ? ['Category',  d.category + (d.aircraft_class ? ' / ' + d.aircraft_class : '')] : null,
+          d?.gear_type    ? ['Gear',      d.gear_type.replace(/_/g, ' ')]            : null,
+          d?.seats        ? ['Seats',     String(d.seats)]                           : null,
+          d?.is_complex   ? ['Complex',   'Yes']                                     : null,
+          d?.status       ? ['Status',    d.status]                                  : null,
+          d?.mode_s_hex   ? ['Mode S',    d.mode_s_hex.toUpperCase()]               : null,
+        ].filter(Boolean);
+
+        const p = d?.performance;
+        const perfRows = p ? [
+          ['MTOW',    p.mtow_lbs ? p.mtow_lbs.toLocaleString() + ' lbs' : null],
+          ['Cruise',  p.cruise_ktas ? p.cruise_ktas + ' ktas' : null],
+          ['Ceiling', p.service_ceiling_ft ? (p.service_ceiling_ft/1000).toFixed(0) + ',000 ft' : null],
+          ['Range',   p.range_nm ? p.range_nm + ' nm' : null],
+          ['Fuel',    p.fuel_gal ? p.fuel_gal + ' gal' : null],
+          ['Burn',    p.fuel_burn_gph ? p.fuel_burn_gph + ' gph' : null],
+          ['Vne',     p.vne_kts ? p.vne_kts + ' kts' : null],
+          ['Vno',     p.vno_kts ? p.vno_kts + ' kts' : null],
+          ['Vx',      p.vx_kts  ? p.vx_kts  + ' kts' : null],
+          ['Vy',      p.vy_kts  ? p.vy_kts  + ' kts' : null],
+          ['Vs0',     p.vs0_kts ? p.vs0_kts + ' kts' : null],
+          ['Vs1',     p.vs1_kts ? p.vs1_kts + ' kts' : null],
+          ['Va',      p.va_kts  ? p.va_kts  + ' kts' : null],
+        ].filter(([,v]) => v) : [];
+
+        card.innerHTML = `
+          ${photoHtml}
+          <div class="fd-ac-body">
+            <div class="fd-ac-reg">${esc(ac.tail_number)}</div>
+            <div class="fd-ac-name">${esc(make)} ${esc(model)}${year ? ' · ' + year : ''}</div>
+            ${specRows.length ? `<div class="fd-ac-specs">
+              ${specRows.map(([k,v]) => `<div>
+                <div class="fd-ac-spec-label">${esc(k)}</div>
+                <div class="fd-ac-spec-val">${esc(String(v))}</div>
+              </div>`).join('')}
+            </div>` : ''}
+            ${perfRows.length ? `<div class="fd-perf-section">
+              <div class="fd-perf-label">Performance (POH reference)</div>
+              <div class="fd-perf-grid">
+                ${perfRows.map(([k,v]) => `<div class="fd-perf-item">
+                  <div class="fd-pk">${esc(k)}</div>
+                  <div class="fd-pv">${esc(v)}</div>
+                </div>`).join('')}
+              </div>
+            </div>` : ''}
+          </div>`;
+      }).catch(() => {
+        const card = document.getElementById('fd-ac-card');
+        if (!card) return;
+        // On fetch failure, fall back to basic info from flight record
+        card.innerHTML = `
+          <div class="fd-ac-photo-wrap">
+            <i class="ph-bold ph-airplane" style="font-size:32px;color:var(--disabled)"></i>
+          </div>
+          <div class="fd-ac-body">
+            <div class="fd-ac-reg">${esc(ac.tail_number)}</div>
+            <div class="fd-ac-name">${esc(ac.make||'')} ${esc(ac.model||'')}${ac.year ? ' · '+ac.year : ''}</div>
+            ${ac.engine_type ? `<div class="fd-ac-specs"><div>
+              <div class="fd-ac-spec-label">Engine</div>
+              <div class="fd-ac-spec-val">${esc(ac.engine_type)}${ac.engine_hp ? ' · '+ac.engine_hp+' HP' : ''}</div>
+            </div></div>` : ''}
+          </div>`;
+      });
   }
 }
 

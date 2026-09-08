@@ -1,5 +1,26 @@
 import { pool } from './client.js'
 
+// V10: Remove fabricated remarks and instructor_comments generated during initial import.
+// Logbook data (hours, T/O, landings, dates, aircraft) is preserved. Only the generated
+// narrative text is cleared so the UI only shows data the pilot actually logged.
+export async function migrateV10() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      UPDATE flights SET remarks = NULL
+      WHERE remarks IS NOT NULL
+        AND foreflight_source IS NOT NULL
+        AND foreflight_source NOT IN ('manual')
+    `)
+    await client.query(`
+      UPDATE flights SET instructor_comments = NULL
+      WHERE instructor_comments IS NOT NULL
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V2 migration: additive ForeFlight-aligned columns
 const SCHEMA_V2 = `
 -- Aircraft: ForeFlight classification fields

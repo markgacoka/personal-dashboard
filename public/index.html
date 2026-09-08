@@ -632,6 +632,13 @@
     .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
     .dp-div { width: 1px; background: var(--rule); flex-shrink: 0; }
 
+    .fl-filter-btn {
+      padding: 4px 12px; font-size: 11px; border-radius: 20px; cursor: pointer;
+      border: 1px solid var(--rule-strong); background: transparent; color: var(--muted);
+      font-family: inherit; letter-spacing: 0.03em; transition: all 0.15s;
+    }
+    .fl-filter-btn:hover { border-color: var(--champagne); color: var(--champagne); }
+    .fl-filter-btn.active { border-color: var(--patina-text); color: var(--patina-text); background: oklch(45% 0.1 145 / 0.12); }
     .fl-list {
       border-radius: var(--r-sm); overflow: hidden;
       border: 1px solid var(--rule);
@@ -1374,6 +1381,13 @@
             </button>
           </div>
           <div id="logbook-stats" class="skel" style="height:64px;margin-bottom:16px"></div>
+          <div id="fl-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="fl-filter-btn active" data-filter="all"   onclick="setFlFilter('all')">All</button>
+            <button class="fl-filter-btn"         data-filter="solo"  onclick="setFlFilter('solo')">Solo</button>
+            <button class="fl-filter-btn"         data-filter="dual"  onclick="setFlFilter('dual')">Dual</button>
+            <button class="fl-filter-btn"         data-filter="night" onclick="setFlFilter('night')">Night</button>
+            <button class="fl-filter-btn"         data-filter="xc"    onclick="setFlFilter('xc')">Cross-Country</button>
+          </div>
           <div class="fl-list" id="fl-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
           </div>
@@ -3282,6 +3296,25 @@ function renderLogbookStats(s) {
 
 const FL_PER_PAGE = 20;
 let _flPage = 0;
+let _flFilter = 'all';
+
+function setFlFilter(filter) {
+  _flFilter = filter;
+  _flPage = 0;
+  document.querySelectorAll('.fl-filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.filter === filter)
+  );
+  applyFlFilter();
+}
+
+function applyFlFilter() {
+  let flights = window._flights || [];
+  if (_flFilter === 'solo')  flights = flights.filter(f => (f.solo || 0) > 0 && !(f.dual_received > 0));
+  if (_flFilter === 'dual')  flights = flights.filter(f => (f.dual_received || 0) > 0);
+  if (_flFilter === 'night') flights = flights.filter(f => (f.night || 0) > 0);
+  if (_flFilter === 'xc')    flights = flights.filter(f => (f.cross_country || 0) > 0);
+  renderFlights(flights);
+}
 
 function flPageStep(dir) {
   const total = (window._flights || []).length;
@@ -3503,20 +3536,55 @@ async function showFlightDetail(id) {
       ${f.ipc           ? '<span class="type-badge" style="color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)">IPC</span>'          : ''}
     </div>` : ''}
 
-    ${f.instructor_comments ? `
-    <hr class="detail-rule">
-    <div style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Instructor Notes</div>
-    <div class="desc-block" style="margin-bottom:24px">${esc(f.instructor_comments)}</div>` : ''}
-
     ${f.remarks ? `
     <hr class="detail-rule">
     <div class="desc-block">${esc(f.remarks)}</div>` : ''}
+
+    <div id="fd-schedule-wrap"></div>
 
     ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
   `;
 
   if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
   requestAnimationFrame(() => initFlightDetailMap(f));
+
+  // Populate NICE AIR schedule card (sync from preloaded cache)
+  const fdSchedWrap = document.getElementById('fd-schedule-wrap');
+  if (fdSchedWrap) {
+    const dateStr  = String(f.date).slice(0, 10);
+    const tail     = f.aircraft?.tail_number || '';
+    const tailShort = tail.replace(/^N/, '');
+    const schedules = window._niceAirSchedules || [];
+    const sched = schedules
+      .filter(s => s.date_str === dateStr &&
+        (s.tail === tail || s.tail === tailShort || s.tail.replace(/^N/, '') === tailShort))
+      .filter(s => s.type !== 'cancelled')
+      .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0] || null;
+
+    if (sched) {
+      const schedOut = (sched.start_local || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
+      const schedIn  = (sched.end_local   || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
+      const fmtLocal = iso => iso ? new Date(iso).toLocaleTimeString('en-US',
+        { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' }) : null;
+      const actualOut = fmtLocal(f.time_out);
+      const actualIn  = fmtLocal(f.time_in);
+      fdSchedWrap.innerHTML = `
+        <hr class="detail-rule">
+        <div class="section-label" style="margin-bottom:10px">NICE AIR Reservation</div>
+        <div style="background:var(--graphite);border:1px solid var(--rule-strong);border-radius:6px;padding:12px 16px;margin-bottom:24px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
+            <div><div style="font-size:11px;color:var(--faint)">Aircraft</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.tail)}</div></div>
+            <div><div style="font-size:11px;color:var(--faint)">Scheduled Depart</div><div style="font-size:13px">${esc(schedOut)} PT</div></div>
+            <div><div style="font-size:11px;color:var(--faint)">Scheduled Return</div><div style="font-size:13px">${esc(schedIn)} PT</div></div>
+            ${sched.cfi ? `<div><div style="font-size:11px;color:var(--faint)">CFI</div><div style="font-size:13px">${esc(sched.cfi)}</div></div>` : ''}
+            ${actualOut ? `<div><div style="font-size:11px;color:var(--faint)">Block Out</div><div style="font-size:13px;color:var(--patina-text)">${esc(actualOut)} PT</div></div>` : ''}
+            ${actualIn  ? `<div><div style="font-size:11px;color:var(--faint)">Block In</div><div style="font-size:13px;color:var(--patina-text)">${esc(actualIn)} PT</div></div>` : ''}
+          </div>
+          ${sched.type === 'changed' ? `<div style="font-size:11px;color:oklch(80% 0.17 85);margin-top:8px">Schedule was modified — showing final reservation times.</div>` : ''}
+          <div style="font-size:11px;color:var(--faint);margin-top:8px">Reservation email only — logbook entry is the source of truth.</div>
+        </div>`;
+    }
+  }
 
   // Load aircraft photo asynchronously
   if (ac?.tail_number) {
@@ -3719,7 +3787,10 @@ async function initFlightDetailMap(f) {
     if (coords.length < 2) {
       if (f.departure?.lon) coords.push([f.departure.lon, f.departure.lat]);
       if (f.via_airports) for (const a of f.via_airports) { if (a.lon) coords.push([a.lon, a.lat]); }
-      if (f.arrival?.lon)  coords.push([f.arrival.lon,  f.arrival.lat]);
+      // Only push arrival if it differs from departure (avoid degenerate line for local pattern flights)
+      if (f.arrival?.lon && f.arrival.icao !== f.departure?.icao) {
+        coords.push([f.arrival.lon, f.arrival.lat]);
+      }
     }
 
     if (coords.length >= 2) {
@@ -3734,12 +3805,18 @@ async function initFlightDetailMap(f) {
 
       const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
       _fdMap.fitBounds(bounds, { padding: 56, duration: 600 });
+    } else if (coords.length === 1) {
+      // Local pattern flight — center on the airport at a closer zoom
+      _fdMap.setCenter(coords[0]);
+      _fdMap.setZoom(12);
     }
 
+    // Deduplicate airports so KRHV→KRHV shows one marker, not two overlapping
+    const seen = new Set();
     const apts = [];
-    if (f.departure?.lon) apts.push(f.departure);
-    if (f.via_airports)   f.via_airports.filter(a=>a.lon).forEach(a => apts.push(a));
-    if (f.arrival?.lon)   apts.push(f.arrival);
+    for (const a of [f.departure, ...(f.via_airports||[]), f.arrival]) {
+      if (a?.lon && !seen.has(a.icao)) { seen.add(a.icao); apts.push(a); }
+    }
 
     if (apts.length) {
       _fdMap.addSource('apts', {
@@ -3782,7 +3859,7 @@ function rowConfirmDelete(id) {
         <i class="ph-bold ph-check"></i>
       </button>
       <button class="row-btn" title="Cancel"
-        onclick="event.stopPropagation();renderFlights(window._flights)">
+        onclick="event.stopPropagation();applyFlFilter()">
         <i class="ph-bold ph-x"></i>
       </button>
     </div>`;
@@ -5577,19 +5654,22 @@ function openPlaidLink() {
 
 // ─── load flights ─────────────────────────────────────────────────────────────
 async function loadFlights() {
-  const [statsRes, flightsRes] = await Promise.allSettled([
+  const [statsRes, flightsRes, schedRes] = await Promise.allSettled([
     fetch('/api/stats/logbook').then(r => r.ok ? r.json() : null),
     fetch('/api/flights').then(r => r.ok ? r.json() : []),
+    fetch('/api/gmail/nice-air').then(r => r.ok ? r.json() : { schedules: [] }).catch(() => ({ schedules: [] })),
   ]);
   const stats   = statsRes.status   === 'fulfilled' ? statsRes.value   : null;
   const flights = flightsRes.status === 'fulfilled' ? flightsRes.value : [];
+  const sched   = schedRes.status   === 'fulfilled' ? schedRes.value   : { schedules: [] };
 
   if (stats) renderLogbookStats(stats);
   else document.getElementById('logbook-stats').innerHTML =
     '<div style="color:var(--muted);font-size:13px;padding:14px">Flight data unavailable</div>';
 
   window._flights = Array.isArray(flights) ? flights : [];
-  renderFlights(window._flights);
+  window._niceAirSchedules = sched.schedules || [];
+  applyFlFilter();
   renderFlightCurrency(window._flights);
 }
 

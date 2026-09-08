@@ -228,13 +228,4 @@ export default async function flightRoutes(fastify) {
     `)
     return { ...rows[0], airports_visited: visited[0].airports_visited }
   })
-
-  fastify.get('/api/flights/:id/track', async (req, reply) => {
-    const { rows } = await pool.query(
-      'SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg FROM track_log_points WHERE flight_id=$1 ORDER BY ts',
-      [req.params.id]
-    )
-    if (!rows.length) return reply.status(404).send({ error: 'No track data' })
-    return rows
-  })
 }

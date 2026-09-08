@@ -1,6 +1,7 @@
 // External API proxy — avoids CORS issues and centralises external calls
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
 import { pool } from '../db/client.js'
+import { fetchNotams } from '../services/notam-fetcher.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
 function parseCsvLine(line) {
@@ -356,7 +357,7 @@ export default async function proxyRoutes(fastify) {
         if (ageH <= 48) {
           const hours = Math.min(Math.ceil(ageH) + 3, 48)
           const r = await xfetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=${hours}`)
-          const obs = r.ok ? await r.json() : []
+          const obs = (r.ok && r.status !== 204) ? await r.json() : []
           const list = Array.isArray(obs) ? obs : []
           const best = list.sort((a, b) =>
             Math.abs(new Date(a.obsTime) - ft) - Math.abs(new Date(b.obsTime) - ft)
@@ -376,9 +377,9 @@ export default async function proxyRoutes(fastify) {
         const best2 = obs2.length ? obs2[obs2.length - 1] : null
         return { source: 'mesonet', metar: best2 ? { rawOb: best2.metar, obsTime: best2.valid } : null, icao }
       }
-      // Current METAR
-      const r = await xfetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=2`)
-      const obs = r.ok ? await r.json() : []
+      // Current METAR — 4h window so we catch airports that close at night (tagged LAST)
+      const r = await xfetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=4`)
+      const obs = (r.ok && r.status !== 204) ? await r.json() : []
       return { source: 'awc', metar: (Array.isArray(obs) ? obs[0] : null) || null, icao }
     } catch (e) {
       fastify.log.warn({ icao, time, err: e.message }, 'METAR lookup failed')
@@ -386,29 +387,161 @@ export default async function proxyRoutes(fastify) {
     }
   })
 
-  // ── NOTAMs via Aviation Weather Center ────────────────────────────────────────
+  // ── NOTAMs via AIM NOTAM Search (Playwright + stealth to bypass Akamai)
+  // Falls back to FAA API if FAA_NOTAM_CLIENT_ID / FAA_NOTAM_CLIENT_SECRET are set.
   fastify.get('/api/external/notam/:icao', async (req, reply) => {
     const icao = req.params.icao.toUpperCase()
+
+    // Fast path: FAA NOTAM API when credentials are available
+    const clientId     = process.env.FAA_NOTAM_CLIENT_ID
+    const clientSecret = process.env.FAA_NOTAM_CLIENT_SECRET
+    if (clientId && clientSecret) {
+      try {
+        const ctrl = new AbortController()
+        const tid  = setTimeout(() => ctrl.abort(), 12000)
+        const r = await fetch(
+          `https://external-api.faa.gov/notamapi/v2/notams?icaoLocation=${icao}&pageSize=50`,
+          { signal: ctrl.signal, headers: { client_id: clientId, client_secret: clientSecret, 'User-Agent': 'personal-dashboard/1.0' } }
+        ).finally(() => clearTimeout(tid))
+        if (r.ok) {
+          const data = await r.json()
+          const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : [])
+          return {
+            notams: items.slice(0, 50).map(n => {
+              const core = n.properties?.coreNOTAMData?.notam || n
+              return { id: core.id || n.notamID, type: core.classification || n.type, text: core.text || n.traditionalMessage || '', startDate: core.effectiveStart, endDate: core.effectiveEnd }
+            }),
+            count: data?.totalCount ?? items.length,
+            icao,
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Primary path: headless Chromium → AIM NOTAM Search (bypasses Akamai bot check)
+    const notams = await fetchNotams(icao, fastify.log)
+    if (notams === null) {
+      return reply.status(200).send({ notams: [], count: 0, icao, unavailable: true })
+    }
+    return { notams, count: notams.length, icao }
+  })
+
+  // ── Aircraft photo via Planespotters.net ─────────────────────────────────────
+  fastify.get('/api/external/aircraft-photo/:reg', async (req, reply) => {
+    const reg = req.params.reg.toUpperCase().replace(/[^A-Z0-9]/g, '')
     try {
-      const r = await xfetch(`https://aviationweather.gov/api/data/notam?ids=${icao}&format=json`, 10000)
-      if (!r.ok) return reply.status(200).send({ notams: [], count: 0, icao })
-      const data = await r.json()
-      const notams = Array.isArray(data) ? data : []
-      // Return first 10 with key fields only
+      const r = await xfetch(`https://api.planespotters.net/pub/photos/reg/${encodeURIComponent(reg)}`, 8000)
+      if (!r.ok) return reply.status(404).send({ error: 'No photo found' })
+      const d = await r.json()
+      const photo = Array.isArray(d.photos) ? d.photos[0] : null
+      if (!photo) return reply.status(404).send({ error: 'No photo found' })
       return {
-        notams: notams.slice(0, 10).map(n => ({
-          id:       n.notamID || n.id,
-          type:     n.type,
-          text:     n.traditionalMessage || n.icaoMessage || n.text || '',
-          startDate: n.effectiveStart || n.startDate,
-          endDate:   n.effectiveEnd   || n.endDate,
-        })),
-        count: notams.length,
+        reg,
+        thumbnail: photo.thumbnail?.src || null,
+        thumbnail_large: photo.thumbnail_large?.src || null,
+        link: photo.link || null,
+        photographer: photo.photographer || null,
+      }
+    } catch (e) {
+      return reply.status(502).send({ error: e.message })
+    }
+  })
+
+  // ── Attach OpenSky GPS track to a flight record ───────────────────────────────
+  fastify.post('/api/external/attach-track', async (req, reply) => {
+    const { flight_id, icao24, first_seen_unix } = req.body || {}
+    if (!flight_id || !icao24 || !first_seen_unix) {
+      return reply.status(400).send({ error: 'flight_id, icao24, first_seen_unix required' })
+    }
+    const hex = String(icao24).toLowerCase().replace(/[^0-9a-f]/g, '')
+    const ts  = parseInt(first_seen_unix)
+
+    // Check cache first
+    const cached = await dbQuery(
+      'SELECT path_json FROM opensky_tracks_cache WHERE icao24=$1 AND first_seen_unix=$2',
+      [hex, ts]
+    )
+    let path
+    if (cached?.length) {
+      path = cached[0].path_json
+    } else {
+      let token = null
+      try { token = await getOskyToken() } catch (_) {}
+      const headers = { 'User-Agent': 'personal-dashboard/1.0' }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const r = await fetch(
+        `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(hex)}&time=${ts}`,
+        { headers, signal: AbortSignal.timeout(12000) }
+      )
+      if (r.status === 401 || r.status === 403) {
+        return reply.status(200).send({ error: 'OpenSky historical tracks require credentials. Add OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET to .env.' })
+      }
+      if (!r.ok) return reply.status(200).send({ error: `OpenSky returned ${r.status}` })
+      const d = await r.json()
+      path = (d.path || []).map(([t, lat, lon, alt, trk, grnd]) => ({
+        ts: new Date(t * 1000).toISOString(), lat, lon,
+        alt_ft: alt != null ? Math.round(alt * 3.28084) : null,
+        track: trk, on_ground: grnd,
+      }))
+      if (path.length) {
+        await dbQuery(
+          `INSERT INTO opensky_tracks_cache (icao24, first_seen_unix, callsign, path_json)
+           VALUES ($1, $2, $3, $4) ON CONFLICT (icao24, first_seen_unix) DO NOTHING`,
+          [hex, ts, d.callsign?.trim() || null, JSON.stringify(path)]
+        )
+      }
+    }
+
+    if (!path?.length) {
+      return reply.status(200).send({ error: 'No GPS track points available for this flight. OpenSky may not have retained this track.' })
+    }
+
+    // Delete existing track points for this flight, then insert new ones
+    await dbQuery('DELETE FROM track_log_points WHERE flight_id=$1', [flight_id])
+    const insertVals = path
+      .filter(p => p.lat && p.lon && !p.on_ground)
+      .map((p, i) => `($1, '${p.ts}', ${p.lat}, ${p.lon}, ${p.alt_ft ?? 'NULL'}, NULL, ${p.track ?? 'NULL'}, NULL)`)
+    if (insertVals.length) {
+      await dbQuery(
+        `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+         VALUES ${insertVals.join(',')}`,
+        [flight_id]
+      )
+    }
+    return { success: true, points_saved: insertVals.length, total_points: path.length }
+  })
+
+  // ── TAF via Aviation Weather Center ───────────────────────────────────────────
+  fastify.get('/api/external/taf/:icao', async (req, reply) => {
+    const icao = req.params.icao.toUpperCase()
+    try {
+      const r = await xfetch(`https://aviationweather.gov/api/data/taf?ids=${icao}&format=json`, 10000)
+      if (!r.ok) return { taf: null, icao }
+      const data = await r.json()
+      const raw = Array.isArray(data) ? data[0] : null
+      if (!raw) return { taf: null, icao }
+      return {
+        taf: {
+          raw:       raw.rawTAF || raw.raw || '',
+          issueTime: raw.issueTime || raw.bulletinTime || null,
+          fcsts:     (raw.fcsts || []).map(f => ({
+            type:    f.changeType || f.type || 'FM',
+            from:    f.timeFrom   || f.fcstTimeFrom,
+            to:      f.timeTo     || f.fcstTimeTo,
+            wdir:    f.wdir,
+            wspd:    f.wspd,
+            wgst:    f.wgst,
+            visib:   f.visib,
+            fltcat:  f.fltcat || '',
+            wx:      Array.isArray(f.wx) ? f.wx.join(' ') : (f.wx || ''),
+            clouds:  (f.clouds || []).map(c => `${c.cover}${c.base!=null ? c.base : ''}`).join(' '),
+          })),
+        },
         icao,
       }
     } catch (e) {
-      fastify.log.warn({ icao, err: e.message }, 'NOTAM lookup failed')
-      return reply.status(200).send({ notams: [], count: 0, icao })
+      fastify.log.warn({ icao, err: e.message }, 'TAF lookup failed')
+      return { taf: null, icao }
     }
   })
 }

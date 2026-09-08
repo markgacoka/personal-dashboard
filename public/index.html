@@ -242,10 +242,10 @@
     }
     .icon-btn:hover { color: var(--muted); border-color: var(--rule-strong); }
 
-    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px 22px 36px; }
+    .view-scroller { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 24px 40px; }
     .view { display: none; }
     .view.active { display: block; }
-    .section { margin-top: 14px; }
+    .section { margin-top: 16px; }
     .section-first { margin-top: 0; }
 
     /* ── Card ────────────────────────────────────────────── */
@@ -280,9 +280,9 @@
     .divider { border: none; border-top: 1px solid var(--rule); margin: 24px 0; }
 
     /* ── Grid helpers ────────────────────────────────────── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
-    .flight-row { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; align-items: start; }
+    .flight-row { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; }
     @media (max-width: 900px) { .flight-row { grid-template-columns: 1fr; } }
 
     /* ── Weekly ledger ───────────────────────────────────── */
@@ -322,63 +322,97 @@
     /* ── Overview cards ─────────────────────────────── */
     .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 800px) { .ov-grid { grid-template-columns: 1fr; } }
-    .ov-card { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 12px 14px; }
-    .ov-card-hd { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .ov-card { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 16px 18px; }
+    .ov-card-hd { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .ov-card-hd button { font-size: 11px; color: var(--faint); background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; }
     .ov-card-hd button:hover { color: var(--champagne); }
 
     /* ── Weather card ───────────────────────────────────────── */
-    .wx-header { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+    .wx-header { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--rule); }
     .wx-header-left { flex:1; min-width:0; }
-    .wx-airport { font-size:13px; font-weight:600; color:var(--champagne); }
-    .wx-airport-meta { font-size:11px; color:var(--muted); margin-top:2px; }
-    .wx-pills { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
-    .wx-verdict { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.04em; }
-    .wx-verdict.go   { background:oklch(19% 0.05 155); color:oklch(70% 0.11 155); }
-    .wx-verdict.caut { background:oklch(21% 0.06 70);  color:oklch(74% 0.11 70);  }
-    .wx-verdict.nogo { background:oklch(19% 0.05 20);  color:oklch(68% 0.09 20);  }
-    .wx-cat-pill { display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; letter-spacing:.04em; }
-    .wx-cat-pill.VFR  { background:oklch(18% 0.03 145); color:oklch(66% 0.09 145); }
-    .wx-cat-pill.MVFR { background:oklch(18% 0.03 225); color:oklch(66% 0.08 225); }
-    .wx-cat-pill.IFR  { background:oklch(18% 0.04 20);  color:oklch(66% 0.09 20);  }
-    .wx-cat-pill.LIFR { background:oklch(18% 0.04 330); color:oklch(66% 0.08 330); }
-    .wx-body { display:grid; grid-template-columns:140px 1fr 1fr; gap:0; }
-    @media (max-width:680px) { .wx-body { grid-template-columns:1fr; } }
-    .wx-col { padding:0 14px; border-right:1px solid var(--rule); }
+    .wx-airport { font-size:18px; font-weight:300; color:var(--champagne); font-family:'Alumni Sans',sans-serif; letter-spacing:0.01em; line-height:1.15; }
+    .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:4px; }
+    .wx-pills { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .wx-verdict { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.05em; }
+    .wx-verdict.go   { background:oklch(16% 0.05 155); color:oklch(72% 0.13 155); border:1px solid oklch(26% 0.07 155); }
+    .wx-verdict.caut { background:oklch(18% 0.06 70);  color:oklch(76% 0.14 70);  border:1px solid oklch(28% 0.09 70); }
+    .wx-verdict.nogo { background:oklch(16% 0.06 20);  color:oklch(70% 0.12 20);  border:1px solid oklch(26% 0.08 20); }
+    .wx-cat-pill { display:inline-block; padding:4px 10px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.05em; }
+    .wx-cat-pill.VFR  { background:oklch(17% 0.04 145); color:oklch(70% 0.11 145); border:1px solid oklch(27% 0.06 145); }
+    .wx-cat-pill.MVFR { background:oklch(17% 0.04 225); color:oklch(70% 0.10 225); border:1px solid oklch(27% 0.06 225); }
+    .wx-cat-pill.IFR  { background:oklch(17% 0.05 20);  color:oklch(70% 0.12 20);  border:1px solid oklch(27% 0.07 20); }
+    .wx-cat-pill.LIFR { background:oklch(17% 0.05 330); color:oklch(70% 0.11 330); border:1px solid oklch(27% 0.07 330); }
+    .wx-body { display:grid; grid-template-columns:185px 1fr 1fr; gap:0; }
+    @media (max-width:760px) { .wx-body { grid-template-columns:1fr; } }
+    .wx-col { padding:0 16px; border-right:1px solid var(--rule); }
     .wx-col:first-child { padding-left:0; }
     .wx-col:last-child  { border-right:none; padding-right:0; }
-    .wx-col-title { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:7px; }
-    .wx-row { display:flex; gap:6px; padding:4px 0; border-bottom:1px solid var(--rule); align-items:baseline; font-size:12px; }
+    .wx-col-title { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:9px; }
+    .wx-row { display:flex; gap:6px; padding:5px 0; border-bottom:1px solid var(--rule); align-items:baseline; font-size:13px; }
     .wx-row:last-child { border-bottom:none; }
-    .wx-lbl { color:var(--muted); font-size:10px; width:70px; flex-shrink:0; }
-    .wx-val { color:var(--body-text); flex:1; font-size:12px; }
-    .wx-sub { color:var(--faint); font-size:10px; }
-    .wx-footer { display:flex; align-items:center; gap:0; margin-top:10px; padding-top:8px; border-top:1px solid var(--rule); flex-wrap:wrap; }
+    .wx-lbl { color:var(--muted); font-size:11px; width:80px; flex-shrink:0; }
+    .wx-val { color:var(--body-text); flex:1; font-size:13px; }
+    .wx-sub { color:var(--faint); font-size:11px; }
+    .wx-footer { display:flex; align-items:center; gap:0; margin-top:12px; padding-top:10px; border-top:1px solid var(--rule); flex-wrap:wrap; }
     .wx-footer-link { font-size:12px; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-right:1px solid var(--rule); }
     .wx-footer-link:first-child { padding-left:0; }
     .wx-footer-link:hover { color:var(--champagne); }
-    .wx-raw { font-size:10px; color:var(--faint); font-family:var(--mono,monospace); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:10px; }
-    .wx-notam-count { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:1px 6px; border-radius:3px; font-size:10px; font-weight:700; margin-left:4px; }
-    .wx-age { font-size:11px; color:var(--faint); }
+    .wx-raw { font-size:11px; color:var(--faint); font-family:var(--mono,monospace); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:10px; }
+    .wx-notam-count { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; margin-left:4px; }
+    .wx-age { font-size:12px; color:var(--faint); }
+    .wx-inline-hdr { font-size:10px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--faint); padding:11px 0 6px; border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:7px; }
+    .wx-inline-hdr .wx-count-badge { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:0; text-transform:none; }
+    .wx-raw-taf { font-size:11px; color:var(--muted); font-family:var(--mono,monospace); padding:8px 0; border-bottom:1px solid var(--rule); white-space:pre-wrap; word-break:break-all; line-height:1.65; }
+    .wx-taf-fcst { display:grid; grid-template-columns:60px 1fr; gap:3px 10px; padding:6px 0; border-bottom:1px solid var(--rule); font-size:12px; align-items:start; }
+    .wx-taf-fcst:last-child { border-bottom:none; }
+    .wx-taf-type { font-size:10px; font-weight:700; letter-spacing:0.07em; color:var(--faint); padding-top:1px; }
+    .wx-taf-time { font-size:11px; color:var(--faint); grid-column:1; }
+    .wx-taf-body { color:var(--body-text); grid-column:2; grid-row:1/3; }
+    .wx-notam-item { padding:9px 0 10px; border-bottom:1px solid var(--rule); font-size:12px; }
+    .wx-notam-item:last-child { border-bottom:none; padding-bottom:4px; }
+    .wx-notam-hdr { display:flex; align-items:center; gap:7px; margin-bottom:5px; flex-wrap:wrap; }
+    .wx-notam-type { font-size:10px; font-weight:700; letter-spacing:0.05em; padding:3px 7px; border-radius:3px; white-space:nowrap; line-height:1.4; }
+    .wx-notam-id { font-size:10px; color:var(--faint); font-family:var(--mono,monospace); }
+    .wx-notam-exp { font-size:10px; color:var(--faint); margin-left:auto; white-space:nowrap; }
+    .wx-notam-txt { color:var(--muted); line-height:1.65; word-break:break-word; font-size:12px; }
+    .wx-links-row { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
+    .wx-ext-link { font-size:12px; color:var(--faint); text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+    .wx-ext-link:hover { color:var(--muted); }
 
     /* currency */
+    .cur-section-hdr { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); padding: 12px 0 5px; border-bottom: 1px solid var(--rule); margin-bottom: 2px; display: flex; align-items: center; gap: 8px; }
+    .cur-section-hdr span { flex: 1; }
     .cur-rows { display: flex; flex-direction: column; gap: 0; }
-    .cur-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+    .cur-row { display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--rule); }
     .cur-row:last-child { border-bottom: none; }
-    .cur-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .cur-name { font-size: 12px; color: var(--body-text); flex: 1; }
-    .cur-badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
-    .cur-days { font-size: 10px; color: var(--faint); white-space: nowrap; }
+    .cur-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .cur-name { font-size: 13px; color: var(--body-text); }
+    .cur-sub  { font-size: 11px; color: var(--faint); margin-top: 2px; }
+    .cur-badge { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 3px; white-space: nowrap; }
+    .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; text-align: right; }
+    /* Medical edit form */
+    .cur-med-form { display: none; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 0 2px; border-top: 1px solid var(--rule); margin-top: 4px; }
+    .cur-med-form.open { display: flex; }
+    .cur-med-sel, .cur-med-date {
+      background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
+      padding: 4px 8px; font-size: 11px; color: var(--body-text); font-family: inherit; cursor: pointer; outline: none;
+    }
+    .cur-med-sel:focus, .cur-med-date:focus { border-color: var(--patina); }
+    .cur-med-toggle {
+      display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); cursor: pointer; user-select: none;
+    }
+    .cur-edit-btn { background: none; border: none; cursor: pointer; color: var(--faint); font-size: 13px; padding: 0 2px; transition: color 0.15s; }
+    .cur-edit-btn:hover { color: var(--muted); }
 
     /* readiness */
 
     /* ── Section label (no eyebrow, just a quiet rule line) ── */
     .section-label {
-      font-size: 11px; font-weight: 500;
-      letter-spacing: 0.08em; text-transform: uppercase;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.10em; text-transform: uppercase;
       color: var(--faint);
-      margin-bottom: 12px;
-      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
     }
     .section-label::after {
       content: '';
@@ -394,42 +428,85 @@
     }
     .act-row {
       border-bottom: 1px solid var(--rule);
+      border-left: 2px solid transparent;
       cursor: pointer;
       transition: background 0.15s;
-      position: relative;
     }
     .act-row:last-child { border-bottom: none; }
     .act-row:hover { background: var(--graphite); }
-    /* Patina left indicator on hover */
-    .act-row::before {
-      content: '';
-      position: absolute; left: 0; top: 0; bottom: 0;
-      width: 1px;
-      background: var(--patina);
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-    .act-row:hover::before { opacity: 1; }
 
-    .act-summary { padding: 12px 18px; display: flex; align-items: center; gap: 14px; }
+    .act-summary { padding: 14px 18px 14px 16px; display: flex; align-items: center; gap: 14px; }
     .act-icon {
-      width: 34px; height: 34px; border-radius: var(--r-md);
+      width: 40px; height: 40px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; font-size: 16px;
+      flex-shrink: 0; font-size: 18px;
     }
+    .act-body { flex: 1; min-width: 0; }
     .act-name {
-      font-size: 13px; font-weight: 500; color: var(--champagne);
+      font-size: 14px; font-weight: 600; color: var(--champagne);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .act-date { font-size: 12px; color: var(--muted); margin-top: 1px; }
-    .act-kpis { margin-left: auto; display: flex; gap: 20px; flex-shrink: 0; align-items: center; }
-    .act-kpi  { text-align: right; }
-    .act-kpi-v {
-      font-size: 13px; font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      color: var(--body-text);
+    .act-meta {
+      font-size: 12px; color: var(--muted); margin-top: 3px;
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
     }
-    .act-kpi-l { font-size: 11px; color: var(--faint); margin-top: 1px; }
+    .act-te {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+      padding: 2px 7px; border-radius: 100px;
+      white-space: nowrap; line-height: 1.4; flex-shrink: 0;
+    }
+    .act-month-hdr {
+      padding: 9px 18px 8px 16px;
+      background: var(--deep);
+      border-bottom: 1px solid var(--rule);
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .act-month-hdr::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+    .act-metrics { display: flex; align-items: center; flex-shrink: 0; }
+    .act-metric { text-align: right; padding: 0 14px; border-left: 1px solid var(--rule); min-width: 62px; }
+    .act-metric:first-child { border-left: none; }
+    .act-metric-v {
+      font-size: 14px; font-weight: 600;
+      font-variant-numeric: tabular-nums; line-height: 1.2;
+    }
+    .act-metric-l {
+      font-size: 10px; color: var(--faint); margin-top: 2px;
+      letter-spacing: 0.04em; white-space: nowrap;
+    }
+    @media (max-width: 700px) { .act-metrics { display: none; } }
+
+    /* ── Activity filters ────────────────────────────────── */
+    .act-filters {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .act-search {
+      flex: 1; min-width: 160px;
+      background: var(--raised); border: 1px solid var(--rule);
+      border-radius: var(--r-sm); padding: 7px 12px;
+      font-family: inherit; font-size: 13px; color: var(--body-text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .act-search::placeholder { color: var(--faint); }
+    .act-search:focus { border-color: var(--patina); }
+    .act-chip {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.03em; border: 1px solid var(--rule); background: none;
+      cursor: pointer; font-family: inherit; color: var(--faint);
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .act-chip:hover { color: var(--muted); border-color: var(--muted); }
+    .act-chip.active { border-color: transparent; color: var(--ground); }
+    .act-chip[data-sport="all"].active      { background: var(--muted); }
+    .act-chip[data-sport="running"].active  { background: var(--run); }
+    .act-chip[data-sport="cycling"].active  { background: var(--bike); color: var(--gold-ink); }
+    .act-chip[data-sport="swimming"].active { background: var(--swim); }
+    .act-chip[data-sport="rowing"].active   { background: var(--row); }
+    .act-chip[data-sport="strength"].active { background: #c07850; }
+    .act-chip[data-sport="other"].active    { background: var(--faint); }
+    .act-empty { padding: 36px 20px; text-align: center; color: var(--muted); font-size: 13px; }
 
     /* ── Badge ───────────────────────────────────────────── */
     .badge {
@@ -632,6 +709,18 @@
     }
     #fd-map { height: 100%; }
 
+    #act-map-container {
+      height: 340px; border-radius: var(--r-md); overflow: hidden;
+      margin: 20px 0 0; border: 1px solid var(--rule); position: relative;
+    }
+    #act-map { height: 100%; }
+    #act-elevation-wrap {
+      margin: 0 0 24px; border: 1px solid var(--rule); border-top: none;
+      border-radius: 0 0 var(--r-md) var(--r-md); background: var(--graphite);
+      padding: 10px 14px 8px;
+    }
+    #act-elevation-chart { }
+
     .ac-card {
       background: var(--graphite);
       border: 1px solid var(--rule);
@@ -664,20 +753,20 @@
     }
 
     /* ── Readiness status pill + delta badge ─────────────── */
-    .rd-pill { display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.03em; }
-    .rd-pill.nogo  { background:#221616;color:#cc6060; }
-    .rd-pill.caut  { background:#22190c;color:#c09030; }
-    .rd-pill.go    { background:#0e1f18;color:#4aaa80; }
-    .rd-pill.muted { background:#1c1c1a;color:#999990; }
-    .rd-delta { display:inline-block;font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px; }
-    .rd-delta.neg { background:#221414;color:#cc5050; }
-    .rd-delta.pos { background:#0e1e16;color:#3aaa70; }
-    .rd-delta.neu { background:#1c1c1a;color:#888880; }
+    .rd-pill { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:5px 13px;border-radius:20px;letter-spacing:.02em; }
+    .rd-pill.nogo  { background:oklch(14% 0.04 20);color:oklch(70% 0.14 20);border:1px solid oklch(24% 0.06 20); }
+    .rd-pill.caut  { background:oklch(15% 0.05 70);color:oklch(74% 0.15 70);border:1px solid oklch(25% 0.08 70); }
+    .rd-pill.go    { background:oklch(13% 0.04 155);color:oklch(70% 0.13 155);border:1px solid oklch(23% 0.06 155); }
+    .rd-pill.muted { background:oklch(15% 0.002 95);color:oklch(60% 0 0);border:1px solid oklch(22% 0.003 95); }
+    .rd-delta { display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px; }
+    .rd-delta.neg { background:oklch(14% 0.04 20);color:oklch(68% 0.12 20); }
+    .rd-delta.pos { background:oklch(13% 0.04 155);color:oklch(68% 0.13 155); }
+    .rd-delta.neu { background:oklch(15% 0.002 95);color:oklch(55% 0 0); }
     /* light-mode overrides */
-    [data-theme="light"] .rd-pill.nogo  { background:#fde8e8;color:#b03030; }
-    [data-theme="light"] .rd-pill.caut  { background:#fef5e4;color:#8a6010; }
-    [data-theme="light"] .rd-pill.go    { background:#e8f5ee;color:#237a50; }
-    [data-theme="light"] .rd-pill.muted { background:#ededea;color:#666660; }
+    [data-theme="light"] .rd-pill.nogo  { background:#fde8e8;color:#b03030;border-color:#f5c6c6; }
+    [data-theme="light"] .rd-pill.caut  { background:#fef5e4;color:#8a6010;border-color:#f5dfa0; }
+    [data-theme="light"] .rd-pill.go    { background:#e8f5ee;color:#237a50;border-color:#b6e0ca; }
+    [data-theme="light"] .rd-pill.muted { background:#ededea;color:#666660;border-color:#d8d8d5; }
     [data-theme="light"] .rd-delta.neg  { background:#fde8e8;color:#b03030; }
     [data-theme="light"] .rd-delta.pos  { background:#e8f5ee;color:#237a50; }
     [data-theme="light"] .rd-delta.neu  { background:#ededea;color:#666660; }
@@ -712,32 +801,33 @@
     .chart-card {
       background: var(--raised);
       border: 1px solid var(--rule);
-      border-radius: var(--r-lg);
-      padding: 10px 12px 8px;
+      border-radius: var(--r-md);
+      padding: 14px 16px 10px;
     }
     .chart-label {
-      font-size: 12px; color: var(--muted);
-      margin-bottom: 6px; font-weight: 500;
-      letter-spacing: 0.01em; text-transform: uppercase;
+      font-size: 11px; color: var(--faint);
+      margin-bottom: 10px; font-weight: 600;
+      letter-spacing: 0.09em; text-transform: uppercase;
     }
-    .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.8; }
 
     /* ── Tremor-style KPI tiles (readiness card) ──────────── */
-    .kpi-tiles { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 10px; }
-    @media (max-width: 680px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
-    .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 8px 10px; }
-    .kpi-big { font-size: 18px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--champagne); }
-    .kpi-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.05em; text-transform: uppercase; }
-    .kpi-sub { font-size: 10px; color: var(--faint); margin-top: 2px; }
+    .kpi-tiles { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 14px; }
+    @media (max-width: 860px) { .kpi-tiles { grid-template-columns: repeat(3,1fr); } }
+    @media (max-width: 480px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
+    .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 12px 14px; }
+    .kpi-big { font-size: 28px; font-weight: 700; line-height: 1.0; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .kpi-lbl { font-size: 11px; color: var(--muted); margin-top: 5px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .kpi-sub { font-size: 11px; color: var(--faint); margin-top: 3px; line-height: 1.4; }
 
     /* ── ACWR progress bar (readiness card) ──────────────── */
     .acwr-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
     .acwr-status-txt { font-size: 14px; font-weight: 600; }
     .acwr-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .acwr-bar-wrap { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(to right, rgba(176,128,48,0.40) 0% 28.57%, rgba(61,148,112,0.35) 28.57% 64.29%, rgba(176,128,48,0.40) 64.29% 78.57%, rgba(176,80,80,0.52) 78.57% 100%); }
+    .acwr-bar-wrap { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(to right, oklch(30% 0.07 75 / 0.5) 0% 28.57%, oklch(25% 0.06 155 / 0.45) 28.57% 64.29%, oklch(30% 0.07 75 / 0.5) 64.29% 78.57%, oklch(28% 0.07 20 / 0.6) 78.57% 100%); }
     .acwr-bar-zone { display: none; }
-    .acwr-bar-pip  { position: absolute; top: -3px; width: 3px; height: 12px; border-radius: 2px; transform: translateX(-50%); }
-    .acwr-bar-labs { position: relative; height: 16px; margin-top: 3px; }
+    .acwr-bar-pip  { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; transform: translateX(-50%); box-shadow: 0 0 6px currentColor; }
+    .acwr-bar-labs { position: relative; height: 18px; margin-top: 4px; }
 
     /* ── Data note ───────────────────────────────────────── */
     .data-note { font-size: 12px; color: var(--faint); }
@@ -985,7 +1075,7 @@
     }
 
     @media (max-width: 700px) {
-      .fl-kpis, .act-kpis { display: none; }
+      .fl-kpis { display: none; }
       .sidebar { width: 52px; }
       .sb-logo { display: none !important; }
       .view-scroller { padding: 20px 16px 40px; }
@@ -993,7 +1083,7 @@
     }
 
     /* ── Finance ──────────────────────────────────────────── */
-    .fin-nw-hero { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .fin-nw-hero { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .fin-nw-amt  { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
     .fin-nw-delta { font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
     .fin-nw-delta.pos { background: #0e1f18; color: #4aaa80; }
@@ -1018,9 +1108,20 @@
     .fin-hold-ret   { text-align: right; font-size: 11px; font-weight: 600; }
     .fin-hold-ytd   { text-align: right; font-size: 11px; font-weight: 600; }
     /* privacy mask */
-    .fin-mask-txt { display: none; color: var(--muted); letter-spacing: .06em; }
+    .fin-mask-txt {
+      display: none;
+      letter-spacing: 0.22em;
+      font-weight: 600;
+      opacity: 0.38;
+    }
     .fin-view-masked .fin-real { display: none; }
     .fin-view-masked .fin-mask-txt { display: inline; }
+    .fin-eye-toggle {
+      background: none; border: none; cursor: pointer; padding: 0 2px;
+      color: var(--faint); display: inline-flex; align-items: center;
+      font-size: 14px; transition: color 0.15s; line-height: 1; vertical-align: middle;
+    }
+    .fin-eye-toggle:hover { color: var(--muted); }
     .fin-ret-bar    { height: 8px; background: var(--graphite-2); border-radius: 4px; overflow: hidden; margin: 8px 0; }
     .fin-ret-fill   { height: 100%; border-radius: 4px; background: linear-gradient(to right, #5a88c0, #5db87c); transition: width 0.6s ease; }
     /* ── Linked accounts grid ───────────────────────────────── */
@@ -1083,7 +1184,7 @@
       border-radius: var(--r-md); padding: 14px 16px;
       display: flex; align-items: center; gap: 14px;
       cursor: pointer; color: var(--faint); font-family: inherit;
-      font-size: 13px; transition: border-color 0.15s, color 0.15s;
+      font-size: 13px; text-align: left; transition: border-color 0.15s, color 0.15s;
     }
     .fin-add-card:hover { border-color: var(--patina); color: var(--patina-text); }
     .fin-add-icon {
@@ -1093,10 +1194,10 @@
     }
     .fin-add-card:hover .fin-add-icon { border-color: var(--patina); }
     /* Overview finance strip */
-    .fin-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .fin-strip-tile { flex: 1; min-width: 120px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 8px 12px; }
-    .fin-strip-amt  { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); }
-    .fin-strip-lbl  { font-size: 10px; color: var(--faint); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
+    .fin-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .fin-strip-tile { flex: 1; min-width: 130px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 12px 14px; }
+    .fin-strip-amt  { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    .fin-strip-lbl  { font-size: 11px; color: var(--faint); margin-top: 4px; text-transform: uppercase; letter-spacing: .06em; }
   </style>
 </head>
 <body>
@@ -1179,11 +1280,24 @@
       <!-- OVERVIEW ──────────────────────────────────────────── -->
       <div class="view active" id="view-overview">
 
+        <!-- Finance overview strip (hidden until data loads) -->
+        <div class="section-first" id="fin-overview-section" style="display:none">
+          <div class="section-label">
+            Net Worth
+            <button class="fin-eye-toggle" onclick="toggleFinMask()" title="Show/hide balances">
+              <i class="ph-bold fin-eye-icon ph-eye-slash"></i>
+            </button>
+          </div>
+          <div id="fin-overview-content">
+            <div class="skel" style="height:80px;border-radius:4px"></div>
+          </div>
+        </div>
+
         <!-- Training Readiness -->
-        <div class="section-first">
-          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
-            <span style="font-size:11px;color:var(--faint);font-weight:500;letter-spacing:.06em;text-transform:uppercase">Today</span>
-            <span id="data-date" class="data-note"></span>
+        <div class="section">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+            <span style="font-size:11px;color:var(--faint);font-weight:600;letter-spacing:.10em;text-transform:uppercase">Today</span>
+            <span id="data-date" class="data-note" style="font-size:12px"></span>
           </div>
           <div id="readiness-card" class="ov-card skel" style="min-height:80px"></div>
         </div>
@@ -1200,11 +1314,11 @@
         <div class="section">
           <div class="grid-2">
             <div class="chart-card">
-              <div class="chart-label">30-day volume <span class="chart-sublabel">(hours)</span></div>
+              <div class="chart-label">30-day volume</div>
               <div id="chart-volume"></div>
             </div>
             <div class="chart-card">
-              <div class="chart-label">30-day load <span class="chart-sublabel">by sport · — 7d avg</span></div>
+              <div class="chart-label">30-day load</div>
               <div id="chart-load"></div>
             </div>
             <div class="chart-card">
@@ -1217,14 +1331,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Finance overview strip (hidden until data loads) -->
-        <div class="section" id="fin-overview-section" style="display:none">
-          <div class="section-label">Net Worth</div>
-          <div id="fin-overview-content">
-            <div class="skel" style="height:80px;border-radius:4px"></div>
-          </div>
-        </div>
       </div>
 
       <!-- ACTIVITIES LIST ──────────────────────────────────── -->
@@ -1233,6 +1339,16 @@
           <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Activities</span>
             <span id="act-count" class="data-note"></span>
+          </div>
+          <div class="act-filters">
+            <button class="act-chip active" data-sport="all" onclick="setActSport('all')">All</button>
+            <button class="act-chip" data-sport="running" onclick="setActSport('running')">Run</button>
+            <button class="act-chip" data-sport="cycling" onclick="setActSport('cycling')">Bike</button>
+            <button class="act-chip" data-sport="swimming" onclick="setActSport('swimming')">Swim</button>
+            <button class="act-chip" data-sport="rowing" onclick="setActSport('rowing')">Row</button>
+            <button class="act-chip" data-sport="strength" onclick="setActSport('strength')">Strength</button>
+            <button class="act-chip" data-sport="other" onclick="setActSport('other')">Other</button>
+            <input class="act-search" id="act-search" type="text" placeholder="Search…" oninput="filterActivities()">
           </div>
           <div class="act-list" id="act-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
@@ -1261,6 +1377,15 @@
           <div class="fl-list" id="fl-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
           </div>
+          <div id="fl-pagination" style="display:none;align-items:center;justify-content:space-between;padding:10px 4px;gap:12px">
+            <button class="btn-ghost" id="fl-prev" onclick="flPageStep(-1)" style="font-size:12px;padding:5px 12px">
+              <i class="ph-bold ph-caret-left"></i> Prev
+            </button>
+            <span id="fl-page-label" style="font-size:12px;color:var(--muted)"></span>
+            <button class="btn-ghost" id="fl-next" onclick="flPageStep(1)" style="font-size:12px;padding:5px 12px">
+              Next <i class="ph-bold ph-caret-right"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1282,9 +1407,6 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Finances</span>
             <span class="data-note" id="fin-sync-status" style="flex:1"></span>
-            <button class="icon-btn" id="fin-eye-btn" onclick="toggleFinMask()" title="Show/hide balances">
-              <i class="ph-bold ph-eye-slash" id="fin-eye-icon"></i>
-            </button>
             <button class="btn-ghost" onclick="finSync()" style="padding:5px 12px;font-size:12px" id="fin-sync-btn">
               <i class="ph-bold ph-arrows-clockwise"></i> Sync
             </button>
@@ -1334,6 +1456,20 @@
   </div>
 </div>
 
+<!-- OpenSky route-picker modal -->
+<div class="modal-overlay" id="route-picker-overlay" style="display:none"
+     onclick="if(event.target===this)closeRoutePicker()">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-hd">
+      <span class="modal-title">Match ADS-B Track</span>
+      <button class="modal-close" onclick="closeRoutePicker()"><i class="ph-bold ph-x"></i></button>
+    </div>
+    <div class="modal-bd" id="route-picker-bd" style="padding:20px">
+      <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1341,11 +1477,22 @@
 const M_TO_MI = 0.000621371;
 
 const SPORT_CFG = {
-  running:  { color: '#5db87c', icon: 'ph-person-simple-run',  label: 'Running'  },
-  cycling:  { color: '#c99c3a', icon: 'ph-bicycle',             label: 'Cycling'  },
-  swimming: { color: '#5a88c0', icon: 'ph-waves',               label: 'Swimming' },
-  rowing:   { color: '#b85e7a', icon: 'ph-rowing',              label: 'Rowing'   },
-  other:    { color: '#7a8a98', icon: 'ph-activity',            label: 'Other'    },
+  running:    { color: '#5db87c', icon: 'ph-person-simple-run',  label: 'Running'    },
+  cycling:    { color: '#c99c3a', icon: 'ph-bicycle',             label: 'Cycling'    },
+  swimming:   { color: '#5a88c0', icon: 'ph-person-simple-swim',  label: 'Swimming'   },
+  rowing:     { color: '#b85e7a', icon: 'ph-person-simple-row',   label: 'Rowing'     },
+  walking:    { color: '#8aaa7a', icon: 'ph-person-simple-walk',  label: 'Walking'    },
+  hiking:     { color: '#a89060', icon: 'ph-mountains',           label: 'Hiking'     },
+  strength:   { color: '#c07850', icon: 'ph-barbell',             label: 'Strength'   },
+  yoga:       { color: '#9a80b8', icon: 'ph-leaf',                label: 'Yoga'       },
+  cardio:     { color: '#c04870', icon: 'ph-heartbeat',           label: 'Cardio'     },
+  skiing:     { color: '#88b8d8', icon: 'ph-snowflake',           label: 'Skiing'     },
+  paddling:   { color: '#4a9aaa', icon: 'ph-boat',                label: 'Paddling'   },
+  climbing:   { color: '#b89060', icon: 'ph-person-simple-hike',  label: 'Climbing'   },
+  golf:       { color: '#6aaa5a', icon: 'ph-flag',                label: 'Golf'       },
+  tennis:     { color: '#d0c050', icon: 'ph-tennis-ball',         label: 'Tennis'     },
+  transition: { color: '#7a9ab8', icon: 'ph-swap',                label: 'Transition' },
+  other:      { color: '#7a8a98', icon: 'ph-activity',            label: 'Other'      },
 };
 
 const HR_ZONES = [
@@ -1385,6 +1532,7 @@ const VIEW_TITLES = {
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
 let _fdMap = null;
+let _actMap = null;
 
 // ─── theme ────────────────────────────────────────────────────────────────────
 let theme = localStorage.getItem('dash-theme') || 'dark';
@@ -1436,10 +1584,21 @@ function fmtHrs(h) { if (!h || parseFloat(h) <= 0) return '—'; return parseFlo
 function normSport(t) {
   if (!t) return 'other';
   const l = t.toLowerCase();
-  if (l.includes('run') || l.includes('treadmill')) return 'running';
-  if (l.includes('cycl') || l.includes('bike') || l.includes('ride')) return 'cycling';
+  if (l.includes('run') || l.includes('treadmill_run') || l.includes('trail_run') || l.includes('ultra_run') || l.includes('virtual_run') || l.includes('track_run')) return 'running';
+  if (l.includes('cycl') || l.includes('bike') || l.includes('ride') || l.includes('biking') || l.includes('gravel') || l.includes('indoor_cycling') || l.includes('virtual_ride')) return 'cycling';
   if (l.includes('swim')) return 'swimming';
   if (l.includes('row')) return 'rowing';
+  if (l.includes('walk') || l.includes('treadmill_walk')) return 'walking';
+  if (l.includes('hik') || l.includes('trail_hike')) return 'hiking';
+  if (l.includes('strength') || l.includes('weight') || l.includes('crossfit') || l.includes('circuit') || l.includes('core') || l.includes('functional') || l.includes('power') || l.includes('bouldering_indoor')) return 'strength';
+  if (l.includes('yoga') || l.includes('pilates') || l.includes('flex') || l.includes('stretch') || l.includes('breath') || l.includes('meditat')) return 'yoga';
+  if (l.includes('elliptical') || l.includes('stair') || l.includes('cardio') || l.includes('hiit') || l.includes('aerobic') || l.includes('jump_rope') || l.includes('box') || l.includes('martial') || l.includes('dance') || l.includes('gymnastic')) return 'cardio';
+  if (l.includes('ski') || l.includes('snowboard') || l.includes('cross_country_ski') || l.includes('backcountry')) return 'skiing';
+  if (l.includes('kayak') || l.includes('paddle') || l.includes('canoe') || l.includes('sup') || l.includes('surf') || l.includes('sail') || l.includes('kite')) return 'paddling';
+  if (l.includes('climb') || l.includes('boulder')) return 'climbing';
+  if (l.includes('golf')) return 'golf';
+  if (l.includes('tennis') || l.includes('racquet') || l.includes('squash') || l.includes('badminton') || l.includes('pickleball')) return 'tennis';
+  if (l.includes('transition')) return 'transition';
   return 'other';
 }
 function esc(s) {
@@ -1486,7 +1645,7 @@ function getChartCfg() {
   };
 }
 
-function _cjsRender(el, config, height = 150) {
+function _cjsRender(el, config, height = 175) {
   if (!el || !window.Chart) return;
   if (el._cjs) { el._cjs.destroy(); el._cjs = null; }
   el.innerHTML = '';
@@ -1640,26 +1799,27 @@ function renderReadiness(activities, daily) {
   const sleepHrs = sleep?.sleepTimeSeconds ? (sleep.sleepTimeSeconds/3600).toFixed(1) : null;
   const deepPct  = (sleep?.deepSleepSeconds&&sleep?.sleepTimeSeconds) ? Math.round(sleep.deepSleepSeconds/sleep.sleepTimeSeconds*100) : null;
   const spo2 = d?.sleep?.wellnessSpO2SleepSummaryDTO?.averageSPO2;
+  const vo2max = d?.vo2max ? Math.round(d.vo2max) : null;
 
   // Status synthesis → actionable recommendation
   let pillClass, pillText, pillColor;
-  if (acwr===null) { pillClass='muted'; pillText='No data'; pillColor='#777770'; }
-  else if (acwr>1.5) { pillClass='nogo'; pillText='Rest today'; pillColor='#b05050'; }
-  else if (acwr>1.3) { pillClass='caut'; pillText='Easy session'; pillColor='#b08030'; }
+  if (acwr===null) { pillClass='muted'; pillText='No data'; pillColor='oklch(55% 0 0)'; }
+  else if (acwr>1.5) { pillClass='nogo'; pillText='Rest today'; pillColor='oklch(68% 0.14 20)'; }
+  else if (acwr>1.3) { pillClass='caut'; pillText='Easy session'; pillColor='oklch(72% 0.15 70)'; }
   else if (acwr>=0.8) {
-    pillClass='go'; pillColor='#3d9470';
+    pillClass='go'; pillColor='oklch(68% 0.14 155)';
     if (trendPct!==null&&trendPct>15) pillText='Build';
     else if (trendPct!==null&&trendPct<-15) pillText='Taper';
     else pillText='Maintain';
-  } else { pillClass='caut'; pillText='Increase load'; pillColor='#b08030'; }
+  } else { pillClass='caut'; pillText='Increase load'; pillColor='oklch(72% 0.15 70)'; }
 
   // Recovery signal from RHR
-  let rhrSignal='', rhrSubColor='#666660';
+  let rhrSignal='', rhrSubColor='var(--faint)';
   if (rhrDelta!==null) {
-    if (rhrDelta>4)      { rhrSignal='↑ elevated';         rhrSubColor='#b05050'; }
-    else if (rhrDelta>1) { rhrSignal='↑ slightly elevated'; rhrSubColor='#b08030'; }
-    else if (rhrDelta<=-2){ rhrSignal='↓ well recovered';  rhrSubColor='#3d9470'; }
-    else                  { rhrSignal='at baseline';        rhrSubColor='#666660'; }
+    if (rhrDelta>4)      { rhrSignal='↑ elevated';          rhrSubColor='oklch(68% 0.14 20)'; }
+    else if (rhrDelta>1) { rhrSignal='↑ slightly elevated'; rhrSubColor='oklch(72% 0.15 70)'; }
+    else if (rhrDelta<=-2){ rhrSignal='↓ well recovered';   rhrSubColor='oklch(68% 0.14 155)'; }
+    else                  { rhrSignal='at baseline';         rhrSubColor='var(--faint)'; }
   }
 
   // ACWR bar (scale 0.4–1.8; optimal zone 0.8–1.3 = 28.57%–64.29% of bar)
@@ -1672,10 +1832,13 @@ function renderReadiness(activities, daily) {
   const deltaArrow = trendPct!==null ? (trendPct>0?'↑':'↓') : '';
 
   // RHR tile color
-  const rhrBigColor = rhrDelta!==null&&rhrDelta>4 ? '#b05050' : rhrDelta!==null&&rhrDelta>1 ? '#b08030' : '#ccccbb';
+  const rhrBigColor = rhrDelta!==null&&rhrDelta>4 ? 'oklch(68% 0.14 20)' : rhrDelta!==null&&rhrDelta>1 ? 'oklch(72% 0.15 70)' : 'var(--champagne)';
   // SpO₂ tile color + label
-  const spo2Color = spo2&&spo2<95 ? '#b05050' : '#ccccbb';
+  const spo2Color = spo2&&spo2<95 ? 'oklch(68% 0.14 20)' : 'var(--champagne)';
   const spo2Lbl   = spo2&&spo2>=97?'optimal':spo2&&spo2>=95?'normal':spo2?'low':'';
+  // VO₂max color + label (Garmin classification for men)
+  const vo2Color  = vo2max&&vo2max>=55?'oklch(68% 0.14 155)':vo2max&&vo2max>=48?'oklch(68% 0.14 235)':vo2max&&vo2max>=40?'oklch(72% 0.15 70)':'var(--champagne)';
+  const vo2Lbl    = vo2max ? (vo2max>=55?'excellent':vo2max>=48?'good':vo2max>=40?'average':'below avg') : '';
 
   document.getElementById('readiness-card').innerHTML = `
     <div class="ov-card-hd">Training Readiness</div>
@@ -1683,7 +1846,7 @@ function renderReadiness(activities, daily) {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
       <div class="rd-pill ${pillClass}">● ${esc(pillText)}</div>
       <div style="display:flex;align-items:center;gap:8px">
-        ${acwr!==null?`<span style="font-size:20px;font-weight:700;color:${pillColor};font-variant-numeric:tabular-nums">${acwr}</span><span style="font-size:10px;color:#666660;margin-left:-4px">ACWR</span>`:''}
+        ${acwr!==null?`<span style="font-size:30px;font-weight:700;color:${pillColor};font-variant-numeric:tabular-nums;line-height:1">${acwr}</span><span style="font-size:12px;color:var(--faint);margin-left:3px;align-self:flex-end;padding-bottom:3px">ACWR</span>`:''}
         ${trendStr?`<div class="rd-delta ${deltaClass}">${deltaArrow} ${trendStr} / wk</div>`:''}
       </div>
     </div>
@@ -1693,7 +1856,7 @@ function renderReadiness(activities, daily) {
       <div class="acwr-bar-zone"></div>
       <div class="acwr-bar-pip" style="left:${pipPct}%;background:${pillColor}"></div>
     </div>
-    <div class="acwr-bar-labs" style="font-size:10px;color:#666660">
+    <div class="acwr-bar-labs" style="font-size:11px;color:var(--faint)">
       <span style="position:absolute;left:0">0.4</span>
       <span style="position:absolute;left:28.57%;transform:translateX(-50%)">0.8 optimal</span>
       <span style="position:absolute;left:64.29%;transform:translateX(-50%)">1.3</span>
@@ -1708,12 +1871,12 @@ function renderReadiness(activities, daily) {
         <div class="kpi-sub">${Math.round(chronic)||'—'} CTL · ${acwr??'—'} ratio</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big">${sleepHrs||'—'}<span style="font-size:12px;font-weight:400;color:#666660">h</span></div>
+        <div class="kpi-big">${sleepHrs||'—'}<span style="font-size:14px;font-weight:400;color:var(--faint)">h</span></div>
         <div class="kpi-lbl">Sleep</div>
-        <div class="kpi-sub">${deepPct?`${deepPct}% deep · `:''} ${sleepHrs&&parseFloat(sleepHrs)<7?'<span style="color:#b08030">low</span>':sleepHrs?'ok':''}</div>
+        <div class="kpi-sub">${deepPct?`${deepPct}% deep · `:''} ${sleepHrs&&parseFloat(sleepHrs)<7?'<span style="color:oklch(70% 0.14 70)">low</span>':sleepHrs?'ok':''}</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big" style="color:${rhrBigColor}">${rhr||'—'}<span style="font-size:11px;font-weight:400;color:#666660"> bpm</span></div>
+        <div class="kpi-big" style="color:${rhrBigColor}">${rhr||'—'}<span style="font-size:14px;font-weight:400;color:var(--faint)"> bpm</span></div>
         <div class="kpi-lbl">RHR</div>
         <div class="kpi-sub" style="color:${rhrSubColor}">${rhrSignal||'—'}</div>
       </div>
@@ -1721,6 +1884,11 @@ function renderReadiness(activities, daily) {
         <div class="kpi-big" style="color:${spo2Color}">${spo2?Math.round(spo2)+'%':'—'}</div>
         <div class="kpi-lbl">SpO₂</div>
         <div class="kpi-sub">${spo2Lbl}</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-big" style="color:${vo2Color}">${vo2max||'—'}</div>
+        <div class="kpi-lbl">VO₂max</div>
+        <div class="kpi-sub">${vo2Lbl}</div>
       </div>
     </div>
   `;
@@ -1732,35 +1900,39 @@ async function loadWeatherWidget() {
   document.getElementById('weather-card').innerHTML =
     `<div class="ov-card-hd">${esc(icao)} Weather</div><div class="skel" style="height:180px;border-radius:6px"></div>`;
   try {
-    const [metarRes, airportRes, notamRes, detailRes] = await Promise.allSettled([
+    // Fast fetches — render the card immediately without waiting for NOTAMs
+    const [metarRes, airportRes, detailRes, tafRes] = await Promise.allSettled([
       fetch(`/api/external/metar/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
       fetch(`/api/external/airport/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():null),
-      fetch(`/api/external/notam/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{count:0,notams:[]}),
       fetch(`/api/external/airport-detail/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{runways:[],frequencies:[]}),
+      fetch(`/api/external/taf/${encodeURIComponent(icao)}`).then(r=>r.ok?r.json():{taf:null}),
     ]);
-    renderWeatherCard(
-      metarRes.value?.metar || null,
-      airportRes.value || null,
-      notamRes.value || {count:0,notams:[]},
-      icao,
-      detailRes.value || {runways:[],frequencies:[]}
-    );
+    const metar   = metarRes.value?.metar || null;
+    const airport = airportRes.value || null;
+    const detail  = detailRes.value || {runways:[], frequencies:[]};
+    const taf     = tafRes.value?.taf || null;
+    renderWeatherCard(metar, airport, { count: 0, notams: [], loading: true }, icao, detail, taf);
+    // NOTAM fetch runs independently — first call may take 30-60 s (Playwright cold start)
+    fetch(`/api/external/notam/${encodeURIComponent(icao)}`)
+      .then(r => r.ok ? r.json() : { count: 0, notams: [] })
+      .then(notamData => renderWeatherCard(metar, airport, notamData || { count: 0, notams: [] }, icao, detail, taf))
+      .catch(() => {});
   } catch(_) {
-    renderWeatherCard(null, null, {count:0,notams:[]}, icao, {runways:[],frequencies:[]});
+    renderWeatherCard(null, null, {count:0,notams:[]}, icao, {runways:[],frequencies:[]}, null);
   }
 }
 
 // runways: [{le_ident, le_hdg, he_ident, he_hdg}] from OurAirports airport-detail
 // bestHdg: magnetic heading of the preferred landing direction (or null)
 function windCompassSvg(wdir, wspd, wgst, runways, bestHdg) {
-  const R = 48, size = 120;
+  const R = 64, size = 168;
   const isCalm = !wspd || wspd < 2;
   const isVRB  = wdir === 'VRB' || wdir == null;
 
   // ── Tick marks ───────────────────────────────────────────────────────────────
   const ticks = Array.from({length:36}, (_, i) => {
     const a = i * 10 * Math.PI / 180;
-    const o = R, inn = i%9===0 ? R-9 : i%3===0 ? R-5 : R-3;
+    const o = R, inn = i%9===0 ? R-12 : i%3===0 ? R-7 : R-4;
     const sw = i%9===0 ? 1.5 : 0.8;
     return `<line x1="${+(Math.sin(a)*o).toFixed(2)}" y1="${+(-Math.cos(a)*o).toFixed(2)}" x2="${+(Math.sin(a)*inn).toFixed(2)}" y2="${+(-Math.cos(a)*inn).toFixed(2)}" stroke="var(--rule)" stroke-width="${sw}"/>`;
   }).join('');
@@ -1790,21 +1962,21 @@ function windCompassSvg(wdir, wspd, wgst, runways, bestHdg) {
   for (const group of groups) {
     const n = group.length;
     group.forEach(({ rwy }, gi) => {
-      const perpOff = n > 1 ? (gi - (n - 1) / 2) * 13 : 0;
+      const perpOff = n > 1 ? (gi - (n - 1) / 2) * 17 : 0;
       const drawHdg = rwy.he_hdg;   // rotate so top = he_end, bottom = le_end
-      const rLen    = R - 7;
+      const rLen    = R - 9;
       const isBest  = (rwy.le_hdg === bestHdg || rwy.he_hdg === bestHdg);
       const fill    = isBest ? 'oklch(23% 0.07 80)'  : 'oklch(15% 0.02 95)';
-      const stroke  = isBest ? 'oklch(58% 0.12 82)'  : 'oklch(30% 0.03 95)';
-      const sw      = isBest ? 1.5 : 0.8;
+      const stroke  = isBest ? 'oklch(62% 0.14 82)'  : 'oklch(30% 0.03 95)';
+      const sw      = isBest ? 1.8 : 0.9;
       const heNum   = Math.round(rwy.he_hdg / 10).toString().padStart(2, '0');
       const leNum   = Math.round(rwy.le_hdg / 10).toString().padStart(2, '0');
       rwyElems.push(
         `<g transform="rotate(${drawHdg}) translate(${perpOff} 0)">` +
-        `<rect x="-5" y="${-rLen}" width="10" height="${rLen*2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" rx="1.5"/>` +
-        (isBest ? `<line x1="0" y1="${-rLen}" x2="0" y2="${rLen}" stroke="${stroke}" stroke-width="0.5" stroke-dasharray="4 3"/>` : '') +
-        `<text y="${-rLen-5}" text-anchor="middle" fill="${stroke}" font-size="7" font-family="Albert Sans,sans-serif">${heNum}</text>` +
-        `<text y="${rLen+12}" text-anchor="middle" fill="${stroke}" font-size="7" font-family="Albert Sans,sans-serif">${leNum}</text>` +
+        `<rect x="-6" y="${-rLen}" width="12" height="${rLen*2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" rx="2"/>` +
+        (isBest ? `<line x1="0" y1="${-rLen}" x2="0" y2="${rLen}" stroke="${stroke}" stroke-width="0.7" stroke-dasharray="5 3"/>` : '') +
+        `<text y="${-rLen-7}" text-anchor="middle" fill="${stroke}" font-size="9" font-weight="600" font-family="Albert Sans,sans-serif">${heNum}</text>` +
+        `<text y="${rLen+15}" text-anchor="middle" fill="${stroke}" font-size="9" font-weight="600" font-family="Albert Sans,sans-serif">${leNum}</text>` +
         `</g>`
       );
     });
@@ -1813,34 +1985,34 @@ function windCompassSvg(wdir, wspd, wgst, runways, bestHdg) {
   // ── Wind indicator ───────────────────────────────────────────────────────────
   let windEl;
   if (isCalm) {
-    windEl = `<circle r="6" fill="none" stroke="oklch(65% 0.14 145)" stroke-width="2"/>` +
-             `<circle r="2.5" fill="oklch(65% 0.14 145)"/>`;
+    windEl = `<circle r="8" fill="none" stroke="oklch(65% 0.14 145)" stroke-width="2.5"/>` +
+             `<circle r="3.5" fill="oklch(65% 0.14 145)"/>`;
   } else if (isVRB) {
     windEl = [0,90,180,270].map(a =>
-      `<g transform="rotate(${a})"><line x1="0" y1="18" x2="0" y2="-20" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"/><polygon points="0,-26 -4,-19 4,-19" fill="var(--muted)"/></g>`
+      `<g transform="rotate(${a})"><line x1="0" y1="24" x2="0" y2="-26" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round"/><polygon points="0,-34 -5,-25 5,-25" fill="var(--muted)"/></g>`
     ).join('');
   } else {
     windEl = `<g transform="rotate(${wdir})">` +
-      `<line x1="0" y1="11" x2="0" y2="-31" stroke="white" stroke-width="2.5" stroke-linecap="round"/>` +
-      `<polygon points="0,-40 -6,-29 6,-29" fill="white"/>` +
-      (wgst ? `<circle r="4" cx="0" cy="15" fill="none" stroke="oklch(76% 0.13 75)" stroke-width="1.5"/>` : '') +
+      `<line x1="0" y1="14" x2="0" y2="-40" stroke="white" stroke-width="2.8" stroke-linecap="round"/>` +
+      `<polygon points="0,-52 -8,-38 8,-38" fill="white"/>` +
+      (wgst ? `<circle r="5" cx="0" cy="19" fill="none" stroke="oklch(78% 0.14 75)" stroke-width="1.8"/>` : '') +
       `</g>`;
   }
 
   const spd = isCalm
-    ? `<text text-anchor="middle" y="4" fill="oklch(65% 0.14 145)" font-size="9" font-family="Albert Sans,sans-serif">calm</text>`
-    : `<text text-anchor="middle" y="3" fill="white" font-size="13" font-weight="700" font-family="Albert Sans,sans-serif">${wspd}</text>` +
-      `<text text-anchor="middle" y="14" fill="var(--faint)" font-size="8" font-family="Albert Sans,sans-serif">kt${wgst ? ' G'+wgst : ''}</text>`;
+    ? `<text text-anchor="middle" y="5" fill="oklch(65% 0.14 145)" font-size="11" font-family="Albert Sans,sans-serif">calm</text>`
+    : `<text text-anchor="middle" y="4" fill="white" font-size="16" font-weight="700" font-family="Albert Sans,sans-serif">${wspd}</text>` +
+      `<text text-anchor="middle" y="18" fill="var(--faint)" font-size="10" font-family="Albert Sans,sans-serif">kt${wgst ? ' G'+wgst : ''}</text>`;
 
   return `<svg width="${size}" height="${size}" viewBox="${-size/2} ${-size/2} ${size} ${size}" style="overflow:visible;flex-shrink:0">
     <circle r="${R}" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
     ${ticks}
-    <text text-anchor="middle" y="${-R-6}" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">N</text>
-    <text text-anchor="middle" y="${R+13}" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">S</text>
-    <text x="${-R-10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">W</text>
-    <text x="${R+10}" y="4" text-anchor="middle" fill="var(--muted)" font-size="9" font-family="Albert Sans,sans-serif">E</text>
+    <text text-anchor="middle" y="${-R-9}" fill="var(--muted)" font-size="11" font-weight="600" font-family="Albert Sans,sans-serif">N</text>
+    <text text-anchor="middle" y="${R+17}" fill="var(--muted)" font-size="11" font-weight="600" font-family="Albert Sans,sans-serif">S</text>
+    <text x="${-R-13}" y="4" text-anchor="middle" fill="var(--muted)" font-size="11" font-weight="600" font-family="Albert Sans,sans-serif">W</text>
+    <text x="${R+13}" y="4" text-anchor="middle" fill="var(--muted)" font-size="11" font-weight="600" font-family="Albert Sans,sans-serif">E</text>
     ${rwyElems.join('')}
-    <circle r="18" fill="oklch(9% 0.002 95 / 0.85)"/>
+    <circle r="24" fill="oklch(9% 0.002 95 / 0.88)"/>
     ${windEl}
     ${spd}
   </svg>`;
@@ -1855,7 +2027,7 @@ function parseMetarObsTime(rawOb) {
   return obs;
 }
 
-function renderWeatherCard(metar, airport, notamData, icao, detail) {
+function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
   const el = document.getElementById('weather-card');
   const runways = detail?.runways || [];
 
@@ -1927,10 +2099,19 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
   // ── Go/No-Go verdict ────────────────────────────────────────────────────────
   const xwindHigh = xwind !== null && xwind > 10;
   const gusty     = wgst && wgst > 20;
-  let verdict, verdictClass;
-  if (cat === 'LIFR' || cat === 'IFR')            { verdict = 'NO-GO';   verdictClass = 'nogo'; }
-  else if (cat === 'MVFR' || xwindHigh || gusty)  { verdict = 'CAUTION'; verdictClass = 'caut'; }
-  else                                              { verdict = 'GO';     verdictClass = 'go';   }
+  let verdict, verdictClass, verdictReasons = [];
+  if (cat === 'LIFR' || cat === 'IFR') {
+    verdict = 'NO-GO'; verdictClass = 'nogo';
+    verdictReasons.push(cat);
+  } else if (cat === 'MVFR' || xwindHigh || gusty) {
+    verdict = 'CAUTION'; verdictClass = 'caut';
+    if (cat === 'MVFR')  verdictReasons.push('MVFR');
+    if (xwindHigh)       verdictReasons.push(`${xwind} kt xwind`);
+    if (gusty)           verdictReasons.push(`gust ${wgst} kt`);
+  } else {
+    verdict = 'GO'; verdictClass = 'go';
+  }
+  const verdictSub = verdictReasons.length ? `<span style="font-size:10px;font-weight:400;opacity:0.8;margin-left:4px">${verdictReasons.join(' · ')}</span>` : '';
 
   // ── Formatted strings ───────────────────────────────────────────────────────
   const windLine  = wdir === 'VRB'         ? `Variable ${wspd} kt`
@@ -1947,6 +2128,16 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
   const altLine    = altimInhg ? `${altimInhg} inHg (${Math.round(altimHpa)} hPa)` : '—';
   const daLine     = da != null
     ? `${(da - (airport?.elev||0)) >= 0 ? '+' : ''}${(da - (airport?.elev||0)).toLocaleString()} ft above field (${da.toLocaleString()} ft)` : '—';
+  const obsLine    = obsDate && !isNaN(obsDate)
+    ? (() => {
+        const d = obsDate;
+        const dd = String(d.getUTCDate()).padStart(2,'0');
+        const hh = String(d.getUTCHours()).padStart(2,'0');
+        const mm = String(d.getUTCMinutes()).padStart(2,'0');
+        const mon = d.toLocaleDateString('en-US',{month:'short',timeZone:'UTC'});
+        return `${mon} ${dd} ${hh}:${mm}Z${ageStr?` · ${ageStr}`:''}`;
+      })()
+    : '—';
 
   // ── Runway summary for the airport column ───────────────────────────────────
   const rwyRows = runways.map(rwy => {
@@ -1954,9 +2145,9 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
     const rwyName = `${rwy.le_ident}/${rwy.he_ident}`;
     const rwyLen  = rwy.length_ft ? `${rwy.length_ft.toLocaleString()} ft` : '';
     const rwyInfo = [rwyLen, rwy.surface?.split('-')[0]].filter(Boolean).join(' · ');
-    return `<div class="wx-row" style="${isBest?'color:oklch(66% 0.10 82)':''}">` +
-      `<span class="wx-lbl" style="${isBest?'color:oklch(58% 0.10 82)':''}">Rwy ${esc(rwyName)}</span>` +
-      `<span class="wx-val" style="font-size:12px">${rwyInfo || '—'}${isBest?' ←':''}</span></div>`;
+    return `<div class="wx-row" style="${isBest?'color:oklch(68% 0.12 82)':''}">` +
+      `<span class="wx-lbl" style="${isBest?'color:oklch(60% 0.12 82)':''}">Rwy ${esc(rwyName)}</span>` +
+      `<span class="wx-val">${rwyInfo || '—'}${isBest?' <span style="color:oklch(62% 0.14 82);font-weight:600">← best</span>':''}</span></div>`;
   }).join('');
 
   // ── Radio frequencies (priority: ATIS/AWOS, then TWR/CTAF, then GND) ───────
@@ -1970,9 +2161,132 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
     `<span class="wx-val" style="font-size:12px;font-variant-numeric:tabular-nums">${esc(f.freq_mhz)} MHz</span></div>`
   ).join('');
 
-  // ── NOTAM count badge ────────────────────────────────────────────────────────
+  // ── NOTAM inline list ────────────────────────────────────────────────────────
   const nCount = notamData?.count || 0;
-  const nBadge = nCount > 0 ? `<span class="wx-notam-count">${nCount}</span>` : '';
+  const notams = notamData?.notams || [];
+  const notamLoading = notamData?.loading === true;
+  const notamUnavailable = notamData?.unavailable === true;
+
+  const NOTAM_TYPE_STYLE = {
+    TFR: 'background:oklch(20% 0.12 30);color:oklch(78% 0.18 30)',
+    FDC: 'background:oklch(20% 0.12 30);color:oklch(78% 0.18 30)',
+    IAP: 'background:oklch(20% 0.10 255);color:oklch(74% 0.14 255)',
+    ODP: 'background:oklch(20% 0.10 255);color:oklch(74% 0.14 255)',
+    RWY: 'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
+    TWY: 'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
+    OBST:'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
+    NAV: 'background:oklch(20% 0.08 230);color:oklch(72% 0.14 230)',
+    COM: 'background:oklch(20% 0.08 230);color:oklch(72% 0.14 230)',
+    SVC: 'background:oklch(20% 0.08 150);color:oklch(72% 0.14 150)',
+    D:   'background:oklch(22% 0.06 75);color:oklch(72% 0.12 75)',
+    N:   'background:oklch(20% 0.06 230);color:oklch(68% 0.10 230)',
+    O:   'background:oklch(20% 0.05 150);color:oklch(68% 0.10 150)',
+  };
+  const NOTAM_TYPE_LABEL = {
+    IAP:'Approach', ODP:'Departure', TFR:'Flight Restriction', FDC:'Regulatory',
+    RWY:'Runway', TWY:'Taxiway', OBST:'Obstacle', COM:'Communications',
+    SVC:'Service', NAV:'Navaid', AD:'Aerodrome', PROCEDURE:'Procedure',
+    STAR:'Arrival', D:'General', N:'Local', O:'Other',
+  };
+  function notamTypeStyle(t) { return NOTAM_TYPE_STYLE[(t||'').toUpperCase()] || NOTAM_TYPE_STYLE.O; }
+  function notamTypeLabel(t) {
+    const k = (t||'').toUpperCase();
+    return NOTAM_TYPE_LABEL[k] || (k.slice(0,8) || '—');
+  }
+
+  // Extract E) free-text section from ICAO NOTAM body
+  function notamESection(raw) {
+    if (!raw) return '';
+    const m = raw.match(/\bE\)\s+([\s\S]*?)(?=\n[A-GQ]\)|$)/);
+    if (m) return m[1].trim();
+    // No field codes found — strip any leading single-letter field lines
+    return raw.replace(/^[QABCDEFG]\)[ \t].*\n?/gm, '').trim() || raw.trim();
+  }
+
+  // Expand the most impactful all-caps NOTAM abbreviations
+  const _NR = [
+    [/\bRWYS\b/g,'Runways'], [/\bRWY\b/g,'Runway'],
+    [/\bTWYS\b/g,'Taxiways'], [/\bTWY\b/g,'Taxiway'],
+    [/\bACFT\b/g,'aircraft'], [/\bACFTS\b/g,'aircraft'],
+    [/\bCLSD\b/g,'CLOSED'], [/\bOBSTS?\b/g,'obstacle'],
+    [/\bTEMP\b/g,'temporary'], [/\bPERM\b/g,'permanent'],
+    [/\bLGT\b/g,'lighting'], [/\bLGTD\b/g,'lighted'],
+    [/\bOPS\b/g,'operations'], [/\bSVC\b/g,'service'],
+    [/\bUNAVBL\b/g,'unavailable'], [/\bAVBL\b/g,'available'],
+    [/\bUNMON\b/g,'unmonitored'], [/\bFREQ\b/g,'frequency'],
+    [/\bDER\b/g,'departure end of runway'], [/\bAMDT\b/g,'amendment'],
+    [/\bORIG\b/g,'original'], [/\bCOMS?\b/g,'communications'],
+    [/\bNOT AUTH\b/g,'not authorized'], [/\bEQPD\b/g,'equipped'],
+    [/\bOUT OF SVC\b/g,'out of service'], [/\bWIP\b/g,'work in progress'],
+    [/\bCATS\b/g,'categories'], [/\bINFO\b/g,'information'],
+    [/\bPPR\b/g,'prior permission required'],
+    [/\bAPCH\b/g,'approach'], [/\bDEP\b/g,'departure'],
+    [/\bHDG\b/g,'heading'], [/\bALT\b/g,'altitude'],
+    [/\bMINM\b/g,'minimum'], [/\bMAXM\b/g,'maximum'],
+    [/\bAD\b/g,'aerodrome'], [/\bARP\b/g,'aerodrome reference point'],
+    [/\bEXCPT\b/g,'except'], [/\bEXCEPT\b/g,'except'],
+    [/\bAPPROX\b/g,'approximately'],
+    // Standalone NA = not authorized (avoid matching NAV, NOTAM, etc.)
+    [/(?<=[,.\s]|^)NA(?=[,.\s]|$)/gm,'not authorized'],
+  ];
+  function notamExpand(text) {
+    let t = text;
+    for (const [re, rep] of _NR) t = t.replace(re, rep);
+    return t;
+  }
+
+  // Format "MM/DD/YYYY HHMM[tz]" → "Mon DD, YYYY HH:MMZ"
+  function fmtNotamDate(s) {
+    if (!s) return null;
+    const m = String(s).match(/^(\d{1,2})\/(\d{2})\/(\d{4})\s+(\d{2})(\d{2})/);
+    if (!m) return String(s);
+    const mo = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[+m[1]-1];
+    return `${mo} ${+m[2]}, ${m[3]} ${m[4]}:${m[5]}Z`;
+  }
+
+  const notamHtml = notamLoading
+    ? `<div style="font-size:11px;color:var(--faint);padding:6px 0">Fetching NOTAMs…</div>`
+    : notamUnavailable
+    ? `<div style="font-size:11px;color:var(--faint);padding:6px 0">Unavailable — <a href="https://notams.aim.faa.gov/notamSearch/nsapp.html" target="_blank" rel="noopener" style="color:var(--muted)">Search ${esc(icao)} →</a></div>`
+    : notams.length
+      ? notams.map(n => {
+          const body = notamExpand(notamESection(n.text));
+          const exp  = fmtNotamDate(n.endDate);
+          return `<div class="wx-notam-item">
+            <div class="wx-notam-hdr">
+              <span class="wx-notam-type" style="${notamTypeStyle(n.type)}">${esc(notamTypeLabel(n.type))}</span>
+              ${n.id ? `<span class="wx-notam-id">${esc(n.id)}</span>` : ''}
+              ${exp ? `<span class="wx-notam-exp">expires ${esc(exp)}</span>` : ''}
+            </div>
+            <span class="wx-notam-txt">${esc(body)}</span>
+          </div>`;
+        }).join('')
+      : `<div style="font-size:11px;color:var(--faint);padding:6px 0">No active NOTAMs</div>`;
+
+  // ── TAF inline ───────────────────────────────────────────────────────────────
+  function fmtTafTime(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true }).replace(',','');
+    } catch { return iso; }
+  }
+  const tafFcstsHtml = taf?.fcsts?.length
+    ? taf.fcsts.map(f => {
+        const parts = [];
+        if (f.wdir != null && f.wspd != null) parts.push(`Wind ${typeof f.wdir==='number'?String(f.wdir).padStart(3,'0'):f.wdir}° ${f.wspd}kt${f.wgst?` G${f.wgst}kt`:''}`);
+        if (f.visib)  parts.push(`Vis ${f.visib} SM`);
+        if (f.clouds) parts.push(f.clouds);
+        if (f.wx)     parts.push(f.wx);
+        if (f.fltcat) parts.push(f.fltcat);
+        return `<div class="wx-taf-fcst">
+          <span class="wx-taf-type">${esc(f.type||'FM')}</span>
+          <span class="wx-taf-body">${esc(parts.join(' · ') || '—')}</span>
+          <span class="wx-taf-time">${esc(fmtTafTime(f.from))}${f.to?` – ${esc(fmtTafTime(f.to))}`:''}</span>
+        </div>`;
+      }).join('')
+    : (taf?.raw ? `<div class="wx-raw-taf">${esc(taf.raw)}</div>` : `<div style="font-size:11px;color:var(--faint);padding:6px 0">TAF not available</div>`);
+  const tafCountBadge = taf?.fcsts?.length ? `<span class="wx-count-badge">${taf.fcsts.length}</span>` : '';
 
   // ── Compass SVG (multi-runway) ───────────────────────────────────────────────
   const compass = windCompassSvg(wdir, wspd, wgst, runways, bestHdg);
@@ -1988,26 +2302,26 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
         <div class="wx-airport">${esc(aptName)}</div>
         <div class="wx-airport-meta">${esc(aptMeta)}</div>
         <div class="wx-pills">
-          <span class="wx-verdict ${verdictClass}"><i class="ph-bold ph-${verdict==='GO'?'check-circle':verdict==='CAUTION'?'warning-circle':'x-circle'}"></i> ${verdict}</span>
+          <span class="wx-verdict ${verdictClass}"><i class="ph-bold ph-${verdict==='GO'?'check-circle':verdict==='CAUTION'?'warning-circle':'x-circle'}"></i> ${verdict}${verdictSub}</span>
           <span class="wx-cat-pill ${cat}">${cat}</span>
-          ${ageStr?`<span class="wx-age">obs ${ageStr}</span>`:''}
         </div>
       </div>
     </div>
 
     <div class="wx-body">
       <!-- Column 1: Multi-runway wind compass -->
-      <div class="wx-col" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div class="wx-col" style="display:flex;flex-direction:column;align-items:center;gap:12px">
         ${compass}
-        <div style="text-align:center;line-height:1.5">
-          <div style="font-size:12px;color:var(--body-text)">${windLine}</div>
-          ${xwindLine?`<div class="wx-sub">${xwindLine}</div>`:''}
+        <div style="text-align:center;line-height:1.6">
+          <div style="font-size:13px;color:var(--body-text);font-weight:500">${windLine}</div>
+          ${xwindLine?`<div class="wx-sub" style="font-size:12px;margin-top:2px">${xwindLine}</div>`:''}
         </div>
       </div>
 
       <!-- Column 2: Sky conditions -->
       <div class="wx-col">
         <div class="wx-col-title">Conditions</div>
+        <div class="wx-row"><span class="wx-lbl">Observed</span><span class="wx-val">${obsLine}</span></div>
         <div class="wx-row"><span class="wx-lbl">Ceiling</span><span class="wx-val">${ceilLine}</span></div>
         <div class="wx-row"><span class="wx-lbl">Visibility</span><span class="wx-val">${visLine}</span></div>
         <div class="wx-row"><span class="wx-lbl">Temp / DP</span><span class="wx-val">${spreadLine}</span></div>
@@ -2015,27 +2329,30 @@ function renderWeatherCard(metar, airport, notamData, icao, detail) {
         <div class="wx-row"><span class="wx-lbl">Density Alt</span><span class="wx-val">${daLine}</span></div>
       </div>
 
-      <!-- Column 3: Airport info (runways + frequencies + links) -->
+      <!-- Column 3: Airport info (runways + frequencies) -->
       <div class="wx-col">
         <div class="wx-col-title">Airport</div>
         ${airport?.elev!=null?`<div class="wx-row"><span class="wx-lbl">Elevation</span><span class="wx-val">${airport.elev} ft MSL</span></div>`:''}
         ${rwyRows}
         ${freqRows ? `<div class="wx-col-title" style="margin-top:10px">Radio</div>${freqRows}` : ''}
-        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-          <a class="wx-footer-link" style="padding:0;border:none" href="https://notams.aim.faa.gov/notamSearch/nsapp.html#/" target="_blank" rel="noopener">
-            <i class="ph-bold ph-warning"></i> NOTAMs ${nBadge}
-          </a>
-          <a class="wx-footer-link" style="padding:0;border:none" href="https://tfr.faa.gov/tfr2/list.jsp" target="_blank" rel="noopener">
-            <i class="ph-bold ph-airplane"></i> TFRs
-          </a>
-          <a class="wx-footer-link" style="padding:0;border:none" href="https://www.airnav.com/airport/${esc(icao)}" target="_blank" rel="noopener">
-            <i class="ph-bold ph-info"></i> AirNav
-          </a>
-          <a class="wx-footer-link" style="padding:0;border:none" href="https://aviationweather.gov/taf/board?ids=${esc(icao)}" target="_blank" rel="noopener">
-            <i class="ph-bold ph-cloud"></i> TAF
-          </a>
+        <div class="wx-links-row">
+          <a class="wx-ext-link" href="https://www.airnav.com/airport/${esc(icao)}" target="_blank" rel="noopener"><i class="ph-bold ph-link-simple"></i> AirNav</a>
+          <a class="wx-ext-link" href="https://skyvector.com/airport/${esc(icao)}" target="_blank" rel="noopener"><i class="ph-bold ph-link-simple"></i> SkyVector</a>
+          <a class="wx-ext-link" href="https://tfr.faa.gov/tfr2/list.jsp" target="_blank" rel="noopener"><i class="ph-bold ph-link-simple"></i> TFRs</a>
         </div>
       </div>
+    </div>
+
+    <!-- Inline TAF -->
+    <div style="margin-top:12px;border-top:1px solid var(--rule);padding-top:2px">
+      <div class="wx-inline-hdr"><i class="ph-bold ph-cloud"></i> Forecast (TAF) ${tafCountBadge}</div>
+      ${tafFcstsHtml}
+    </div>
+
+    <!-- Inline NOTAMs -->
+    <div style="margin-top:4px">
+      <div class="wx-inline-hdr"><i class="ph-bold ph-warning"></i> NOTAMs / TFRs <span class="wx-count-badge">${nCount > 0 ? nCount : 0}</span>${nCount > 30 ? `<span style="font-size:9px;color:var(--faint);letter-spacing:0;text-transform:none">(showing 30)</span>` : ''}</div>
+      ${notamHtml}
     </div>
 
     ${raw?`<div class="wx-footer"><div class="wx-raw">${esc(raw)}</div></div>`:''}
@@ -2051,6 +2368,29 @@ function editHomeAirport() {
   }
 }
 
+// ─── medical helpers ──────────────────────────────────────────────────────────
+function medCalExpiry(dateStr, months) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const y = d.getFullYear() + Math.floor((d.getMonth() + months) / 12);
+  const m = (d.getMonth() + months) % 12;
+  return new Date(y, m + 1, 0); // last day of that calendar month
+}
+function getMedExpiry(cls, under40, dateStr) {
+  const mo = cls === '1' ? (under40 ? 12 : 6)
+           : cls === '2' ? 12
+           : cls === '3' ? (under40 ? 60 : 24)
+           : cls === 'basicmed' ? 48 : null;
+  return mo ? medCalExpiry(dateStr, mo) : null;
+}
+const MED_LABEL = { '1': 'First Class', '2': 'Second Class', '3': 'Third Class', basicmed: 'BasicMed' };
+function getMedData() {
+  return {
+    cls:     localStorage.getItem('med-cls')     || '3',
+    under40: localStorage.getItem('med-under40') !== 'false',
+    date:    localStorage.getItem('med-date')    || '',
+  };
+}
+
 // ─── flight currency ──────────────────────────────────────────────────────────
 function renderFlightCurrency(flights) {
   const el = document.getElementById('currency-card');
@@ -2059,124 +2399,248 @@ function renderFlightCurrency(flights) {
     return;
   }
 
-  const now = Date.now();
+  const now  = Date.now();
   const d90  = 90  * 86400000;
-  const d24mo = 730 * 86400000; // ~24 calendar months
+  const d6mo = 183 * 86400000;
+  const d24mo= 730 * 86400000;
 
-  // Sum T/O + landings in a time window
-  function sumIn(ms, toField, lndField) {
-    return flights
-      .filter(f => now - new Date(f.date+'T12:00:00').getTime() < ms)
-      .reduce((acc,f) => ({
-        to:  acc.to  + (f[toField]||0),
-        lnd: acc.lnd + (f[lndField]||0),
-      }), {to:0, lnd:0});
+  function fDate(d) { return new Date(String(d).slice(0,10)+'T12:00:00').getTime(); }
+
+  function sumIn(ms, toF, lndF) {
+    return flights.filter(f => now - fDate(f.date) < ms)
+      .reduce((a,f) => ({ to: a.to+(f[toF]||0), lnd: a.lnd+(f[lndF]||0) }), {to:0,lnd:0});
   }
 
-  const day90   = sumIn(d90, 'day_takeoffs', 'day_landings_full_stop');
-  // Fallback: if no ForeFlight-style fields, use generic takeoffs/landings
-  const dayTO   = day90.to  || sumIn(d90, 'takeoffs', 'landings').to;
-  const dayLnd  = day90.lnd || sumIn(d90, 'takeoffs', 'landings').lnd;
-  const dayCur  = dayTO>=3 && dayLnd>=3;
+  // Day VFR §61.57(a)
+  const day90  = sumIn(d90, 'day_takeoffs', 'day_landings_full_stop');
+  const dayTO  = day90.to  || sumIn(d90, 'takeoffs', 'landings').to;
+  const dayLnd = day90.lnd || sumIn(d90, 'takeoffs', 'landings').lnd;
+  const dayCur = dayTO >= 3 && dayLnd >= 3;
 
-  const ngt90   = sumIn(d90, 'night_takeoffs', 'night_landings_full_stop');
-  const ngtTO   = ngt90.to;
-  const ngtLnd  = ngt90.lnd;
-  const ngtCur  = ngtTO>=3 && ngtLnd>=3;
-
-  const lastBFR = flights
-    .filter(f => f.flight_review)
-    .sort((a,b) => new Date(b.date)-new Date(a.date))[0];
-  const bfrAge  = lastBFR ? now - new Date(lastBFR.date+'T12:00:00').getTime() : null;
-  const bfrCur  = bfrAge!==null && bfrAge < d24mo;
-  const bfrDays = bfrAge!==null ? Math.floor((d24mo - bfrAge)/86400000) : null;
-
-  // Days until day currency lapses (when 3rd most recent T/O falls out of 90d window)
   function daysToLapse(flts, toF, lndF) {
-    // Collect individual T/O events by date, sorted newest first
     const ops = [];
     for (const f of flts) {
       const n = (f[toF]||0) + (f[lndF]||0);
-      if (n > 0) ops.push({ date: new Date(f.date+'T12:00:00').getTime(), n });
+      if (n > 0) ops.push({ t: fDate(f.date), n });
     }
-    ops.sort((a,b) => b.date-a.date);
-    let cum=0;
+    ops.sort((a,b) => b.t - a.t);
+    let cum = 0;
     for (const op of ops) {
       cum += op.n;
-      if (cum >= 6) { // 3 T/O + 3 landings = at minimum 6 ops
-        return Math.floor((op.date + d90 - now) / 86400000);
-      }
+      if (cum >= 6) return Math.floor((op.t + d90 - now) / 86400000);
     }
     return null;
   }
-
   const dayDays = dayCur ? daysToLapse(flights,'day_takeoffs','day_landings_full_stop') : null;
 
-  function getBadgeStyle(type) {
-    const light = document.documentElement.getAttribute('data-theme') === 'light';
-    if (type === 'expiring') return light ? 'background:#fef5e4;color:#8a6010' : 'background:#271f0b;color:#c09030';
-    if (type === 'current')  return light ? 'background:#e8f5ee;color:#237a50' : 'background:#0e2222;color:#3d9494';
-    return light ? 'background:#fde8e8;color:#b03030' : 'background:#221414;color:#cc5050';
+  // Night VFR §61.57(b)
+  const ngt90  = sumIn(d90, 'night_takeoffs', 'night_landings_full_stop');
+  const ngtTO  = ngt90.to;
+  const ngtLnd = ngt90.lnd;
+  const ngtCur = ngtTO >= 3 && ngtLnd >= 3;
+
+  // Instrument currency §61.57(c)
+  const ifrApps6  = flights.filter(f => now - fDate(f.date) < d6mo)
+    .reduce((s,f) => s + (Array.isArray(f.approaches) ? f.approaches.length : 0), 0);
+  const ifrApps12 = flights.filter(f => now - fDate(f.date) < d24mo)
+    .reduce((s,f) => s + (Array.isArray(f.approaches) ? f.approaches.length : 0), 0);
+  const ifrTotal  = flights.reduce((s,f) => s + (Array.isArray(f.approaches) ? f.approaches.length : 0), 0);
+  const ifrCur    = ifrApps6 >= 6;
+  const ifrGrace  = !ifrCur && ifrApps12 >= 6; // within grace period
+
+  // IPC check
+  const lastIPC = flights.filter(f => f.ipc).sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+
+  // Flight Review §61.56
+  const lastBFR  = flights.filter(f => f.flight_review).sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+  const bfrAge   = lastBFR ? now - fDate(lastBFR.date) : null;
+  const bfrCur   = bfrAge !== null && bfrAge < d24mo;
+  const bfrDays  = bfrAge !== null ? Math.floor((d24mo - bfrAge) / 86400000) : null;
+
+  // Badge helper
+  function bs(type) {
+    const lt = document.documentElement.getAttribute('data-theme') === 'light';
+    if (type === 'expiring') return lt ? 'background:#fef5e4;color:#8a6010' : 'background:#271f0b;color:#c09030';
+    if (type === 'current')  return lt ? 'background:#e8f5ee;color:#237a50' : 'background:#0e2222;color:#4aaa80';
+    if (type === 'grace')    return lt ? 'background:#fdf0e4;color:#8a5010' : 'background:#251808;color:#b07030';
+    if (type === 'na')       return lt ? 'background:#f0f0f0;color:#888'    : 'background:#1e1e1e;color:#666';
+    return lt ? 'background:#fde8e8;color:#b03030' : 'background:#221414;color:#cc5050';
   }
 
-  function row(name, current, daysLeft, detail) {
-    let dotColor, badgeStyle, badgeText;
-    if (current && daysLeft!==null && daysLeft<=15) {
-      dotColor='#b08030'; badgeStyle=getBadgeStyle('expiring'); badgeText=`exp in ${daysLeft}d`;
+  function row(name, sub, current, daysLeft, detail, type) {
+    let dot, badge, btext;
+    if (type === 'na') {
+      dot='#505860'; badge=bs('na'); btext='—';
+    } else if (type === 'grace') {
+      dot='#b07030'; badge=bs('grace'); btext='grace period';
+    } else if (current && daysLeft !== null && daysLeft <= 30) {
+      dot='#b08030'; badge=bs('expiring'); btext=`${daysLeft}d left`;
     } else if (current) {
-      dotColor='#3d9494'; badgeStyle=getBadgeStyle('current'); badgeText='current';
+      dot='#4aaa80'; badge=bs('current'); btext='current';
     } else {
-      dotColor='#b05050'; badgeStyle=getBadgeStyle('lapsed'); badgeText='lapsed';
+      dot='#b05050'; badge=bs('lapsed'); btext='lapsed';
     }
     return `<div class="cur-row">
-      <div class="cur-dot" style="background:${dotColor}"></div>
-      <div class="cur-name">${name}</div>
-      <span class="cur-badge" style="${badgeStyle}">${badgeText}</span>
-      ${detail?`<div class="cur-days">${detail}</div>`:''}
+      <div class="cur-dot" style="background:${dot}"></div>
+      <div><div class="cur-name">${name}</div>${sub?`<div class="cur-sub">${sub}</div>`:''}</div>
+      <span class="cur-badge" style="${badge}">${btext}</span>
+      <div class="cur-days">${detail||''}</div>
     </div>`;
   }
 
-  const dayDetail  = dayCur  ? (dayDays!==null?`${dayDays}d`:'') : `${dayTO} T/O · ${dayLnd} lnd`;
-  const ngtDetail  = ngtCur  ? '' : `${ngtTO} T/O · ${ngtLnd} lnd`;
-  const bfrDetail  = bfrDays!==null ? (bfrCur?`${bfrDays}d`:`${-bfrDays}d ago`) : 'none logged';
+  // Medical section
+  const med = getMedData();
+  let medHtml = '';
+  if (med.date) {
+    const expiry = getMedExpiry(med.cls, med.under40, med.date);
+    const dLeft  = expiry ? Math.floor((expiry - Date.now()) / 86400000) : null;
+    const expired = dLeft !== null && dLeft < 0;
+    const expStr  = expiry ? expiry.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const privilege = med.cls === '1' ? (med.under40 ? '12 months first-class' : '6 months first-class')
+                    : med.cls === '2' ? '12 months second-class'
+                    : med.cls === 'basicmed' ? '48 months'
+                    : (med.under40 ? '60 months' : '24 months');
+    const dot   = expired ? '#b05050' : dLeft < 60 ? '#b08030' : '#4aaa80';
+    const light = document.documentElement.getAttribute('data-theme') === 'light';
+    const badge = expired
+      ? (light?'background:#fde8e8;color:#b03030':'background:#221414;color:#cc5050')
+      : dLeft < 60
+        ? (light?'background:#fef5e4;color:#8a6010':'background:#271f0b;color:#c09030')
+        : (light?'background:#e8f5ee;color:#237a50':'background:#0e2222;color:#4aaa80');
+    const btext = expired ? `exp ${-dLeft}d ago` : `${dLeft}d left`;
+    medHtml = `<div class="cur-row">
+      <div class="cur-dot" style="background:${dot}"></div>
+      <div>
+        <div class="cur-name">${MED_LABEL[med.cls]} Medical</div>
+        <div class="cur-sub">Expires ${expStr} · ${privilege}</div>
+      </div>
+      <span class="cur-badge" style="${badge}">${btext}</span>
+      <div class="cur-days"></div>
+    </div>`;
+  } else {
+    medHtml = `<div class="cur-row">
+      <div class="cur-dot" style="background:#505860"></div>
+      <div><div class="cur-name">Medical Certificate</div><div class="cur-sub">No exam date set</div></div>
+      <span class="cur-badge" style="${bs('na')}">—</span>
+      <div class="cur-days"></div>
+    </div>`;
+  }
+
+  const dayDetail = dayCur ? (dayDays!==null?`${dayDays}d`:'') : `${dayTO} T/O · ${dayLnd} lnd`;
+  const ngtDetail = ngtCur ? '' : `${ngtTO} T/O · ${ngtLnd} lnd`;
+  const bfrDetail = bfrDays!==null ? (bfrCur?`${bfrDays}d`:`${-bfrDays}d ago`) : 'none logged';
+  const ifrDetail = ifrTotal === 0 ? 'none logged' : `${ifrApps6} in 6mo`;
 
   el.innerHTML = `
     <div class="ov-card-hd">FAA Currency <span style="font-size:10px;color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none">§61.57</span></div>
-    <div class="cur-rows">
-      ${row('Day VFR', dayCur, dayDays, dayDetail)}
-      ${row('Night VFR', ngtCur, null, ngtDetail)}
-      ${row('Flight Review', bfrCur, bfrDays!==null&&bfrDays<60?bfrDays:null, bfrDetail)}
+
+    <div class="cur-section-hdr">
+      <span>Medical Certificate</span>
+      <button class="cur-edit-btn" title="Edit medical" onclick="this.closest('.ov-card').querySelector('.cur-med-form').classList.toggle('open')">
+        <i class="ph-bold ph-pencil-simple"></i>
+      </button>
     </div>
-    <div style="margin-top:12px;font-size:11px;color:var(--faint)">Based on ${flights.length} logged flight${flights.length!==1?'s':''}</div>
+    <div class="cur-rows">${medHtml}</div>
+    <div class="cur-med-form" id="cur-med-form">
+      <select class="cur-med-sel" id="med-cls-sel" onchange="saveMed()">
+        <option value="1" ${med.cls==='1'?'selected':''}>First Class</option>
+        <option value="2" ${med.cls==='2'?'selected':''}>Second Class</option>
+        <option value="3" ${med.cls==='3'?'selected':''}>Third Class</option>
+        <option value="basicmed" ${med.cls==='basicmed'?'selected':''}>BasicMed</option>
+      </select>
+      <label class="cur-med-toggle">
+        <input type="checkbox" id="med-u40" onchange="saveMed()" ${med.under40?'checked':''}> Under 40
+      </label>
+      <input type="date" class="cur-med-date" id="med-date-inp" value="${med.date}" onchange="saveMed()">
+    </div>
+
+    <div class="cur-section-hdr"><span>Pilot Currency</span></div>
+    <div class="cur-rows">
+      ${row('Day VFR', '3 T/O + landings in 90 days · §61.57(a)', dayCur, dayDays, dayDetail)}
+      ${row('Night VFR', '3 night T/O + landings in 90 days · §61.57(b)', ngtCur, null, ngtDetail)}
+      ${ifrTotal > 0 || ifrApps12 > 0
+        ? row('Instrument', '6 approaches + holds in 6 months · §61.57(c)', ifrCur, null, ifrDetail, ifrGrace?'grace':undefined)
+        : row('Instrument', '6 approaches + holds in 6 months · §61.57(c)', false, null, ifrDetail, 'na')}
+      ${row('Flight Review', 'Every 24 calendar months · §61.56', bfrCur, bfrDays!==null&&bfrDays<60?bfrDays:null, bfrDetail)}
+    </div>
+
+    <div style="margin-top:10px;font-size:11px;color:var(--faint)">Based on ${flights.length} logged flight${flights.length!==1?'s':''}</div>
   `;
 }
 
+function saveMed() {
+  const cls    = document.getElementById('med-cls-sel')?.value || '3';
+  const under40= document.getElementById('med-u40')?.checked !== false;
+  const date   = document.getElementById('med-date-inp')?.value || '';
+  localStorage.setItem('med-cls', cls);
+  localStorage.setItem('med-under40', String(under40));
+  localStorage.setItem('med-date', date);
+  renderFlightCurrency(window._flights || []);
+  document.getElementById('cur-med-form')?.classList.add('open');
+}
+
 // ─── charts ───────────────────────────────────────────────────────────────────
+
+// Full 30-day date array in local time (oldest first), format "YYYY-MM-DD"
+function last30Days() {
+  return Array.from({ length: 30 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
+  });
+}
+
+function fmtChartDate(dayStr, opts) {
+  // Parse as local noon to avoid UTC-shift edge cases
+  return new Date(dayStr + 'T12:00:00').toLocaleDateString('en-US', opts);
+}
+
+function chartTooltipTitle(allDays, items) {
+  const idx = items?.[0]?.dataIndex ?? -1;
+  if (idx < 0 || !allDays[idx]) return '';
+  return fmtChartDate(allDays[idx], { weekday:'short', month:'short', day:'numeric' });
+}
+
 function buildVolumeChart(activities) {
   const cfg = getChartCfg();
-  const days = {}, cutoff = Date.now() - 30*86400000;
+  const cutoffStr = last30Days()[0];
+  const dayData = {};
+  let totalHrs = 0;
+
   for (const a of activities) {
-    const ts = new Date(a.startTimeLocal||0).getTime();
+    const day = (a.startTimeLocal || '').slice(0, 10);
+    if (!day || day < cutoffStr) continue;
     const dur = (a.movingDuration || a.duration || 0) / 3600;
-    if (ts < cutoff || dur <= 0) continue;
-    const day = new Date(ts).toISOString().slice(0,10);
-    if (!days[day]) days[day] = { running:0, cycling:0, swimming:0, rowing:0, other:0 };
-    days[day][normSport(a.activityType?.typeKey)] += dur;
+    if (dur <= 0) continue;
+    if (!dayData[day]) dayData[day] = { running:0, cycling:0, swimming:0, rowing:0, strength:0, other:0 };
+    const sport = normSport(a.activityType?.typeKey);
+    const key = ['running','cycling','swimming','rowing','strength'].includes(sport) ? sport : 'other';
+    dayData[day][key] = (dayData[day][key] || 0) + dur;
+    totalHrs += dur;
   }
-  const sorted = Object.keys(days).sort();
-  const step = Math.max(1, Math.floor(sorted.length / 6));
-  const labels = sorted.map((d,i) => i%step===0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
-  const sports = ['running','cycling','swimming','rowing','other'].filter(sp => sorted.some(d => days[d][sp] > 0));
-  _cjsRender(document.getElementById('chart-volume'), {
+
+  // Only days that have data — gives natural bar width, no dead space
+  const days = Object.keys(dayData).sort();
+  const sports = ['running','cycling','swimming','rowing','strength','other']
+    .filter(sp => days.some(d => (dayData[d][sp] || 0) > 0));
+
+  const el = document.getElementById('chart-volume');
+  const lbl = el?.closest('.chart-card')?.querySelector('.chart-label');
+  if (lbl) lbl.innerHTML = `30-day volume <span class="chart-sublabel">${totalHrs.toFixed(1)} hrs · ${days.length} sessions</span>`;
+
+  if (!days.length) { el.innerHTML = '<div style="padding:20px;color:var(--faint);font-size:12px">No activity data</div>'; return; }
+
+  _cjsRender(el, {
     type: 'bar',
     data: {
-      labels,
+      labels: days.map(d => fmtChartDate(d, { month:'short', day:'numeric' })),
       datasets: sports.map(sp => ({
         label: SPORT_CFG[sp].label,
-        data: sorted.map(d => parseFloat((days[d][sp]||0).toFixed(2))),
-        backgroundColor: SPORT_CFG[sp].color + 'c8',
-        borderRadius: 2,
-        maxBarThickness: 22,
+        data: days.map(d => parseFloat((dayData[d][sp] || 0).toFixed(2))),
+        backgroundColor: SPORT_CFG[sp].color + 'cc',
+        borderRadius: 3,
+        barPercentage: 0.7,
+        categoryPercentage: 0.85,
         stack: 'vol',
       }))
     },
@@ -2184,25 +2648,34 @@ function buildVolumeChart(activities) {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'circle' } },
-        tooltip: { ...cfg.tt, callbacks: {
-          label: c => c.raw > 0 ? `${c.dataset.label}: ${c.raw.toFixed(1)} hr` : null,
-          footer: items => { const t = items.reduce((s,c)=>s+c.raw,0); return t > 0 ? `Total: ${t.toFixed(1)} hr` : null; },
-        }},
+        legend: {
+          labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 7, boxHeight: 7, padding: 12, usePointStyle: true, pointStyle: 'circle' },
+          onClick: () => {},
+        },
+        tooltip: { ...cfg.tt,
+          callbacks: {
+            title: items => { const i = items[0]?.dataIndex; return days[i] ? fmtChartDate(days[i], { weekday:'short', month:'short', day:'numeric' }) : ''; },
+            label: c => c.raw > 0 ? `${c.dataset.label}: ${c.raw.toFixed(1)}h` : null,
+            footer: items => { const t = items.reduce((s,c)=>s+(c.raw||0), 0); return t > 0.01 ? `Total: ${t.toFixed(1)}h` : null; },
+          }
+        },
       },
-      scales: { x: cfg.scaleX, y: { ...cfg.scaleY, stacked: true, ticks: { ...cfg.scaleY.ticks, callback: v => v.toFixed(1) } } },
+      scales: {
+        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 10, maxRotation: 0 } },
+        y: { ...cfg.scaleY, stacked: true, ticks: { ...cfg.scaleY.ticks, callback: v => v > 0 ? `${v}h` : '0' } },
+      },
     }
-  });
+  }, 175);
 }
 
 function buildLoadChart(activities) {
   const cfg = getChartCfg();
-  const cutoff = Date.now() - 30*86400000;
+  const cutoffStr = last30Days()[0];
   const dayMap = {};
+
   for (const a of activities) {
-    const ts = new Date(a.startTimeLocal).getTime();
-    if (ts < cutoff || !a.activityTrainingLoad) continue;
-    const day = new Date(ts).toISOString().slice(0,10);
+    const day = (a.startTimeLocal || '').slice(0, 10);
+    if (!day || day < cutoffStr || !a.activityTrainingLoad) continue;
     if (!dayMap[day]) dayMap[day] = { load: 0, sport: 'other', topLoad: 0 };
     dayMap[day].load += a.activityTrainingLoad;
     if (a.activityTrainingLoad > dayMap[day].topLoad) {
@@ -2210,29 +2683,51 @@ function buildLoadChart(activities) {
       dayMap[day].sport = normSport(a.activityType?.typeKey);
     }
   }
-  const sorted = Object.keys(dayMap).sort();
-  const loads  = sorted.map(d => Math.round(dayMap[d].load));
-  const colors = sorted.map(d => SPORT_CFG[dayMap[d].sport].color + 'c8');
-  const step   = Math.max(1, Math.floor(sorted.length / 6));
-  const labels = sorted.map((d,i) => i%step===0 ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '');
-  const avg7   = loads.map((_,i) => { const sl=loads.slice(Math.max(0,i-6),i+1); return Math.round(sl.reduce((s,v)=>s+v,0)/sl.length); });
-  _cjsRender(document.getElementById('chart-load'), {
+
+  // Only workout days — same approach as volume chart
+  const days = Object.keys(dayMap).sort();
+  const loads  = days.map(d => Math.round(dayMap[d].load));
+  const colors = days.map(d => SPORT_CFG[dayMap[d].sport || 'other'].color + 'cc');
+  const totalLoad = loads.reduce((s, v) => s + v, 0);
+
+  const el = document.getElementById('chart-load');
+  const lbl = el?.closest('.chart-card')?.querySelector('.chart-label');
+  if (lbl) lbl.innerHTML = `30-day load <span class="chart-sublabel">${totalLoad.toLocaleString()} total</span>`;
+
+  if (!days.length) { el.innerHTML = '<div style="padding:20px;color:var(--faint);font-size:12px">No load data</div>'; return; }
+
+  _cjsRender(el, {
     type: 'bar',
     data: {
-      labels,
-      datasets: [
-        { label: 'Load', data: loads, backgroundColor: colors, borderRadius: 3, maxBarThickness: 22, order: 2 },
-        { label: '7d avg', data: avg7, type: 'line', borderColor: cfg.tickColor, borderWidth: 1.5,
-          borderDash: [3,3], pointRadius: 0, fill: false, order: 1, tension: 0.3 },
-      ]
+      labels: days.map(d => fmtChartDate(d, { month:'short', day:'numeric' })),
+      datasets: [{
+        label: 'Training Load',
+        data: loads,
+        backgroundColor: colors,
+        borderRadius: 3,
+        barPercentage: 0.7,
+        categoryPercentage: 0.85,
+      }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: { label: c => c.dataset.label === '7d avg' ? `7d avg: ${c.raw}` : `Load: ${c.raw}` } } },
-      scales: { x: cfg.scaleX, y: cfg.scaleY },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...cfg.tt,
+          callbacks: {
+            title: items => { const i = items[0]?.dataIndex; return days[i] ? fmtChartDate(days[i], { weekday:'short', month:'short', day:'numeric' }) : ''; },
+            label: c => `Load: ${c.raw}`,
+          }
+        },
+      },
+      scales: {
+        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 10, maxRotation: 0 } },
+        y: cfg.scaleY,
+      },
     }
-  });
+  }, 175);
 }
 
 function buildHRChart(activities) {
@@ -2316,47 +2811,139 @@ function buildZonesChart(activities) {
 }
 
 // ─── activity list ────────────────────────────────────────────────────────────
+let _actSport = 'all';
+
+const TE_LABEL = {
+  vo2max: 'VO₂ Max', aerobic_base: 'Base', aerobic_capacity: 'Capacity',
+  lactate_threshold: 'Threshold', anaerobic: 'Anaerobic',
+  tempo: 'Tempo', recovery: 'Recovery',
+};
+const TE_COLOR = {
+  vo2max: '#5a88c0', aerobic_base: '#5db87c', aerobic_capacity: '#5db87c',
+  lactate_threshold: '#c07030', anaerobic: '#c04040',
+  tempo: '#c99c3a', recovery: '#7a8a98',
+};
+function fmtTE(te) {
+  if (!te) return '';
+  const label = TE_LABEL[te] || te.replace(/_/g, ' ');
+  const color = TE_COLOR[te] || '#7a8a98';
+  return `<span class="act-te" style="color:${color};background:${color}28">${label}</span>`;
+}
+
+function actRowHtml(a) {
+  const sport = normSport(a.activityType?.typeKey);
+  const { color, icon, label } = SPORT_CFG[sport];
+  const te = a.trainingEffectLabel;
+  const dur = a.movingDuration || a.duration;
+
+  const metrics = [];
+  if (a.distance > 0) {
+    metrics.push({ v: fmtDist(a.distance), l: 'dist', c: color });
+    if (dur > 0) {
+      const timeLabel = (sport === 'running' || sport === 'swimming') && a.averageSpeed > 0
+        ? fmtPace(a.averageSpeed)
+        : sport === 'cycling' && a.averageSpeed > 0
+          ? (a.averageSpeed * 2.23694).toFixed(1) + ' mph'
+          : 'time';
+      metrics.push({ v: fmtTime(dur), l: timeLabel, c: 'var(--champagne)' });
+    }
+  } else if (dur > 0) {
+    metrics.push({ v: fmtTime(dur), l: 'time', c: 'var(--champagne)' });
+  }
+  if (a.averageHR > 0) metrics.push({ v: String(a.averageHR), l: 'bpm', c: 'oklch(65% 0.15 350)' });
+  if (a.activityTrainingLoad > 0) metrics.push({ v: String(Math.round(a.activityTrainingLoad)), l: 'load', c: 'var(--patina-text)' });
+
+  return `<div class="act-row" data-id="${a.activityId}" style="border-left-color:${color}55">
+    <div class="act-summary">
+      <div class="act-icon" style="background:color-mix(in oklch, ${color} 12%, var(--raised))">
+        <i class="ph-bold ${icon}" style="color:${color}"></i>
+      </div>
+      <div class="act-body">
+        <div class="act-name">${esc(a.activityName || label)}</div>
+        <div class="act-meta">
+          <span>${fmtDate(a.startTimeLocal)}</span>
+          <span style="color:var(--faint)">·</span>
+          <span>${label}</span>
+          ${te ? fmtTE(te) : ''}
+        </div>
+      </div>
+      ${metrics.length ? `<div class="act-metrics">
+        ${metrics.map(m => `<div class="act-metric">
+          <div class="act-metric-v" style="color:${m.c}">${m.v}</div>
+          <div class="act-metric-l">${m.l}</div>
+        </div>`).join('')}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+const PRIMARY_SPORTS = new Set(['running', 'cycling', 'swimming', 'rowing', 'strength']);
+
+function filterActivities() {
+  const all = window._actsArr || [];
+  const q = (document.getElementById('act-search')?.value || '').toLowerCase();
+  const filtered = all.filter(a => {
+    const sport = normSport(a.activityType?.typeKey);
+    if (_actSport !== 'all') {
+      if (_actSport === 'other') {
+        if (PRIMARY_SPORTS.has(sport)) return false;
+      } else if (sport !== _actSport) {
+        return false;
+      }
+    }
+    if (q && !(a.activityName||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const totalAll = all.length;
+  const countEl = document.getElementById('act-count');
+  if (countEl) {
+    countEl.textContent = filtered.length < totalAll
+      ? `· ${filtered.length} of ${totalAll} sessions`
+      : `· ${totalAll} sessions`;
+  }
+
+  const list = document.getElementById('act-list');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="act-empty">No activities match</div>`;
+    return;
+  }
+
+  // Group by month
+  const groups = [];
+  let lastKey = null;
+  for (const a of filtered) {
+    const d = new Date(a.startTimeLocal);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (key !== lastKey) { groups.push({ label, rows: [] }); lastKey = key; }
+    groups[groups.length - 1].rows.push(a);
+  }
+
+  list.innerHTML = groups.map(g =>
+    `<div class="act-month-hdr">${g.label}</div>` + g.rows.map(actRowHtml).join('')
+  ).join('');
+
+  list.querySelectorAll('.act-row').forEach(row => {
+    row.addEventListener('click', () => navigate('activity', row.dataset.id));
+  });
+}
+
+function setActSport(sport) {
+  _actSport = sport;
+  document.querySelectorAll('.act-chip').forEach(c => c.classList.toggle('active', c.dataset.sport === sport));
+  filterActivities();
+}
+
 function renderActivities(activities) {
   document.getElementById('act-count').textContent = `· ${activities.length} sessions`;
   window._acts = {};
   for (const a of activities) window._acts[a.activityId] = a;
-
-  document.getElementById('act-list').innerHTML = activities.slice(0,50).map(a => {
-    const sport = normSport(a.activityType?.typeKey);
-    const { color, icon, label } = SPORT_CFG[sport];
-    const id = a.activityId;
-    const te = a.trainingEffectLabel;
-    return `<div class="act-row" data-id="${id}">
-      <div class="act-summary">
-        <div class="act-icon" style="background:color-mix(in oklch, ${color} 15%, var(--raised))">
-          <i class="ph-bold ${icon}" style="color:${color}"></i>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="act-name">${esc(a.activityName||label)}</div>
-          <div class="act-date">${fmtDate(a.startTimeLocal)} · <span style="color:var(--faint)">${label}</span></div>
-        </div>
-        <div class="act-kpis">
-          ${a.distance > 0 ? `<div class="act-kpi">
-            <div class="act-kpi-v" style="color:${color}">${fmtDist(a.distance)}</div>
-            <div class="act-kpi-l">${fmtTime(a.movingDuration||a.duration)}</div>
-          </div>` : (a.movingDuration > 0 ? `<div class="act-kpi-v">${fmtTime(a.movingDuration)}</div>` : '')}
-          ${a.averageHR > 0 ? `<div class="act-kpi">
-            <div class="act-kpi-v" style="color:oklch(65% 0.15 350)">${a.averageHR} bpm</div>
-            <div class="act-kpi-l">avg HR</div>
-          </div>` : ''}
-          ${a.activityTrainingLoad > 0 ? `<div class="act-kpi">
-            <div class="act-kpi-v" style="color:var(--patina-text)">${Math.round(a.activityTrainingLoad)}</div>
-            <div class="act-kpi-l">load</div>
-          </div>` : ''}
-          ${te ? `<span class="badge" style="color:var(--faint);border-color:var(--rule)">${esc(te.toLowerCase())}</span>` : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.querySelectorAll('.act-row').forEach(row => {
-    row.addEventListener('click', () => navigate('activity', row.dataset.id));
-  });
+  _actSport = 'all';
+  document.querySelectorAll('.act-chip').forEach(c => c.classList.toggle('active', c.dataset.sport === 'all'));
+  const search = document.getElementById('act-search');
+  if (search) search.value = '';
+  filterActivities();
 }
 
 // ─── activity detail page ─────────────────────────────────────────────────────
@@ -2380,6 +2967,10 @@ async function showActivityDetail(id) {
     a.averageHR > 0 ? { label:'Avg HR', val: a.averageHR+' bpm', color:'oklch(65% 0.15 350)' } : null,
   ].filter(Boolean);
 
+  const hasMap = !!a.hasPolyline;
+
+  if (_actMap) { try { _actMap.remove(); } catch(_) {} _actMap = null; }
+
   content.innerHTML = `
     <div class="detail-header">
       <div class="detail-sport-chip">
@@ -2396,16 +2987,40 @@ async function showActivityDetail(id) {
         </div>`).join('')}
       </div>
     </div>
+    ${hasMap ? `
+    <div id="act-map-container">
+      <div id="act-map"></div>
+      <div id="act-map-spinner" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--canvas);border-radius:var(--r-md)">
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <div id="act-elevation-wrap"><div id="act-elevation-chart"></div></div>` : ''}
     <div id="act-detail-body">
       <div style="display:flex;align-items:center;gap:8px;color:var(--muted)"><div class="spinner"></div> Loading…</div>
     </div>`;
 
-  try {
-    const detail = await fetch('/api/activities/' + id).then(r => r.json());
-    document.getElementById('act-detail-body').innerHTML = buildActivityDetailHTML(a, detail);
-  } catch(e) {
-    document.getElementById('act-detail-body').innerHTML =
-      `<div style="color:var(--warn);font-size:13px">Failed to load activity detail.</div>`;
+  const [detailResult, gpxResult] = await Promise.allSettled([
+    fetch('/api/activities/' + id).then(r => r.json()),
+    hasMap ? fetch('/api/activities/' + id + '/gpx').then(r => r.ok ? r.json() : null) : Promise.resolve(null),
+  ]);
+
+  const body = document.getElementById('act-detail-body');
+  if (body) {
+    if (detailResult.status === 'fulfilled') {
+      body.innerHTML = buildActivityDetailHTML(a, detailResult.value);
+    } else {
+      body.innerHTML = `<div style="color:var(--warn);font-size:13px">Failed to load activity detail.</div>`;
+    }
+  }
+
+  const gpxData = gpxResult?.status === 'fulfilled' ? gpxResult.value : null;
+  if (hasMap && gpxData?.points?.length >= 2) {
+    requestAnimationFrame(() => initActRouteMap(gpxData.points, sport, color));
+  } else if (hasMap) {
+    const spinner = document.getElementById('act-map-spinner');
+    if (spinner) spinner.remove();
+    const wrap = document.getElementById('act-elevation-wrap');
+    if (wrap) wrap.remove();
   }
 }
 
@@ -2518,6 +3133,108 @@ function buildActivityDetailHTML(a, detail) {
   return metricsHTML + teHTML + zonesHTML + splitsHTML + descHTML;
 }
 
+function initActRouteMap(points, sport, color) {
+  const container = document.getElementById('act-map');
+  if (!container) return;
+
+  const mapStyle = document.documentElement.getAttribute('data-theme') === 'light'
+    ? 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+  _actMap = new maplibregl.Map({
+    container: 'act-map',
+    style: mapStyle,
+    center: points[0],
+    zoom: 13,
+    attributionControl: false,
+  });
+  _actMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  _actMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  _actMap.on('load', () => {
+    const spinner = document.getElementById('act-map-spinner');
+    if (spinner) spinner.remove();
+
+    const coords = points.map(p => [p[0], p[1]]);
+    _actMap.addSource('act-route', {
+      type: 'geojson',
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
+    });
+    _actMap.addLayer({ id: 'act-route-glow', type: 'line', source: 'act-route',
+      paint: { 'line-color': color, 'line-width': 10, 'line-opacity': 0.2, 'line-blur': 8 } });
+    _actMap.addLayer({ id: 'act-route-line', type: 'line', source: 'act-route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': color, 'line-width': 2.5, 'line-opacity': 0.95 } });
+
+    const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+    _actMap.fitBounds(bounds, { padding: 60, duration: 600 });
+
+    // Start (green) and end (gold) markers
+    new maplibregl.Marker({ color: 'oklch(65% 0.16 145)' }).setLngLat(coords[0]).addTo(_actMap);
+    new maplibregl.Marker({ color: 'oklch(80% 0.17 85)' }).setLngLat(coords[coords.length - 1]).addTo(_actMap);
+
+    if (points.some(p => p[2] != null)) buildElevationChart(points);
+  });
+}
+
+function buildElevationChart(points) {
+  const wrap = document.getElementById('act-elevation-wrap');
+  const el   = document.getElementById('act-elevation-chart');
+  if (!el || !window.Chart) return;
+
+  function haversineMi(a, b) {
+    const R = 3958.8, dLat = (b[1]-a[1])*Math.PI/180, dLon = (b[0]-a[0])*Math.PI/180;
+    const s = Math.sin(dLat/2)**2 + Math.cos(a[1]*Math.PI/180)*Math.cos(b[1]*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.asin(Math.sqrt(s));
+  }
+
+  const labels = [], data = [];
+  let dist = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) dist += haversineMi(points[i-1], points[i]);
+    if (points[i][2] != null) {
+      labels.push(dist.toFixed(2));
+      data.push(+(points[i][2] * 3.28084).toFixed(0));
+    }
+  }
+  if (data.length < 2) { if (wrap) wrap.remove(); return; }
+
+  _cjsRender(el, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: 'oklch(70% 0.12 188)',
+        backgroundColor: 'oklch(70% 0.12 188 / 0.15)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: {
+          ticks: { color: 'oklch(60% 0 0)', font: { size: 10 }, maxTicksLimit: 7,
+            callback: (_, i) => labels[i] !== undefined ? labels[i] + ' mi' : '' },
+          grid: { color: 'oklch(100% 0 0 / 0.05)' },
+          border: { display: false },
+        },
+        y: {
+          ticks: { color: 'oklch(60% 0 0)', font: { size: 10 },
+            callback: v => v + ' ft' },
+          grid: { color: 'oklch(100% 0 0 / 0.05)' },
+          border: { display: false },
+        },
+      },
+    },
+  }, 90);
+}
+
 // ─── logbook ──────────────────────────────────────────────────────────────────
 function renderLogbookStats(s) {
   const h   = v => parseFloat(v||0) > 0 ? parseFloat(v).toFixed(1)+'h' : '—';
@@ -2563,17 +3280,37 @@ function renderLogbookStats(s) {
   document.getElementById('fl-subtitle').textContent = `· ${s.total_hours}h · PPL training`;
 }
 
+const FL_PER_PAGE = 20;
+let _flPage = 0;
+
+function flPageStep(dir) {
+  const total = (window._flights || []).length;
+  const pages = Math.ceil(total / FL_PER_PAGE);
+  _flPage = Math.max(0, Math.min(pages - 1, _flPage + dir));
+  renderFlights(window._flights || []);
+}
+
 function renderFlights(flights) {
   if (!flights.length) {
     document.getElementById('fl-list').innerHTML =
       '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">No flights logged yet.</div>';
+    const pg = document.getElementById('fl-pagination');
+    if (pg) pg.style.display = 'none';
     return;
   }
-  document.getElementById('fl-list').innerHTML = flights.map(f => {
+
+  const total = flights.length;
+  const pages = Math.ceil(total / FL_PER_PAGE);
+  _flPage = Math.max(0, Math.min(pages - 1, _flPage));
+  const page = flights.slice(_flPage * FL_PER_PAGE, (_flPage + 1) * FL_PER_PAGE);
+
+  document.getElementById('fl-list').innerHTML = page.map(f => {
     const color   = typeColor(f.training_type);
     const id      = f.id;
     const soloTag = f.solo > 0 && !f.dual_given
       ? `<span class="badge" style="color:oklch(65% 0.15 350);border-color:oklch(65% 0.15 350)">solo</span>` : '';
+    const trackTag = f.has_track
+      ? `<span class="badge" style="color:var(--patina-text);border-color:var(--patina-text)"><i class="ph-bold ph-map-pin" style="font-size:9px"></i> route</span>` : '';
     const icaoStyle = 'color:var(--champagne);font-weight:600';
     return `<div class="fl-row" data-flid="${id}">
       <div class="fl-summary">
@@ -2582,7 +3319,7 @@ function renderFlights(flights) {
           <div class="fl-route">
             <span style="${icaoStyle}">${esc(routeLabel(f))}</span>
             <span class="badge" style="color:${color};border-color:${color}">${esc(typeLabel(f.training_type))}</span>
-            ${soloTag}
+            ${soloTag}${trackTag}
           </div>
           <div class="fl-meta">${new Date(f.date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})} · <span style="color:var(--faint)">${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</span></div>
         </div>
@@ -2622,6 +3359,19 @@ function renderFlights(flights) {
   document.querySelectorAll('.fl-row').forEach(row => {
     row.addEventListener('click', () => navigate('flight', row.dataset.flid));
   });
+
+  const pg = document.getElementById('fl-pagination');
+  if (pg) {
+    if (pages > 1) {
+      pg.style.display = 'flex';
+      document.getElementById('fl-page-label').textContent =
+        `${_flPage * FL_PER_PAGE + 1}–${Math.min((_flPage + 1) * FL_PER_PAGE, total)} of ${total}`;
+      document.getElementById('fl-prev').disabled = _flPage === 0;
+      document.getElementById('fl-next').disabled = _flPage >= pages - 1;
+    } else {
+      pg.style.display = 'none';
+    }
+  }
 }
 
 // ─── flight detail page ───────────────────────────────────────────────────────
@@ -2649,14 +3399,21 @@ async function showFlightDetail(id) {
   const acHTML = ac ? `
     <hr class="detail-rule">
     <div class="ac-card">
-      <div class="ac-title"><i class="ph-bold ph-airplane-tilt"></i> ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}</div>
-      <div class="ac-specs">
-        ${ac.engine_type ? `<div><span class="ac-spec-key">Engine</span> ${esc(ac.engine_type)}${ac.engine_hp?' ('+ac.engine_hp+' HP)':''}</div>` : ''}
-        ${ac.seats ? `<div><span class="ac-spec-key">Seats</span> ${ac.seats}</div>` : ''}
-        <div><span class="ac-spec-key">IFR</span> ${ac.ifr_equipped?'Equipped':'Not equipped'}</div>
-        ${ac.glass_cockpit ? `<div><span class="ac-spec-key">Avionics</span> Glass cockpit</div>` : ''}
-        ${ac.is_complex ? `<div><span class="ac-spec-key">Complex</span> Yes</div>` : ''}
-        ${ac.notes ? `<div style="grid-column:1/-1;color:var(--muted);font-size:13px;margin-top:4px">${esc(ac.notes)}</div>` : ''}
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div id="ac-photo-wrap" style="flex-shrink:0;width:120px;height:75px;border-radius:6px;overflow:hidden;background:var(--graphite);display:flex;align-items:center;justify-content:center">
+          <i class="ph-bold ph-airplane" style="font-size:24px;color:var(--disabled)"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="ac-title"><i class="ph-bold ph-airplane-tilt"></i> ${esc(ac.tail_number)} — ${esc(ac.make)} ${esc(ac.model)}${ac.year?' '+ac.year:''}</div>
+          <div class="ac-specs">
+            ${ac.engine_type ? `<div><span class="ac-spec-key">Engine</span> ${esc(ac.engine_type)}${ac.engine_hp?' ('+ac.engine_hp+' HP)':''}</div>` : ''}
+            ${ac.seats ? `<div><span class="ac-spec-key">Seats</span> ${ac.seats}</div>` : ''}
+            <div><span class="ac-spec-key">IFR</span> ${ac.ifr_equipped?'Equipped':'Not equipped'}</div>
+            ${ac.glass_cockpit ? `<div><span class="ac-spec-key">Avionics</span> Glass cockpit</div>` : ''}
+            ${ac.is_complex ? `<div><span class="ac-spec-key">Complex</span> Yes</div>` : ''}
+            ${ac.notes ? `<div style="grid-column:1/-1;color:var(--muted);font-size:13px;margin-top:4px">${esc(ac.notes)}</div>` : ''}
+          </div>
+        </div>
       </div>
     </div>` : '';
 
@@ -2703,13 +3460,16 @@ async function showFlightDetail(id) {
           <div class="val" style="color:${k.color}">${k.val}<span class="unit">${k.unit}</span></div>
         </div>`).join('')}
       </div>
-      <div id="flight-action-area" style="display:flex;gap:8px;margin-top:20px">
+      <div id="flight-action-area" style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
         <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:6px 12px">
           <i class="ph-bold ph-pencil-simple"></i> Edit
         </button>
         <button class="btn-ghost" id="delete-flight-btn" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:6px 12px">
           <i class="ph-bold ph-trash"></i> Delete
         </button>
+        ${f.aircraft?.mode_s_hex || true ? `<button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" style="font-size:12px;padding:6px 12px;color:var(--patina-text);border-color:var(--patina-text)">
+          <i class="ph-bold ph-map-pin"></i> ${f.has_track ? 'Update Route' : 'Find Route'}
+        </button>` : ''}
       </div>
     </div>
 
@@ -2752,11 +3512,146 @@ async function showFlightDetail(id) {
     <hr class="detail-rule">
     <div class="desc-block">${esc(f.remarks)}</div>` : ''}
 
-    ${f.foreflight_source ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
+    ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
   `;
 
   if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
   requestAnimationFrame(() => initFlightDetailMap(f));
+
+  // Load aircraft photo asynchronously
+  if (ac?.tail_number) {
+    fetch('/api/external/aircraft-photo/' + encodeURIComponent(ac.tail_number))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const wrap = document.getElementById('ac-photo-wrap');
+        if (!wrap) return;
+        const src = d?.thumbnail_large || d?.thumbnail;
+        if (src) {
+          const link = d?.link ? `href="${esc(d.link)}" target="_blank" rel="noopener"` : '';
+          wrap.innerHTML = `<a ${link} style="display:block;width:100%;height:100%">
+            <img src="${esc(src)}" alt="${esc(ac.tail_number)}"
+              style="width:100%;height:100%;object-fit:cover;border-radius:6px"
+              onerror="this.parentElement.parentElement.innerHTML='<i class=\\'ph-bold ph-airplane\\' style=\\'font-size:24px;color:var(--disabled)\\'></i>'">
+          </a>`;
+          if (d?.photographer) {
+            wrap.title = 'Photo: ' + d.photographer;
+          }
+        }
+      }).catch(() => {});
+  }
+}
+
+// ─── OpenSky route picker ─────────────────────────────────────────────────────
+let _routePickerFlightId = null;
+
+function closeRoutePicker() {
+  document.getElementById('route-picker-overlay').style.display = 'none';
+  _routePickerFlightId = null;
+}
+
+async function openRoutePicker(flightId) {
+  _routePickerFlightId = flightId;
+  const overlay = document.getElementById('route-picker-overlay');
+  const bd = document.getElementById('route-picker-bd');
+  overlay.style.display = 'flex';
+  bd.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+
+  const f = (window._flights || []).find(x => String(x.id) === String(flightId));
+  if (!f) { closeRoutePicker(); return; }
+
+  const hex = f.aircraft?.mode_s_hex;
+  const dateStr = String(f.date).slice(0, 10);
+  const depIcao = f.departure?.icao || 'KRHV';
+
+  if (!hex) {
+    bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">
+      No Mode S hex on file for ${esc(f.aircraft?.tail_number || 'this aircraft')}.<br>
+      Update the aircraft record with its ICAO 24-bit address to search ADS-B data.
+    </div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/external/flights-detected?departure=${encodeURIComponent(depIcao)}&date=${dateStr}&icao24=${hex}`)
+      .then(r => r.ok ? r.json() : { flights: [] });
+    const candidates = res.flights || [];
+
+    const logDurMin = Math.round(parseFloat(f.total_duration || 0) * 60);
+
+    if (!candidates.length) {
+      bd.innerHTML = `<div style="padding:20px;text-align:center">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">No ADS-B departures found from ${esc(depIcao)} for ${esc(f.aircraft?.tail_number)} on ${dateStr}.</div>
+        <div style="font-size:12px;color:var(--faint)">OpenSky retains historical data for ~30 days on the free tier. Older flights require a paid account.</div>
+      </div>`;
+      return;
+    }
+
+    const rows = candidates.map((c, i) => {
+      const depTime = c.departure_time ? new Date(c.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+      const arrTime = c.arrival_time   ? new Date(c.arrival_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+      const durMin = c.duration_min ?? '?';
+      const durDiff = typeof durMin === 'number' ? Math.abs(durMin - logDurMin) : null;
+      const matchScore = durDiff !== null && durDiff <= 10 ? '✓ good match' : durDiff !== null && durDiff <= 20 ? '~ close' : '';
+      const matchColor = matchScore.startsWith('✓') ? 'var(--patina-text)' : matchScore ? 'oklch(80% 0.17 85)' : 'var(--faint)';
+      return `<div class="rp-row" style="border:1px solid var(--rule);border-radius:6px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:background 0.12s"
+        onclick="confirmRouteMatch(${flightId}, '${esc(hex)}', ${c.first_seen_unix}, '${esc(c.arrival_icao||'')}', this)"
+        onmouseover="this.style.background='var(--graphite)'" onmouseout="this.style.background=''">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--champagne)">${esc(depIcao)} → ${esc(c.arrival_icao||'?')}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">${depTime} – ${arrTime} · ${durMin} min</div>
+            ${c.callsign ? `<div style="font-size:11px;color:var(--faint);margin-top:2px">Callsign: ${esc(c.callsign)}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;color:${matchColor}">${matchScore}</div>
+            <div style="font-size:11px;color:var(--faint);margin-top:2px">log: ${logDurMin} min</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    bd.innerHTML = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+        Logbook: <strong style="color:var(--champagne)">${esc(f.aircraft?.tail_number)}</strong>
+        ${esc(depIcao)}→${esc(f.arrival?.icao||'?')} · ${logDurMin} min · ${dateStr}
+      </div>
+      <div style="font-size:11px;color:var(--faint);margin-bottom:14px">Select the ADS-B track that matches your flight to plot it on the map.</div>
+      ${rows}
+      <div style="font-size:11px;color:var(--faint);margin-top:10px;text-align:center">
+        ${candidates.length} candidate${candidates.length!==1?'s':''} · Click a row to confirm and save the GPS track
+      </div>`;
+  } catch (e) {
+    bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+async function confirmRouteMatch(flightId, icao24, firstSeenUnix, arrivalIcao, rowEl) {
+  rowEl.style.opacity = '0.5';
+  rowEl.style.pointerEvents = 'none';
+  rowEl.innerHTML += '<div style="font-size:11px;color:var(--patina-text);margin-top:6px">Fetching GPS track…</div>';
+
+  try {
+    const res = await fetch('/api/external/attach-track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flight_id: flightId, icao24, first_seen_unix: firstSeenUnix }),
+    }).then(r => r.json());
+
+    if (res.error) throw new Error(res.error);
+
+    // Update local flight record
+    const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
+    if (fi >= 0) window._flights[fi].has_track = true;
+
+    closeRoutePicker();
+    // Refresh the detail view to show the track
+    showFlightDetail(flightId);
+  } catch (e) {
+    rowEl.style.opacity = '';
+    rowEl.style.pointerEvents = '';
+    rowEl.querySelector('div:last-child')?.remove();
+    rowEl.innerHTML += `<div style="font-size:11px;color:var(--warn);margin-top:6px">Error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function initFlightDetailMap(f) {
@@ -4237,14 +5132,15 @@ async function handleMFSubmit(e) {
 let _finMasked = localStorage.getItem('fin-masked') !== '0'; // hidden by default
 
 function fd(formatted) {
-  return `<span class="fin-dollar"><span class="fin-real">${formatted}</span><span class="fin-mask-txt">•••</span></span>`;
+  return `<span class="fin-real">${formatted}</span><span class="fin-mask-txt" aria-hidden="true">•••••</span>`;
 }
 
 function applyFinMask() {
   const ids = ['fin-dashboard-content', 'fin-overview-content'];
   ids.forEach(id => document.getElementById(id)?.classList.toggle('fin-view-masked', _finMasked));
-  const icon = document.getElementById('fin-eye-icon');
-  if (icon) icon.className = `ph-bold ${_finMasked ? 'ph-eye-slash' : 'ph-eye'}`;
+  document.querySelectorAll('.fin-eye-icon').forEach(icon => {
+    icon.className = `ph-bold fin-eye-icon ${_finMasked ? 'ph-eye-slash' : 'ph-eye'}`;
+  });
 }
 
 function toggleFinMask() {
@@ -4332,7 +5228,10 @@ async function loadFinanceDashboard() {
       <div class="card" style="margin-bottom:10px">
         <div class="fin-nw-hero">
           <span class="fin-nw-amt">${fd(fmtDollarsExact(nw.total))}</span>
-          <span class="fin-nw-delta ${dCls}">${dSign}${fd(fmtDollars(delta))} / 30d</span>
+          <button class="fin-eye-toggle" onclick="toggleFinMask()" title="Show/hide balances" style="font-size:18px;align-self:center">
+            <i class="ph-bold fin-eye-icon ${_finMasked ? 'ph-eye-slash' : 'ph-eye'}"></i>
+          </button>
+          <span class="fin-nw-delta ${dCls}" style="margin-left:auto">${dSign}${fd(fmtDollars(delta))} / 30d</span>
         </div>
         <div class="fin-strip" style="margin-top:0">
           <div class="fin-strip-tile">

@@ -571,8 +571,8 @@ export default async function proxyRoutes(fastify) {
     try {
       const data = await fr24Fetch('/api/flight-summary/full', {
         registrations:        tail,
-        flight_datetime_from: dayStart.toISOString(),
-        flight_datetime_to:   dayEnd.toISOString(),
+        flight_datetime_from: dayStart.toISOString().slice(0, 19),
+        flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
         limit:                20,
       })
       const raw  = Array.isArray(data?.data) ? data.data : []
@@ -640,6 +640,7 @@ export default async function proxyRoutes(fastify) {
   // Runs sequentially with a short delay to respect rate limits.
   fastify.post('/api/external/fr24-backfill', async (req, reply) => {
     const overwrite = req.query.overwrite === 'true'
+    const limitN    = req.query.limit ? parseInt(req.query.limit) : null
 
     // Load all flights (join aircraft for tail number)
     const { rows: flights } = await pool.query(`
@@ -652,7 +653,8 @@ export default async function proxyRoutes(fastify) {
       ORDER BY f.date ASC
     `)
 
-    const toProcess = overwrite ? flights : flights.filter(f => !f.has_track)
+    let toProcess = overwrite ? flights : flights.filter(f => !f.has_track)
+    if (limitN) toProcess = toProcess.slice(0, limitN)
     const results = []
     // 2 s between each API call keeps us well under FR24 Essential rate limits.
     // fr24Fetch auto-retries on 429 with Retry-After header back-off.
@@ -670,8 +672,8 @@ export default async function proxyRoutes(fastify) {
         const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
         const data = await fr24Fetch('/api/flight-summary/full', {
           registrations:        tail,
-          flight_datetime_from: dayStart.toISOString(),
-          flight_datetime_to:   dayEnd.toISOString(),
+          flight_datetime_from: dayStart.toISOString().slice(0, 19),
+          flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
           limit:                10,
         })
         fr24Flights = Array.isArray(data?.data) ? data.data : []

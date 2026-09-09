@@ -81,15 +81,6 @@ export default async function flightRoutes(fastify) {
     return { ...flight, via_airports: allIcaos.map(ic => airportMap[ic] || { icao: ic }) }
   })
 
-  fastify.get('/api/flights/:id/track', async (req, reply) => {
-    const { rows } = await pool.query(
-      'SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm FROM track_log_points WHERE flight_id=$1 ORDER BY ts',
-      [req.params.id]
-    )
-    if (!rows.length) return reply.status(404).send({ error: 'No track' })
-    return rows
-  })
-
   fastify.post('/api/flights', async (req, reply) => {
     const {
       date, aircraft_id, departure_icao, arrival_icao,

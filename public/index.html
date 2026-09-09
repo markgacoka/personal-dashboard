@@ -3983,6 +3983,7 @@ async function autoLoadFaTrack(f) {
       .then(r => r.ok ? r.json() : null).catch(() => null);
     const faFlights = faRes?.flights || [];
 
+    // FA free tier covers only 10 days back — older flights return limit_exceeded
     if (!faFlights.length) {
       sessionStorage.setItem(skipKey, '1');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }

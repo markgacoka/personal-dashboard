@@ -569,6 +569,11 @@ export default async function proxyRoutes(fastify) {
       _faCache.set(cacheKey, { ts: Date.now(), flights })
       return { flights, source: 'flightaware' }
     } catch (e) {
+      // FA free tier only has 10-day historical window — older requests return 400.
+      // Return 200 with empty list so the frontend skips gracefully without noise.
+      if (e.message.includes('400') || e.message.toLowerCase().includes('too far in the past')) {
+        return { flights: [], source: 'flightaware', limit_exceeded: true }
+      }
       fastify.log.warn({ tail, date, err: e.message }, 'FlightAware flights lookup failed')
       return reply.status(502).send({ error: e.message })
     }

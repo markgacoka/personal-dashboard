@@ -380,18 +380,44 @@
     .wx-ext-link:hover { color:var(--muted); }
 
     /* currency */
-    .cur-section-hdr { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); padding: 12px 0 5px; border-bottom: 1px solid var(--rule); margin-bottom: 2px; display: flex; align-items: center; gap: 8px; }
-    .cur-section-hdr span { flex: 1; }
-    .cur-rows { display: flex; flex-direction: column; gap: 0; }
-    .cur-row { display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--rule); }
-    .cur-row:last-child { border-bottom: none; }
-    .cur-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .cur-name { font-size: 13px; color: var(--body-text); }
-    .cur-sub  { font-size: 11px; color: var(--faint); margin-top: 2px; }
-    .cur-badge { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 3px; white-space: nowrap; }
-    .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; text-align: right; }
+    .cur-section-hdr {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
+      color: var(--faint); margin: 14px 0 6px;
+    }
+    .cur-section-hdr::before { content: ''; flex: 0 0 0px; }
+    .cur-section-hdr::after  { content: ''; flex: 1; height: 1px; background: var(--rule); }
+    .cur-section-hdr span { flex: 0 1 auto; }
+    .cur-rows { display: flex; flex-direction: column; gap: 3px; }
+    .cur-row {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: center; gap: 10px;
+      padding: 10px 10px 10px 13px;
+      border-radius: var(--r-sm);
+      border-left: 3px solid transparent;
+      background: var(--deep);
+      transition: background 0.15s;
+    }
+    .cur-row.cr-current  { border-color: oklch(55% 0.14 155); background: oklch(55% 0.14 155 / 0.06); }
+    .cur-row.cr-expiring { border-color: oklch(60% 0.15 75);  background: oklch(60% 0.15 75  / 0.06); }
+    .cur-row.cr-grace    { border-color: oklch(60% 0.15 55);  background: oklch(60% 0.15 55  / 0.05); }
+    .cur-row.cr-lapsed   { border-color: oklch(50% 0.14 20);  background: oklch(50% 0.14 20  / 0.05); }
+    .cur-row.cr-na       { border-color: var(--rule-strong);  }
+    [data-theme="light"] .cur-row.cr-current  { background: oklch(55% 0.14 155 / 0.07); }
+    [data-theme="light"] .cur-row.cr-lapsed   { background: oklch(50% 0.14 20  / 0.06); }
+    [data-theme="light"] .cur-row.cr-expiring { background: oklch(60% 0.15 75  / 0.07); }
+    .cur-name { font-size: 13px; font-weight: 500; color: var(--champagne); line-height: 1.25; }
+    .cur-reg  { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; color: var(--faint); margin-left: 5px; font-family: 'Alumni Sans', monospace; }
+    .cur-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+    .cur-status { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+    .cur-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .cur-days { font-size: 11px; color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
     /* Medical edit form */
-    .cur-med-form { display: none; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 0 2px; border-top: 1px solid var(--rule); margin-top: 4px; }
+    .cur-med-form { display: none; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 2px 2px; }
     .cur-med-form.open { display: flex; }
     .cur-med-sel, .cur-med-date {
       background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
@@ -2839,34 +2865,47 @@ function renderFlightCurrency(flights) {
   const bfrCur   = bfrAge !== null && bfrAge < d24mo;
   const bfrDays  = bfrAge !== null ? Math.floor((d24mo - bfrAge) / 86400000) : null;
 
-  // Badge helper
+  // Badge styles per status type
   function bs(type) {
     const lt = document.documentElement.getAttribute('data-theme') === 'light';
-    if (type === 'expiring') return lt ? 'background:#fef5e4;color:#8a6010' : 'background:#271f0b;color:#c09030';
-    if (type === 'current')  return lt ? 'background:#e8f5ee;color:#237a50' : 'background:#0e2222;color:#4aaa80';
-    if (type === 'grace')    return lt ? 'background:#fdf0e4;color:#8a5010' : 'background:#251808;color:#b07030';
-    if (type === 'na')       return lt ? 'background:#f0f0f0;color:#888'    : 'background:#1e1e1e;color:#666';
-    return lt ? 'background:#fde8e8;color:#b03030' : 'background:#221414;color:#cc5050';
+    if (type === 'expiring') return lt ? 'background:#fef5e4;color:#7a5208' : 'background:oklch(60% 0.15 75 / 0.18);color:oklch(78% 0.15 75)';
+    if (type === 'current')  return lt ? 'background:#e8f5ee;color:#1d6940' : 'background:oklch(55% 0.14 155 / 0.18);color:oklch(72% 0.14 155)';
+    if (type === 'grace')    return lt ? 'background:#fdf0e4;color:#7a4510' : 'background:oklch(60% 0.15 55 / 0.18);color:oklch(76% 0.15 55)';
+    if (type === 'na')       return lt ? 'background:#eee;color:#888'       : 'background:oklch(28% 0 0);color:oklch(50% 0 0)';
+    return lt ? 'background:#fde8e8;color:#991c1c' : 'background:oklch(50% 0.14 20 / 0.18);color:oklch(68% 0.14 20)';
   }
 
-  function row(name, sub, current, daysLeft, detail, type) {
-    let dot, badge, btext;
+  // Icon per status
+  function icon(type) {
+    if (type === 'current')  return '<i class="ph-bold ph-check-circle" style="font-size:11px"></i>';
+    if (type === 'expiring') return '<i class="ph-bold ph-warning" style="font-size:11px"></i>';
+    if (type === 'grace')    return '<i class="ph-bold ph-clock-countdown" style="font-size:11px"></i>';
+    if (type === 'na')       return '<i class="ph-bold ph-minus" style="font-size:11px"></i>';
+    return '<i class="ph-bold ph-x-circle" style="font-size:11px"></i>';
+  }
+
+  function row(name, reg, sub, current, daysLeft, detail, type) {
+    let crClass, badge, btext, itype;
     if (type === 'na') {
-      dot='#505860'; badge=bs('na'); btext='—';
+      crClass='cr-na'; itype='na'; badge=bs('na'); btext='N/A';
     } else if (type === 'grace') {
-      dot='#b07030'; badge=bs('grace'); btext='grace period';
+      crClass='cr-grace'; itype='grace'; badge=bs('grace'); btext='Grace';
     } else if (current && daysLeft !== null && daysLeft <= 30) {
-      dot='#b08030'; badge=bs('expiring'); btext=`${daysLeft}d left`;
+      crClass='cr-expiring'; itype='expiring'; badge=bs('expiring'); btext='Expiring';
     } else if (current) {
-      dot='#4aaa80'; badge=bs('current'); btext='current';
+      crClass='cr-current'; itype='current'; badge=bs('current'); btext='Current';
     } else {
-      dot='#b05050'; badge=bs('lapsed'); btext='lapsed';
+      crClass='cr-lapsed'; itype='lapsed'; badge=bs('lapsed'); btext='Lapsed';
     }
-    return `<div class="cur-row">
-      <div class="cur-dot" style="background:${dot}"></div>
-      <div><div class="cur-name">${name}</div>${sub?`<div class="cur-sub">${sub}</div>`:''}</div>
-      <span class="cur-badge" style="${badge}">${btext}</span>
-      <div class="cur-days">${detail||''}</div>
+    return `<div class="cur-row ${crClass}">
+      <div>
+        <div class="cur-name">${esc(name)}<span class="cur-reg">${reg ? esc(reg) : ''}</span></div>
+        ${sub?`<div class="cur-sub">${esc(sub)}</div>`:''}
+      </div>
+      <div class="cur-status">
+        <span class="cur-badge" style="${badge}">${icon(itype)} ${btext}</span>
+        ${detail?`<div class="cur-days">${esc(detail)}</div>`:''}
+      </div>
     </div>`;
   }
 
@@ -2878,47 +2917,56 @@ function renderFlightCurrency(flights) {
     const dLeft  = expiry ? Math.floor((expiry - Date.now()) / 86400000) : null;
     const expired = dLeft !== null && dLeft < 0;
     const expStr  = expiry ? expiry.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const privilege = med.cls === '1' ? (med.under40 ? '12 months first-class' : '6 months first-class')
-                    : med.cls === '2' ? '12 months second-class'
+    const privilege = med.cls === '1' ? (med.under40 ? '12 mo · first-class privileges' : '6 mo · first-class privileges')
+                    : med.cls === '2' ? '12 months · second-class privileges'
                     : med.cls === 'basicmed' ? '48 months'
-                    : (med.under40 ? '60 months' : '24 months');
-    const dot   = expired ? '#b05050' : dLeft < 60 ? '#b08030' : '#4aaa80';
-    const light = document.documentElement.getAttribute('data-theme') === 'light';
+                    : (med.under40 ? '60 months · third-class privileges' : '24 months · third-class privileges');
+    const lt = document.documentElement.getAttribute('data-theme') === 'light';
+    const crClass = expired ? 'cr-lapsed' : dLeft < 60 ? 'cr-expiring' : 'cr-current';
     const badge = expired
-      ? (light?'background:#fde8e8;color:#b03030':'background:#221414;color:#cc5050')
+      ? (lt?'background:#fde8e8;color:#991c1c':'background:oklch(50% 0.14 20 / 0.18);color:oklch(68% 0.14 20)')
       : dLeft < 60
-        ? (light?'background:#fef5e4;color:#8a6010':'background:#271f0b;color:#c09030')
-        : (light?'background:#e8f5ee;color:#237a50':'background:#0e2222;color:#4aaa80');
-    const btext = expired ? `exp ${-dLeft}d ago` : `${dLeft}d left`;
-    medHtml = `<div class="cur-row">
-      <div class="cur-dot" style="background:${dot}"></div>
+        ? (lt?'background:#fef5e4;color:#7a5208':'background:oklch(60% 0.15 75 / 0.18);color:oklch(78% 0.15 75)')
+        : (lt?'background:#e8f5ee;color:#1d6940':'background:oklch(55% 0.14 155 / 0.18);color:oklch(72% 0.14 155)');
+    const icoType = expired ? 'lapsed' : dLeft < 60 ? 'expiring' : 'current';
+    const btext = expired ? `Expired ${-dLeft}d ago` : dLeft < 30 ? `${dLeft}d left` : 'Current';
+    const detail = expired ? '' : `Expires ${expStr}`;
+    medHtml = `<div class="cur-row ${crClass}">
       <div>
-        <div class="cur-name">${MED_LABEL[med.cls]} Medical</div>
-        <div class="cur-sub">Expires ${expStr} · ${privilege}</div>
+        <div class="cur-name">${esc(MED_LABEL[med.cls])} Medical</div>
+        <div class="cur-sub">${esc(privilege)}</div>
       </div>
-      <span class="cur-badge" style="${badge}">${btext}</span>
-      <div class="cur-days"></div>
+      <div class="cur-status">
+        <span class="cur-badge" style="${badge}">${icon(icoType)} ${esc(btext)}</span>
+        ${detail?`<div class="cur-days">${esc(detail)}</div>`:''}
+      </div>
     </div>`;
   } else {
-    medHtml = `<div class="cur-row">
-      <div class="cur-dot" style="background:#505860"></div>
-      <div><div class="cur-name">Medical Certificate</div><div class="cur-sub">No exam date set</div></div>
-      <span class="cur-badge" style="${bs('na')}">—</span>
-      <div class="cur-days"></div>
+    medHtml = `<div class="cur-row cr-na">
+      <div>
+        <div class="cur-name">Medical Certificate</div>
+        <div class="cur-sub">No exam date recorded</div>
+      </div>
+      <div class="cur-status">
+        <span class="cur-badge" style="${bs('na')}">${icon('na')} N/A</span>
+      </div>
     </div>`;
   }
 
-  const dayDetail = dayCur ? (dayDays!==null?`${dayDays}d`:'') : `${dayTO} T/O · ${dayLnd} lnd`;
+  const dayDetail = dayCur ? (dayDays!==null?`${dayDays}d until lapse`:'') : `${dayTO} T/O · ${dayLnd} lnd`;
   const ngtDetail = ngtCur ? '' : `${ngtTO} T/O · ${ngtLnd} lnd`;
-  const bfrDetail = bfrDays!==null ? (bfrCur?`${bfrDays}d`:`${-bfrDays}d ago`) : 'none logged';
-  const ifrDetail = ifrTotal === 0 ? 'none logged' : `${ifrApps6} in 6mo`;
+  const bfrDetail = bfrDays!==null ? (bfrCur?`${bfrDays}d until lapse`:`${-bfrDays}d overdue`) : 'none logged';
+  const ifrDetail = ifrTotal === 0 ? 'none logged' : `${ifrApps6} approaches in 6mo`;
 
   el.innerHTML = `
-    <div class="ov-card-hd">FAA Currency <span style="font-size:10px;color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none">§61.57</span></div>
+    <div class="ov-card-hd">FAA Currency
+      <span style="font-size:10px;color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none;margin-left:4px">§61.57</span>
+      <span style="font-size:11px;color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none;margin-left:auto">${flights.length} flights</span>
+    </div>
 
     <div class="cur-section-hdr">
-      <span>Medical Certificate</span>
-      <button class="cur-edit-btn" title="Edit medical" onclick="this.closest('.ov-card').querySelector('.cur-med-form').classList.toggle('open')">
+      <span>Medical</span>
+      <button class="cur-edit-btn" title="Edit medical" onclick="this.closest('.ov-card').querySelector('.cur-med-form').classList.toggle('open')" style="margin-left:4px">
         <i class="ph-bold ph-pencil-simple"></i>
       </button>
     </div>
@@ -2936,17 +2984,15 @@ function renderFlightCurrency(flights) {
       <input type="date" class="cur-med-date" id="med-date-inp" value="${med.date}" onchange="saveMed()">
     </div>
 
-    <div class="cur-section-hdr"><span>Pilot Currency</span></div>
+    <div class="cur-section-hdr" style="margin-top:10px"><span>Pilot Currency</span></div>
     <div class="cur-rows">
-      ${row('Day VFR', '3 T/O + landings in 90 days · §61.57(a)', dayCur, dayDays, dayDetail)}
-      ${row('Night VFR', '3 night T/O + landings in 90 days · §61.57(b)', ngtCur, null, ngtDetail)}
+      ${row('Day VFR', '§61.57(a)', '3 T/O + full-stop landings in 90 days', dayCur, dayDays, dayDetail)}
+      ${row('Night VFR', '§61.57(b)', '3 night T/O + full-stop landings in 90 days', ngtCur, null, ngtDetail)}
       ${ifrTotal > 0 || ifrApps12 > 0
-        ? row('Instrument', '6 approaches + holds in 6 months · §61.57(c)', ifrCur, null, ifrDetail, ifrGrace?'grace':undefined)
-        : row('Instrument', '6 approaches + holds in 6 months · §61.57(c)', false, null, ifrDetail, 'na')}
-      ${row('Flight Review', 'Every 24 calendar months · §61.56', bfrCur, bfrDays!==null&&bfrDays<60?bfrDays:null, bfrDetail)}
+        ? row('Instrument', '§61.57(c)', '6 approaches + holds/intercepting in 6 months', ifrCur, null, ifrDetail, ifrGrace?'grace':undefined)
+        : row('Instrument', '§61.57(c)', '6 approaches + holds/intercepting in 6 months', false, null, ifrDetail, 'na')}
+      ${row('Flight Review', '§61.56', 'Every 24 calendar months', bfrCur, bfrDays!==null&&bfrDays<60?bfrDays:null, bfrDetail)}
     </div>
-
-    <div style="margin-top:10px;font-size:11px;color:var(--faint)">Based on ${flights.length} logged flight${flights.length!==1?'s':''}</div>
   `;
 }
 

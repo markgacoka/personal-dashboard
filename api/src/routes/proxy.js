@@ -598,32 +598,40 @@ export default async function proxyRoutes(fastify) {
   })
 
   // ── FlightRadar24: attach GPS track to a flight record ────────────────────────
-  // POST /api/external/attach-fr24-track  body: { flight_id, fr24_id }
+  // POST /api/external/attach-fr24-track  body: { flight_id, fr24_id, registration, first_seen, last_seen }
+  // Samples positions at 5-minute intervals across the flight duration.
   fastify.post('/api/external/attach-fr24-track', async (req, reply) => {
-    const { flight_id, fr24_id } = req.body || {}
-    if (!flight_id || !fr24_id) {
-      return reply.status(400).send({ error: 'flight_id and fr24_id required' })
+    const { flight_id, fr24_id, registration, first_seen, last_seen } = req.body || {}
+    if (!flight_id || !fr24_id || !registration || !first_seen || !last_seen) {
+      return reply.status(400).send({ error: 'flight_id, fr24_id, registration, first_seen, last_seen required' })
     }
 
-    try {
-      const data = await fr24Fetch('/api/historic/flight-positions/full', {
-        fr24_id,
-      })
-      // FR24 returns positions under data.positions or data.data.positions
-      const posData = data?.data?.positions ?? data?.positions ?? data?.data ?? []
-      const positions = Array.isArray(posData) ? posData : []
-      if (!positions.length) {
-        return { success: false, points_saved: 0, total_points: 0, message: 'No track positions from FR24' }
-      }
+    const firstSeenTs = Math.floor(new Date(first_seen).getTime() / 1000)
+    const lastSeenTs  = Math.floor(new Date(last_seen).getTime()  / 1000)
+    const SAMPLE_STEP = 300
 
-      const normalized = normalizeFr24Positions(positions)
-      const saved = await saveTrackPoints(pool, flight_id, normalized)
-      fastify.log.info({ flight_id, fr24_id, saved }, 'FR24 track attached')
-      return { success: true, points_saved: saved, total_points: positions.length }
-    } catch (e) {
-      fastify.log.warn({ flight_id, fr24_id, err: e.message }, 'FR24 track attach failed')
-      return reply.status(502).send({ error: e.message })
+    const rawPositions = []
+    for (let ts = firstSeenTs + SAMPLE_STEP; ts <= lastSeenTs; ts += SAMPLE_STEP) {
+      await new Promise(r => setTimeout(r, 1000))
+      try {
+        const posData = await fr24Fetch('/api/historic/flight-positions/full', {
+          registrations: registration,
+          timestamp: ts,
+        })
+        const pts = Array.isArray(posData?.data) ? posData.data : []
+        const pt  = pts.find(p => p.fr24_id === fr24_id)
+        if (pt) rawPositions.push(pt)
+      } catch (_) {}
     }
+
+    if (!rawPositions.length) {
+      return { success: false, points_saved: 0, total_points: 0, message: 'No track positions from FR24' }
+    }
+
+    const normalized = normalizeFr24Positions(rawPositions)
+    const saved = await saveTrackPoints(pool, flight_id, normalized)
+    fastify.log.info({ flight_id, fr24_id, saved }, 'FR24 track attached')
+    return { success: true, points_saved: saved, total_points: rawPositions.length }
   })
 
   // ── FlightRadar24: batch backfill all flights without tracks ──────────────────
@@ -708,24 +716,36 @@ export default async function proxyRoutes(fastify) {
         continue
       }
 
-      // 3. Fetch track positions
-      try {
-        const trackData = await fr24Fetch('/api/historic/flight-positions/full', { fr24_id: fr24Id })
-        const posData   = trackData?.data?.positions ?? trackData?.positions ?? trackData?.data ?? []
-        const positions = Array.isArray(posData) ? posData : []
-        const normalized = normalizeFr24Positions(positions)
-        const saved = await saveTrackPoints(pool, f.id, normalized)
+      // 3. Sample positions across the flight duration at 5-minute intervals.
+      // The historic positions endpoint returns one snapshot per timestamp.
+      // first_seen/last_seen come from the FR24 flight summary.
+      const firstSeenTs = Math.floor(new Date(best.first_seen ?? best.datetime_takeoff).getTime() / 1000)
+      const lastSeenTs  = Math.floor(new Date(best.last_seen  ?? best.datetime_landed ).getTime() / 1000)
+      const SAMPLE_STEP = 300 // 5-minute intervals
 
-        results.push(saved
-          ? { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved }
-          : { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions' }
-        )
-      } catch (e) {
-        fastify.log.warn({ flight_id: f.id, fr24Id, err: e.message }, 'FR24 track fetch failed')
-        results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'track_error', reason: e.message })
+      const rawPositions = []
+      for (let ts = firstSeenTs + SAMPLE_STEP; ts <= lastSeenTs; ts += SAMPLE_STEP) {
+        await sleep(1000)  // 1 s between position calls
+        try {
+          const posData = await fr24Fetch('/api/historic/flight-positions/full', {
+            registrations: tail,
+            timestamp:     ts,
+          })
+          const pts = Array.isArray(posData?.data) ? posData.data : []
+          const pt  = pts.find(p => p.fr24_id === fr24Id)
+          if (pt) rawPositions.push(pt)
+        } catch (_) {}
       }
 
-      await sleep(CALL_DELAY)  // pace after track call
+      const normalized = normalizeFr24Positions(rawPositions)
+      const saved = await saveTrackPoints(pool, f.id, normalized)
+      results.push(saved
+        ? { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved }
+        : { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions', samples: rawPositions.length }
+      )
+
+      // Pace between flights — position sampling already added its own per-call delay
+      await sleep(CALL_DELAY)
     }
 
     const summary = {

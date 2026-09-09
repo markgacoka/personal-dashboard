@@ -38,16 +38,18 @@ export function normalizeOpenSkyPath(path) {
   }))
 }
 
-// Normalize FR24 position array (various field name variants)
+// Normalize FR24 v1 API position array (from /api/historic/flight-positions/full)
+// timestamp is ISO string, alt in feet, gspeed in knots, vspeed in fpm
 export function normalizeFr24Positions(positions) {
   return (positions || []).map(p => ({
-    ts:               new Date((p.timestamp ?? p.ts) * 1000).toISOString(),
+    ts:               typeof p.timestamp === 'string' ? p.timestamp
+                        : new Date((p.timestamp ?? p.ts) * 1000).toISOString(),
     lat:              p.lat ?? p.latitude,
     lon:              p.lon ?? p.longitude,
-    altitude_ft:      Math.round(p.alt ?? p.altitude ?? 0),
-    groundspeed_kts:  p.spd ?? p.speed ?? p.groundspeed ?? null,
-    track_deg:        p.hdg ?? p.heading ?? p.track_deg ?? null,
-    vertical_speed_fpm: null,
+    altitude_ft:      p.alt ?? Math.round(p.altitude ?? 0),
+    groundspeed_kts:  p.gspeed ?? p.spd ?? p.speed ?? p.groundspeed ?? null,
+    track_deg:        p.track ?? p.hdg ?? p.heading ?? p.track_deg ?? null,
+    vertical_speed_fpm: p.vspeed ?? null,
     on_ground:        (p.alt ?? p.altitude ?? 999) <= 200,
   }))
 }

@@ -4484,9 +4484,13 @@ async function initFlightDetailMap(f) {
         scrubInput.value = 0;
         scrubWrap.style.display = 'block';
 
-        // Plane marker
+        // Plane marker — outer div is MapLibre's positioning target, inner div handles rotation.
+        // MapLibre sets outer.style.transform='translate(X,Y)'; we set inner.style.transform='rotate(Xdeg)'.
+        // Never set transform on the same element MapLibre controls — it would overwrite the translate.
+        const markerOuter = document.createElement('div');
+        markerOuter.style.cssText = 'width:28px;height:28px;pointer-events:none';
         const planeEl = document.createElement('div');
-        planeEl.style.cssText = 'width:28px;height:28px;pointer-events:none;transform-origin:center center';
+        planeEl.style.cssText = 'width:28px;height:28px;transform-origin:center center;will-change:transform';
         planeEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28">
           <g transform="translate(16,16)">
             <rect x="-2" y="-10" width="4" height="20" rx="2" fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.5))"/>
@@ -4496,7 +4500,8 @@ async function initFlightDetailMap(f) {
             <path d="M2,7 L5,10 L4,11 L2,8.5 Z"  fill="${routeColor}" opacity=".75"/>
           </g>
         </svg>`;
-        const planeMkr = new maplibregl.Marker({ element: planeEl, anchor: 'center' })
+        markerOuter.appendChild(planeEl);
+        const planeMkr = new maplibregl.Marker({ element: markerOuter, anchor: 'center' })
           .setLngLat([allPts[0].lon, allPts[0].lat])
           .addTo(thisMap);
 

@@ -597,10 +597,11 @@ export default async function proxyRoutes(fastify) {
     }
   })
 
-  // ── FlightRadar24: smart auto-fetch track by flight_id ────────────────────────
+  // ── FlightRadar24: auto-fetch track by time-window sweep ─────────────────────
   // POST /api/external/auto-fetch-fr24-track/:flight_id
-  // Looks up FR24 flights for the tail+date, scores matches by airport/duration/time,
-  // samples positions at 60s intervals, saves to track_log_points.
+  // Sweeps timestamps within the flight's schedule window at 10-second intervals,
+  // querying historic/flight-positions/full for the tail at each step.
+  // Deduplicates by position timestamp, saves to track_log_points.
   fastify.post('/api/external/auto-fetch-fr24-track/:flight_id', async (req, reply) => {
     const flightId = parseInt(req.params.flight_id)
     if (!process.env.FR24_API_TOKEN) {
@@ -611,19 +612,20 @@ export default async function proxyRoutes(fastify) {
     const { rows } = await pool.query(`
       SELECT f.id, f.date::text, f.departure_icao, f.arrival_icao,
              f.time_out, f.time_in, f.total_duration,
-             ac.tail_number, ac.mode_s_hex
+             ac.tail_number
       FROM flights f
       JOIN aircraft ac ON ac.id = f.aircraft_id
       WHERE f.id = $1
     `, [flightId])
     if (!rows.length) return reply.status(404).send({ error: 'Flight not found' })
-    const fl    = rows[0]
-    const tail  = fl.tail_number
+    const fl      = rows[0]
+    const tail    = fl.tail_number
     const dateStr = String(fl.date).slice(0, 10)
 
-    // 2. Try Gmail schedule if time_out is missing
+    // 2. Determine time window — DB first, fall back to Gmail schedule
     let timeOut = fl.time_out
-    if (!timeOut) {
+    let timeIn  = fl.time_in
+    if (!timeOut || !timeIn) {
       try {
         const scheds    = await fetchNiceAirSchedules()
         const tailShort = tail.replace(/^N/, '')
@@ -631,93 +633,67 @@ export default async function proxyRoutes(fastify) {
           s.date_str === dateStr && s.type !== 'cancelled' &&
           (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
         )
-        if (match?.start_unix) timeOut = new Date(match.start_unix * 1000).toISOString()
+        if (match?.start_unix) timeOut = timeOut || new Date(match.start_unix * 1000).toISOString()
+        if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
       } catch (_) {}
     }
-
-    // 3. Get FR24 flights for this tail on this date
-    let fr24Flights = []
-    try {
-      const dayStart = new Date(dateStr + 'T08:00:00Z')
-      const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
-      const data = await fr24Fetch('/api/flight-summary/full', {
-        registrations:        tail,
-        flight_datetime_from: dayStart.toISOString().slice(0, 19),
-        flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
-        limit:                20,
-      })
-      fr24Flights = Array.isArray(data?.data) ? data.data : []
-    } catch (e) {
-      return reply.status(502).send({ error: `FR24 lookup failed: ${e.message}` })
-    }
-    if (!fr24Flights.length) {
-      return reply.status(404).send({ error: 'No FR24 flights found for this tail+date' })
+    if (!timeOut) {
+      return reply.status(400).send({ error: 'No time_out available — update the flight record or sync Gmail schedule' })
     }
 
-    // 4. Score-match: airports + time proximity + duration
-    const normIcao = ic => ic?.toUpperCase().replace(/^K/, '')
-    const scored = fr24Flights.map(ff => {
-      let score = 0
-      const dep = ff.orig_icao || ''
-      const arr = ff.dest_icao_actual || ff.dest_icao || ''
-      if (fl.departure_icao && (dep === fl.departure_icao || normIcao(dep) === normIcao(fl.departure_icao))) score += 3
-      if (fl.arrival_icao   && (arr === fl.arrival_icao   || normIcao(arr) === normIcao(fl.arrival_icao)))   score += 3
-      // Time proximity to Gmail/DB block-out time
-      const deptTs = new Date(ff.datetime_takeoff || ff.first_seen || 0)
-      if (timeOut && !isNaN(deptTs)) {
-        const diffMin = Math.abs(new Date(timeOut) - deptTs) / 60000
-        if (diffMin < 20)  score += 5
-        else if (diffMin < 45)  score += 3
-        else if (diffMin < 90)  score += 1
-      }
-      // Duration match (logbook in hours, FR24 duration_min in minutes)
-      if (fl.total_duration && ff.duration_min) {
-        const logMin = parseFloat(fl.total_duration) * 60
-        const ratio  = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
-        if (ratio > 0.85) score += 3
-        else if (ratio > 0.65) score += 1
-      }
-      return { ff, score }
-    })
-    scored.sort((a, b) => b.score - a.score)
+    // 3. Sweep window: time_out-5min → time_in+5min (or logbook duration + buffer)
+    const t0 = new Date(timeOut).getTime() - 5 * 60_000
+    let t1
+    if (timeIn) {
+      t1 = new Date(timeIn).getTime() + 5 * 60_000
+    } else if (fl.total_duration) {
+      t1 = new Date(timeOut).getTime() + parseFloat(fl.total_duration) * 3_600_000 + 10 * 60_000
+    } else {
+      t1 = t0 + 4 * 3_600_000
+    }
 
-    const best    = scored[0].ff
-    const fr24Id  = best.fr24_id
-    if (!fr24Id) return reply.status(404).send({ error: 'Best FR24 match has no fr24_id' })
-
-    const firstTs = Math.floor(new Date(best.datetime_takeoff || best.departure_time || best.first_seen).getTime() / 1000)
-    const lastTs  = Math.floor(new Date(best.datetime_landed  || best.arrival_time   || best.last_seen ).getTime() / 1000)
-
-    // 5. Sample positions at 60-second intervals
-    const STEP = 60
+    // 4. Sweep timestamps at 10-second intervals
+    // Each call returns the last known position of the tail at that moment.
+    // Deduplicate by the position's own timestamp — avoids storing the same
+    // observation twice when consecutive sweep steps land on the same ADS-B fix.
+    const STEP_MS  = 10_000
+    const DELAY_MS = 250
     const rawPositions = []
-    for (let ts = firstTs + STEP; ts <= lastTs; ts += STEP) {
-      await new Promise(r => setTimeout(r, 600))
+    let lastPosTs = null
+
+    for (let ts = t0; ts <= t1; ts += STEP_MS) {
+      await new Promise(r => setTimeout(r, DELAY_MS))
       try {
         const posData = await fr24Fetch('/api/historic/flight-positions/full', {
           registrations: tail,
-          timestamp:     ts,
+          timestamp:     Math.floor(ts / 1000),
         })
         const pts = Array.isArray(posData?.data) ? posData.data : []
-        const pt  = pts.find(p => p.fr24_id === fr24Id)
-        if (pt) rawPositions.push(pt)
+        const pt  = pts[0]
+        if (!pt) continue
+        if (pt.timestamp === lastPosTs) continue
+        lastPosTs = pt.timestamp
+        rawPositions.push(pt)
       } catch (_) {}
     }
 
     if (!rawPositions.length) {
-      return reply.status(200).send({ success: false, points_saved: 0, fr24_id: fr24Id, message: 'No positions from FR24' })
+      return reply.status(200).send({
+        success: false, points_saved: 0,
+        window_from: new Date(t0).toISOString(), window_to: new Date(t1).toISOString(),
+        message: 'No positions from FR24 in window',
+      })
     }
 
     const normalized = normalizeFr24Positions(rawPositions)
     const saved = await saveTrackPoints(pool, flightId, normalized)
-    fastify.log.info({ flightId, fr24Id, saved, score: scored[0].score }, 'FR24 smart track saved')
+    fastify.log.info({ flightId, tail, saved, window_min: Math.round((t1 - t0) / 60000) }, 'FR24 time-window track saved')
     return {
       success:      true,
       points_saved: saved,
       total_points: rawPositions.length,
-      fr24_id:      fr24Id,
-      candidates:   fr24Flights.length,
-      matched:      { dep: best.orig_icao, arr: best.dest_icao_actual || best.dest_icao, duration_min: best.duration_min, score: scored[0].score },
+      window_from:  new Date(t0).toISOString(),
+      window_to:    new Date(t1).toISOString(),
     }
   })
 
@@ -761,7 +737,8 @@ export default async function proxyRoutes(fastify) {
   // ── FlightRadar24: batch backfill all flights without tracks ──────────────────
   // POST /api/external/fr24-backfill?overwrite=false[&limit=N]
   // Streams NDJSON: one JSON line per flight as it completes, final line is summary.
-  // Run with: curl -X POST "..." --max-time 1800 -s -N
+  // Sweeps timestamps at 10-second intervals within each flight's schedule window.
+  // Run with: curl -X POST "..." --max-time 7200 -s -N
   fastify.post('/api/external/fr24-backfill', async (req, reply) => {
     const overwrite = req.query.overwrite === 'true'
     const limitN    = req.query.limit ? parseInt(req.query.limit) : null
@@ -779,106 +756,99 @@ export default async function proxyRoutes(fastify) {
     let toProcess = overwrite ? flights : flights.filter(f => !f.has_track)
     if (limitN) toProcess = toProcess.slice(0, limitN)
 
-    // Stream NDJSON so the connection stays alive through the full run.
     reply.raw.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'X-Accel-Buffering': 'no' })
 
-    const emit = obj => reply.raw.write(JSON.stringify(obj) + '\n')
-    const sleep = ms => new Promise(res => setTimeout(res, ms))
-    const CALL_DELAY = 2000
-    const counts = { ok: 0, no_match: 0, no_positions: 0, errors: 0 }
+    const emit   = obj => reply.raw.write(JSON.stringify(obj) + '\n')
+    const sleep  = ms  => new Promise(res => setTimeout(res, ms))
+    const QUERY_DELAY  = 200   // ms between FR24 API calls within a flight sweep
+    const FLIGHT_DELAY = 5000  // ms between flights
+    const STEP_MS      = 10_000
+    const counts = { ok: 0, no_window: 0, no_positions: 0, errors: 0 }
+
+    // Fetch Gmail schedules once for all flights (cached internally)
+    let allScheds = []
+    try { allScheds = await fetchNiceAirSchedules() } catch (_) {}
 
     for (const f of toProcess) {
       const tail    = f.tail_number
       const dateStr = String(f.date).slice(0, 10)
 
-      // 1. Lookup FR24 summary for this registration + date
-      let fr24Flights = []
-      try {
-        const dayStart = new Date(dateStr + 'T08:00:00Z')
-        const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
-        const data = await fr24Fetch('/api/flight-summary/full', {
-          registrations:        tail,
-          flight_datetime_from: dayStart.toISOString().slice(0, 19),
-          flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
-          limit:                10,
-        })
-        fr24Flights = Array.isArray(data?.data) ? data.data : []
-      } catch (e) {
-        fastify.log.warn({ flight_id: f.id, tail, date: dateStr, err: e.message }, 'FR24 backfill lookup failed')
-        emit({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
-        counts.errors++
-        await sleep(CALL_DELAY)
+      // 1. Determine time window — DB first, fall back to Gmail schedule
+      let timeOut = f.time_out
+      let timeIn  = f.time_in
+      if (!timeOut || !timeIn) {
+        const tailShort = tail.replace(/^N/, '')
+        const match = allScheds.find(s =>
+          s.date_str === dateStr && s.type !== 'cancelled' &&
+          (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
+        )
+        if (match?.start_unix) timeOut = timeOut || new Date(match.start_unix * 1000).toISOString()
+        if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
+      }
+
+      if (!timeOut) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_window', reason: 'no time_out in DB or Gmail' })
+        counts.no_window++
         continue
       }
 
-      await sleep(CALL_DELAY)
-
-      if (!fr24Flights.length) {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_match' })
-        counts.no_match++
-        continue
+      // 2. Sweep window: time_out-5min → time_in+5min (or duration + buffer)
+      const t0 = new Date(timeOut).getTime() - 5 * 60_000
+      let t1
+      if (timeIn) {
+        t1 = new Date(timeIn).getTime() + 5 * 60_000
+      } else if (f.total_duration) {
+        t1 = new Date(timeOut).getTime() + parseFloat(f.total_duration) * 3_600_000 + 10 * 60_000
+      } else {
+        t1 = t0 + 4 * 3_600_000
       }
 
-      // 2. Pick best-matching FR24 flight
-      const logDep = f.departure_icao?.slice(1)
-      const logArr = f.arrival_icao?.slice(1)
-      const scored = fr24Flights.map(ff => {
-        let score = 0
-        const dep = ff.orig_icao || ''
-        const arr = ff.dest_icao_actual || ff.dest_icao || ''
-        if (dep === f.departure_icao || dep === logDep) score += 2
-        if (arr === f.arrival_icao   || arr === logArr)  score += 2
-        if (f.time_out && ff.datetime_takeoff) {
-          const diffMin = Math.abs(
-            new Date(f.time_out).getTime() - new Date(ff.datetime_takeoff).getTime()
-          ) / 60000
-          if (diffMin < 30) score += 3
-          else if (diffMin < 60) score += 1
-        }
-        return { ff, score }
-      })
-      scored.sort((a, b) => b.score - a.score)
-      const best   = scored[0].ff
-      const fr24Id = best.fr24_id
-      if (!fr24Id) {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_fr24_id' })
-        counts.errors++
-        continue
-      }
+      emit({ id: f.id, date: dateStr, tail, status: 'sweeping',
+             window_from: new Date(t0).toISOString(), window_to: new Date(t1).toISOString(),
+             steps: Math.ceil((t1 - t0) / STEP_MS) })
 
-      // 3. Sample positions at 5-minute intervals across the flight duration
-      const firstSeenTs = Math.floor(new Date(best.first_seen ?? best.datetime_takeoff).getTime() / 1000)
-      const lastSeenTs  = Math.floor(new Date(best.last_seen  ?? best.datetime_landed ).getTime() / 1000)
+      // 3. Sweep — each step queries the tail's position at that moment
       const rawPositions = []
-      for (let ts = firstSeenTs + 300; ts <= lastSeenTs; ts += 300) {
-        await sleep(1000)
+      let lastPosTs = null
+
+      for (let ts = t0; ts <= t1; ts += STEP_MS) {
+        await sleep(QUERY_DELAY)
         try {
           const posData = await fr24Fetch('/api/historic/flight-positions/full', {
             registrations: tail,
-            timestamp:     ts,
+            timestamp:     Math.floor(ts / 1000),
           })
           const pts = Array.isArray(posData?.data) ? posData.data : []
-          const pt  = pts.find(p => p.fr24_id === fr24Id)
-          if (pt) rawPositions.push(pt)
-        } catch (_) {}
+          const pt  = pts[0]
+          if (!pt) continue
+          if (pt.timestamp === lastPosTs) continue
+          lastPosTs = pt.timestamp
+          rawPositions.push(pt)
+        } catch (e) {
+          fastify.log.warn({ flight_id: f.id, tail, ts, err: e.message }, 'FR24 backfill position fetch failed')
+        }
       }
 
+      // 4. Save
       const normalized = normalizeFr24Positions(rawPositions)
-      const saved = await saveTrackPoints(pool, f.id, normalized)
-      if (saved) {
-        emit({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved })
-        counts.ok++
-      } else {
-        emit({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions', samples: rawPositions.length })
-        counts.no_positions++
+      try {
+        const saved = await saveTrackPoints(pool, f.id, normalized)
+        if (saved) {
+          emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, raw: rawPositions.length })
+          counts.ok++
+        } else {
+          emit({ id: f.id, date: dateStr, tail, status: 'no_positions', raw: rawPositions.length })
+          counts.no_positions++
+        }
+      } catch (e) {
+        emit({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
+        counts.errors++
       }
 
-      await sleep(CALL_DELAY)
+      await sleep(FLIGHT_DELAY)
     }
 
-    const summary = {
-      total: flights.length, processed: toProcess.length, ...counts,
-    }
+    const summary = { total: flights.length, processed: toProcess.length, ...counts }
     fastify.log.info(summary, 'FR24 backfill complete')
     emit({ type: 'summary', ...summary })
     reply.raw.end()

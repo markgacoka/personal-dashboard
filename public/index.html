@@ -1619,6 +1619,9 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span style="font-size:13px;color:var(--muted)">Flight Log</span>
             <span id="fl-subtitle" class="data-note" style="flex:1"></span>
+            <button class="btn-ghost" id="sync-night-btn" onclick="syncNightData()" style="padding:6px 12px;font-size:12px;color:var(--patina-text);border-color:var(--patina-text)" title="Compute night hours and day/night splits from schedule times">
+              <i class="ph-bold ph-moon"></i> Sync Night
+            </button>
             <button class="btn-primary" onclick="openFlightModal()" style="padding:6px 14px;font-size:12px">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
@@ -1729,6 +1732,20 @@
       <button class="modal-close" onclick="closeRoutePicker()"><i class="ph-bold ph-x"></i></button>
     </div>
     <div class="modal-bd" id="route-picker-bd" style="padding:20px">
+      <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Night sync results modal -->
+<div class="modal-overlay" id="night-sync-overlay" style="display:none"
+     onclick="if(event.target===this)closeNightSync()">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-hd">
+      <span class="modal-title"><i class="ph-bold ph-moon" style="color:var(--patina-text);margin-right:6px"></i>Night Data Sync</span>
+      <button class="modal-close" onclick="closeNightSync()"><i class="ph-bold ph-x"></i></button>
+    </div>
+    <div class="modal-bd" id="night-sync-bd" style="padding:20px;max-height:70vh;overflow-y:auto">
       <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
     </div>
   </div>
@@ -4043,6 +4060,85 @@ async function autoLoadFaTrack(f) {
 }
 
 // ─── OpenSky route picker ─────────────────────────────────────────────────────
+// ─── Night data sync ──────────────────────────────────────────────────────────
+function closeNightSync() {
+  document.getElementById('night-sync-overlay').style.display = 'none';
+}
+
+async function syncNightData() {
+  const btn = document.getElementById('sync-night-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Syncing…'; }
+  document.getElementById('night-sync-overlay').style.display = 'flex';
+  document.getElementById('night-sync-bd').innerHTML =
+    '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Computing civil twilight for all flights…</div></div>';
+
+  try {
+    const res = await fetch('/api/flights/backfill-night', { method: 'POST' }).then(r => r.json());
+    const results = res.results || [];
+    const nightFlights = results.filter(r => r.night_hrs > 0);
+
+    const tableRows = results.map(r => `
+      <tr>
+        <td style="color:var(--patina-text)">${r.date}</td>
+        <td>${esc(r.tail)}</td>
+        <td>${r.time_out ? r.time_out.slice(11, 16) + 'Z' : '—'}</td>
+        <td>${r.time_in  ? r.time_in.slice(11, 16)  + 'Z' : '—'}</td>
+        <td style="color:${r.night_hrs > 0 ? 'oklch(80% 0.17 85)' : 'var(--faint)'}">
+          ${r.night_hrs > 0 ? r.night_hrs.toFixed(1) + 'h' : '—'}
+        </td>
+        <td style="font-size:11px;color:var(--muted)">${r.day_tos}D/${r.night_tos}N</td>
+        <td style="font-size:11px;color:var(--muted)">${r.day_ldgs}D/${r.night_ldgs}N</td>
+      </tr>`).join('');
+
+    document.getElementById('night-sync-bd').innerHTML = `
+      <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--champagne)">${res.updated}</div>
+          <div style="font-size:11px;color:var(--muted)">Flights updated</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;color:oklch(80% 0.17 85)">${nightFlights.length}</div>
+          <div style="font-size:11px;color:var(--muted)">Night flights</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;color:oklch(80% 0.17 85)">${nightFlights.reduce((s,r) => s + r.night_hrs, 0).toFixed(1)}</div>
+          <div style="font-size:11px;color:var(--muted)">Total night hours</div>
+        </div>
+        <div style="flex:1;text-align:right;font-size:11px;color:var(--faint);align-self:flex-end">
+          Civil twilight (NOAA) · ${res.total - res.updated} flights skipped (no schedule time)
+        </div>
+      </div>
+      ${results.length ? `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--rule);color:var(--muted);text-align:left">
+              <th style="padding:6px 8px">Date</th>
+              <th style="padding:6px 8px">Tail</th>
+              <th style="padding:6px 8px">Block Out</th>
+              <th style="padding:6px 8px">Block In</th>
+              <th style="padding:6px 8px">Night</th>
+              <th style="padding:6px 8px">T/Os</th>
+              <th style="padding:6px 8px">Landings</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>` : '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No flights matched any Gmail schedule. Ensure Gmail is connected and schedules are loaded.</div>'}
+    `;
+
+    // Reload flight data so the logbook reflects updated night hours
+    if (res.updated > 0) {
+      await loadFlights();
+    }
+  } catch (e) {
+    document.getElementById('night-sync-bd').innerHTML =
+      `<div style="padding:20px;color:var(--warn);font-size:13px">Sync failed: ${esc(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-moon"></i> Sync Night'; }
+  }
+}
+
 let _routePickerFlightId = null;
 
 function closeRoutePicker() {

@@ -597,6 +597,130 @@ export default async function proxyRoutes(fastify) {
     }
   })
 
+  // ── FlightRadar24: smart auto-fetch track by flight_id ────────────────────────
+  // POST /api/external/auto-fetch-fr24-track/:flight_id
+  // Looks up FR24 flights for the tail+date, scores matches by airport/duration/time,
+  // samples positions at 60s intervals, saves to track_log_points.
+  fastify.post('/api/external/auto-fetch-fr24-track/:flight_id', async (req, reply) => {
+    const flightId = parseInt(req.params.flight_id)
+    if (!process.env.FR24_API_TOKEN) {
+      return reply.status(503).send({ error: 'FR24_API_TOKEN not configured' })
+    }
+
+    // 1. Read flight + aircraft from DB
+    const { rows } = await pool.query(`
+      SELECT f.id, f.date::text, f.departure_icao, f.arrival_icao,
+             f.time_out, f.time_in, f.total_duration,
+             ac.tail_number, ac.mode_s_hex
+      FROM flights f
+      JOIN aircraft ac ON ac.id = f.aircraft_id
+      WHERE f.id = $1
+    `, [flightId])
+    if (!rows.length) return reply.status(404).send({ error: 'Flight not found' })
+    const fl    = rows[0]
+    const tail  = fl.tail_number
+    const dateStr = String(fl.date).slice(0, 10)
+
+    // 2. Try Gmail schedule if time_out is missing
+    let timeOut = fl.time_out
+    if (!timeOut) {
+      try {
+        const scheds    = await fetchNiceAirSchedules()
+        const tailShort = tail.replace(/^N/, '')
+        const match     = scheds.find(s =>
+          s.date_str === dateStr && s.type !== 'cancelled' &&
+          (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
+        )
+        if (match?.start_unix) timeOut = new Date(match.start_unix * 1000).toISOString()
+      } catch (_) {}
+    }
+
+    // 3. Get FR24 flights for this tail on this date
+    let fr24Flights = []
+    try {
+      const dayStart = new Date(dateStr + 'T08:00:00Z')
+      const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
+      const data = await fr24Fetch('/api/flight-summary/full', {
+        registrations:        tail,
+        flight_datetime_from: dayStart.toISOString().slice(0, 19),
+        flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
+        limit:                20,
+      })
+      fr24Flights = Array.isArray(data?.data) ? data.data : []
+    } catch (e) {
+      return reply.status(502).send({ error: `FR24 lookup failed: ${e.message}` })
+    }
+    if (!fr24Flights.length) {
+      return reply.status(404).send({ error: 'No FR24 flights found for this tail+date' })
+    }
+
+    // 4. Score-match: airports + time proximity + duration
+    const normIcao = ic => ic?.toUpperCase().replace(/^K/, '')
+    const scored = fr24Flights.map(ff => {
+      let score = 0
+      const dep = ff.orig_icao || ''
+      const arr = ff.dest_icao_actual || ff.dest_icao || ''
+      if (fl.departure_icao && (dep === fl.departure_icao || normIcao(dep) === normIcao(fl.departure_icao))) score += 3
+      if (fl.arrival_icao   && (arr === fl.arrival_icao   || normIcao(arr) === normIcao(fl.arrival_icao)))   score += 3
+      // Time proximity to Gmail/DB block-out time
+      const deptTs = new Date(ff.datetime_takeoff || ff.first_seen || 0)
+      if (timeOut && !isNaN(deptTs)) {
+        const diffMin = Math.abs(new Date(timeOut) - deptTs) / 60000
+        if (diffMin < 20)  score += 5
+        else if (diffMin < 45)  score += 3
+        else if (diffMin < 90)  score += 1
+      }
+      // Duration match (logbook in hours, FR24 duration_min in minutes)
+      if (fl.total_duration && ff.duration_min) {
+        const logMin = parseFloat(fl.total_duration) * 60
+        const ratio  = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
+        if (ratio > 0.85) score += 3
+        else if (ratio > 0.65) score += 1
+      }
+      return { ff, score }
+    })
+    scored.sort((a, b) => b.score - a.score)
+
+    const best    = scored[0].ff
+    const fr24Id  = best.fr24_id
+    if (!fr24Id) return reply.status(404).send({ error: 'Best FR24 match has no fr24_id' })
+
+    const firstTs = Math.floor(new Date(best.datetime_takeoff || best.departure_time || best.first_seen).getTime() / 1000)
+    const lastTs  = Math.floor(new Date(best.datetime_landed  || best.arrival_time   || best.last_seen ).getTime() / 1000)
+
+    // 5. Sample positions at 60-second intervals
+    const STEP = 60
+    const rawPositions = []
+    for (let ts = firstTs + STEP; ts <= lastTs; ts += STEP) {
+      await new Promise(r => setTimeout(r, 600))
+      try {
+        const posData = await fr24Fetch('/api/historic/flight-positions/full', {
+          registrations: tail,
+          timestamp:     ts,
+        })
+        const pts = Array.isArray(posData?.data) ? posData.data : []
+        const pt  = pts.find(p => p.fr24_id === fr24Id)
+        if (pt) rawPositions.push(pt)
+      } catch (_) {}
+    }
+
+    if (!rawPositions.length) {
+      return reply.status(200).send({ success: false, points_saved: 0, fr24_id: fr24Id, message: 'No positions from FR24' })
+    }
+
+    const normalized = normalizeFr24Positions(rawPositions)
+    const saved = await saveTrackPoints(pool, flightId, normalized)
+    fastify.log.info({ flightId, fr24Id, saved, score: scored[0].score }, 'FR24 smart track saved')
+    return {
+      success:      true,
+      points_saved: saved,
+      total_points: rawPositions.length,
+      fr24_id:      fr24Id,
+      candidates:   fr24Flights.length,
+      matched:      { dep: best.orig_icao, arr: best.dest_icao_actual || best.dest_icao, duration_min: best.duration_min, score: scored[0].score },
+    }
+  })
+
   // ── FlightRadar24: attach GPS track to a flight record ────────────────────────
   // POST /api/external/attach-fr24-track  body: { flight_id, fr24_id, registration, first_seen, last_seen }
   // Samples positions at 5-minute intervals across the flight duration.

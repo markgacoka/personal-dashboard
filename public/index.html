@@ -3919,6 +3919,20 @@ async function showFlightDetail(id) {
       </div>
     </div>
 
+    <!-- ── Track Scrubber ────────────────────────────────── -->
+    ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden">
+      <div style="position:relative;background:var(--graphite);overflow:hidden">
+        <canvas id="fd-elev-chart" style="width:100%;height:68px;display:block"></canvas>
+      </div>
+      <div style="background:var(--raised);padding:7px 14px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--rule)">
+        <button id="fd-play-btn" title="Play/pause" style="width:26px;height:26px;flex-shrink:0;border-radius:var(--r-sm);border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px">
+          <i class="ph-bold ph-play" id="fd-play-icon"></i>
+        </button>
+        <input type="range" id="fd-scrubber" min="0" value="0" step="1" style="flex:1;accent-color:var(--patina);cursor:pointer">
+        <span id="fd-scrubber-info" style="font-size:10px;font-variant-numeric:tabular-nums;color:var(--body-text);min-width:150px;text-align:right;white-space:nowrap"></span>
+      </div>
+    </div>` : ''}
+
     <!-- ── GPS Stats ─────────────────────────────────────── -->
     ${f.has_track ? `<div id="fd-track-stats" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;min-height:28px">
       <span style="font-size:11px;color:var(--faint)">Loading GPS stats…</span>
@@ -4261,119 +4275,36 @@ function closeRoutePicker() {
 }
 
 async function openRoutePicker(flightId) {
-  _routePickerFlightId = flightId;
-  const overlay = document.getElementById('route-picker-overlay');
-  const bd = document.getElementById('route-picker-bd');
-  overlay.style.display = 'flex';
-  bd.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Checking Gmail schedule…</div></div>';
-
-  const f = (window._flights || []).find(x => String(x.id) === String(flightId));
-  if (!f) { closeRoutePicker(); return; }
-
-  const hex = f.aircraft?.mode_s_hex;
-  const dateStr = String(f.date).slice(0, 10);
-  const depIcao = f.departure?.icao || 'KRHV';
-  const tail = f.aircraft?.tail_number || '';
-
-  if (!hex) {
-    bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">
-      No Mode S hex on file for ${esc(tail || 'this aircraft')}.<br>
-      Update the aircraft record with its ICAO 24-bit address to search ADS-B data.
-    </div>`;
-    return;
+  // Use FR24 smart auto-match (airport + duration + Gmail schedule time)
+  const btn = document.getElementById('find-route-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle"></div>';
+    btn.title = 'Fetching from FlightRadar24…';
   }
-
   try {
-    // Find the matching NICE AIR Gmail schedule for exact departure time
-    await ensureNiceAirSchedules();
-    const schedules = window._niceAirSchedules || [];
-    const tailShort = tail.replace(/^N/, '');
-    const matched = schedules
-      .filter(s => s.date_str === dateStr && (s.tail === tail || s.tail === tailShort || s.tail.replace(/^N/,'') === tailShort))
-      .filter(s => s.type !== 'cancelled')
-      .sort((a, b) => (b.received || '').localeCompare(a.received || ''));
-    const sched = matched[0] || null;
+    const res = await fetch(`/api/external/auto-fetch-fr24-track/${flightId}`, { method: 'POST' })
+      .then(r => r.json()).catch(() => null);
 
-    if (!sched) {
-      bd.innerHTML = `<div style="padding:20px">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
-          No NICE AIR reservation email found for ${esc(tail)} on ${dateStr}.
-        </div>
-        <div style="font-size:12px;color:var(--faint)">
-          Without the scheduled start time, ADS-B track matching cannot be confirmed with certainty.<br>
-          If you know the approximate departure time, the track can still be attached manually from the logbook admin.
-        </div>
-      </div>`;
-      return;
-    }
+    if (res?.error) throw new Error(res.error);
+    if (!res?.success || !res.points_saved) throw new Error('No track points returned from FR24');
 
-    // Show what we found and auto-attach
-    const cancelCount = schedules.filter(s => s.date_str === dateStr && s.type === 'cancelled' &&
-      (s.tail === tail || s.tail.replace(/^N/,'') === tailShort)).length;
+    const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
+    if (fi >= 0) window._flights[fi].has_track = true;
 
-    bd.innerHTML = `
-      <div style="background:var(--graphite);border:1px solid var(--rule-strong);border-radius:6px;padding:12px 16px;margin-bottom:16px">
-        <div style="font-size:10px;color:var(--patina-text);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">
-          <i class="ph-bold ph-envelope-open"></i> NICE AIR Reservation Found
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">
-          <div><div style="font-size:11px;color:var(--faint)">Aircraft</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.tail)}</div></div>
-          <div><div style="font-size:11px;color:var(--faint)">Departs</div><div style="font-size:13px;color:var(--champagne)">${esc(sched.start_local||'—')}</div></div>
-          <div><div style="font-size:11px;color:var(--faint)">Returns</div><div style="font-size:13px">${esc(sched.end_local||'—')}</div></div>
-          ${sched.cfi ? `<div><div style="font-size:11px;color:var(--faint)">CFI</div><div style="font-size:13px">${esc(sched.cfi)}</div></div>` : ''}
-        </div>
-        ${sched.type === 'changed' ? `<div style="font-size:11px;color:oklch(80% 0.17 85);margin-top:8px">Schedule was modified — showing final times.</div>` : ''}
-        ${cancelCount ? `<div style="font-size:11px;color:var(--warn);margin-top:4px">${cancelCount} cancellation email(s) also found for this date.</div>` : ''}
-      </div>
-      <div id="rp-status" style="padding:12px;text-align:center">
-        <div class="spinner" style="margin:0 auto 10px"></div>
-        <div style="font-size:12px;color:var(--muted)">Searching ADS-B network for GPS track…</div>
-      </div>`;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; btn.title = 'Refresh GPS route'; }
+    if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
+    const fUp = (window._flights || []).find(x => String(x.id) === String(flightId));
+    if (fUp) requestAnimationFrame(() => initFlightDetailMap(fUp));
 
-    // Now query OpenSky using the exact schedule start time as the anchor
-    const adsRes = await fetch(`/api/external/flights-detected?departure=${encodeURIComponent(depIcao)}&date=${dateStr}&icao24=${hex}`)
-      .then(r => r.ok ? r.json() : { flights: [] }).catch(() => ({ flights: [] }));
-    const candidates = adsRes.flights || [];
-
-    // Pick the candidate closest to the scheduled departure time
-    const logDurMin = Math.round(parseFloat(f.total_duration || 0) * 60);
-    let best = null;
-    if (sched.start_unix && candidates.length) {
-      best = candidates.reduce((prev, cur) => {
-        const pd = Math.abs((prev.first_seen_unix || 0) - sched.start_unix);
-        const cd = Math.abs((cur.first_seen_unix || 0) - sched.start_unix);
-        return cd < pd ? cur : prev;
-      });
-      // Reject if more than 45 min off from scheduled time (probably a different flight)
-      if (Math.abs((best.first_seen_unix || 0) - sched.start_unix) > 2700) best = null;
-    }
-
-    const statusEl = document.getElementById('rp-status');
-    if (!statusEl) return;
-
-    if (!best) {
-      const reason = !candidates.length
-        ? 'No departures found in ADS-B data. OpenSky retains ~30 days of free history.'
-        : `${candidates.length} departure(s) found but none within 45 min of scheduled time.`;
-      statusEl.innerHTML = `<div style="font-size:13px;color:var(--muted)">${reason}</div>
-        <div style="font-size:12px;color:var(--faint);margin-top:6px">GPS route could not be attached automatically.</div>`;
-      return;
-    }
-
-    const depTime = best.departure_time ? new Date(best.departure_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'America/Los_Angeles'}) : '—';
-    const diffMin = sched.start_unix ? Math.round(Math.abs((best.first_seen_unix||0) - sched.start_unix)/60) : '?';
-    statusEl.innerHTML = `
-      <div style="border:1px solid var(--patina-text);border-radius:6px;padding:12px 14px;margin-bottom:12px;text-align:left">
-        <div style="font-size:12px;color:var(--patina-text);margin-bottom:6px">ADS-B match found</div>
-        <div style="font-size:13px;color:var(--champagne)">${esc(depIcao)} → ${esc(best.arrival_icao||'?')}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">Departed ${depTime} PDT · ${best.duration_min ?? '?'} min · ${diffMin} min from schedule</div>
-      </div>
-      <button onclick="autoAttachTrack(${flightId},'${esc(hex)}',${best.first_seen_unix})"
-        style="background:var(--patina-text);color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:13px;cursor:pointer;font-weight:500;width:100%">
-        Attach GPS Track to Flight
-      </button>`;
   } catch (e) {
-    bd.innerHTML = `<div style="color:var(--warn);padding:20px;text-align:center;font-size:13px">Error: ${esc(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; btn.title = 'Fetch GPS route'; }
+    // Show a brief error badge near the button
+    const errEl = document.createElement('span');
+    errEl.style.cssText = 'font-size:11px;color:var(--warn);margin-left:6px';
+    errEl.textContent = e.message?.includes('configured') ? 'FR24 not configured' : 'FR24: no match';
+    btn?.parentElement?.appendChild(errEl);
+    setTimeout(() => errEl.remove(), 5000);
   }
 }
 
@@ -4433,14 +4364,15 @@ async function initFlightDetailMap(f) {
 
     let coords = [];
     let firstPtTime = null, lastPtTime = null;
+    let allPts = [];
     if (f.has_track) {
-      const pts = await fetch('/api/flights/' + f.id + '/track')
+      allPts = await fetch('/api/flights/' + f.id + '/track')
         .then(r => r.ok ? r.json() : []).catch(() => []);
       if (_fdMap !== thisMap) return; // stale after await
-      coords = (pts || []).map(p => [p.lon, p.lat]).filter(c => c[0] != null && c[1] != null);
-      if (pts?.length) {
-        firstPtTime = pts[0].ts;
-        lastPtTime  = pts[pts.length - 1].ts;
+      coords = allPts.map(p => [p.lon, p.lat]).filter(c => c[0] != null && c[1] != null);
+      if (allPts.length) {
+        firstPtTime = allPts[0].ts;
+        lastPtTime  = allPts[allPts.length - 1].ts;
       }
     }
 
@@ -4536,6 +4468,133 @@ async function initFlightDetailMap(f) {
       });
       thisMap.on('mouseenter', 'apts-dot', () => thisMap.getCanvas().style.cursor = 'pointer');
       thisMap.on('mouseleave', 'apts-dot', () => thisMap.getCanvas().style.cursor = '');
+    }
+
+    // ── Track scrubber + animated plane marker ────────────────────────────────
+    if (allPts.length >= 2) {
+      const scrubWrap  = document.getElementById('fd-scrubber-wrap');
+      const elevCanvas = document.getElementById('fd-elev-chart');
+      const scrubInput = document.getElementById('fd-scrubber');
+      const playBtn    = document.getElementById('fd-play-btn');
+      const playIcon   = document.getElementById('fd-play-icon');
+      const scrubInfo  = document.getElementById('fd-scrubber-info');
+
+      if (scrubWrap && elevCanvas && scrubInput) {
+        scrubInput.max   = allPts.length - 1;
+        scrubInput.value = 0;
+        scrubWrap.style.display = 'block';
+
+        // Plane marker
+        const planeEl = document.createElement('div');
+        planeEl.style.cssText = 'width:28px;height:28px;pointer-events:none;transform-origin:center center';
+        planeEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28">
+          <g transform="translate(16,16)">
+            <rect x="-2" y="-10" width="4" height="20" rx="2" fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.5))"/>
+            <path d="M-2,-1 L-11,4 L-9.5,6 L-2,2.5 Z" fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.4))"/>
+            <path d="M2,-1 L11,4 L9.5,6 L2,2.5 Z"  fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.4))"/>
+            <path d="M-2,7 L-5,10 L-4,11 L-2,8.5 Z" fill="${routeColor}" opacity=".75"/>
+            <path d="M2,7 L5,10 L4,11 L2,8.5 Z"  fill="${routeColor}" opacity=".75"/>
+          </g>
+        </svg>`;
+        const planeMkr = new maplibregl.Marker({ element: planeEl, anchor: 'center' })
+          .setLngLat([allPts[0].lon, allPts[0].lat])
+          .addTo(thisMap);
+
+        // Elevation chart draw
+        function drawElev(idx) {
+          const dpr  = window.devicePixelRatio || 1;
+          const cw   = elevCanvas.offsetWidth;
+          const ch   = elevCanvas.offsetHeight;
+          elevCanvas.width  = cw * dpr;
+          elevCanvas.height = ch * dpr;
+          const ctx  = elevCanvas.getContext('2d');
+          ctx.scale(dpr, dpr);
+          const n    = allPts.length;
+          const alts = allPts.map(p => p.altitude_ft ?? 0);
+          const mn   = Math.min(...alts);
+          const mx   = Math.max(...alts) || 1;
+          const pad  = 10;
+          const xOf  = i => (i / (n - 1)) * cw;
+          const yOf  = a => ch - pad - ((a - mn) / (mx - mn || 1)) * (ch - pad * 2);
+
+          // Filled area
+          ctx.beginPath();
+          ctx.moveTo(0, ch);
+          for (let i = 0; i < n; i++) ctx.lineTo(xOf(i), yOf(alts[i]));
+          ctx.lineTo(cw, ch);
+          ctx.closePath();
+          ctx.fillStyle = routeColor + '28';
+          ctx.fill();
+
+          // Stroke
+          ctx.beginPath();
+          for (let i = 0; i < n; i++) { if (i===0) ctx.moveTo(xOf(i),yOf(alts[i])); else ctx.lineTo(xOf(i),yOf(alts[i])); }
+          ctx.strokeStyle = routeColor;
+          ctx.lineWidth   = 1.5;
+          ctx.lineJoin    = 'round';
+          ctx.stroke();
+
+          // Cursor
+          const cx = xOf(idx);
+          ctx.save();
+          ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,ch);
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+          ctx.setLineDash([3,3]); ctx.stroke(); ctx.restore();
+
+          // Altitude label at cursor
+          const altLbl = Math.round(alts[idx]).toLocaleString() + ' ft';
+          const lx = Math.min(cx + 5, cw - 52);
+          ctx.fillStyle = routeColor;
+          ctx.font = `600 10px "Albert Sans",sans-serif`;
+          ctx.fillText(altLbl, lx, 14);
+        }
+
+        function updateScrubPos(idx) {
+          const pt = allPts[Math.min(idx, allPts.length - 1)];
+          planeMkr.setLngLat([pt.lon, pt.lat]);
+          planeEl.style.transform = `rotate(${pt.track_deg ?? 0}deg)`;
+          const utc  = new Date(pt.ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+'Z';
+          const alt  = pt.altitude_ft != null ? Math.round(pt.altitude_ft).toLocaleString()+' ft' : '';
+          const spd  = pt.groundspeed_kts != null ? Math.round(pt.groundspeed_kts)+' kts' : '';
+          const hdg  = pt.track_deg != null ? Math.round(pt.track_deg)+'°' : '';
+          scrubInfo.textContent = [utc,alt,spd,hdg].filter(Boolean).join(' · ');
+          drawElev(idx);
+        }
+
+        // Initial render
+        requestAnimationFrame(() => { drawElev(0); updateScrubPos(0); });
+
+        scrubInput.addEventListener('input', () => updateScrubPos(parseInt(scrubInput.value)));
+
+        // Play / pause
+        let _playTimer = null;
+        if (playBtn) {
+          playBtn.addEventListener('click', () => {
+            if (_playTimer) {
+              clearInterval(_playTimer); _playTimer = null;
+              playIcon.className = 'ph-bold ph-play';
+            } else {
+              playIcon.className = 'ph-bold ph-pause';
+              let idx = parseInt(scrubInput.value);
+              if (idx >= allPts.length - 1) idx = 0;
+              _playTimer = setInterval(() => {
+                idx++;
+                if (idx >= allPts.length) {
+                  clearInterval(_playTimer); _playTimer = null;
+                  playIcon.className = 'ph-bold ph-play';
+                  return;
+                }
+                scrubInput.value = idx;
+                updateScrubPos(idx);
+              }, 160);
+            }
+          });
+        }
+
+        // Redraw chart on resize
+        const _ro = new ResizeObserver(() => drawElev(parseInt(scrubInput.value)));
+        _ro.observe(elevCanvas);
+      }
     }
   });
 }

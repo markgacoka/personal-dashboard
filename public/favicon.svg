@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark navy background -->
+  <rect width="32" height="32" rx="7" fill="#0e1c27"/>
+  <!-- Subtle patina horizon glow -->
+  <ellipse cx="16" cy="23" rx="13" ry="4" fill="#28a880" fill-opacity="0.2"/>
+  <!-- Airplane top-down silhouette, angled up-right -->
+  <g transform="translate(16,15) rotate(-35)">
+    <!-- Fuselage -->
+    <rect x="-1.3" y="-8" width="2.6" height="16" rx="1.3" fill="#9cc8d5"/>
+    <!-- Main wings -->
+    <path d="M-1 -1 L-11 4 L-9.5 5.5 L-1 2 Z" fill="#9cc8d5"/>
+    <path d="M1 -1 L11 4 L9.5 5.5 L1 2 Z" fill="#9cc8d5"/>
+    <!-- Tail horizontal stabilizers -->
+    <path d="M-1 5.5 L-5 8 L-4 9 L-1 6.5 Z" fill="#78b2c0"/>
+    <path d="M1 5.5 L5 8 L4 9 L1 6.5 Z" fill="#78b2c0"/>
+  </g>
+  <!-- Patina nav-light accent -->
+  <circle cx="22" cy="8" r="1.4" fill="#3ec888"/>
+</svg>

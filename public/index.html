@@ -678,41 +678,93 @@
     .fl-kpi-l { font-size: 11px; color: var(--faint); margin-top: 1px; }
 
     /* ── Flight detail page ──────────────────────────────── */
-    .flight-detail-header {
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--rule);
-      margin-bottom: 28px;
+    /* ── Flight detail hero ──────────────────────────────── */
+    .fd-hero {
+      background: linear-gradient(145deg, oklch(16% 0.045 218) 0%, oklch(12% 0.025 230) 100%);
+      padding: 18px 22px 0;
+      border: 1px solid oklch(38% 0 0 / 0.35);
+      border-bottom: none;
+      border-radius: var(--r-md) var(--r-md) 0 0;
+      position: relative; overflow: hidden;
     }
-    .flight-route-label {
+    .fd-hero::before {
+      content: ''; position: absolute; right: -50px; top: -50px;
+      width: 220px; height: 220px; border-radius: 50%;
+      border: 36px solid oklch(76% 0.088 190 / 0.05);
+      pointer-events: none;
+    }
+    .fd-hero::after {
+      content: ''; position: absolute; right: 80px; top: -30px;
+      width: 110px; height: 110px; border-radius: 50%;
+      border: 20px solid oklch(76% 0.088 190 / 0.03);
+      pointer-events: none;
+    }
+    .fd-hero-top {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 16px; position: relative; z-index: 1;
+    }
+    .fd-hero-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 3px 9px; border-radius: 20px;
+      margin-bottom: 8px;
+    }
+    .fd-route-hero {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 32px; font-weight: 300;
+      font-size: 46px; font-weight: 300;
       color: var(--champagne);
-      letter-spacing: -0.01em; line-height: 1.1;
+      letter-spacing: -0.01em; line-height: 1;
+      margin-bottom: 6px;
     }
-    .flight-meta {
-      font-size: 13px; color: var(--muted);
-      margin-top: 6px;
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    .fd-hero-meta {
+      font-size: 12px; color: oklch(58% 0.04 200);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     }
-    .flight-meta-sep { color: var(--rule-strong); }
-    .flight-hero-stats { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 20px; }
-    .flight-hero-stat .label {
-      font-size: 11px; color: var(--faint);
-      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px;
+    .fd-hero-meta-sep { color: oklch(35% 0 0 / 0.5); }
+    .fd-hero-actions {
+      display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; padding-top: 4px;
     }
-    .flight-hero-stat .val {
-      font-size: 20px; font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      color: var(--champagne);
-      letter-spacing: -0.02em; line-height: 1.1;
+    .fd-hero-stats-bar {
+      display: flex; margin-top: 18px; position: relative; z-index: 1;
+      border-top: 1px solid oklch(50% 0 0 / 0.18);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
-    .flight-hero-stat .unit {
-      font-size: 12px; color: var(--muted); margin-left: 2px;
+    .fd-hstat {
+      padding: 11px 18px 13px;
+      border-right: 1px solid oklch(50% 0 0 / 0.15);
+      flex-shrink: 0; text-align: left;
+    }
+    .fd-hstat:last-child { border-right: none; }
+    .fd-hstat-label {
+      font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em;
+      color: oklch(46% 0.03 210); margin-bottom: 4px; white-space: nowrap;
+    }
+    .fd-hstat-val {
+      font-size: 19px; font-weight: 600;
+      font-variant-numeric: tabular-nums; line-height: 1;
+      white-space: nowrap;
+    }
+    .fd-hstat-unit { font-size: 11px; margin-left: 1px; color: oklch(52% 0.03 210); font-weight: 400; }
+
+    /* ── Main grid: map + sidebar ────────────────────────── */
+    .fd-main-grid {
+      display: grid;
+      grid-template-columns: 1fr 290px;
+      border: 1px solid oklch(38% 0 0 / 0.35);
+      border-radius: 0 0 var(--r-md) var(--r-md);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .fd-sidebar {
+      display: flex; flex-direction: column;
+      border-left: 1px solid oklch(38% 0 0 / 0.25);
+      background: var(--graphite);
+      overflow: hidden;
     }
 
     #fd-map-container {
-      height: 360px; border-radius: var(--r-md); overflow: hidden;
-      margin: 24px 0; border: 1px solid var(--rule);
+      height: 100%; min-height: 390px;
+      border-radius: 0; border: none; margin: 0; overflow: hidden;
     }
     #fd-map { height: 100%; }
 
@@ -746,59 +798,50 @@
     }
     .ac-spec-key { font-weight: 500; color: var(--body-text); }
 
-    /* ── Flight detail two-column grid ──────────────────── */
-    .fd-two-col {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 16px;
-      margin: 0 0 24px;
-      align-items: start;
-    }
-    @media (max-width: 680px) { .fd-two-col { grid-template-columns: 1fr; } }
+    /* fd-two-col kept for schedule card fallback if needed */
+    .fd-two-col { display: contents; }
+    @media (max-width: 800px) { .fd-main-grid { grid-template-columns: 1fr; } .fd-sidebar { border-left: none; border-top: 1px solid oklch(38% 0 0 / 0.25); } }
 
-    /* Aircraft card redesign — horizontal layout */
+    /* Aircraft card — vertical, lives in sidebar */
     .fd-ac-card {
-      background: var(--graphite);
-      border: 1px solid var(--rule);
-      border-radius: var(--r-sm);
+      background: transparent;
       overflow: hidden;
-      display: flex; flex-direction: row;
+      display: flex; flex-direction: column;
+      flex: 1;
     }
     .fd-ac-photo-wrap {
-      width: 150px; flex-shrink: 0;
+      width: 100%; height: 160px; flex-shrink: 0;
       background: var(--raised);
       position: relative; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      min-height: 120px;
     }
     .fd-ac-photo-wrap img {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
     .fd-ac-photo-credit {
       position: absolute; bottom: 4px; right: 6px;
-      font-size: 9px; color: oklch(90% 0 0 / 0.65);
+      font-size: 9px; color: oklch(90% 0 0 / 0.6);
       text-shadow: 0 1px 2px oklch(0% 0 0 / 0.9);
-      writing-mode: vertical-rl; transform: rotate(180deg);
     }
-    .fd-ac-body { padding: 12px 14px; flex: 1; min-width: 0; }
+    .fd-ac-body { padding: 12px 14px; flex: 1; }
     .fd-ac-reg {
-      font-size: 16px; font-weight: 700;
+      font-size: 14px; font-weight: 700;
       color: var(--patina-text); letter-spacing: 0.04em;
       margin-bottom: 2px;
     }
-    .fd-ac-name { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .fd-ac-name { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
     .fd-ac-specs {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-      gap: 6px 14px; margin-bottom: 12px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 6px 10px; margin-bottom: 10px;
     }
-    .fd-ac-spec-label { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
-    .fd-ac-spec-val { font-size: 12px; color: var(--body-text); font-weight: 500; }
+    .fd-ac-spec-label { font-size: 9px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-ac-spec-val { font-size: 11px; color: var(--body-text); font-weight: 500; }
     .fd-perf-section {
       border-top: 1px solid var(--rule);
-      padding-top: 10px; margin-top: 2px;
+      padding-top: 8px; margin-top: 2px;
     }
     .fd-perf-label {
-      font-size: 10px; color: var(--faint); text-transform: uppercase;
+      font-size: 9px; color: var(--faint); text-transform: uppercase;
       letter-spacing: 0.06em; margin-bottom: 6px;
     }
     .fd-perf-grid {
@@ -3747,128 +3790,134 @@ async function showFlightDetail(id) {
     title: routeLabel(f),
   });
 
+  // All non-zero stats for the hero bar
   const heroStats = [
-    { label:'Total', val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'var(--champagne)' },
-    f.dual_received > 0 ? { label:'Dual Received', val: parseFloat(f.dual_received).toFixed(1), unit:'h', color:'var(--patina-text)' } : null,
-    f.dual_given > 0   ? { label:'Dual Given',    val: parseFloat(f.dual_given).toFixed(1),    unit:'h', color:'var(--patina-text)' } : null,
-    f.pic > 0          ? { label:'PIC',            val: parseFloat(f.pic).toFixed(1),            unit:'h', color:'oklch(65% 0.16 145)' } : null,
-    f.cross_country > 0 ? { label:'X-Country',    val: parseFloat(f.cross_country).toFixed(1),  unit:'h', color:'oklch(68% 0.15 235)' } : null,
+    { label:'Total',      val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'var(--champagne)' },
+    f.dual_received > 0 ? { label:'Dual Rcvd',  val: parseFloat(f.dual_received).toFixed(1),  unit:'h', color:'var(--patina-text)' } : null,
+    f.dual_given > 0    ? { label:'Dual Given',  val: parseFloat(f.dual_given).toFixed(1),     unit:'h', color:'var(--patina-text)' } : null,
+    f.pic > 0           ? { label:'PIC',         val: parseFloat(f.pic).toFixed(1),             unit:'h', color:'oklch(65% 0.16 145)' } : null,
+    f.solo > 0          ? { label:'Solo',        val: parseFloat(f.solo).toFixed(1),            unit:'h', color:'oklch(65% 0.15 350)' } : null,
+    f.cross_country > 0 ? { label:'X-Country',  val: parseFloat(f.cross_country).toFixed(1),   unit:'h', color:'oklch(68% 0.15 235)' } : null,
+    f.night > 0         ? { label:'Night',       val: parseFloat(f.night).toFixed(1),           unit:'h', color:'oklch(80% 0.17 85)' } : null,
     f.actual_instrument > 0 ? { label:'Actual IFR', val: parseFloat(f.actual_instrument).toFixed(1), unit:'h', color:'var(--patina-text)' } : null,
+    f.simulated_instrument > 0 ? { label:'Sim Inst', val: parseFloat(f.simulated_instrument).toFixed(1), unit:'h', color:'var(--patina-text)' } : null,
+    f.day_takeoffs > 0  ? { label:'Day T/O',    val: String(f.day_takeoffs),   unit:'', color:'var(--body-text)' } : null,
+    f.day_landings_full_stop > 0 ? { label:'Day Ldg', val: String(f.day_landings_full_stop), unit:'', color:'var(--body-text)' } : null,
+    f.night_takeoffs > 0 ? { label:'Night T/O', val: String(f.night_takeoffs), unit:'', color:'oklch(80% 0.17 85)' } : null,
+    f.night_landings_full_stop > 0 ? { label:'Night Ldg', val: String(f.night_landings_full_stop), unit:'', color:'oklch(80% 0.17 85)' } : null,
+    f.holds > 0         ? { label:'Holds',      val: String(f.holds),          unit:'', color:'oklch(68% 0.15 235)' } : null,
+    f.distance_nm       ? { label:'Distance',   val: Math.round(f.distance_nm)+' nm', unit:'', color:'var(--muted)' } : null,
   ].filter(Boolean);
 
   const ac = f.aircraft;
   const acCardPlaceholder = ac ? `
     <div id="fd-ac-card" class="fd-ac-card">
       <div class="fd-ac-photo-wrap">
-        <i class="ph-bold ph-airplane" style="font-size:32px;color:var(--disabled)"></i>
+        <i class="ph-bold ph-airplane" style="font-size:28px;color:var(--disabled)"></i>
       </div>
       <div class="fd-ac-body">
         <div class="fd-ac-reg">${esc(ac.tail_number)}</div>
         <div class="fd-ac-name">${esc(ac.make||'')} ${esc(ac.model||'')}${ac.year ? ' · '+ac.year : ''}</div>
-        <div style="display:flex;align-items:center;gap:6px;color:var(--faint);font-size:12px">
-          <div class="spinner" style="width:12px;height:12px;border-width:2px;flex-shrink:0"></div>
-          Loading aircraft data…
+        <div style="display:flex;align-items:center;gap:5px;color:var(--faint);font-size:11px">
+          <div class="spinner" style="width:10px;height:10px;border-width:2px;flex-shrink:0"></div>
+          Loading…
         </div>
       </div>
     </div>` : `
-    <div id="fd-ac-card" style="background:var(--graphite);border:1px solid var(--rule);border-radius:var(--r-sm);padding:20px;display:flex;align-items:center;justify-content:center;color:var(--disabled);font-size:12px">
+    <div id="fd-ac-card" style="padding:20px;display:flex;align-items:center;justify-content:center;color:var(--disabled);font-size:12px">
       No aircraft on record
     </div>`;
 
-  const allMetrics = [
-    ['Total',        fmtHrs(f.total_duration),              'var(--champagne)'],
-    ['Dual Received',fmtHrs(f.dual_received),               'var(--patina-text)'],
-    ['Dual Given',   fmtHrs(f.dual_given),                  'var(--patina-text)'],
-    ['PIC',          fmtHrs(f.pic),                         'oklch(65% 0.16 145)'],
-    ['SIC',          fmtHrs(f.sic),                         'var(--muted)'],
-    ['Solo',         fmtHrs(f.solo),                        'oklch(65% 0.15 350)'],
-    ['X-Country',    fmtHrs(f.cross_country),               'oklch(68% 0.15 235)'],
-    ['Night',        fmtHrs(f.night),                       'oklch(80% 0.17 85)'],
-    ['Actual IFR',   fmtHrs(f.actual_instrument),           'var(--patina-text)'],
-    ['Sim Inst',     fmtHrs(f.simulated_instrument),        'var(--patina-text)'],
-    ['Ground Train', fmtHrs(f.ground_training),             'var(--muted)'],
-    ['Day T/O',      f.day_takeoffs > 0 ? String(f.day_takeoffs) : null,          null],
-    ['Day Ldg',      f.day_landings_full_stop > 0 ? String(f.day_landings_full_stop) : null, null],
-    ['Night T/O',    f.night_takeoffs > 0 ? String(f.night_takeoffs) : null,      'oklch(80% 0.17 85)'],
-    ['Night Ldg',    f.night_landings_full_stop > 0 ? String(f.night_landings_full_stop) : null, 'oklch(80% 0.17 85)'],
-    ['Holds',        f.holds > 0 ? String(f.holds) : null,  'oklch(68% 0.15 235)'],
-    ['Distance',     f.distance_nm ? Math.round(f.distance_nm)+' nm' : null,      null],
-    ['Hobbs',        (f.hobbs_start&&f.hobbs_end) ? `${f.hobbs_start} → ${f.hobbs_end}` : null, null],
-    ['Tach',         (f.tach_start&&f.tach_end)   ? `${f.tach_start} → ${f.tach_end}`   : null, null],
-  ].filter(([,v]) => v && v !== '—');
+  const dateStr = String(f.date).slice(0, 10);
+  const longDate = new Date(f.date+'T12:00:00').toLocaleDateString('en-US',
+    {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 
   document.getElementById('flight-detail-content').innerHTML = `
-    <div class="flight-detail-header">
-      <div class="detail-sport-chip">
-        <i class="ph-bold ph-airplane" style="color:${color};font-size:13px"></i>
-        ${esc(typeLabel(f.training_type))}
-        ${f.solo > 0 && !f.dual_given ? '<span class="badge" style="color:oklch(65% 0.15 350);border-color:oklch(65% 0.15 350);margin-left:4px">solo</span>' : ''}
-        <span style="color:var(--rule-strong)">·</span>
-        ${new Date(f.date).toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <div class="fd-hero">
+      <div class="fd-hero-top">
+        <div>
+          <div class="fd-hero-chip detail-sport-chip" style="background:${color}1a;border:1px solid ${color}40;color:${color}">
+            <i class="ph-bold ph-airplane" style="font-size:11px"></i>
+            ${esc(typeLabel(f.training_type))}
+            ${f.solo > 0 && !f.dual_given ? '· Solo' : ''}
+          </div>
+          <div class="fd-route-hero">${esc(routeLabel(f))}</div>
+          <div class="fd-hero-meta">
+            <span>${esc(longDate)}</span>
+            ${ac ? `<span class="fd-hero-meta-sep">·</span><span style="color:oklch(65% 0.06 200)">${esc(ac.tail_number)}</span><span class="fd-hero-meta-sep">·</span><span>${esc(ac.make)} ${esc(ac.model)}</span>` : ''}
+            ${f.instructor_name ? `<span class="fd-hero-meta-sep">·</span><span>${esc(f.instructor_name)}</span>` : ''}
+          </div>
+        </div>
+        <div class="fd-hero-actions">
+          <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:5px 11px;border-color:oklch(45% 0 0/0.4);color:oklch(65% 0 0)">
+            <i class="ph-bold ph-pencil-simple"></i> Edit
+          </button>
+          <button class="btn-ghost" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:5px 11px;border-color:oklch(45% 0 0/0.4);color:oklch(55% 0 0)">
+            <i class="ph-bold ph-trash"></i>
+          </button>
+          <button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" style="font-size:12px;padding:5px 11px;color:var(--patina-text);border-color:var(--patina-text)40">
+            <i class="ph-bold ph-map-pin"></i> ${f.has_track ? 'Update Route' : 'Find Route'}
+          </button>
+        </div>
       </div>
-      <div class="flight-route-label">${esc(routeLabel(f))}</div>
-      <div class="flight-meta">
-        ${ac ? `<span>${esc(ac.tail_number)} · ${esc(ac.make)} ${esc(ac.model)}</span>` : ''}
-        ${f.instructor_name ? `<span class="flight-meta-sep">·</span><span>${esc(f.instructor_name)}</span>` : ''}
-        ${f.distance_nm ? `<span class="flight-meta-sep">·</span><span>${Math.round(f.distance_nm)} nm</span>` : ''}
-      </div>
-      <div class="flight-hero-stats">
-        ${heroStats.map(k => `<div class="flight-hero-stat">
-          <div class="label">${k.label}</div>
-          <div class="val" style="color:${k.color}">${k.val}<span class="unit">${k.unit}</span></div>
+      <div class="fd-hero-stats-bar">
+        ${heroStats.map(k => `<div class="fd-hstat">
+          <div class="fd-hstat-label">${k.label}</div>
+          <div class="fd-hstat-val" style="color:${k.color}">${k.val}${k.unit ? `<span class="fd-hstat-unit">${k.unit}</span>` : ''}</div>
         </div>`).join('')}
       </div>
-      <div id="flight-action-area" style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
-        <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:6px 12px">
-          <i class="ph-bold ph-pencil-simple"></i> Edit
-        </button>
-        <button class="btn-ghost" id="delete-flight-btn" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:6px 12px">
-          <i class="ph-bold ph-trash"></i> Delete
-        </button>
-        ${f.aircraft?.mode_s_hex || true ? `<button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" style="font-size:12px;padding:6px 12px;color:var(--patina-text);border-color:var(--patina-text)">
-          <i class="ph-bold ph-map-pin"></i> ${f.has_track ? 'Update Route' : 'Find Route'}
-        </button>` : ''}
+    </div>
+
+    <!-- ── Map + Sidebar ─────────────────────────────────── -->
+    <div class="fd-main-grid">
+      <div id="fd-map-container"><div id="fd-map"></div></div>
+      <div class="fd-sidebar">
+        ${acCardPlaceholder}
+        <div id="fd-schedule-wrap"></div>
       </div>
     </div>
 
-    <div id="fd-map-container">
-      <div id="fd-map"></div>
-    </div>
+    <!-- ── Details ───────────────────────────────────────── -->
+    ${(f.flight_review||f.checkride||f.ipc||f.approaches?.length||f.remarks||f.instructor_comments) ? `
+    <div style="margin-bottom:20px">
+      ${(f.flight_review||f.checkride||f.ipc) ? `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        ${f.flight_review ? '<span class="type-badge" style="color:oklch(80% 0.17 85);border-color:oklch(80% 0.17 85)">Flight Review</span>' : ''}
+        ${f.checkride     ? '<span class="type-badge" style="color:oklch(65% 0.16 145);border-color:oklch(65% 0.16 145)">Checkride</span>'    : ''}
+        ${f.ipc           ? '<span class="type-badge" style="color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)">IPC</span>'          : ''}
+      </div>` : ''}
 
-    <div class="fd-two-col">
-      ${acCardPlaceholder}
-      <div id="fd-schedule-wrap"></div>
-    </div>
+      ${(f.approaches&&f.approaches.length) ? `
+      <div style="margin-bottom:14px">
+        <div class="section-label" style="margin-bottom:8px">Approaches</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${f.approaches.map(ap => `<span class="approach-tag">
+            ${esc(ap.approach_type)} ${ap.runway?'Rwy '+esc(ap.runway):''} ${esc(ap.airport_icao||'')}${ap.circle_to_land?' C/L':''}
+          </span>`).join('')}
+        </div>
+      </div>` : ''}
 
-    <div class="section-label" style="margin-bottom:10px">Flight Time Breakdown</div>
-    <div class="perf-dl" style="margin-bottom:24px">
-      ${allMetrics.map(([l,v,c]) => `<div class="perf-entry">
-        <span class="perf-label">${l}</span>
-        <span class="perf-val" ${c?`style="color:${c}"`:''}>${esc(String(v))}</span>
-      </div>`).join('')}
-    </div>
+      ${f.remarks ? `
+      <div style="border-left:3px solid var(--patina-text);padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0;margin-bottom:8px">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Remarks</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6">${esc(f.remarks)}</div>
+      </div>` : ''}
 
-    ${(f.approaches&&f.approaches.length) ? `
-    <hr class="detail-rule">
-    <div class="section-label" style="margin-bottom:10px">Approaches</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
-      ${f.approaches.map(ap => `<span class="approach-tag">
-        ${esc(ap.approach_type)} ${ap.runway?'Rwy '+esc(ap.runway):''} ${esc(ap.airport_icao||'')}${ap.circle_to_land?' C/L':''}
-      </span>`).join('')}
+      ${f.instructor_comments ? `
+      <div style="border-left:3px solid oklch(68% 0.15 235);padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Instructor Comments</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6">${esc(f.instructor_comments)}</div>
+      </div>` : ''}
     </div>` : ''}
 
-    ${(f.flight_review||f.checkride||f.ipc) ? `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
-      ${f.flight_review ? '<span class="type-badge" style="color:oklch(80% 0.17 85);border-color:oklch(80% 0.17 85)">Flight Review</span>' : ''}
-      ${f.checkride     ? '<span class="type-badge" style="color:oklch(65% 0.16 145);border-color:oklch(65% 0.16 145)">Checkride</span>'    : ''}
-      ${f.ipc           ? '<span class="type-badge" style="color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)">IPC</span>'          : ''}
+    ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="font-size:11px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
+    ${(f.hobbs_start&&f.hobbs_end)||(f.tach_start&&f.tach_end) ? `
+    <div style="display:flex;gap:16px;font-size:11px;color:var(--faint);margin-top:8px">
+      ${(f.hobbs_start&&f.hobbs_end) ? `<span>Hobbs ${f.hobbs_start} → ${f.hobbs_end}</span>` : ''}
+      ${(f.tach_start&&f.tach_end)   ? `<span>Tach ${f.tach_start} → ${f.tach_end}</span>`   : ''}
     </div>` : ''}
-
-    ${f.remarks ? `
-    <hr class="detail-rule">
-    <div class="desc-block">${esc(f.remarks)}</div>` : ''}
-
-    ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="margin-top:20px;font-size:12px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
   `;
 
   if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
@@ -3887,12 +3936,6 @@ async function showFlightDetail(id) {
       .filter(s => s.type !== 'cancelled')
       .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0] || null;
 
-    // If no schedule, collapse right column so aircraft card takes full width
-    if (!sched) {
-      const twoCol = document.querySelector('.fd-two-col');
-      if (twoCol) twoCol.style.gridTemplateColumns = '1fr';
-    }
-
     if (sched) {
       const schedOut = (sched.start_local || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
       const schedIn  = (sched.end_local   || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
@@ -3901,42 +3944,35 @@ async function showFlightDetail(id) {
       const actualOut = fmtLocal(f.time_out);
       const actualIn  = fmtLocal(f.time_in);
       fdSchedWrap.innerHTML = `
-        <div class="fd-ac-card" style="height:100%">
-          <div style="background:oklch(45% 0.1 188 / 0.12);border-bottom:1px solid var(--rule);padding:10px 16px;display:flex;align-items:center;gap:8px">
-            <i class="ph-bold ph-envelope-open" style="color:var(--patina-text);font-size:14px"></i>
-            <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--patina-text)">NICE AIR Reservation</span>
+        <div style="border-top:1px solid oklch(38% 0 0/0.25)">
+          <div style="background:oklch(45% 0.1 188/0.1);padding:8px 14px;display:flex;align-items:center;gap:7px;border-bottom:1px solid oklch(38% 0 0/0.2)">
+            <i class="ph-bold ph-envelope-open" style="color:var(--patina-text);font-size:12px"></i>
+            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--patina-text)">NICE AIR</span>
           </div>
           <div class="fd-ac-body">
             <div class="fd-ac-specs">
-              <div>
-                <div class="fd-ac-spec-label">Aircraft</div>
-                <div class="fd-ac-spec-val" style="color:var(--champagne)">${esc(sched.tail)}</div>
-              </div>
-              ${sched.cfi ? `<div>
+              ${sched.cfi ? `<div style="grid-column:1/-1">
                 <div class="fd-ac-spec-label">CFI</div>
                 <div class="fd-ac-spec-val">${esc(sched.cfi)}</div>
               </div>` : ''}
               <div>
-                <div class="fd-ac-spec-label">Sched. Depart</div>
-                <div class="fd-ac-spec-val">${esc(schedOut)} PT</div>
+                <div class="fd-ac-spec-label">Sched Out</div>
+                <div class="fd-ac-spec-val">${esc(schedOut)}</div>
               </div>
               <div>
-                <div class="fd-ac-spec-label">Sched. Return</div>
-                <div class="fd-ac-spec-val">${esc(schedIn)} PT</div>
+                <div class="fd-ac-spec-label">Sched In</div>
+                <div class="fd-ac-spec-val">${esc(schedIn)}</div>
               </div>
               ${actualOut ? `<div>
                 <div class="fd-ac-spec-label">Block Out</div>
-                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualOut)} PT</div>
+                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualOut)}</div>
               </div>` : ''}
               ${actualIn ? `<div>
                 <div class="fd-ac-spec-label">Block In</div>
-                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualIn)} PT</div>
+                <div class="fd-ac-spec-val" style="color:var(--patina-text)">${esc(actualIn)}</div>
               </div>` : ''}
             </div>
-            ${sched.type === 'changed' ? `<div style="margin-top:10px;font-size:11px;color:oklch(80% 0.17 85)">
-              <i class="ph-bold ph-warning"></i> Schedule was modified — showing final times.
-            </div>` : ''}
-            <div style="margin-top:10px;font-size:11px;color:var(--disabled)">Logbook entry is the source of truth.</div>
+            ${sched.type === 'changed' ? `<div style="margin-top:8px;font-size:10px;color:oklch(80% 0.17 85)"><i class="ph-bold ph-warning"></i> Modified schedule.</div>` : ''}
           </div>
         </div>`;
     }

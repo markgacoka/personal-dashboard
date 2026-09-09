@@ -48,7 +48,7 @@ async function dbQuery(sql, params) {
 const FR24_BASE = 'https://fr24api.flightradar24.com'
 const _fr24Cache = new Map() // key `tail/YYYY-MM-DD` → { ts, flights[] }
 
-async function fr24Fetch(path, params = {}) {
+async function fr24Fetch(path, params = {}, _retries = 2) {
   const token = process.env.FR24_API_TOKEN
   if (!token) throw new Error('FR24_API_TOKEN not configured')
   const url = new URL(FR24_BASE + path)
@@ -59,8 +59,15 @@ async function fr24Fetch(path, params = {}) {
       'Accept-Version': 'v1',
       Accept: 'application/json',
     },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(20000),
   })
+  if (r.status === 429 && _retries > 0) {
+    const retryAfter = parseInt(r.headers.get('Retry-After') || '65', 10)
+    const waitMs = Math.max(retryAfter * 1000, 65_000)
+    console.log(`FR24 rate limited — waiting ${waitMs / 1000}s`)
+    await new Promise(res => setTimeout(res, waitMs))
+    return fr24Fetch(path, params, _retries - 1)
+  }
   if (!r.ok) {
     const body = await r.text().catch(() => r.statusText)
     throw new Error(`FlightRadar24 ${r.status}: ${body.slice(0, 200)}`)
@@ -526,14 +533,14 @@ export default async function proxyRoutes(fastify) {
 
     try {
       const data = await fr24Fetch('/api/flight-summary/full', {
-        registration: tail,
-        start_timestamp: Math.floor(dayStart.getTime() / 1000),
-        end_timestamp:   Math.floor(dayEnd.getTime()   / 1000),
-        flights_max: 20,
+        reg:            tail,
+        timestamp_from: Math.floor(dayStart.getTime() / 1000),
+        timestamp_to:   Math.floor(dayEnd.getTime()   / 1000),
+        limit:          20,
       })
       const raw  = Array.isArray(data?.data) ? data.data : []
       const flights = raw.map(f => ({
-        fr24_id:        f.fr24_id,
+        fr24_id:        f.fr24_id || f.id || f.flight_id,
         ident:          f.callsign || f.flight || tail,
         departure_icao: f.orig_icao || f.origin_icao || null,
         arrival_icao:   f.dest_icao || f.destination_icao || null,
@@ -563,8 +570,7 @@ export default async function proxyRoutes(fastify) {
 
     try {
       const data = await fr24Fetch('/api/historic/flight-positions/full', {
-        fr24id: fr24_id,
-        stats: 'false',
+        fr24_id,
       })
       // FR24 returns positions under data.positions or data.data.positions
       const posData = data?.data?.positions ?? data?.positions ?? data?.data ?? []
@@ -603,9 +609,13 @@ export default async function proxyRoutes(fastify) {
 
     const toProcess = overwrite ? flights : flights.filter(f => !f.has_track)
     const results = []
+    // 2 s between each API call keeps us well under FR24 Essential rate limits.
+    // fr24Fetch auto-retries on 429 with Retry-After header back-off.
+    const sleep = ms => new Promise(res => setTimeout(res, ms))
+    const CALL_DELAY = 2000
 
     for (const f of toProcess) {
-      const tail   = f.tail_number
+      const tail    = f.tail_number
       const dateStr = String(f.date).slice(0, 10)
 
       // 1. Look up FR24 flights for this registration + date
@@ -614,27 +624,27 @@ export default async function proxyRoutes(fastify) {
         const dayStart = new Date(dateStr + 'T08:00:00Z')
         const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
         const data = await fr24Fetch('/api/flight-summary/full', {
-          registration: tail,
-          start_timestamp: Math.floor(dayStart.getTime() / 1000),
-          end_timestamp:   Math.floor(dayEnd.getTime()   / 1000),
-          flights_max: 10,
+          reg:            tail,
+          timestamp_from: Math.floor(dayStart.getTime() / 1000),
+          timestamp_to:   Math.floor(dayEnd.getTime()   / 1000),
+          limit:          10,
         })
         fr24Flights = Array.isArray(data?.data) ? data.data : []
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, tail, date: dateStr, err: e.message }, 'FR24 backfill lookup failed')
         results.push({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message.slice(0, 80) })
-        await new Promise(r => setTimeout(r, 500))
+        await sleep(CALL_DELAY)
         continue
       }
 
+      await sleep(CALL_DELAY)  // pace after summary call
+
       if (!fr24Flights.length) {
         results.push({ id: f.id, date: dateStr, tail, status: 'no_match' })
-        await new Promise(r => setTimeout(r, 200))
         continue
       }
 
       // 2. Pick best match: prefer flights where departure/arrival ICAO align with logbook
-      let best = fr24Flights[0]
       const logDep = f.departure_icao?.slice(1) // strip K prefix for IATA comparison
       const logArr = f.arrival_icao?.slice(1)
       const scored = fr24Flights.map(ff => {
@@ -643,49 +653,42 @@ export default async function proxyRoutes(fastify) {
         const arr = ff.dest_icao || ff.destination_icao || ''
         if (dep === f.departure_icao || dep === logDep) score += 2
         if (arr === f.arrival_icao   || arr === logArr)  score += 2
-        // If we have block times, prefer flights closest in departure time
         if (f.time_out && ff.actual_departure) {
-          const logOutUnix = Math.floor(new Date(f.time_out).getTime() / 1000)
-          const fr24Unix   = Math.floor(new Date(ff.actual_departure).getTime() / 1000)
-          const diffMin    = Math.abs(logOutUnix - fr24Unix) / 60
+          const diffMin = Math.abs(
+            new Date(f.time_out).getTime() - new Date(ff.actual_departure).getTime()
+          ) / 60000
           if (diffMin < 30) score += 3
           else if (diffMin < 60) score += 1
         }
         return { ff, score }
       })
       scored.sort((a, b) => b.score - a.score)
-      best = scored[0].ff
+      const best = scored[0].ff
 
-      const fr24Id = best.fr24_id
+      const fr24Id = best.fr24_id || best.id || best.flight_id
       if (!fr24Id) {
         results.push({ id: f.id, date: dateStr, tail, status: 'no_fr24_id' })
-        await new Promise(r => setTimeout(r, 200))
         continue
       }
 
       // 3. Fetch track positions
       try {
-        const trackData = await fr24Fetch('/api/historic/flight-positions/full', {
-          fr24id: fr24Id,
-          stats: 'false',
-        })
-        const posData  = trackData?.data?.positions ?? trackData?.positions ?? trackData?.data ?? []
+        const trackData = await fr24Fetch('/api/historic/flight-positions/full', { fr24_id: fr24Id })
+        const posData   = trackData?.data?.positions ?? trackData?.positions ?? trackData?.data ?? []
         const positions = Array.isArray(posData) ? posData : []
         const normalized = normalizeFr24Positions(positions)
         const saved = await saveTrackPoints(pool, f.id, normalized)
 
-        if (!saved) {
-          results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions' })
-        } else {
-          results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved })
-        }
+        results.push(saved
+          ? { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved }
+          : { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions' }
+        )
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, fr24Id, err: e.message }, 'FR24 track fetch failed')
         results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'track_error', reason: e.message.slice(0, 80) })
       }
 
-      // Respect FR24 rate limits — Essential plan allows ~10 req/s
-      await new Promise(r => setTimeout(r, 300))
+      await sleep(CALL_DELAY)  // pace after track call
     }
 
     const summary = {

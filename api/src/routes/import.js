@@ -314,4 +314,45 @@ export default async function importRoutes(fastify) {
     if (!rows.length) return reply.status(404).send({ error: 'No track data for this flight' })
     return rows
   })
+
+  fastify.get('/api/flights/:id/track-stats', async (req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, vertical_speed_fpm
+       FROM track_log_points WHERE flight_id=$1 ORDER BY ts`,
+      [req.params.id]
+    )
+    if (!rows.length) return reply.status(404).send({ error: 'No track data' })
+
+    const alts  = rows.map(r => r.altitude_ft  ?? 0)
+    const spds  = rows.map(r => r.groundspeed_kts ?? 0)
+    const vsps  = rows.map(r => r.vertical_speed_fpm ?? 0)
+    const movingSpds = spds.filter(v => v > 5)
+
+    let distNm = 0
+    for (let i = 1; i < rows.length; i++) {
+      const R = 3440.065
+      const dLat = (rows[i].lat - rows[i-1].lat) * Math.PI / 180
+      const dLon = (rows[i].lon - rows[i-1].lon) * Math.PI / 180
+      const a = Math.sin(dLat/2)**2 +
+        Math.cos(rows[i-1].lat * Math.PI/180) * Math.cos(rows[i].lat * Math.PI/180) * Math.sin(dLon/2)**2
+      distNm += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    }
+
+    const durationMin = rows.length > 1
+      ? Math.round((new Date(rows[rows.length-1].ts) - new Date(rows[0].ts)) / 60000)
+      : null
+
+    return {
+      max_altitude_ft:    Math.round(Math.max(...alts)),
+      max_groundspeed_kts: Math.round(Math.max(...spds)),
+      avg_groundspeed_kts: movingSpds.length
+        ? Math.round(movingSpds.reduce((s, v) => s + v, 0) / movingSpds.length)
+        : null,
+      max_climb_fpm:   Math.round(Math.max(...vsps)),
+      max_descent_fpm: Math.round(Math.min(...vsps)),
+      distance_nm:     Math.round(distNm * 10) / 10,
+      track_points:    rows.length,
+      duration_min:    durationMin,
+    }
+  })
 }

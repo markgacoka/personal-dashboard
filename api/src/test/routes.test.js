@@ -712,7 +712,7 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
     assert.equal(r.status, 200);
     const html = await r.text();
     assert.ok(html.includes('Gacoka'), 'page should contain athlete name');
-    assert.ok(html.includes('apexcharts'), 'should reference ApexCharts');
+    assert.ok(html.includes('chart.js'), 'should reference Chart.js');
     assert.ok(html.includes('maplibre-gl'), 'should reference MapLibre GL');
     assert.ok(!html.includes('text/babel'), 'should NOT use Babel (which caused blank page)');
   });

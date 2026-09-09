@@ -1888,14 +1888,14 @@ const SPLIT_META = {
 };
 
 const TYPE_CFG = {
-  dual:          { color: 'oklch(68% 0.15 235)', label: 'Dual'      },
-  maneuvers:     { color: 'oklch(70% 0.12 188)', label: 'Maneuvers' },
-  pattern:       { color: 'oklch(65% 0.16 145)', label: 'Pattern'   },
-  'x-country':   { color: 'oklch(60% 0.18 260)', label: 'X-Country' },
-  night:         { color: 'oklch(80% 0.17 85)',  label: 'Night'     },
-  instrument:    { color: 'oklch(76% 0.088 190)',label: 'Instrument'},
-  solo:          { color: 'oklch(65% 0.15 350)', label: 'Solo'      },
-  checkride_prep:{ color: 'oklch(72% 0.17 55)',  label: 'Checkride Prep' },
+  dual:          { color: '#3b82f6', label: 'Dual'      },
+  maneuvers:     { color: '#14b8a6', label: 'Maneuvers' },
+  pattern:       { color: '#22c55e', label: 'Pattern'   },
+  'x-country':   { color: '#818cf8', label: 'X-Country' },
+  night:         { color: '#f59e0b', label: 'Night'     },
+  instrument:    { color: '#38bdf8', label: 'Instrument'},
+  solo:          { color: '#f472b6', label: 'Solo'      },
+  checkride_prep:{ color: '#fb923c', label: 'Checkride Prep' },
 };
 
 const VIEW_TITLES = {
@@ -1979,7 +1979,7 @@ function normSport(t) {
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function typeColor(t) { return (TYPE_CFG[t]||{}).color || 'oklch(62% 0 0)'; }
+function typeColor(t) { return (TYPE_CFG[t]||{}).color || '#6b7280'; }
 function typeLabel(t) { return (TYPE_CFG[t]||{}).label || (t||'Other'); }
 function routeLabel(f) {
   const stops = [f.departure?.icao || f.departure_icao];
@@ -3595,8 +3595,8 @@ function initActRouteMap(points, sport, color) {
     _actMap.fitBounds(bounds, { padding: 60, duration: 600 });
 
     // Start (green) and end (gold) markers
-    new maplibregl.Marker({ color: 'oklch(65% 0.16 145)' }).setLngLat(coords[0]).addTo(_actMap);
-    new maplibregl.Marker({ color: 'oklch(80% 0.17 85)' }).setLngLat(coords[coords.length - 1]).addTo(_actMap);
+    new maplibregl.Marker({ color: '#22c55e' }).setLngLat(coords[0]).addTo(_actMap);
+    new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[coords.length - 1]).addTo(_actMap);
 
     if (points.some(p => p[2] != null)) buildElevationChart(points);
   });
@@ -3831,23 +3831,22 @@ async function showFlightDetail(id) {
   });
 
   // All non-zero stats for the hero bar
-  // Hero is always dark-background — use hardcoded light colors, not theme variables
   const heroStats = [
-    { label:'Total',      val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'oklch(91% 0 0)' },
-    f.dual_received > 0 ? { label:'Dual Rcvd',  val: parseFloat(f.dual_received).toFixed(1),  unit:'h', color:'oklch(76% 0.088 190)' } : null,
-    f.dual_given > 0    ? { label:'Dual Given',  val: parseFloat(f.dual_given).toFixed(1),     unit:'h', color:'oklch(76% 0.088 190)' } : null,
-    f.pic > 0           ? { label:'PIC',         val: parseFloat(f.pic).toFixed(1),             unit:'h', color:'oklch(65% 0.16 145)' } : null,
-    f.solo > 0          ? { label:'Solo',        val: parseFloat(f.solo).toFixed(1),            unit:'h', color:'oklch(65% 0.15 350)' } : null,
-    f.cross_country > 0 ? { label:'X-Country',  val: parseFloat(f.cross_country).toFixed(1),   unit:'h', color:'oklch(68% 0.15 235)' } : null,
-    f.night > 0         ? { label:'Night',       val: parseFloat(f.night).toFixed(1),           unit:'h', color:'oklch(80% 0.17 85)' } : null,
-    f.actual_instrument > 0 ? { label:'Actual IFR', val: parseFloat(f.actual_instrument).toFixed(1), unit:'h', color:'oklch(76% 0.088 190)' } : null,
-    f.simulated_instrument > 0 ? { label:'Sim Inst', val: parseFloat(f.simulated_instrument).toFixed(1), unit:'h', color:'oklch(76% 0.088 190)' } : null,
-    f.day_takeoffs > 0  ? { label:'Day T/O',    val: String(f.day_takeoffs),   unit:'', color:'oklch(88% 0 0)' } : null,
-    f.day_landings_full_stop > 0 ? { label:'Day Ldg', val: String(f.day_landings_full_stop), unit:'', color:'oklch(88% 0 0)' } : null,
-    f.night_takeoffs > 0 ? { label:'Night T/O', val: String(f.night_takeoffs), unit:'', color:'oklch(80% 0.17 85)' } : null,
-    f.night_landings_full_stop > 0 ? { label:'Night Ldg', val: String(f.night_landings_full_stop), unit:'', color:'oklch(80% 0.17 85)' } : null,
-    f.holds > 0         ? { label:'Holds',      val: String(f.holds),          unit:'', color:'oklch(68% 0.15 235)' } : null,
-    f.distance_nm       ? { label:'Distance',   val: Math.round(f.distance_nm)+' nm', unit:'', color:'oklch(72% 0 0)' } : null,
+    { label:'Total',      val: parseFloat(f.total_duration||0).toFixed(1), unit:'h', color: 'var(--champagne)' },
+    f.dual_received > 0 ? { label:'Dual Rcvd',  val: parseFloat(f.dual_received).toFixed(1),  unit:'h', color: TYPE_CFG.dual.color } : null,
+    f.dual_given > 0    ? { label:'Dual Given',  val: parseFloat(f.dual_given).toFixed(1),     unit:'h', color: TYPE_CFG.dual.color } : null,
+    f.pic > 0           ? { label:'PIC',         val: parseFloat(f.pic).toFixed(1),             unit:'h', color: TYPE_CFG.pattern.color } : null,
+    f.solo > 0          ? { label:'Solo',        val: parseFloat(f.solo).toFixed(1),            unit:'h', color: TYPE_CFG.solo.color } : null,
+    f.cross_country > 0 ? { label:'X-Country',  val: parseFloat(f.cross_country).toFixed(1),   unit:'h', color: TYPE_CFG['x-country'].color } : null,
+    f.night > 0         ? { label:'Night',       val: parseFloat(f.night).toFixed(1),           unit:'h', color: TYPE_CFG.night.color } : null,
+    f.actual_instrument > 0 ? { label:'Actual IFR', val: parseFloat(f.actual_instrument).toFixed(1), unit:'h', color: TYPE_CFG.instrument.color } : null,
+    f.simulated_instrument > 0 ? { label:'Sim Inst', val: parseFloat(f.simulated_instrument).toFixed(1), unit:'h', color: TYPE_CFG.instrument.color } : null,
+    f.day_takeoffs > 0  ? { label:'Day T/O',    val: String(f.day_takeoffs),   unit:'', color: 'var(--body-text)' } : null,
+    f.day_landings_full_stop > 0 ? { label:'Day Ldg', val: String(f.day_landings_full_stop), unit:'', color: 'var(--body-text)' } : null,
+    f.night_takeoffs > 0 ? { label:'Night T/O', val: String(f.night_takeoffs), unit:'', color: TYPE_CFG.night.color } : null,
+    f.night_landings_full_stop > 0 ? { label:'Night Ldg', val: String(f.night_landings_full_stop), unit:'', color: TYPE_CFG.night.color } : null,
+    f.holds > 0         ? { label:'Holds',      val: String(f.holds),          unit:'', color: TYPE_CFG['x-country'].color } : null,
+    f.distance_nm       ? { label:'Distance',   val: Math.round(f.distance_nm)+' nm', unit:'', color: 'var(--muted)' } : null,
   ].filter(Boolean);
 
   const ac = f.aircraft;
@@ -3920,14 +3919,19 @@ async function showFlightDetail(id) {
       </div>
     </div>
 
+    <!-- ── GPS Stats ─────────────────────────────────────── -->
+    ${f.has_track ? `<div id="fd-track-stats" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;min-height:28px">
+      <span style="font-size:11px;color:var(--faint)">Loading GPS stats…</span>
+    </div>` : ''}
+
     <!-- ── Details ───────────────────────────────────────── -->
     ${(f.flight_review||f.checkride||f.ipc||f.approaches?.length||f.remarks||f.instructor_comments) ? `
     <div style="margin-bottom:20px">
       ${(f.flight_review||f.checkride||f.ipc) ? `
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        ${f.flight_review ? '<span class="type-badge" style="color:oklch(80% 0.17 85);border-color:oklch(80% 0.17 85)">Flight Review</span>' : ''}
-        ${f.checkride     ? '<span class="type-badge" style="color:oklch(65% 0.16 145);border-color:oklch(65% 0.16 145)">Checkride</span>'    : ''}
-        ${f.ipc           ? '<span class="type-badge" style="color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)">IPC</span>'          : ''}
+        ${f.flight_review ? `<span class="type-badge" style="color:${TYPE_CFG.night.color};border-color:${TYPE_CFG.night.color}">Flight Review</span>` : ''}
+        ${f.checkride     ? `<span class="type-badge" style="color:${TYPE_CFG.pattern.color};border-color:${TYPE_CFG.pattern.color}">Checkride</span>` : ''}
+        ${f.ipc           ? `<span class="type-badge" style="color:${TYPE_CFG.dual.color};border-color:${TYPE_CFG.dual.color}">IPC</span>` : ''}
       </div>` : ''}
 
       ${(f.approaches&&f.approaches.length) ? `
@@ -3947,7 +3951,7 @@ async function showFlightDetail(id) {
       </div>` : ''}
 
       ${f.instructor_comments ? `
-      <div style="border-left:3px solid oklch(68% 0.15 235);padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0">
+      <div style="border-left:3px solid ${TYPE_CFG.dual.color};padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0">
         <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Instructor Comments</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.6">${esc(f.instructor_comments)}</div>
       </div>` : ''}
@@ -4108,6 +4112,33 @@ async function showFlightDetail(id) {
               <div class="fd-ac-spec-val">${esc(ac.engine_type)}${ac.engine_hp ? ' · '+ac.engine_hp+' HP' : ''}</div>
             </div></div>` : ''}
           </div>`;
+      });
+  }
+
+  // Populate GPS track stats
+  if (f.has_track) {
+    fetch('/api/flights/' + f.id + '/track-stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(s => {
+        const el = document.getElementById('fd-track-stats');
+        if (!el || !s) return;
+        const chips = [
+          s.max_altitude_ft  ? { label: 'Peak Alt',    val: s.max_altitude_ft.toLocaleString() + ' ft' } : null,
+          s.distance_nm      ? { label: 'GPS Dist',    val: s.distance_nm.toFixed(1) + ' nm' }           : null,
+          s.max_groundspeed_kts ? { label: 'Max GS',   val: s.max_groundspeed_kts + ' kts' }             : null,
+          s.avg_groundspeed_kts ? { label: 'Avg GS',   val: s.avg_groundspeed_kts + ' kts' }             : null,
+          s.max_climb_fpm > 50  ? { label: 'Peak Climb', val: '+' + s.max_climb_fpm.toLocaleString() + ' fpm' } : null,
+          s.max_descent_fpm < -50 ? { label: 'Peak Desc', val: s.max_descent_fpm.toLocaleString() + ' fpm' }   : null,
+          s.track_points     ? { label: 'Track Pts',   val: String(s.track_points) }                     : null,
+        ].filter(Boolean);
+        if (!chips.length) { el.remove(); return; }
+        el.innerHTML = chips.map(c => `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);font-size:11px">
+          <span style="color:var(--faint)">${c.label}</span>
+          <span style="color:var(--champagne);font-weight:600;font-variant-numeric:tabular-nums">${c.val}</span>
+        </span>`).join('');
+      }).catch(() => {
+        const el = document.getElementById('fd-track-stats');
+        if (el) el.remove();
       });
   }
 
@@ -4395,17 +4426,22 @@ async function initFlightDetailMap(f) {
     if (_fdMap !== thisMap) return; // stale — a newer map replaced this one
 
     const routeColor = typeColor(f.training_type);
-    const dotColor   = isLight ? '#1a1a1a' : 'oklch(84% 0.19 80.46)';
-    const dotStroke  = isLight ? '#ffffff' : 'oklch(4% 0.004 95)';
-    const lblColor   = isLight ? '#1a1a1a' : 'oklch(84% 0.19 80.46)';
-    const lblHalo    = isLight ? '#ffffff' : 'oklch(4% 0.004 95)';
+    const dotColor   = isLight ? '#1a1a1a' : '#d4a520';
+    const dotStroke  = isLight ? '#ffffff' : '#0a0909';
+    const lblColor   = isLight ? '#1a1a1a' : '#d4a520';
+    const lblHalo    = isLight ? '#ffffff' : '#0a0909';
 
     let coords = [];
+    let firstPtTime = null, lastPtTime = null;
     if (f.has_track) {
       const pts = await fetch('/api/flights/' + f.id + '/track')
         .then(r => r.ok ? r.json() : []).catch(() => []);
       if (_fdMap !== thisMap) return; // stale after await
       coords = (pts || []).map(p => [p.lon, p.lat]).filter(c => c[0] != null && c[1] != null);
+      if (pts?.length) {
+        firstPtTime = pts[0].ts;
+        lastPtTime  = pts[pts.length - 1].ts;
+      }
     }
 
     if (coords.length < 2) {
@@ -4433,7 +4469,7 @@ async function initFlightDetailMap(f) {
       thisMap.setZoom(12);
     }
 
-    // Deduplicate airports
+    // Deduplicate airports (for map display), preserving first occurrence
     const seen = new Set();
     const apts = [];
     for (const a of [f.departure, ...(f.via_airports||[]), f.arrival]) {
@@ -4441,11 +4477,38 @@ async function initFlightDetailMap(f) {
     }
 
     if (apts.length) {
+      // Fetch METAR for each unique airport in parallel, using leg-specific times
+      const dateBase  = String(f.date).slice(0, 10);
+      const deptTime  = firstPtTime || f.time_out  || (dateBase + 'T19:00:00Z');
+      const arrvTime  = lastPtTime  || f.time_in   || (dateBase + 'T21:00:00Z');
+      const allLegs   = [f.departure, ...(f.via_airports||[]), f.arrival].filter(a => a?.icao);
+      const metarCache = {}; // icao → [{leg, metar, valid}]
+
+      const fetchMetar = (icao, time, leg) =>
+        fetch(`/api/metar?station=${encodeURIComponent(icao)}&time=${encodeURIComponent(new Date(time).toISOString())}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d?.metar) return;
+            if (!metarCache[icao]) metarCache[icao] = [];
+            const alreadyHasLeg = metarCache[icao].some(x => x.leg === leg);
+            if (!alreadyHasLeg) metarCache[icao].push({ leg, metar: d.metar, valid: d.valid });
+          })
+          .catch(() => {});
+
+      const n = allLegs.length;
+      await Promise.allSettled(allLegs.map((a, i) => {
+        const t = i === 0 ? deptTime : i === n - 1 ? arrvTime
+          : new Date(new Date(deptTime).getTime() + (new Date(arrvTime) - new Date(deptTime)) * (i / (n - 1))).toISOString();
+        const leg = i === 0 ? 'Departure' : i === n - 1 ? 'Arrival' : 'Via';
+        return fetchMetar(a.icao, t, leg);
+      }));
+      if (_fdMap !== thisMap) return; // stale after METAR fetches
+
       thisMap.addSource('apts', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: apts.map(a => ({
           type: 'Feature',
-          properties: { icao: a.icao, name: a.name },
+          properties: { icao: a.icao, name: a.name || '' },
           geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
         })) },
       });
@@ -4457,9 +4520,18 @@ async function initFlightDetailMap(f) {
 
       thisMap.on('click', 'apts-dot', e => {
         const p = e.features[0].properties;
-        new maplibregl.Popup({ offset: 10, closeButton: false })
+        const obs = metarCache[p.icao] || [];
+        const metarHtml = obs.length
+          ? obs.map(o => {
+              const t = o.valid ? new Date(o.valid)
+                .toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC' }) + 'Z' : '';
+              return `<div style="margin-top:6px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;opacity:.6">${o.leg}${t ? ' · ' + t : ''}</span><br>
+                <code style="font-size:10px;word-break:break-all">${o.metar}</code></div>`;
+            }).join('')
+          : '<div style="margin-top:6px;font-size:11px;opacity:.6">No METAR available</div>';
+        new maplibregl.Popup({ offset: 10, closeButton: false, maxWidth: '320px' })
           .setLngLat(e.features[0].geometry.coordinates)
-          .setHTML(`<strong>${p.icao}</strong>${p.name?'<br>'+p.name:''}`)
+          .setHTML(`<strong>${p.icao}</strong>${p.name ? '<br><span style="font-size:11px">' + p.name + '</span>' : ''}${metarHtml}`)
           .addTo(thisMap);
       });
       thisMap.on('mouseenter', 'apts-dot', () => thisMap.getCanvas().style.cursor = 'pointer');
@@ -5605,7 +5677,7 @@ function initPreviewMap(flights) {
     });
     if (aptFeats.length) {
       _m.previewMap.addSource('pmapts',{type:'geojson',data:{type:'FeatureCollection',features:aptFeats}});
-      _m.previewMap.addLayer({id:'pmapts',type:'circle',source:'pmapts',paint:{'circle-radius':5,'circle-color':'oklch(84% 0.19 80.46)','circle-stroke-width':1.5,'circle-stroke-color':'oklch(4% 0.004 95)'}});
+      _m.previewMap.addLayer({id:'pmapts',type:'circle',source:'pmapts',paint:{'circle-radius':5,'circle-color':'#d4a520','circle-stroke-width':1.5,'circle-stroke-color':'#0a0909'}});
     }
     if (allCoords.length) {
       const b = allCoords.reduce((b,c)=>b.extend(c), new maplibregl.LngLatBounds(allCoords[0],allCoords[0]));

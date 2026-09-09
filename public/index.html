@@ -1692,9 +1692,6 @@
             <button class="btn-ghost" id="sync-night-btn" onclick="syncNightData()" style="padding:6px 12px;font-size:12px;color:var(--patina-text);border-color:var(--patina-text)" title="Sync block-out/in times from Gmail schedules">
               <i class="ph-bold ph-clock"></i> Sync Times
             </button>
-            <button class="btn-ghost" id="fr24-backfill-btn" onclick="openFr24Backfill()" style="padding:6px 12px;font-size:12px;color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)" title="Fetch GPS tracks for all flights from FlightRadar24">
-              <i class="ph-bold ph-path"></i> Backfill Routes
-            </button>
             <button class="btn-primary" onclick="openFlightModal()" style="padding:6px 14px;font-size:12px">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
@@ -1820,33 +1817,6 @@
     </div>
     <div class="modal-bd" id="night-sync-bd" style="padding:20px;max-height:70vh;overflow-y:auto">
       <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
-    </div>
-  </div>
-</div>
-
-<!-- FR24 backfill modal -->
-<div class="modal-overlay" id="fr24-backfill-overlay" style="display:none"
-     onclick="if(event.target===this)closeFr24Backfill()">
-  <div class="modal-box" style="max-width:720px">
-    <div class="modal-hd">
-      <span class="modal-title"><i class="ph-bold ph-path" style="color:oklch(68% 0.15 235);margin-right:6px"></i>FR24 Route Backfill</span>
-      <button class="modal-close" onclick="closeFr24Backfill()"><i class="ph-bold ph-x"></i></button>
-    </div>
-    <div class="modal-bd" id="fr24-backfill-bd" style="padding:20px;max-height:75vh;overflow-y:auto">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
-        Fetches GPS tracks for all flights without route data from FlightRadar24 (Essential plan — up to 2 years history).
-        This may take a few minutes depending on the number of flights.
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
-          <input type="checkbox" id="fr24-overwrite-cb" style="width:14px;height:14px">
-          Overwrite existing tracks
-        </label>
-      </div>
-      <button class="btn-primary" id="fr24-run-btn" onclick="runFr24Backfill()" style="font-size:13px">
-        <i class="ph-bold ph-path"></i> Start Backfill
-      </button>
-      <div id="fr24-backfill-result" style="margin-top:16px"></div>
     </div>
   </div>
 </div>
@@ -4068,25 +4038,22 @@ async function showFlightDetail(id) {
       });
   }
 
-  // Auto-load GPS track from FlightRadar24 if no track on record yet
-  if (!f.has_track && ac?.tail_number) {
-    autoLoadFr24Track(f);
+  // Auto-load GPS track via OpenSky if aircraft has a Mode S hex and no track on record yet
+  if (!f.has_track && f.aircraft?.mode_s_hex) {
+    autoLoadTrack(f);
   }
 }
 
-// ─── FlightRadar24 auto-track loader ─────────────────────────────────────────
-// Automatically fetches GPS track from FR24 for flights that have no track.
-// Uses sessionStorage to avoid re-hitting FR24 for flights it has no record of.
-async function autoLoadFr24Track(f) {
-  if (!f || !f.aircraft?.tail_number) return;
+// ─── OpenSky auto-track loader ────────────────────────────────────────────────
+// Silently fetches GPS track from OpenSky for flights that have no track.
+// Uses the aircraft's Mode S hex + block-out time as the lookup anchor.
+async function autoLoadTrack(f) {
+  if (!f || !f.aircraft?.mode_s_hex) return;
   const flightId = f.id;
-  const tail     = f.aircraft.tail_number;
-  const dateStr  = String(f.date).slice(0, 10);
-  const skipKey  = `fr24-skip-${flightId}`;
+  const skipKey  = `osky-skip-${flightId}`;
 
   if (sessionStorage.getItem(skipKey)) return;
 
-  // Show subtle loading indicator in the action area
   const btn = document.getElementById('find-route-btn');
   if (btn) {
     btn.disabled = true;
@@ -4094,69 +4061,31 @@ async function autoLoadFr24Track(f) {
   }
 
   try {
-    // 1. Get FR24 flights for this tail + date
-    const fr24Res = await fetch(`/api/external/fr24-flights/${encodeURIComponent(tail)}?date=${dateStr}`)
-      .then(r => r.ok ? r.json() : null).catch(() => null);
-    const fr24Flights = fr24Res?.flights || [];
+    const res = await fetch(`/api/external/auto-fetch-track/${flightId}`, { method: 'POST' })
+      .then(r => r.json()).catch(() => null);
 
-    if (!fr24Flights.length) {
+    if (!res?.success || !res.points_saved) {
       sessionStorage.setItem(skipKey, '1');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
       return;
     }
 
-    // 2. Match best candidate — prefer flight closest to logbook block-out time
-    const anchor = f.time_out ? new Date(f.time_out).getTime()
-                  : new Date(dateStr + 'T18:00:00Z').getTime(); // noon Pacific fallback
-
-    const candidate = fr24Flights.reduce((best, cand) => {
-      const t = cand.first_seen_unix ? cand.first_seen_unix * 1000 : null;
-      if (!t) return best;
-      const diff = Math.abs(t - anchor);
-      if (!best || diff < best.diff) return { cand, diff };
-      return best;
-    }, null)?.cand;
-
-    if (!candidate?.fr24_id) {
-      sessionStorage.setItem(skipKey, '1');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
-      return;
-    }
-
-    // 3. Attach the GPS track
-    const attachRes = await fetch('/api/external/attach-fr24-track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ flight_id: flightId, fr24_id: candidate.fr24_id }),
-    }).then(r => r.ok ? r.json() : null).catch(() => null);
-
-    if (!attachRes?.success || !attachRes.points_saved) {
-      sessionStorage.setItem(skipKey, '1');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
-      return;
-    }
-
-    // 4. Update in-memory flight record and refresh map + button
     const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
     if (fi >= 0) window._flights[fi].has_track = true;
 
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Update Route';
-    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Update Route'; }
 
-    // Re-init map to show the newly loaded track
     if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
     const fUpdated = (window._flights || []).find(x => String(x.id) === String(flightId));
     if (fUpdated) requestAnimationFrame(() => initFlightDetailMap(fUpdated));
 
   } catch (e) {
-    console.warn('autoLoadFr24Track failed:', e.message);
+    sessionStorage.setItem(skipKey, '1');
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
   }
 }
 
-// ─── OpenSky route picker ─────────────────────────────────────────────────────
+
 // ─── Night data sync ──────────────────────────────────────────────────────────
 function closeNightSync() {
   document.getElementById('night-sync-overlay').style.display = 'none';
@@ -4218,76 +4147,6 @@ function fmtUTCtoPT(iso) {
   if (!iso) return '—';
   return new Date(iso.includes('T') ? iso : iso + 'Z')
     .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
-}
-
-// ─── FR24 Route Backfill ──────────────────────────────────────────────────────
-function openFr24Backfill() {
-  document.getElementById('fr24-backfill-overlay').style.display = 'flex';
-  document.getElementById('fr24-backfill-result').innerHTML = '';
-}
-
-function closeFr24Backfill() {
-  document.getElementById('fr24-backfill-overlay').style.display = 'none';
-}
-
-async function runFr24Backfill() {
-  const overwrite = document.getElementById('fr24-overwrite-cb')?.checked;
-  const btn = document.getElementById('fr24-run-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Running backfill…'; }
-  document.getElementById('fr24-backfill-result').innerHTML =
-    '<div style="padding:20px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Fetching flight tracks from FlightRadar24…<br>This may take a minute.</div></div>';
-
-  try {
-    const res = await fetch(`/api/external/fr24-backfill?overwrite=${overwrite}`, { method: 'POST' }).then(r => r.json());
-    const s = res.summary || {};
-    const results = res.results || [];
-
-    const statusColor = { ok: 'var(--patina-text)', no_match: 'var(--muted)', no_positions: 'oklch(74% 0.15 70)', error: 'var(--warn)', track_error: 'var(--warn)', no_fr24_id: 'var(--faint)' };
-    const statusLabel = { ok: 'Track saved', no_match: 'No FR24 match', no_positions: 'No airborne data', error: 'Lookup error', track_error: 'Track error', no_fr24_id: 'No FR24 ID' };
-
-    const tableRows = results.map(r => `
-      <tr>
-        <td style="color:var(--patina-text)">${r.date}</td>
-        <td>${esc(r.tail)}</td>
-        <td style="font-size:10px;font-family:monospace;color:var(--faint)">${r.fr24_id ? esc(r.fr24_id.slice(0,10)+'…') : '—'}</td>
-        <td style="color:${statusColor[r.status]||'var(--muted)'}">${statusLabel[r.status]||r.status}${r.points ? ' ('+r.points+' pts)' : ''}${r.reason ? ': '+esc(r.reason.slice(0,40)) : ''}</td>
-      </tr>`).join('');
-
-    document.getElementById('fr24-backfill-result').innerHTML = `
-      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px">
-        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--patina-text)">${s.ok||0}</div><div style="font-size:11px;color:var(--muted)">Tracks saved</div></div>
-        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--muted)">${s.no_match||0}</div><div style="font-size:11px;color:var(--muted)">No FR24 match</div></div>
-        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--warn)">${s.errors||0}</div><div style="font-size:11px;color:var(--muted)">Errors</div></div>
-        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--champagne)">${s.processed||0}</div><div style="font-size:11px;color:var(--muted)">Processed</div></div>
-      </div>
-      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead style="position:sticky;top:0;background:var(--overlay)">
-            <tr style="border-bottom:1px solid var(--rule);color:var(--muted);text-align:left">
-              <th style="padding:6px 8px">Date</th>
-              <th style="padding:6px 8px">Tail</th>
-              <th style="padding:6px 8px">FR24 ID</th>
-              <th style="padding:6px 8px">Result</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-    `;
-
-    if ((s.ok||0) > 0) {
-      await loadFlights();
-      // Clear cached skip keys so auto-loader doesn't skip newly backfilled flights
-      for (const r of results) {
-        if (r.status === 'ok') sessionStorage.removeItem(`fr24-skip-${r.id}`);
-      }
-    }
-  } catch (e) {
-    document.getElementById('fr24-backfill-result').innerHTML =
-      `<div style="padding:16px;color:var(--warn);font-size:13px">Backfill failed: ${esc(e.message)}</div>`;
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-path"></i> Start Backfill'; }
-  }
 }
 
 let _routePickerFlightId = null;

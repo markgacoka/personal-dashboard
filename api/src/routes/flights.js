@@ -1,5 +1,6 @@
 import { pool } from '../db/client.js'
 import { fetchNiceAirSchedules } from '../services/gmail.js'
+import { autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 const FLIGHT_SELECT = `
   SELECT
@@ -112,6 +113,10 @@ export default async function flightRoutes(fastify) {
        time_out, time_in, instructor_id || null, remarks]
     )
     const flightId = rows[0].id
+
+    // Fire-and-forget OpenSky track fetch — fails silently if no Mode S hex or data unavailable
+    autoFetchOpenSkyTrack(pool, flightId).catch(() => {})
+
     for (const ap of approaches) {
       if (!ap.approach_type || !ap.airport_icao) continue
       await pool.query(

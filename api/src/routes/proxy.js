@@ -3,6 +3,7 @@ import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-r
 import { pool } from '../db/client.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
 import { fetchNiceAirSchedules } from '../services/gmail.js'
+import { getOskyToken, normalizeFr24Positions, normalizeOpenSkyPath, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
 function parseCsvLine(line) {
@@ -67,28 +68,6 @@ async function fr24Fetch(path, params = {}) {
   return r.json()
 }
 
-// ── OpenSky OAuth token cache ─────────────────────────────────────────────────
-// OpenSky v2 uses client_credentials (clientId + clientSecret → bearer token).
-// Env vars: OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET
-const OSKY_TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token'
-let _oskyToken = null  // { value, expiresAt }
-
-async function getOskyToken() {
-  const id  = process.env.OPENSKY_CLIENT_ID
-  const sec = process.env.OPENSKY_CLIENT_SECRET
-  if (!id || !sec) return null
-  if (_oskyToken && _oskyToken.expiresAt > Date.now() + 30_000) return _oskyToken.value
-  const r = await fetch(OSKY_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: sec }),
-    signal: AbortSignal.timeout(10000),
-  })
-  if (!r.ok) throw new Error(`OpenSky token fetch failed: ${r.status}`)
-  const d = await r.json()
-  _oskyToken = { value: d.access_token, expiresAt: Date.now() + (d.expires_in ?? 3600) * 1000 }
-  return _oskyToken.value
-}
 
 export default async function proxyRoutes(fastify) {
   const xfetch = (url, ms = 7000) => {
@@ -268,15 +247,7 @@ export default async function proxyRoutes(fastify) {
       if (r.status === 401 || r.status === 403) return reply.status(200).send({ track: null, needs_auth: true })
       if (!r.ok) return reply.status(200).send({ track: null })
       const d = await r.json()
-      // path: [[time, lat, lon, baro_alt_m, true_track, on_ground], ...]
-      const path = (d.path || []).map(([t, lat, lon, alt, trk, grnd]) => ({
-        ts:        new Date(t * 1000).toISOString(),
-        lat,
-        lon,
-        alt_ft:    alt != null ? Math.round(alt * 3.28084) : null,
-        track:     trk,
-        on_ground: grnd,
-      }))
+      const path = normalizeOpenSkyPath(d.path)
       const callsign = d.callsign?.trim() || null
 
       // ── Cache write ───────────────────────────────────────────────────────
@@ -506,11 +477,7 @@ export default async function proxyRoutes(fastify) {
       }
       if (!r.ok) return reply.status(200).send({ error: `OpenSky returned ${r.status}` })
       const d = await r.json()
-      path = (d.path || []).map(([t, lat, lon, alt, trk, grnd]) => ({
-        ts: new Date(t * 1000).toISOString(), lat, lon,
-        alt_ft: alt != null ? Math.round(alt * 3.28084) : null,
-        track: trk, on_ground: grnd,
-      }))
+      path = normalizeOpenSkyPath(d.path)
       if (path.length) {
         await dbQuery(
           `INSERT INTO opensky_tracks_cache (icao24, first_seen_unix, callsign, path_json)
@@ -524,19 +491,20 @@ export default async function proxyRoutes(fastify) {
       return reply.status(200).send({ error: 'No GPS track points available for this flight. OpenSky may not have retained this track.' })
     }
 
-    // Delete existing track points for this flight, then insert new ones
-    await dbQuery('DELETE FROM track_log_points WHERE flight_id=$1', [flight_id])
-    const insertVals = path
-      .filter(p => p.lat && p.lon && !p.on_ground)
-      .map((p, i) => `($1, '${p.ts}', ${p.lat}, ${p.lon}, ${p.alt_ft ?? 'NULL'}, NULL, ${p.track ?? 'NULL'}, NULL)`)
-    if (insertVals.length) {
-      await dbQuery(
-        `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
-         VALUES ${insertVals.join(',')}`,
-        [flight_id]
-      )
+    const saved = await saveTrackPoints(pool, flight_id, path)
+    return { success: true, points_saved: saved, total_points: path.length }
+  })
+
+  // ── OpenSky: auto-fetch track by flight_id (uses mode_s_hex + time_out from DB) ─
+  // POST /api/external/auto-fetch-track/:flight_id
+  // Used by the UI "Find Route" auto-loader and on new flight creation.
+  fastify.post('/api/external/auto-fetch-track/:flight_id', async (req, reply) => {
+    const flightId = parseInt(req.params.flight_id)
+    const result = await autoFetchOpenSkyTrack(pool, flightId)
+    if (result.error && !result.points_saved) {
+      return reply.status(result.error === 'Flight not found' ? 404 : 200).send(result)
     }
-    return { success: true, points_saved: insertVals.length, total_points: path.length }
+    return result
   })
 
   // ── FlightRadar24: flights by tail + date ────────────────────────────────────
@@ -605,31 +573,10 @@ export default async function proxyRoutes(fastify) {
         return { success: false, points_saved: 0, total_points: 0, message: 'No track positions from FR24' }
       }
 
-      // Filter airborne positions (altitude > 200 ft, valid lat/lon)
-      const airborne = positions.filter(p =>
-        (p.alt ?? p.altitude) > 200 && (p.lat || p.latitude) && (p.lon || p.longitude)
-      )
-
-      await dbQuery('DELETE FROM track_log_points WHERE flight_id=$1', [flight_id])
-      if (airborne.length) {
-        const rows = airborne.map(p => {
-          const ts  = new Date((p.timestamp ?? p.ts) * 1000).toISOString()
-          const lat = p.lat ?? p.latitude
-          const lon = p.lon ?? p.longitude
-          const alt = Math.round(p.alt ?? p.altitude ?? 0)
-          const spd = p.spd ?? p.speed ?? p.groundspeed ?? 'NULL'
-          const hdg = p.hdg ?? p.heading ?? p.track_deg ?? 'NULL'
-          return `($1, '${ts}', ${lat}, ${lon}, ${alt}, ${spd}, ${hdg}, NULL)`
-        })
-        await dbQuery(
-          `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
-           VALUES ${rows.join(',')}`,
-          [flight_id]
-        )
-      }
-
-      fastify.log.info({ flight_id, fr24_id, saved: airborne.length }, 'FR24 track attached')
-      return { success: true, points_saved: airborne.length, total_points: positions.length }
+      const normalized = normalizeFr24Positions(positions)
+      const saved = await saveTrackPoints(pool, flight_id, normalized)
+      fastify.log.info({ flight_id, fr24_id, saved }, 'FR24 track attached')
+      return { success: true, points_saved: saved, total_points: positions.length }
     } catch (e) {
       fastify.log.warn({ flight_id, fr24_id, err: e.message }, 'FR24 track attach failed')
       return reply.status(502).send({ error: e.message })
@@ -724,29 +671,13 @@ export default async function proxyRoutes(fastify) {
         })
         const posData  = trackData?.data?.positions ?? trackData?.positions ?? trackData?.data ?? []
         const positions = Array.isArray(posData) ? posData : []
-        const airborne  = positions.filter(p =>
-          (p.alt ?? p.altitude) > 200 && (p.lat || p.latitude) && (p.lon || p.longitude)
-        )
+        const normalized = normalizeFr24Positions(positions)
+        const saved = await saveTrackPoints(pool, f.id, normalized)
 
-        if (!airborne.length) {
+        if (!saved) {
           results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions' })
         } else {
-          await dbQuery('DELETE FROM track_log_points WHERE flight_id=$1', [f.id])
-          const rows = airborne.map(p => {
-            const ts  = new Date((p.timestamp ?? p.ts) * 1000).toISOString()
-            const lat = p.lat ?? p.latitude
-            const lon = p.lon ?? p.longitude
-            const alt = Math.round(p.alt ?? p.altitude ?? 0)
-            const spd = p.spd ?? p.speed ?? p.groundspeed ?? 'NULL'
-            const hdg = p.hdg ?? p.heading ?? p.track_deg ?? 'NULL'
-            return `(${f.id}, '${ts}', ${lat}, ${lon}, ${alt}, ${spd}, ${hdg}, NULL)`
-          })
-          await dbQuery(
-            `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
-             VALUES ${rows.join(',')}`,
-            []
-          )
-          results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: airborne.length })
+          results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved })
         }
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, fr24Id, err: e.message }, 'FR24 track fetch failed')

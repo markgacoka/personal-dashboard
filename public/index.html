@@ -764,7 +764,7 @@
       overflow: hidden;
     }
     .fd-ac-photo-wrap {
-      width: 100%; aspect-ratio: 16/9;
+      width: 100%; height: 160px; flex-shrink: 0;
       background: var(--raised);
       position: relative; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
@@ -958,6 +958,31 @@
     .cert-bar-fill.warn { background: oklch(70% 0.15 70); }
     .cert-bar-fill.crit { background: oklch(65% 0.14 20); }
     .cert-date-range { display: flex; justify-content: space-between; font-size: 10px; color: var(--disabled); }
+
+    .cert-status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 3px 10px;
+      border-radius: 20px; margin-top: 12px;
+    }
+    .cert-status-badge.good {
+      background: oklch(65% 0.13 155 / 0.18);
+      color: oklch(72% 0.12 145);
+      border: 1px solid oklch(65% 0.13 155 / 0.35);
+    }
+    .cert-status-badge.warn {
+      background: oklch(70% 0.15 70 / 0.18);
+      color: oklch(74% 0.15 70);
+      border: 1px solid oklch(70% 0.15 70 / 0.35);
+    }
+
+    .cert-compact-line {
+      font-size: 12px; color: var(--muted);
+      display: flex; flex-wrap: wrap; gap: 4px 10px;
+      align-items: center;
+    }
+    .cert-compact-line .sep { color: var(--rule-strong); }
+    .cert-compact-line .val { color: var(--body-text); font-weight: 500; }
 
     .cert-footer {
       padding: 10px 20px;
@@ -1622,6 +1647,9 @@
             <button class="btn-ghost" id="sync-night-btn" onclick="syncNightData()" style="padding:6px 12px;font-size:12px;color:var(--patina-text);border-color:var(--patina-text)" title="Sync block-out/in times from Gmail schedules">
               <i class="ph-bold ph-clock"></i> Sync Times
             </button>
+            <button class="btn-ghost" id="fr24-backfill-btn" onclick="openFr24Backfill()" style="padding:6px 12px;font-size:12px;color:oklch(68% 0.15 235);border-color:oklch(68% 0.15 235)" title="Fetch GPS tracks for all flights from FlightRadar24">
+              <i class="ph-bold ph-path"></i> Backfill Routes
+            </button>
             <button class="btn-primary" onclick="openFlightModal()" style="padding:6px 14px;font-size:12px">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
@@ -1747,6 +1775,33 @@
     </div>
     <div class="modal-bd" id="night-sync-bd" style="padding:20px;max-height:70vh;overflow-y:auto">
       <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FR24 backfill modal -->
+<div class="modal-overlay" id="fr24-backfill-overlay" style="display:none"
+     onclick="if(event.target===this)closeFr24Backfill()">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-hd">
+      <span class="modal-title"><i class="ph-bold ph-path" style="color:oklch(68% 0.15 235);margin-right:6px"></i>FR24 Route Backfill</span>
+      <button class="modal-close" onclick="closeFr24Backfill()"><i class="ph-bold ph-x"></i></button>
+    </div>
+    <div class="modal-bd" id="fr24-backfill-bd" style="padding:20px;max-height:75vh;overflow-y:auto">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        Fetches GPS tracks for all flights without route data from FlightRadar24 (Essential plan — up to 2 years history).
+        This may take a few minutes depending on the number of flights.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="fr24-overwrite-cb" style="width:14px;height:14px">
+          Overwrite existing tracks
+        </label>
+      </div>
+      <button class="btn-primary" id="fr24-run-btn" onclick="runFr24Backfill()" style="font-size:13px">
+        <i class="ph-bold ph-path"></i> Start Backfill
+      </button>
+      <div id="fr24-backfill-result" style="margin-top:16px"></div>
     </div>
   </div>
 </div>
@@ -3969,23 +4024,23 @@ async function showFlightDetail(id) {
       });
   }
 
-  // Auto-load GPS track from FlightAware if no track on record yet
+  // Auto-load GPS track from FlightRadar24 if no track on record yet
   if (!f.has_track && ac?.tail_number) {
-    autoLoadFaTrack(f);
+    autoLoadFr24Track(f);
   }
 }
 
-// ─── FlightAware auto-track loader ───────────────────────────────────────────
-// Automatically fetches GPS track from FlightAware for flights that have no track.
-// Uses sessionStorage to avoid re-hitting FA for flights it has no record of.
-async function autoLoadFaTrack(f) {
+// ─── FlightRadar24 auto-track loader ─────────────────────────────────────────
+// Automatically fetches GPS track from FR24 for flights that have no track.
+// Uses sessionStorage to avoid re-hitting FR24 for flights it has no record of.
+async function autoLoadFr24Track(f) {
   if (!f || !f.aircraft?.tail_number) return;
   const flightId = f.id;
   const tail     = f.aircraft.tail_number;
   const dateStr  = String(f.date).slice(0, 10);
-  const skipKey  = `fa-skip-${flightId}`;
+  const skipKey  = `fr24-skip-${flightId}`;
 
-  if (sessionStorage.getItem(skipKey)) return; // FA had no record last time
+  if (sessionStorage.getItem(skipKey)) return;
 
   // Show subtle loading indicator in the action area
   const btn = document.getElementById('find-route-btn');
@@ -3995,24 +4050,22 @@ async function autoLoadFaTrack(f) {
   }
 
   try {
-    // 1. Get FA flights for this tail + date
-    const faRes = await fetch(`/api/external/fa-flights/${encodeURIComponent(tail)}?date=${dateStr}`)
+    // 1. Get FR24 flights for this tail + date
+    const fr24Res = await fetch(`/api/external/fr24-flights/${encodeURIComponent(tail)}?date=${dateStr}`)
       .then(r => r.ok ? r.json() : null).catch(() => null);
-    const faFlights = faRes?.flights || [];
+    const fr24Flights = fr24Res?.flights || [];
 
-    // FA free tier covers only 10 days back — older flights return limit_exceeded
-    if (!faFlights.length) {
+    if (!fr24Flights.length) {
       sessionStorage.setItem(skipKey, '1');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
       return;
     }
 
-    // 2. Match best candidate — prefer flight closest to logbook date/time
-    //    Try Gmail schedule first for departure time anchor, fall back to logbook time_out
+    // 2. Match best candidate — prefer flight closest to logbook block-out time
     const anchor = f.time_out ? new Date(f.time_out).getTime()
                   : new Date(dateStr + 'T18:00:00Z').getTime(); // noon Pacific fallback
 
-    const candidate = faFlights.reduce((best, cand) => {
+    const candidate = fr24Flights.reduce((best, cand) => {
       const t = cand.first_seen_unix ? cand.first_seen_unix * 1000 : null;
       if (!t) return best;
       const diff = Math.abs(t - anchor);
@@ -4020,17 +4073,17 @@ async function autoLoadFaTrack(f) {
       return best;
     }, null)?.cand;
 
-    if (!candidate || !candidate.fa_flight_id) {
+    if (!candidate?.fr24_id) {
       sessionStorage.setItem(skipKey, '1');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
       return;
     }
 
     // 3. Attach the GPS track
-    const attachRes = await fetch('/api/external/attach-fa-track', {
+    const attachRes = await fetch('/api/external/attach-fr24-track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ flight_id: flightId, fa_flight_id: candidate.fa_flight_id }),
+      body: JSON.stringify({ flight_id: flightId, fr24_id: candidate.fr24_id }),
     }).then(r => r.ok ? r.json() : null).catch(() => null);
 
     if (!attachRes?.success || !attachRes.points_saved) {
@@ -4054,7 +4107,7 @@ async function autoLoadFaTrack(f) {
     if (fUpdated) requestAnimationFrame(() => initFlightDetailMap(fUpdated));
 
   } catch (e) {
-    console.warn('autoLoadFaTrack failed:', e.message);
+    console.warn('autoLoadFr24Track failed:', e.message);
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
   }
 }
@@ -4121,6 +4174,76 @@ function fmtUTCtoPT(iso) {
   if (!iso) return '—';
   return new Date(iso.includes('T') ? iso : iso + 'Z')
     .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
+}
+
+// ─── FR24 Route Backfill ──────────────────────────────────────────────────────
+function openFr24Backfill() {
+  document.getElementById('fr24-backfill-overlay').style.display = 'flex';
+  document.getElementById('fr24-backfill-result').innerHTML = '';
+}
+
+function closeFr24Backfill() {
+  document.getElementById('fr24-backfill-overlay').style.display = 'none';
+}
+
+async function runFr24Backfill() {
+  const overwrite = document.getElementById('fr24-overwrite-cb')?.checked;
+  const btn = document.getElementById('fr24-run-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Running backfill…'; }
+  document.getElementById('fr24-backfill-result').innerHTML =
+    '<div style="padding:20px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Fetching flight tracks from FlightRadar24…<br>This may take a minute.</div></div>';
+
+  try {
+    const res = await fetch(`/api/external/fr24-backfill?overwrite=${overwrite}`, { method: 'POST' }).then(r => r.json());
+    const s = res.summary || {};
+    const results = res.results || [];
+
+    const statusColor = { ok: 'var(--patina-text)', no_match: 'var(--muted)', no_positions: 'oklch(74% 0.15 70)', error: 'var(--warn)', track_error: 'var(--warn)', no_fr24_id: 'var(--faint)' };
+    const statusLabel = { ok: 'Track saved', no_match: 'No FR24 match', no_positions: 'No airborne data', error: 'Lookup error', track_error: 'Track error', no_fr24_id: 'No FR24 ID' };
+
+    const tableRows = results.map(r => `
+      <tr>
+        <td style="color:var(--patina-text)">${r.date}</td>
+        <td>${esc(r.tail)}</td>
+        <td style="font-size:10px;font-family:monospace;color:var(--faint)">${r.fr24_id ? esc(r.fr24_id.slice(0,10)+'…') : '—'}</td>
+        <td style="color:${statusColor[r.status]||'var(--muted)'}">${statusLabel[r.status]||r.status}${r.points ? ' ('+r.points+' pts)' : ''}${r.reason ? ': '+esc(r.reason.slice(0,40)) : ''}</td>
+      </tr>`).join('');
+
+    document.getElementById('fr24-backfill-result').innerHTML = `
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--patina-text)">${s.ok||0}</div><div style="font-size:11px;color:var(--muted)">Tracks saved</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--muted)">${s.no_match||0}</div><div style="font-size:11px;color:var(--muted)">No FR24 match</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--warn)">${s.errors||0}</div><div style="font-size:11px;color:var(--muted)">Errors</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--champagne)">${s.processed||0}</div><div style="font-size:11px;color:var(--muted)">Processed</div></div>
+      </div>
+      <div style="overflow-x:auto;max-height:350px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead style="position:sticky;top:0;background:var(--overlay)">
+            <tr style="border-bottom:1px solid var(--rule);color:var(--muted);text-align:left">
+              <th style="padding:6px 8px">Date</th>
+              <th style="padding:6px 8px">Tail</th>
+              <th style="padding:6px 8px">FR24 ID</th>
+              <th style="padding:6px 8px">Result</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    if ((s.ok||0) > 0) {
+      await loadFlights();
+      // Clear cached skip keys so auto-loader doesn't skip newly backfilled flights
+      for (const r of results) {
+        if (r.status === 'ok') sessionStorage.removeItem(`fr24-skip-${r.id}`);
+      }
+    }
+  } catch (e) {
+    document.getElementById('fr24-backfill-result').innerHTML =
+      `<div style="padding:16px;color:var(--warn);font-size:13px">Backfill failed: ${esc(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-path"></i> Start Backfill'; }
+  }
 }
 
 let _routePickerFlightId = null;
@@ -4520,11 +4643,18 @@ function renderCertificates() {
   }
 
   container.innerHTML = `
-    <div style="margin-bottom:24px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:4px">U.S. Department of Transportation · Federal Aviation Administration</div>
-      <div style="font-size:11px;color:var(--faint)">
-        Certificate validity per 14 CFR 61.19 (pilot) and 14 CFR 61.23 (medical).
-        Under age 40: 60 calendar months from date of issue / examination.
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--body-text)">Pilot Credentials</div>
+        <div style="font-size:11px;color:var(--faint);margin-top:2px">U.S. Department of Transportation · Federal Aviation Administration</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="cert-status-badge ${spCls}">
+          <i class="ph-bold ph-airplane"></i> Student Pilot · ${spDays.toLocaleString()} days valid
+        </div>
+        <div class="cert-status-badge ${medCls}">
+          <i class="ph-bold ph-first-aid-kit"></i> 3rd Class Medical · ${medDays.toLocaleString()} days valid
+        </div>
       </div>
     </div>
 
@@ -4540,52 +4670,34 @@ function renderCertificates() {
             <div class="cert-holder-name">${esc(sp.name)}</div>
             <div class="cert-number">№ ${esc(sp.certNumber)}</div>
           </div>
+          <div class="cert-status-badge ${spCls}">
+            <i class="ph-bold ph-check-circle"></i> Valid · ${spDays.toLocaleString()} days remaining
+          </div>
         </div>
 
         <div class="cert-body">
 
           <div>
-            <div class="cert-section-label"><i class="ph-bold ph-map-pin-simple"></i> Address</div>
-            <div class="cert-address">${esc(sp.address).replace('\n', '<br>')}</div>
-          </div>
-
-          <div>
             <div class="cert-section-label"><i class="ph-bold ph-user"></i> Identity</div>
-            <div class="cert-data-grid three">
-              <div class="cert-datum">
-                <div class="cert-datum-label">Nationality</div>
-                <div class="cert-datum-val highlight">${esc(sp.nationality)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Date of Birth</div>
-                <div class="cert-datum-val">Sep 25, 2000</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Sex</div>
-                <div class="cert-datum-val">${esc(sp.sex)}</div>
-              </div>
+            <div class="cert-compact-line">
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Nationality</span> <span class="val">${esc(sp.nationality)}</span></span>
+              <span class="sep">·</span>
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">DOB</span> <span class="val">Sep 25, 2000</span></span>
+              <span class="sep">·</span>
+              <span class="val">${esc(sp.sex)}</span>
             </div>
           </div>
 
           <div>
-            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical Description</div>
-            <div class="cert-data-grid">
-              <div class="cert-datum">
-                <div class="cert-datum-label">Height</div>
-                <div class="cert-datum-val">${esc(sp.height)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Weight</div>
-                <div class="cert-datum-val">${esc(sp.weight)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Hair</div>
-                <div class="cert-datum-val">${esc(sp.hair)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Eyes</div>
-                <div class="cert-datum-val">${esc(sp.eyes)}</div>
-              </div>
+            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical</div>
+            <div class="cert-compact-line">
+              <span class="val">${esc(sp.height)}</span>
+              <span class="sep">·</span>
+              <span class="val">${esc(sp.weight)}</span>
+              <span class="sep">·</span>
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Hair</span> <span class="val">${esc(sp.hair)}</span></span>
+              <span class="sep">·</span>
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Eyes</span> <span class="val">${esc(sp.eyes)}</span></span>
             </div>
           </div>
 
@@ -4617,51 +4729,36 @@ function renderCertificates() {
             <div class="cert-holder-name">${esc(med.name)}</div>
             <div class="cert-number">ID ${esc(med.applicantId)}</div>
           </div>
+          <div class="cert-status-badge ${medCls}">
+            <i class="ph-bold ph-check-circle"></i> Valid · ${medDays.toLocaleString()} days remaining
+          </div>
         </div>
 
         <div class="cert-body">
 
           <div>
-            <div class="cert-section-label"><i class="ph-bold ph-map-pin-simple"></i> Address</div>
-            <div class="cert-address">${esc(med.address).replace('\n', '<br>')}</div>
-          </div>
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical Description</div>
-            <div class="cert-data-grid">
-              <div class="cert-datum">
-                <div class="cert-datum-label">Height</div>
-                <div class="cert-datum-val">${esc(med.height)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Weight</div>
-                <div class="cert-datum-val">${esc(med.weight)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Hair</div>
-                <div class="cert-datum-val">${esc(med.hair)}</div>
-              </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Eyes</div>
-                <div class="cert-datum-val">${esc(med.eyes)}</div>
-              </div>
+            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical</div>
+            <div class="cert-compact-line">
+              <span class="val">${esc(med.height)}</span>
+              <span class="sep">·</span>
+              <span class="val">${esc(med.weight)}</span>
+              <span class="sep">·</span>
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Hair</span> <span class="val">${esc(med.hair)}</span></span>
+              <span class="sep">·</span>
+              <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Eyes</span> <span class="val">${esc(med.eyes)}</span></span>
             </div>
           </div>
 
           <div>
             <div class="cert-section-label"><i class="ph-bold ph-stethoscope"></i> Examiner</div>
-            <div class="cert-data-grid">
-              <div class="cert-datum">
-                <div class="cert-datum-label">AME Name</div>
-                <div class="cert-datum-val highlight">${esc(med.examiner)}</div>
+            <div class="cert-compact-line" style="flex-direction:column;align-items:flex-start;gap:4px">
+              <div>
+                <span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">AME</span>
+                <span class="val" style="color:var(--champagne);margin-left:6px">${esc(med.examiner)}</span>
               </div>
-              <div class="cert-datum">
-                <div class="cert-datum-label">Desig. No.</div>
-                <div class="cert-datum-val mono">${esc(med.examDesig)}</div>
-              </div>
-              <div class="cert-datum" style="grid-column:1/-1">
-                <div class="cert-datum-label">Control Number</div>
-                <div class="cert-datum-val mono">${esc(med.controlNo)}</div>
+              <div style="display:flex;gap:16px">
+                <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Desig.</span> <span class="val" style="font-family:'Alumni Sans',monospace;letter-spacing:.04em">${esc(med.examDesig)}</span></span>
+                <span><span style="color:var(--faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Control</span> <span class="val" style="font-family:'Alumni Sans',monospace;letter-spacing:.04em">${esc(med.controlNo)}</span></span>
               </div>
             </div>
           </div>
@@ -4686,13 +4783,13 @@ function renderCertificates() {
     </div>
 
     <!-- ── FAA Regulatory Reference ─────────────────────────── -->
-    <div class="section-label" style="margin-bottom:14px">Regulatory Notes</div>
+    <div class="section-label" style="margin-bottom:14px;margin-top:8px">Regulatory Notes</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px">
-      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);padding:14px 16px">
-        <div style="font-size:11px;font-weight:600;color:var(--patina-text);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <div style="background:var(--raised);border:1px solid var(--rule);border-left:3px solid var(--patina-text);border-radius:var(--r-sm);padding:14px 16px">
+        <div style="font-size:11px;font-weight:600;color:var(--patina-text);margin-bottom:10px;display:flex;align-items:center;gap:6px">
           <i class="ph-bold ph-airplane"></i> Student Pilot (14 CFR 61.19)
         </div>
-        <ul style="font-size:12px;color:var(--muted);line-height:1.7;padding-left:16px;margin:0">
+        <ul style="font-size:12px;color:var(--muted);line-height:1.8;padding-left:16px;margin:0">
           <li>Valid 60 calendar months from month of issue (under age 40)</li>
           <li>Solo flight requires current medical + instructor endorsement</li>
           <li>Cannot carry passengers — solo only</li>
@@ -4700,11 +4797,11 @@ function renderCertificates() {
           <li>Night solo requires 14 CFR 61.87(o) endorsement</li>
         </ul>
       </div>
-      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);padding:14px 16px">
-        <div style="font-size:11px;font-weight:600;color:oklch(70% 0.10 250);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <div style="background:var(--raised);border:1px solid var(--rule);border-left:3px solid oklch(70% 0.10 250);border-radius:var(--r-sm);padding:14px 16px">
+        <div style="font-size:11px;font-weight:600;color:oklch(70% 0.10 250);margin-bottom:10px;display:flex;align-items:center;gap:6px">
           <i class="ph-bold ph-first-aid-kit"></i> Third Class Medical (14 CFR 61.23)
         </div>
-        <ul style="font-size:12px;color:var(--muted);line-height:1.7;padding-left:16px;margin:0">
+        <ul style="font-size:12px;color:var(--muted);line-height:1.8;padding-left:16px;margin:0">
           <li>Valid 60 calendar months from examination date (under age 40)</li>
           <li>Required for student, recreational &amp; private pilot operations</li>
           <li>Must be current before any solo flight</li>

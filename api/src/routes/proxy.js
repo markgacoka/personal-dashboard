@@ -635,14 +635,13 @@ export default async function proxyRoutes(fastify) {
   })
 
   // ── FlightRadar24: batch backfill all flights without tracks ──────────────────
-  // POST /api/external/fr24-backfill?overwrite=false
-  // Iterates all DB flights, looks up FR24 by registration+date, saves tracks.
-  // Runs sequentially with a short delay to respect rate limits.
+  // POST /api/external/fr24-backfill?overwrite=false[&limit=N]
+  // Streams NDJSON: one JSON line per flight as it completes, final line is summary.
+  // Run with: curl -X POST "..." --max-time 1800 -s -N
   fastify.post('/api/external/fr24-backfill', async (req, reply) => {
     const overwrite = req.query.overwrite === 'true'
     const limitN    = req.query.limit ? parseInt(req.query.limit) : null
 
-    // Load all flights (join aircraft for tail number)
     const { rows: flights } = await pool.query(`
       SELECT f.id, f.date::text, f.departure_icao, f.arrival_icao,
              f.time_out, f.time_in, f.total_duration,
@@ -655,17 +654,20 @@ export default async function proxyRoutes(fastify) {
 
     let toProcess = overwrite ? flights : flights.filter(f => !f.has_track)
     if (limitN) toProcess = toProcess.slice(0, limitN)
-    const results = []
-    // 2 s between each API call keeps us well under FR24 Essential rate limits.
-    // fr24Fetch auto-retries on 429 with Retry-After header back-off.
+
+    // Stream NDJSON so the connection stays alive through the full run.
+    reply.raw.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'X-Accel-Buffering': 'no' })
+
+    const emit = obj => reply.raw.write(JSON.stringify(obj) + '\n')
     const sleep = ms => new Promise(res => setTimeout(res, ms))
     const CALL_DELAY = 2000
+    const counts = { ok: 0, no_match: 0, no_positions: 0, errors: 0 }
 
     for (const f of toProcess) {
       const tail    = f.tail_number
       const dateStr = String(f.date).slice(0, 10)
 
-      // 1. Look up FR24 flights for this registration + date
+      // 1. Lookup FR24 summary for this registration + date
       let fr24Flights = []
       try {
         const dayStart = new Date(dateStr + 'T08:00:00Z')
@@ -679,20 +681,22 @@ export default async function proxyRoutes(fastify) {
         fr24Flights = Array.isArray(data?.data) ? data.data : []
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, tail, date: dateStr, err: e.message }, 'FR24 backfill lookup failed')
-        results.push({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
+        emit({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
+        counts.errors++
         await sleep(CALL_DELAY)
         continue
       }
 
-      await sleep(CALL_DELAY)  // pace after summary call
+      await sleep(CALL_DELAY)
 
       if (!fr24Flights.length) {
-        results.push({ id: f.id, date: dateStr, tail, status: 'no_match' })
+        emit({ id: f.id, date: dateStr, tail, status: 'no_match' })
+        counts.no_match++
         continue
       }
 
-      // 2. Pick best match: prefer flights where departure/arrival ICAO align with logbook
-      const logDep = f.departure_icao?.slice(1) // strip K prefix for IATA comparison
+      // 2. Pick best-matching FR24 flight
+      const logDep = f.departure_icao?.slice(1)
       const logArr = f.arrival_icao?.slice(1)
       const scored = fr24Flights.map(ff => {
         let score = 0
@@ -710,24 +714,20 @@ export default async function proxyRoutes(fastify) {
         return { ff, score }
       })
       scored.sort((a, b) => b.score - a.score)
-      const best = scored[0].ff
-
+      const best   = scored[0].ff
       const fr24Id = best.fr24_id
       if (!fr24Id) {
-        results.push({ id: f.id, date: dateStr, tail, status: 'no_fr24_id' })
+        emit({ id: f.id, date: dateStr, tail, status: 'no_fr24_id' })
+        counts.errors++
         continue
       }
 
-      // 3. Sample positions across the flight duration at 5-minute intervals.
-      // The historic positions endpoint returns one snapshot per timestamp.
-      // first_seen/last_seen come from the FR24 flight summary.
+      // 3. Sample positions at 5-minute intervals across the flight duration
       const firstSeenTs = Math.floor(new Date(best.first_seen ?? best.datetime_takeoff).getTime() / 1000)
       const lastSeenTs  = Math.floor(new Date(best.last_seen  ?? best.datetime_landed ).getTime() / 1000)
-      const SAMPLE_STEP = 300 // 5-minute intervals
-
       const rawPositions = []
-      for (let ts = firstSeenTs + SAMPLE_STEP; ts <= lastSeenTs; ts += SAMPLE_STEP) {
-        await sleep(1000)  // 1 s between position calls
+      for (let ts = firstSeenTs + 300; ts <= lastSeenTs; ts += 300) {
+        await sleep(1000)
         try {
           const posData = await fr24Fetch('/api/historic/flight-positions/full', {
             registrations: tail,
@@ -741,24 +741,23 @@ export default async function proxyRoutes(fastify) {
 
       const normalized = normalizeFr24Positions(rawPositions)
       const saved = await saveTrackPoints(pool, f.id, normalized)
-      results.push(saved
-        ? { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved }
-        : { id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions', samples: rawPositions.length }
-      )
+      if (saved) {
+        emit({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'ok', points: saved })
+        counts.ok++
+      } else {
+        emit({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'no_positions', samples: rawPositions.length })
+        counts.no_positions++
+      }
 
-      // Pace between flights — position sampling already added its own per-call delay
       await sleep(CALL_DELAY)
     }
 
     const summary = {
-      total: flights.length,
-      processed: toProcess.length,
-      ok:        results.filter(r => r.status === 'ok').length,
-      no_match:  results.filter(r => r.status === 'no_match').length,
-      errors:    results.filter(r => ['error', 'track_error'].includes(r.status)).length,
+      total: flights.length, processed: toProcess.length, ...counts,
     }
     fastify.log.info(summary, 'FR24 backfill complete')
-    return { summary, results }
+    emit({ type: 'summary', ...summary })
+    reply.raw.end()
   })
 
   // ── NICE AIR schedule emails from Gmail ──────────────────────────────────────

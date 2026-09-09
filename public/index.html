@@ -3402,8 +3402,8 @@ async function showActivityDetail(id) {
   if (hasMap && gpxData?.points?.length >= 2) {
     requestAnimationFrame(() => initActRouteMap(gpxData.points, sport, color));
   } else if (hasMap) {
-    const spinner = document.getElementById('act-map-spinner');
-    if (spinner) spinner.remove();
+    const mapCont = document.getElementById('act-map-container');
+    if (mapCont) mapCont.remove();
     const wrap = document.getElementById('act-elevation-wrap');
     if (wrap) wrap.remove();
   }

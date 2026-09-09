@@ -515,12 +515,37 @@ export default async function proxyRoutes(fastify) {
   })
 
   // ── FlightRadar24: raw diagnostic call (pass any params, see raw response) ───
-  // GET /api/external/fr24-raw?path=/api/flight-summary/full&reg=N12345&...
+  // GET /api/external/fr24-raw?path=/api/...&param1=val1
+  // POST /api/external/fr24-raw  body: { path, ...params }
   fastify.get('/api/external/fr24-raw', async (req, reply) => {
     const { path: apiPath = '/api/flight-summary/full', ...params } = req.query
     try {
       const data = await fr24Fetch(apiPath, params)
       return { ok: true, data }
+    } catch (e) {
+      return reply.status(200).send({ ok: false, error: e.message })
+    }
+  })
+  fastify.post('/api/external/fr24-raw', async (req, reply) => {
+    const { path: apiPath = '/api/flight-summary/full', ...params } = req.body || {}
+    try {
+      const token = process.env.FR24_API_TOKEN
+      if (!token) return reply.status(200).send({ ok: false, error: 'FR24_API_TOKEN not configured' })
+      const url = new URL(FR24_BASE + apiPath)
+      const r = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept-Version': 'v1',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+        signal: AbortSignal.timeout(20000),
+      })
+      const body = await r.text()
+      try { return { ok: r.ok, status: r.status, data: JSON.parse(body) } }
+      catch { return { ok: r.ok, status: r.status, data: body } }
     } catch (e) {
       return reply.status(200).send({ ok: false, error: e.message })
     }
@@ -552,16 +577,16 @@ export default async function proxyRoutes(fastify) {
       })
       const raw  = Array.isArray(data?.data) ? data.data : []
       const flights = raw.map(f => ({
-        fr24_id:        f.fr24_id || f.id || f.flight_id,
+        fr24_id:        f.fr24_id,
         ident:          f.callsign || f.flight || tail,
-        departure_icao: f.orig_icao || f.origin_icao || null,
-        arrival_icao:   f.dest_icao || f.destination_icao || null,
-        departure_time: f.actual_departure  || f.scheduled_departure || null,
-        arrival_time:   f.actual_arrival    || f.scheduled_arrival   || null,
-        first_seen_unix: f.actual_departure
-          ? Math.floor(new Date(f.actual_departure).getTime() / 1000) : null,
-        duration_min: (f.actual_departure && f.actual_arrival)
-          ? Math.round((new Date(f.actual_arrival) - new Date(f.actual_departure)) / 60000)
+        departure_icao: f.orig_icao || null,
+        arrival_icao:   f.dest_icao_actual || f.dest_icao || null,
+        departure_time: f.datetime_takeoff || f.first_seen || null,
+        arrival_time:   f.datetime_landed  || f.last_seen  || null,
+        first_seen_unix: f.datetime_takeoff
+          ? Math.floor(new Date(f.datetime_takeoff).getTime() / 1000) : null,
+        duration_min: (f.datetime_takeoff && f.datetime_landed)
+          ? Math.round((new Date(f.datetime_landed) - new Date(f.datetime_takeoff)) / 60000)
           : null,
       }))
       _fr24Cache.set(cacheKey, { ts: Date.now(), flights })
@@ -661,13 +686,13 @@ export default async function proxyRoutes(fastify) {
       const logArr = f.arrival_icao?.slice(1)
       const scored = fr24Flights.map(ff => {
         let score = 0
-        const dep = ff.orig_icao || ff.origin_icao || ''
-        const arr = ff.dest_icao || ff.destination_icao || ''
+        const dep = ff.orig_icao || ''
+        const arr = ff.dest_icao_actual || ff.dest_icao || ''
         if (dep === f.departure_icao || dep === logDep) score += 2
         if (arr === f.arrival_icao   || arr === logArr)  score += 2
-        if (f.time_out && ff.actual_departure) {
+        if (f.time_out && ff.datetime_takeoff) {
           const diffMin = Math.abs(
-            new Date(f.time_out).getTime() - new Date(ff.actual_departure).getTime()
+            new Date(f.time_out).getTime() - new Date(ff.datetime_takeoff).getTime()
           ) / 60000
           if (diffMin < 30) score += 3
           else if (diffMin < 60) score += 1
@@ -677,7 +702,7 @@ export default async function proxyRoutes(fastify) {
       scored.sort((a, b) => b.score - a.score)
       const best = scored[0].ff
 
-      const fr24Id = best.fr24_id || best.id || best.flight_id
+      const fr24Id = best.fr24_id
       if (!fr24Id) {
         results.push({ id: f.id, date: dateStr, tail, status: 'no_fr24_id' })
         continue

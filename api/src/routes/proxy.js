@@ -40,6 +40,26 @@ async function dbQuery(sql, params) {
   try { return (await pool.query(sql, params)).rows } catch { return null }
 }
 
+// ── FlightAware AeroAPI ───────────────────────────────────────────────────────
+// Env var: FLIGHTAWARE_AEROAPI_KEY
+// Free tier: 500 ops/month. GET /flights/{ident} + GET /flights/{id}/track = 2 ops per flight.
+const FA_BASE  = 'https://aeroapi.flightaware.com/aeroapi'
+const _faCache = new Map() // key `tail/YYYY-MM-DD` → { ts, flights[] }
+
+async function faFetch(path) {
+  const key = process.env.FLIGHTAWARE_AEROAPI_KEY
+  if (!key) throw new Error('FLIGHTAWARE_AEROAPI_KEY not configured')
+  const r = await fetch(`${FA_BASE}${path}`, {
+    headers: { 'x-apikey': key, Accept: 'application/json; charset=utf-8' },
+    signal: AbortSignal.timeout(14000),
+  })
+  if (!r.ok) {
+    const body = await r.text().catch(() => r.statusText)
+    throw new Error(`FlightAware ${r.status}: ${body.slice(0, 200)}`)
+  }
+  return r.json()
+}
+
 // ── OpenSky OAuth token cache ─────────────────────────────────────────────────
 // OpenSky v2 uses client_credentials (clientId + clientSecret → bearer token).
 // Env vars: OPENSKY_CLIENT_ID, OPENSKY_CLIENT_SECRET
@@ -510,6 +530,88 @@ export default async function proxyRoutes(fastify) {
       )
     }
     return { success: true, points_saved: insertVals.length, total_points: path.length }
+  })
+
+  // ── FlightAware AeroAPI: flights by tail + date ───────────────────────────────
+  // GET /api/external/fa-flights/:tail?date=YYYY-MM-DD
+  // Returns FA flights list for a Pacific-day window. Cached 1h in memory.
+  fastify.get('/api/external/fa-flights/:tail', async (req, reply) => {
+    const tail = req.params.tail.toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const date = req.query.date // YYYY-MM-DD
+    if (!date) return reply.status(400).send({ error: 'date required (YYYY-MM-DD)' })
+
+    const cacheKey = `${tail}/${date}`
+    const hit = _faCache.get(cacheKey)
+    if (hit && Date.now() - hit.ts < 3_600_000) return { flights: hit.flights, source: 'cache' }
+
+    // Pacific-day UTC window: PST is UTC-8, PDT is UTC-7.
+    // Use UTC-8 worst case: day starts at 08:00 UTC, add 26h buffer for full coverage.
+    const dayStart = new Date(date + 'T08:00:00Z')
+    const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
+    const startISO = dayStart.toISOString().slice(0, 19) + 'Z'
+    const endISO   = dayEnd.toISOString().slice(0, 19) + 'Z'
+
+    try {
+      const data = await faFetch(`/flights/${encodeURIComponent(tail)}?start=${startISO}&end=${endISO}&max_pages=1`)
+      const raw  = Array.isArray(data?.flights) ? data.flights : []
+      const flights = raw.map(f => ({
+        fa_flight_id:   f.fa_flight_id,
+        ident:          f.ident,
+        departure_icao: f.origin?.code_icao || f.origin?.code || null,
+        arrival_icao:   f.destination?.code_icao || f.destination?.code || null,
+        departure_time: f.actual_off || f.scheduled_off || null,
+        arrival_time:   f.actual_on  || f.scheduled_on  || null,
+        first_seen_unix: f.actual_off ? Math.floor(new Date(f.actual_off).getTime() / 1000) : null,
+        duration_min:   (f.actual_off && f.actual_on)
+          ? Math.round((new Date(f.actual_on) - new Date(f.actual_off)) / 60000)
+          : null,
+      }))
+      _faCache.set(cacheKey, { ts: Date.now(), flights })
+      return { flights, source: 'flightaware' }
+    } catch (e) {
+      fastify.log.warn({ tail, date, err: e.message }, 'FlightAware flights lookup failed')
+      return reply.status(502).send({ error: e.message })
+    }
+  })
+
+  // ── FlightAware AeroAPI: attach GPS track to a flight record ──────────────────
+  // POST /api/external/attach-fa-track  body: { flight_id, fa_flight_id }
+  fastify.post('/api/external/attach-fa-track', async (req, reply) => {
+    const { flight_id, fa_flight_id } = req.body || {}
+    if (!flight_id || !fa_flight_id) {
+      return reply.status(400).send({ error: 'flight_id and fa_flight_id required' })
+    }
+
+    try {
+      const data = await faFetch(`/flights/${encodeURIComponent(fa_flight_id)}/track`)
+      const positions = Array.isArray(data?.positions) ? data.positions : []
+      if (!positions.length) {
+        return { success: false, points_saved: 0, total_points: 0, message: 'No track positions from FlightAware' }
+      }
+
+      // Filter out on-ground positions (altitude < 200 ft AGL or explicit on_ground flag)
+      const airborne = positions.filter(p =>
+        p.altitude != null && p.altitude > 200 && p.lat && p.lon
+      )
+
+      await dbQuery('DELETE FROM track_log_points WHERE flight_id=$1', [flight_id])
+      if (airborne.length) {
+        const vals = airborne.map(p =>
+          `($1, '${new Date(p.timestamp * 1000).toISOString()}', ${p.lat}, ${p.lon}, ${Math.round(p.altitude)}, ${p.groundspeed ?? 'NULL'}, ${p.heading ?? 'NULL'}, NULL)`
+        )
+        await dbQuery(
+          `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+           VALUES ${vals.join(',')}`,
+          [flight_id]
+        )
+      }
+
+      fastify.log.info({ flight_id, fa_flight_id, saved: airborne.length }, 'FA track attached')
+      return { success: true, points_saved: airborne.length, total_points: positions.length }
+    } catch (e) {
+      fastify.log.warn({ flight_id, fa_flight_id, err: e.message }, 'FlightAware track attach failed')
+      return reply.status(502).send({ error: e.message })
+    }
   })
 
   // ── NICE AIR schedule emails from Gmail ──────────────────────────────────────

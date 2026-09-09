@@ -3951,6 +3951,94 @@ async function showFlightDetail(id) {
           </div>`;
       });
   }
+
+  // Auto-load GPS track from FlightAware if no track on record yet
+  if (!f.has_track && ac?.tail_number) {
+    autoLoadFaTrack(f);
+  }
+}
+
+// ─── FlightAware auto-track loader ───────────────────────────────────────────
+// Automatically fetches GPS track from FlightAware for flights that have no track.
+// Uses sessionStorage to avoid re-hitting FA for flights it has no record of.
+async function autoLoadFaTrack(f) {
+  if (!f || !f.aircraft?.tail_number) return;
+  const flightId = f.id;
+  const tail     = f.aircraft.tail_number;
+  const dateStr  = String(f.date).slice(0, 10);
+  const skipKey  = `fa-skip-${flightId}`;
+
+  if (sessionStorage.getItem(skipKey)) return; // FA had no record last time
+
+  // Show subtle loading indicator in the action area
+  const btn = document.getElementById('find-route-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Loading route…';
+  }
+
+  try {
+    // 1. Get FA flights for this tail + date
+    const faRes = await fetch(`/api/external/fa-flights/${encodeURIComponent(tail)}?date=${dateStr}`)
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+    const faFlights = faRes?.flights || [];
+
+    if (!faFlights.length) {
+      sessionStorage.setItem(skipKey, '1');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+      return;
+    }
+
+    // 2. Match best candidate — prefer flight closest to logbook date/time
+    //    Try Gmail schedule first for departure time anchor, fall back to logbook time_out
+    const anchor = f.time_out ? new Date(f.time_out).getTime()
+                  : new Date(dateStr + 'T18:00:00Z').getTime(); // noon Pacific fallback
+
+    const candidate = faFlights.reduce((best, cand) => {
+      const t = cand.first_seen_unix ? cand.first_seen_unix * 1000 : null;
+      if (!t) return best;
+      const diff = Math.abs(t - anchor);
+      if (!best || diff < best.diff) return { cand, diff };
+      return best;
+    }, null)?.cand;
+
+    if (!candidate || !candidate.fa_flight_id) {
+      sessionStorage.setItem(skipKey, '1');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+      return;
+    }
+
+    // 3. Attach the GPS track
+    const attachRes = await fetch('/api/external/attach-fa-track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flight_id: flightId, fa_flight_id: candidate.fa_flight_id }),
+    }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+    if (!attachRes?.success || !attachRes.points_saved) {
+      sessionStorage.setItem(skipKey, '1');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+      return;
+    }
+
+    // 4. Update in-memory flight record and refresh map + button
+    const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
+    if (fi >= 0) window._flights[fi].has_track = true;
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Update Route';
+    }
+
+    // Re-init map to show the newly loaded track
+    if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
+    const fUpdated = (window._flights || []).find(x => String(x.id) === String(flightId));
+    if (fUpdated) requestAnimationFrame(() => initFlightDetailMap(fUpdated));
+
+  } catch (e) {
+    console.warn('autoLoadFaTrack failed:', e.message);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+  }
 }
 
 // ─── OpenSky route picker ─────────────────────────────────────────────────────

@@ -545,10 +545,10 @@ export default async function proxyRoutes(fastify) {
 
     try {
       const data = await fr24Fetch('/api/flight-summary/full', {
-        reg:            tail,
-        timestamp_from: Math.floor(dayStart.getTime() / 1000),
-        timestamp_to:   Math.floor(dayEnd.getTime()   / 1000),
-        limit:          20,
+        registrations:        tail,
+        flight_datetime_from: dayStart.toISOString(),
+        flight_datetime_to:   dayEnd.toISOString(),
+        limit:                20,
       })
       const raw  = Array.isArray(data?.data) ? data.data : []
       const flights = raw.map(f => ({
@@ -636,10 +636,10 @@ export default async function proxyRoutes(fastify) {
         const dayStart = new Date(dateStr + 'T08:00:00Z')
         const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
         const data = await fr24Fetch('/api/flight-summary/full', {
-          reg:            tail,
-          timestamp_from: Math.floor(dayStart.getTime() / 1000),
-          timestamp_to:   Math.floor(dayEnd.getTime()   / 1000),
-          limit:          10,
+          registrations:        tail,
+          flight_datetime_from: dayStart.toISOString(),
+          flight_datetime_to:   dayEnd.toISOString(),
+          limit:                10,
         })
         fr24Flights = Array.isArray(data?.data) ? data.data : []
       } catch (e) {

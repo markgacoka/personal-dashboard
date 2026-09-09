@@ -756,55 +756,57 @@
     }
     @media (max-width: 680px) { .fd-two-col { grid-template-columns: 1fr; } }
 
-    /* Aircraft card redesign */
+    /* Aircraft card redesign — horizontal layout */
     .fd-ac-card {
       background: var(--graphite);
       border: 1px solid var(--rule);
       border-radius: var(--r-sm);
       overflow: hidden;
+      display: flex; flex-direction: row;
     }
     .fd-ac-photo-wrap {
-      width: 100%; height: 160px; flex-shrink: 0;
+      width: 150px; flex-shrink: 0;
       background: var(--raised);
       position: relative; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
+      min-height: 120px;
     }
     .fd-ac-photo-wrap img {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
     .fd-ac-photo-credit {
-      position: absolute; bottom: 6px; right: 8px;
-      font-size: 10px; color: oklch(90% 0 0 / 0.7);
-      text-shadow: 0 1px 3px oklch(0% 0 0 / 0.8);
+      position: absolute; bottom: 4px; right: 6px;
+      font-size: 9px; color: oklch(90% 0 0 / 0.65);
+      text-shadow: 0 1px 2px oklch(0% 0 0 / 0.9);
+      writing-mode: vertical-rl; transform: rotate(180deg);
     }
-    .fd-ac-body { padding: 14px 16px; }
+    .fd-ac-body { padding: 12px 14px; flex: 1; min-width: 0; }
     .fd-ac-reg {
-      font-size: 18px; font-weight: 700;
+      font-size: 16px; font-weight: 700;
       color: var(--patina-text); letter-spacing: 0.04em;
       margin-bottom: 2px;
     }
-    .fd-ac-name { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .fd-ac-name { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
     .fd-ac-specs {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 8px 16px; margin-bottom: 14px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 6px 14px; margin-bottom: 12px;
     }
     .fd-ac-spec-label { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
-    .fd-ac-spec-val { font-size: 13px; color: var(--body-text); font-weight: 500; }
+    .fd-ac-spec-val { font-size: 12px; color: var(--body-text); font-weight: 500; }
     .fd-perf-section {
       border-top: 1px solid var(--rule);
-      padding-top: 12px; margin-top: 4px;
+      padding-top: 10px; margin-top: 2px;
     }
     .fd-perf-label {
       font-size: 10px; color: var(--faint); text-transform: uppercase;
-      letter-spacing: 0.06em; margin-bottom: 8px;
+      letter-spacing: 0.06em; margin-bottom: 6px;
     }
     .fd-perf-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-      gap: 8px;
+      display: flex; flex-wrap: wrap; gap: 6px 18px;
     }
-    .fd-perf-item { }
-    .fd-pk { font-size: 10px; color: var(--faint); }
-    .fd-pv { font-size: 13px; color: var(--champagne); font-weight: 600; }
+    .fd-perf-item { display: flex; align-items: baseline; gap: 5px; }
+    .fd-pk { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-pv { font-size: 12px; color: var(--champagne); font-weight: 600; }
 
     /* ── Pilot Credentials ───────────────────────────────── */
     .cert-grid {
@@ -3884,6 +3886,12 @@ async function showFlightDetail(id) {
         (s.tail === tail || s.tail === tailShort || s.tail.replace(/^N/, '') === tailShort))
       .filter(s => s.type !== 'cancelled')
       .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0] || null;
+
+    // If no schedule, collapse right column so aircraft card takes full width
+    if (!sched) {
+      const twoCol = document.querySelector('.fd-two-col');
+      if (twoCol) twoCol.style.gridTemplateColumns = '1fr';
+    }
 
     if (sched) {
       const schedOut = (sched.start_local || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';

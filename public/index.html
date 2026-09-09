@@ -3967,9 +3967,10 @@ async function showFlightDetail(id) {
   if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
   requestAnimationFrame(() => initFlightDetailMap(f));
 
-  // Populate NICE AIR schedule card (sync from preloaded cache)
+  // Populate NICE AIR schedule card (lazy-loads Gmail data on first open)
   const fdSchedWrap = document.getElementById('fd-schedule-wrap');
   if (fdSchedWrap) {
+    ensureNiceAirSchedules().then(() => {
     const dateStr  = String(f.date).slice(0, 10);
     const tail     = f.aircraft?.tail_number || '';
     const tailShort = tail.replace(/^N/, '');
@@ -4020,6 +4021,7 @@ async function showFlightDetail(id) {
           </div>
         </div>`;
     }
+    }); // end ensureNiceAirSchedules().then
   }
 
   // Load comprehensive aircraft data and render full card
@@ -4255,8 +4257,8 @@ async function openRoutePicker(flightId) {
 
   try {
     // Find the matching NICE AIR Gmail schedule for exact departure time
-    const gmailRes = await fetch('/api/gmail/nice-air').then(r => r.ok ? r.json() : { schedules: [] }).catch(() => ({ schedules: [] }));
-    const schedules = gmailRes.schedules || [];
+    await ensureNiceAirSchedules();
+    const schedules = window._niceAirSchedules || [];
     const tailShort = tail.replace(/^N/, '');
     const matched = schedules
       .filter(s => s.date_str === dateStr && (s.tail === tail || s.tail === tailShort || s.tail.replace(/^N/,'') === tailShort))
@@ -6538,23 +6540,35 @@ function openPlaidLink() {
 
 // ─── load flights ─────────────────────────────────────────────────────────────
 async function loadFlights() {
-  const [statsRes, flightsRes, schedRes] = await Promise.allSettled([
+  const [statsRes, flightsRes] = await Promise.allSettled([
     fetch('/api/stats/logbook').then(r => r.ok ? r.json() : null),
     fetch('/api/flights').then(r => r.ok ? r.json() : []),
-    fetch('/api/gmail/nice-air').then(r => r.ok ? r.json() : { schedules: [] }).catch(() => ({ schedules: [] })),
   ]);
   const stats   = statsRes.status   === 'fulfilled' ? statsRes.value   : null;
   const flights = flightsRes.status === 'fulfilled' ? flightsRes.value : [];
-  const sched   = schedRes.status   === 'fulfilled' ? schedRes.value   : { schedules: [] };
 
   if (stats) renderLogbookStats(stats);
   else document.getElementById('logbook-stats').innerHTML =
     '<div style="color:var(--muted);font-size:13px;padding:14px">Flight data unavailable</div>';
 
   window._flights = Array.isArray(flights) ? flights : [];
-  window._niceAirSchedules = sched.schedules || [];
+  // _niceAirSchedules loaded lazily on first flight detail open — not on list load
+  if (!window._niceAirSchedules) window._niceAirSchedules = [];
   applyFlFilter();
   renderFlightCurrency(window._flights);
+}
+
+// Fetch NICE AIR schedules once per session (lazy, on first flight detail open)
+let _niceAirFetchPromise = null;
+async function ensureNiceAirSchedules() {
+  if (window._niceAirSchedules?.length) return;
+  if (!_niceAirFetchPromise) {
+    _niceAirFetchPromise = fetch('/api/gmail/nice-air')
+      .then(r => r.ok ? r.json() : { schedules: [] })
+      .catch(() => ({ schedules: [] }))
+      .then(d => { window._niceAirSchedules = d.schedules || []; });
+  }
+  await _niceAirFetchPromise;
 }
 
 // Pre-seed medical certificate data from actual certificates (Third Class, exam 2025-08-22, under 40)

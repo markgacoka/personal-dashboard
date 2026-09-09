@@ -555,3 +555,18 @@ export async function migrateV3() {
     client.release()
   }
 }
+
+// V11: indexes on high-frequency correlated subquery columns
+export async function migrateV11() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_track_log_flight_id  ON track_log_points (flight_id);
+      CREATE INDEX IF NOT EXISTS idx_approaches_flight_id ON approaches (flight_id);
+      CREATE INDEX IF NOT EXISTS idx_flights_date         ON flights (date DESC);
+      CREATE INDEX IF NOT EXISTS idx_flights_aircraft_id  ON flights (aircraft_id);
+    `)
+  } finally {
+    client.release()
+  }
+}

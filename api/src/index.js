@@ -11,7 +11,7 @@ import statsRoutes from './routes/stats.js'
 import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
-import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10 } from './db/migrate.js'
+import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11 } from './db/migrate.js'
 import financeRoutes from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 
@@ -63,6 +63,7 @@ if (process.env.DATABASE_URL) {
     await migrateV8()
     await migrateV9()
     await migrateV10()
+    await migrateV11()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)

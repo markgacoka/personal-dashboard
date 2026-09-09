@@ -1,5 +1,4 @@
 import { pool } from '../db/client.js'
-import { civilTwilightUTC } from '../services/twilight.js'
 import { fetchNiceAirSchedules } from '../services/gmail.js'
 
 const FLIGHT_SELECT = `
@@ -231,28 +230,22 @@ export default async function flightRoutes(fastify) {
     return { ...rows[0], airports_visited: visited[0].airports_visited }
   })
 
-  // ── Backfill departure/arrival times + night hours from Gmail schedules ───────
-  // Uses civil twilight (NOAA) to determine night flight time, day/night T/O and
-  // landing splits. Logbook totals (total_duration, takeoffs, landings) are preserved.
+  // ── Sync schedule block times from Gmail ─────────────────────────────────────
+  // Sets time_out (block out) and time_in (block in) from NICE AIR Gmail schedules.
+  // Does not touch any logbook values — night, takeoffs, landings are source-of-truth.
   fastify.post('/api/flights/backfill-night', async (req, reply) => {
-    // Load all flights with airport lat/lon
     const { rows: flights } = await pool.query(`
-      SELECT f.id, f.date::text, f.total_duration, f.takeoffs, f.landings,
-             f.time_out, f.time_in, f.training_type,
-             ac.tail_number,
-             dep.lat AS dep_lat, dep.lon AS dep_lon, dep.icao AS dep_icao,
-             arr.lat AS arr_lat, arr.lon AS arr_lon
+      SELECT f.id, f.date::text, f.time_out, f.time_in, ac.tail_number
       FROM flights f
-      JOIN aircraft  ac  ON ac.id  = f.aircraft_id
-      JOIN airports  dep ON dep.icao = f.departure_icao
-      JOIN airports  arr ON arr.icao = f.arrival_icao
+      JOIN aircraft ac ON ac.id = f.aircraft_id
     `)
 
-    // Fetch Gmail schedules — group by date_str/tail, keep latest non-cancelled
     let schedules = []
     try { schedules = await fetchNiceAirSchedules() } catch (e) {
-      fastify.log.warn({ err: e.message }, 'Gmail fetch failed during night backfill')
+      fastify.log.warn({ err: e.message }, 'Gmail fetch failed during schedule sync')
     }
+
+    // Keep latest non-cancelled schedule per date+tail
     const schedMap = new Map()
     for (const s of schedules) {
       if (!s.date_str || !s.tail || s.type === 'cancelled' || !s.start_unix) continue
@@ -266,89 +259,26 @@ export default async function flightRoutes(fastify) {
       const dateStr   = String(f.date).slice(0, 10)
       const tailShort = (f.tail_number || '').replace(/^N/, '')
       const sched     = schedMap.get(`${dateStr}/${tailShort}`)
+      if (!sched) continue
 
-      // Resolve departure Unix timestamp (seconds)
-      let depTs = null
-      if (f.time_out) {
-        const raw = String(f.time_out)
-        depTs = Math.floor(new Date(raw.includes('T') ? raw : raw + 'Z').getTime() / 1000)
-      } else if (sched?.start_unix) {
-        depTs = sched.start_unix
-      }
-      if (!depTs) continue // no time anchor — skip
+      // Only set if not already recorded (ForeFlight import takes precedence)
+      const timeOut = f.time_out || new Date(sched.start_unix * 1000).toISOString()
+      const timeIn  = f.time_in  || (sched.end_unix ? new Date(sched.end_unix * 1000).toISOString() : null)
 
-      // Arrival = departure + actual flight time (logbook duration is source of truth)
-      const arrTs   = depTs + Math.round((f.total_duration || 0) * 3600)
-      const timeOut = f.time_out || new Date(depTs * 1000).toISOString()
-      const timeIn  = f.time_in  || new Date(arrTs * 1000).toISOString()
-
-      // Civil twilight for departure airport on this date
-      const twi = civilTwilightUTC(dateStr, parseFloat(f.dep_lat), parseFloat(f.dep_lon))
-      if (!twi) continue
-
-      const dawnMs    = twi.dawn.getTime()
-      const duskMs    = twi.dusk.getTime()
-      // Evening night period runs dusk → dawn of the following morning
-      const nextDawnMs = dawnMs < duskMs ? dawnMs + 86400000 : dawnMs
-
-      const depMs   = depTs * 1000
-      const arrMs   = arrTs * 1000
-      const totalMs = arrMs - depMs
-      if (totalMs <= 0) continue
-
-      // Night duration = intersection of [dep, arr] with [dusk, nextDawn]
-      const nightMs  = Math.max(0, Math.min(arrMs, nextDawnMs) - Math.max(depMs, duskMs))
-      // Round to nearest 0.1h (FAA logbook convention)
-      const nightHrs = Math.round(nightMs / 360000) / 10
-
-      const nightFrac = nightMs / totalMs
-      const totalTOs  = f.takeoffs || 0
-      const totalLdgs = f.landings || 0
-
-      // Day/night T/O split
-      // Single T/O: based on departure time; multiple: pro-rate by night fraction
-      const nightTOs = totalTOs <= 1
-        ? (depMs >= duskMs ? totalTOs : 0)
-        : Math.round(nightFrac * totalTOs)
-      const dayTOs = totalTOs - nightTOs
-
-      // Day/night full-stop landing split
-      // Single landing: based on arrival time; multiple (pattern): pro-rate
-      const nightLdgs = totalLdgs <= 1
-        ? (arrMs >= duskMs ? totalLdgs : 0)
-        : Math.round(nightFrac * totalLdgs)
-      const dayLdgs = totalLdgs - nightLdgs
-
-      await pool.query(`
-        UPDATE flights SET
-          time_out                  = $2,
-          time_in                   = $3,
-          night                     = $4,
-          night_takeoffs            = $5,
-          day_takeoffs              = $6,
-          night_landings            = $7,
-          night_landings_full_stop  = $7,
-          day_landings_full_stop    = $8
-        WHERE id = $1
-      `, [f.id, timeOut, timeIn, nightHrs, nightTOs, dayTOs, nightLdgs, dayLdgs])
+      await pool.query(
+        `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
+        [f.id, timeOut, timeIn]
+      )
 
       results.push({
-        id:        f.id,
-        date:      dateStr,
-        dep:       f.dep_icao,
-        tail:      f.tail_number,
-        time_out:  timeOut.slice(0, 16),
-        time_in:   timeIn.slice(0, 16),
-        dusk_utc:  twi.dusk.toISOString().slice(0, 16),
-        night_hrs: nightHrs,
-        day_tos:   dayTOs,
-        night_tos: nightTOs,
-        day_ldgs:  dayLdgs,
-        night_ldgs: nightLdgs,
+        id:       f.id,
+        date:     dateStr,
+        tail:     f.tail_number,
+        time_out: timeOut?.slice(0, 16),
+        time_in:  timeIn?.slice(0, 16),
       })
     }
 
-    fastify.log.info({ processed: results.length, total: flights.length }, 'Night backfill complete')
     return { updated: results.length, total: flights.length, results }
   })
 }

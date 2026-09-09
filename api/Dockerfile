@@ -1,10 +1,13 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
 # Build context is repo root, so paths reference top-level dirs
 COPY api/package.json api/package-lock.json* ./
 RUN npm ci --omit=dev
+
+# Install Chromium + system deps for the exact playwright version in node_modules
+RUN npx playwright install chromium --with-deps
 
 COPY api/src/ ./src/
 COPY public/ ./public/

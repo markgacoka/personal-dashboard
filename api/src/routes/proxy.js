@@ -70,7 +70,7 @@ async function fr24Fetch(path, params = {}, _retries = 2) {
   }
   if (!r.ok) {
     const body = await r.text().catch(() => r.statusText)
-    throw new Error(`FlightRadar24 ${r.status}: ${body.slice(0, 200)}`)
+    throw new Error(`FlightRadar24 ${r.status}: ${body}`)
   }
   return r.json()
 }
@@ -514,6 +514,18 @@ export default async function proxyRoutes(fastify) {
     return result
   })
 
+  // ── FlightRadar24: raw diagnostic call (pass any params, see raw response) ───
+  // GET /api/external/fr24-raw?path=/api/flight-summary/full&reg=N12345&...
+  fastify.get('/api/external/fr24-raw', async (req, reply) => {
+    const { path: apiPath = '/api/flight-summary/full', ...params } = req.query
+    try {
+      const data = await fr24Fetch(apiPath, params)
+      return { ok: true, data }
+    } catch (e) {
+      return reply.status(200).send({ ok: false, error: e.message })
+    }
+  })
+
   // ── FlightRadar24: flights by tail + date ────────────────────────────────────
   // GET /api/external/fr24-flights/:tail?date=YYYY-MM-DD
   // Returns FR24 flights list for a Pacific-day window. Cached 1h in memory.
@@ -632,7 +644,7 @@ export default async function proxyRoutes(fastify) {
         fr24Flights = Array.isArray(data?.data) ? data.data : []
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, tail, date: dateStr, err: e.message }, 'FR24 backfill lookup failed')
-        results.push({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message.slice(0, 80) })
+        results.push({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
         await sleep(CALL_DELAY)
         continue
       }
@@ -685,7 +697,7 @@ export default async function proxyRoutes(fastify) {
         )
       } catch (e) {
         fastify.log.warn({ flight_id: f.id, fr24Id, err: e.message }, 'FR24 track fetch failed')
-        results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'track_error', reason: e.message.slice(0, 80) })
+        results.push({ id: f.id, date: dateStr, tail, fr24_id: fr24Id, status: 'track_error', reason: e.message })
       }
 
       await sleep(CALL_DELAY)  // pace after track call

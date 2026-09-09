@@ -34,17 +34,28 @@ function filterFrom(activities, since) {
   return activities.filter((a) => new Date(a.startTimeLocal) >= since)
 }
 
+async function fetchVo2Max() {
+  // VO2max is stored on running/cycling activities as vO2MaxValue
+  try {
+    const acts = await garmin((gc) => gc.getActivities(0, 20))
+    const withVo2 = acts.filter(a => a.vO2MaxValue != null)
+    return withVo2.length ? parseFloat(withVo2[0].vO2MaxValue) : null
+  } catch { return null }
+}
+
 async function fetchDailyForDate(dateStr) {
   const d = new Date(dateStr)
-  const [stepsR, hrR, sleepR] = await Promise.allSettled([
+  const [stepsR, hrR, sleepR, vo2R] = await Promise.allSettled([
     garmin((gc) => gc.getSteps(d)),
     garmin((gc) => gc.getHeartRate(d)),
     garmin((gc) => gc.getSleepData(d)),
+    fetchVo2Max(),
   ])
   const steps      = stepsR.status === 'fulfilled' ? stepsR.value : null
   const heart_rate = hrR.status    === 'fulfilled' ? hrR.value    : null
   const sleep      = sleepR.status === 'fulfilled' ? sleepR.value : null
-  return { date: dateStr, steps, heart_rate, sleep }
+  const vo2max     = vo2R.status   === 'fulfilled' ? vo2R.value   : null
+  return { date: dateStr, steps, heart_rate, sleep, vo2max }
 }
 
 function hasData(daily) {

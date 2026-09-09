@@ -706,28 +706,23 @@
     /* ── Flight detail page ──────────────────────────────── */
     /* ── Flight detail hero ──────────────────────────────── */
     .fd-hero {
-      background: linear-gradient(145deg, oklch(16% 0.045 218) 0%, oklch(12% 0.025 230) 100%);
+      background: var(--graphite);
       padding: 18px 22px 0;
-      border: 1px solid oklch(38% 0 0 / 0.35);
+      border: 1px solid var(--rule);
       border-bottom: none;
       border-radius: var(--r-md) var(--r-md) 0 0;
       position: relative; overflow: hidden;
     }
+    /* Subtle tinted top-left accent strip */
     .fd-hero::before {
-      content: ''; position: absolute; right: -50px; top: -50px;
-      width: 220px; height: 220px; border-radius: 50%;
-      border: 36px solid oklch(76% 0.088 190 / 0.05);
-      pointer-events: none;
-    }
-    .fd-hero::after {
-      content: ''; position: absolute; right: 80px; top: -30px;
-      width: 110px; height: 110px; border-radius: 50%;
-      border: 20px solid oklch(76% 0.088 190 / 0.03);
+      content: ''; position: absolute; left: 0; top: 0;
+      width: 4px; height: 100%; background: var(--type-color, var(--patina-text));
       pointer-events: none;
     }
     .fd-hero-top {
       display: flex; justify-content: space-between;
       align-items: flex-start; gap: 16px; position: relative; z-index: 1;
+      padding-left: 12px;
     }
     .fd-hero-chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -738,39 +733,39 @@
     .fd-route-hero {
       font-family: 'Alumni Sans', sans-serif;
       font-size: 46px; font-weight: 300;
-      color: oklch(91% 0 0);
+      color: var(--champagne);
       letter-spacing: -0.01em; line-height: 1;
       margin-bottom: 6px;
     }
     .fd-hero-meta {
-      font-size: 12px; color: oklch(68% 0.04 200);
+      font-size: 12px; color: var(--muted);
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     }
-    .fd-hero-meta-sep { color: oklch(45% 0 0 / 0.7); }
+    .fd-hero-meta-sep { color: var(--disabled); }
     .fd-hero-actions {
       display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; padding-top: 4px;
     }
     .fd-hero-stats-bar {
-      display: flex; margin-top: 18px; position: relative; z-index: 1;
-      border-top: 1px solid oklch(50% 0 0 / 0.18);
+      display: flex; margin-top: 18px; position: relative; z-index: 1; padding-left: 12px;
+      border-top: 1px solid var(--rule);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
     .fd-hstat {
       padding: 11px 18px 13px;
-      border-right: 1px solid oklch(50% 0 0 / 0.15);
+      border-right: 1px solid var(--rule);
       flex-shrink: 0; text-align: left;
     }
     .fd-hstat:last-child { border-right: none; }
     .fd-hstat-label {
       font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em;
-      color: oklch(55% 0.03 210); margin-bottom: 4px; white-space: nowrap;
+      color: var(--faint); margin-bottom: 4px; white-space: nowrap;
     }
     .fd-hstat-val {
       font-size: 19px; font-weight: 600;
       font-variant-numeric: tabular-nums; line-height: 1;
       white-space: nowrap;
     }
-    .fd-hstat-unit { font-size: 11px; margin-left: 1px; color: oklch(62% 0.03 210); font-weight: 400; }
+    .fd-hstat-unit { font-size: 11px; margin-left: 1px; color: var(--muted); font-weight: 400; }
 
     /* ── Main grid: map + sidebar ────────────────────────── */
     .fd-main-grid {
@@ -1892,9 +1887,10 @@ const SPLIT_META = {
 };
 
 const TYPE_CFG = {
+  dual:          { color: 'oklch(68% 0.15 235)', label: 'Dual'      },
   maneuvers:     { color: 'oklch(70% 0.12 188)', label: 'Maneuvers' },
   pattern:       { color: 'oklch(65% 0.16 145)', label: 'Pattern'   },
-  'x-country':   { color: 'oklch(68% 0.15 235)', label: 'X-Country' },
+  'x-country':   { color: 'oklch(60% 0.18 260)', label: 'X-Country' },
   night:         { color: 'oklch(80% 0.17 85)',  label: 'Night'     },
   instrument:    { color: 'oklch(76% 0.088 190)',label: 'Instrument'},
   solo:          { color: 'oklch(65% 0.15 350)', label: 'Solo'      },
@@ -3879,10 +3875,10 @@ async function showFlightDetail(id) {
   document.getElementById('flight-detail-content').innerHTML = `
 
     <!-- ── Hero ─────────────────────────────────────────── -->
-    <div class="fd-hero">
+    <div class="fd-hero" style="--type-color:${color}">
       <div class="fd-hero-top">
         <div>
-          <div class="fd-hero-chip detail-sport-chip" style="background:${color}1a;border:1px solid ${color}40;color:${color}">
+          <div class="fd-hero-chip" style="background:${color}1a;border:1px solid ${color}40;color:${color}">
             <i class="ph-bold ph-airplane" style="font-size:11px"></i>
             ${esc(typeLabel(f.training_type))}
             ${f.solo > 0 && !f.dual_given ? '· Solo' : ''}
@@ -3890,19 +3886,19 @@ async function showFlightDetail(id) {
           <div class="fd-route-hero">${esc(routeLabel(f))}</div>
           <div class="fd-hero-meta">
             <span>${esc(longDate)}</span>
-            ${ac ? `<span class="fd-hero-meta-sep">·</span><span style="color:oklch(65% 0.06 200)">${esc(ac.tail_number)}</span><span class="fd-hero-meta-sep">·</span><span>${esc(ac.make)} ${esc(ac.model)}</span>` : ''}
+            ${ac ? `<span class="fd-hero-meta-sep">·</span><span style="color:var(--patina-text)">${esc(ac.tail_number)}</span><span class="fd-hero-meta-sep">·</span><span>${esc(ac.make)} ${esc(ac.model)}</span>` : ''}
             ${f.instructor_name ? `<span class="fd-hero-meta-sep">·</span><span>${esc(f.instructor_name)}</span>` : ''}
           </div>
         </div>
         <div class="fd-hero-actions">
-          <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:5px 11px;border-color:oklch(45% 0 0/0.4);color:oklch(65% 0 0)">
+          <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:5px 11px">
             <i class="ph-bold ph-pencil-simple"></i> Edit
           </button>
-          <button class="btn-ghost" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:5px 11px;border-color:oklch(45% 0 0/0.4);color:oklch(55% 0 0)">
+          <button class="btn-ghost" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:5px 11px;color:var(--warn)">
             <i class="ph-bold ph-trash"></i>
           </button>
-          <button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" style="font-size:12px;padding:5px 11px;color:var(--patina-text);border-color:var(--patina-text)40">
-            <i class="ph-bold ph-map-pin"></i> ${f.has_track ? 'Update Route' : 'Find Route'}
+          <button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" title="${f.has_track ? 'Refresh GPS route' : 'Fetch GPS route'}" style="font-size:12px;padding:5px 10px;color:var(--patina-text);border-color:var(--patina-text)40">
+            <i class="ph-bold ph-map-pin"></i>
           </button>
         </div>
       </div>
@@ -4133,7 +4129,7 @@ async function autoLoadTrack(f) {
   const btn = document.getElementById('find-route-btn');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Loading route…';
+    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle"></div>';
   }
 
   try {
@@ -4142,14 +4138,14 @@ async function autoLoadTrack(f) {
 
     if (!res?.success || !res.points_saved) {
       sessionStorage.setItem(skipKey, '1');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
       return;
     }
 
     const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
     if (fi >= 0) window._flights[fi].has_track = true;
 
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Update Route'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
 
     if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
     const fUpdated = (window._flights || []).find(x => String(x.id) === String(flightId));
@@ -4157,7 +4153,7 @@ async function autoLoadTrack(f) {
 
   } catch (e) {
     sessionStorage.setItem(skipKey, '1');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i> Find Route'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
   }
 }
 
@@ -4378,55 +4374,65 @@ async function initFlightDetailMap(f) {
   const container = document.getElementById('fd-map');
   if (!container) return;
 
-  const mapStyle = document.documentElement.getAttribute('data-theme') === 'light'
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const mapStyle = isLight
     ? 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
     : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-  _fdMap = new maplibregl.Map({
+
+  // Capture local ref so async callbacks don't operate on a replaced map
+  const thisMap = _fdMap = new maplibregl.Map({
     container: 'fd-map',
     style: mapStyle,
     center: [f.departure?.lon || -122.0, f.departure?.lat || 37.5],
     zoom: 8,
     attributionControl: false,
   });
-  _fdMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-  _fdMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  thisMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  thisMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
-  _fdMap.on('load', async () => {
+  thisMap.on('load', async () => {
+    if (_fdMap !== thisMap) return; // stale — a newer map replaced this one
+
+    const routeColor = typeColor(f.training_type);
+    const dotColor   = isLight ? '#1a1a1a' : 'oklch(84% 0.19 80.46)';
+    const dotStroke  = isLight ? '#ffffff' : 'oklch(4% 0.004 95)';
+    const lblColor   = isLight ? '#1a1a1a' : 'oklch(84% 0.19 80.46)';
+    const lblHalo    = isLight ? '#ffffff' : 'oklch(4% 0.004 95)';
+
     let coords = [];
     if (f.has_track) {
-      try {
-        const pts = await fetch('/api/flights/' + f.id + '/track').then(r => r.ok ? r.json() : []);
-        coords = pts.map(p => [p.lon, p.lat]);
-      } catch(_) {}
+      const pts = await fetch('/api/flights/' + f.id + '/track')
+        .then(r => r.ok ? r.json() : []).catch(() => []);
+      if (_fdMap !== thisMap) return; // stale after await
+      coords = (pts || []).map(p => [p.lon, p.lat]).filter(c => c[0] != null && c[1] != null);
     }
+
     if (coords.length < 2) {
       if (f.departure?.lon) coords.push([f.departure.lon, f.departure.lat]);
       if (f.via_airports) for (const a of f.via_airports) { if (a.lon) coords.push([a.lon, a.lat]); }
-      // Only push arrival if it differs from departure (avoid degenerate line for local pattern flights)
       if (f.arrival?.lon && f.arrival.icao !== f.departure?.icao) {
         coords.push([f.arrival.lon, f.arrival.lat]);
       }
     }
 
     if (coords.length >= 2) {
-      _fdMap.addSource('route', {
+      thisMap.addSource('route', {
         type: 'geojson',
         data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
       });
-      _fdMap.addLayer({ id:'route-glow', type:'line', source:'route',
-        paint: { 'line-color': typeColor(f.training_type), 'line-width': 6, 'line-opacity': 0.2, 'line-blur': 4 } });
-      _fdMap.addLayer({ id:'route-line', type:'line', source:'route',
-        paint: { 'line-color': typeColor(f.training_type), 'line-width': 2.5, 'line-opacity': 0.9 } });
+      thisMap.addLayer({ id:'route-glow', type:'line', source:'route',
+        paint: { 'line-color': routeColor, 'line-width': 8, 'line-opacity': 0.25, 'line-blur': 6 } });
+      thisMap.addLayer({ id:'route-line', type:'line', source:'route',
+        paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 1.0 } });
 
       const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
-      _fdMap.fitBounds(bounds, { padding: 56, duration: 600 });
+      thisMap.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: 500 });
     } else if (coords.length === 1) {
-      // Local pattern flight — center on the airport at a closer zoom
-      _fdMap.setCenter(coords[0]);
-      _fdMap.setZoom(12);
+      thisMap.setCenter(coords[0]);
+      thisMap.setZoom(12);
     }
 
-    // Deduplicate airports so KRHV→KRHV shows one marker, not two overlapping
+    // Deduplicate airports
     const seen = new Set();
     const apts = [];
     for (const a of [f.departure, ...(f.via_airports||[]), f.arrival]) {
@@ -4434,7 +4440,7 @@ async function initFlightDetailMap(f) {
     }
 
     if (apts.length) {
-      _fdMap.addSource('apts', {
+      thisMap.addSource('apts', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: apts.map(a => ({
           type: 'Feature',
@@ -4442,21 +4448,21 @@ async function initFlightDetailMap(f) {
           geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
         })) },
       });
-      _fdMap.addLayer({ id:'apts-dot', type:'circle', source:'apts',
-        paint: { 'circle-radius': 5, 'circle-color': 'oklch(84% 0.19 80.46)', 'circle-stroke-width': 2, 'circle-stroke-color': 'oklch(4% 0.004 95)' } });
-      _fdMap.addLayer({ id:'apts-lbl', type:'symbol', source:'apts',
+      thisMap.addLayer({ id:'apts-dot', type:'circle', source:'apts',
+        paint: { 'circle-radius': 5, 'circle-color': dotColor, 'circle-stroke-width': 2, 'circle-stroke-color': dotStroke } });
+      thisMap.addLayer({ id:'apts-lbl', type:'symbol', source:'apts',
         layout: { 'text-field': ['get','icao'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-font':['Noto Sans Regular'] },
-        paint:  { 'text-color': 'oklch(84% 0.19 80.46)', 'text-halo-color': 'oklch(4% 0.004 95)', 'text-halo-width': 1.5 } });
+        paint:  { 'text-color': lblColor, 'text-halo-color': lblHalo, 'text-halo-width': 1.5 } });
 
-      _fdMap.on('click', 'apts-dot', e => {
+      thisMap.on('click', 'apts-dot', e => {
         const p = e.features[0].properties;
         new maplibregl.Popup({ offset: 10, closeButton: false })
           .setLngLat(e.features[0].geometry.coordinates)
           .setHTML(`<strong>${p.icao}</strong>${p.name?'<br>'+p.name:''}`)
-          .addTo(_fdMap);
+          .addTo(thisMap);
       });
-      _fdMap.on('mouseenter', 'apts-dot', () => _fdMap.getCanvas().style.cursor = 'pointer');
-      _fdMap.on('mouseleave', 'apts-dot', () => _fdMap.getCanvas().style.cursor = '');
+      thisMap.on('mouseenter', 'apts-dot', () => thisMap.getCanvas().style.cursor = 'pointer');
+      thisMap.on('mouseleave', 'apts-dot', () => thisMap.getCanvas().style.cursor = '');
     }
   });
 }

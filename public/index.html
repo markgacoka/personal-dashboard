@@ -3920,16 +3920,18 @@ async function showFlightDetail(id) {
     </div>
 
     <!-- ── Track Scrubber ────────────────────────────────── -->
-    ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden">
-      <div style="position:relative;background:var(--graphite);overflow:hidden">
-        <canvas id="fd-elev-chart" style="width:100%;height:68px;display:block"></canvas>
+    ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--deep)">
+      <div style="position:relative">
+        <canvas id="fd-elev-chart" style="display:block;width:100%;height:128px;cursor:crosshair;touch-action:none"></canvas>
+        <div id="fd-scrubber-info" style="position:absolute;top:8px;left:10px;right:10px;display:flex;gap:5px;flex-wrap:wrap;pointer-events:none"></div>
       </div>
-      <div style="background:var(--raised);padding:7px 14px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--rule)">
-        <button id="fd-play-btn" title="Play/pause" style="width:26px;height:26px;flex-shrink:0;border-radius:var(--r-sm);border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px">
-          <i class="ph-bold ph-play" id="fd-play-icon"></i>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--raised);border-top:1px solid var(--rule)">
+        <button id="fd-play-btn" title="Play" style="width:28px;height:28px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <i class="ph-bold ph-play" id="fd-play-icon" style="font-size:12px"></i>
         </button>
-        <input type="range" id="fd-scrubber" min="0" value="0" step="1" style="flex:1;accent-color:var(--patina);cursor:pointer">
-        <span id="fd-scrubber-info" style="font-size:10px;font-variant-numeric:tabular-nums;color:var(--body-text);min-width:150px;text-align:right;white-space:nowrap"></span>
+        <span id="fd-time-start" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+        <div style="flex:1"></div>
+        <span id="fd-time-end" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
       </div>
     </div>` : ''}
 
@@ -4474,30 +4476,45 @@ async function initFlightDetailMap(f) {
     if (allPts.length >= 2) {
       const scrubWrap  = document.getElementById('fd-scrubber-wrap');
       const elevCanvas = document.getElementById('fd-elev-chart');
-      const scrubInput = document.getElementById('fd-scrubber');
       const playBtn    = document.getElementById('fd-play-btn');
       const playIcon   = document.getElementById('fd-play-icon');
       const scrubInfo  = document.getElementById('fd-scrubber-info');
+      const timeStart  = document.getElementById('fd-time-start');
+      const timeEnd    = document.getElementById('fd-time-end');
 
-      if (scrubWrap && elevCanvas && scrubInput) {
-        scrubInput.max   = allPts.length - 1;
-        scrubInput.value = 0;
+      if (scrubWrap && elevCanvas) {
         scrubWrap.style.display = 'block';
+        let scrubIdx = 0;
+        let _playTimer = null;
 
-        // Plane marker — outer div is MapLibre's positioning target, inner div handles rotation.
-        // MapLibre sets outer.style.transform='translate(X,Y)'; we set inner.style.transform='rotate(Xdeg)'.
-        // Never set transform on the same element MapLibre controls — it would overwrite the translate.
+        // Time range labels
+        const fmtUtc = (ts, sec) => new Date(ts).toLocaleTimeString('en-US',{
+          hour:'2-digit', minute:'2-digit', ...(sec ? {second:'2-digit'} : {}), timeZone:'UTC'
+        }) + 'Z';
+        if (timeStart) timeStart.textContent = fmtUtc(allPts[0].ts, false);
+        if (timeEnd)   timeEnd.textContent   = fmtUtc(allPts[allPts.length-1].ts, false);
+
+        // ── Plane marker ──────────────────────────────────────────────────────
+        // markerOuter: MapLibre owns its transform (translate). planeEl: we rotate only.
         const markerOuter = document.createElement('div');
-        markerOuter.style.cssText = 'width:28px;height:28px;pointer-events:none';
+        markerOuter.style.cssText = 'width:36px;height:36px;pointer-events:none';
         const planeEl = document.createElement('div');
-        planeEl.style.cssText = 'width:28px;height:28px;transform-origin:center center;will-change:transform';
-        planeEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28">
-          <g transform="translate(16,16)">
-            <rect x="-2" y="-10" width="4" height="20" rx="2" fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.5))"/>
-            <path d="M-2,-1 L-11,4 L-9.5,6 L-2,2.5 Z" fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.4))"/>
-            <path d="M2,-1 L11,4 L9.5,6 L2,2.5 Z"  fill="${routeColor}" filter="drop-shadow(0 1px 2px rgba(0,0,0,.4))"/>
-            <path d="M-2,7 L-5,10 L-4,11 L-2,8.5 Z" fill="${routeColor}" opacity=".75"/>
-            <path d="M2,7 L5,10 L4,11 L2,8.5 Z"  fill="${routeColor}" opacity=".75"/>
+        planeEl.style.cssText = 'width:36px;height:36px;transform-origin:center center;will-change:transform';
+        planeEl.innerHTML = `<svg viewBox="0 0 36 36" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="psh${f.id}" x="-60%" y="-60%" width="220%" height="220%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="2.5" flood-color="#000" flood-opacity=".65"/>
+            </filter>
+          </defs>
+          <g transform="translate(18,18)" filter="url(#psh${f.id})">
+            <path d="M0,-15 C1.8,-13 2.8,-7 2.8,1 C2.8,8 2,13 0,16 C-2,13 -2.8,8 -2.8,1 C-2.8,-7 -1.8,-13 0,-15 Z"
+                  fill="${routeColor}"/>
+            <path d="M-2.5,1 L-15,9 L-14,12 L-2.5,5 Z" fill="${routeColor}" opacity=".92"/>
+            <path d="M2.5,1 L15,9 L14,12 L2.5,5 Z"     fill="${routeColor}" opacity=".92"/>
+            <path d="M-2,12 L-9,17 L-8.5,19 L-2,14 Z"  fill="${routeColor}" opacity=".82"/>
+            <path d="M2,12 L9,17 L8.5,19 L2,14 Z"      fill="${routeColor}" opacity=".82"/>
+            <ellipse cx="0" cy="-15" rx="4.5" ry="1.2"  fill="rgba(255,255,255,.2)"/>
+            <ellipse cx="0" cy="-10" rx="1.3" ry="2.2"  fill="rgba(255,255,255,.38)"/>
           </g>
         </svg>`;
         markerOuter.appendChild(planeEl);
@@ -4505,74 +4522,150 @@ async function initFlightDetailMap(f) {
           .setLngLat([allPts[0].lon, allPts[0].lat])
           .addTo(thisMap);
 
-        // Elevation chart draw
+        // ── Elevation chart (canvas handles all scrubber interaction) ─────────
+        const alts  = allPts.map(p => p.altitude_ft ?? 0);
+        const altMn = Math.min(...alts);
+        const altMx = Math.max(...alts) || altMn + 1;
+        const n     = allPts.length;
+
         function drawElev(idx) {
-          const dpr  = window.devicePixelRatio || 1;
-          const cw   = elevCanvas.offsetWidth;
-          const ch   = elevCanvas.offsetHeight;
+          const dpr = window.devicePixelRatio || 1;
+          const cw  = elevCanvas.offsetWidth;
+          const ch  = elevCanvas.offsetHeight;
+          if (!cw || !ch) return;
           elevCanvas.width  = cw * dpr;
           elevCanvas.height = ch * dpr;
-          const ctx  = elevCanvas.getContext('2d');
+          const ctx = elevCanvas.getContext('2d');
           ctx.scale(dpr, dpr);
-          const n    = allPts.length;
-          const alts = allPts.map(p => p.altitude_ft ?? 0);
-          const mn   = Math.min(...alts);
-          const mx   = Math.max(...alts) || 1;
-          const pad  = 10;
-          const xOf  = i => (i / (n - 1)) * cw;
-          const yOf  = a => ch - pad - ((a - mn) / (mx - mn || 1)) * (ch - pad * 2);
 
-          // Filled area
+          // Layout zones
+          const barH  = 10;   // progress bar height at bottom
+          const padT  = 8;    // top clearance
+          const padB  = barH + 8;  // bottom clearance (above bar)
+          const profH = ch - padT - padB;
+
+          const xOf = i => (i / (n - 1)) * cw;
+          const yOf = a => padT + profH - ((a - altMn) / (altMx - altMn)) * profH;
+          const pct = idx / (n - 1);
+
+          // Background: subtle grid lines
+          ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+          ctx.lineWidth   = 1;
+          for (let g = 1; g < 4; g++) {
+            const gy = padT + (profH / 4) * g;
+            ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(cw, gy); ctx.stroke();
+          }
+
+          // Gradient fill under profile
+          const grad = ctx.createLinearGradient(0, padT, 0, ch - padB);
+          grad.addColorStop(0,   routeColor + '50');
+          grad.addColorStop(0.6, routeColor + '18');
+          grad.addColorStop(1,   routeColor + '04');
           ctx.beginPath();
-          ctx.moveTo(0, ch);
+          ctx.moveTo(0, ch - padB);
           for (let i = 0; i < n; i++) ctx.lineTo(xOf(i), yOf(alts[i]));
-          ctx.lineTo(cw, ch);
+          ctx.lineTo(cw, ch - padB);
           ctx.closePath();
-          ctx.fillStyle = routeColor + '28';
+          ctx.fillStyle = grad;
           ctx.fill();
 
-          // Stroke
+          // Profile line
           ctx.beginPath();
-          for (let i = 0; i < n; i++) { if (i===0) ctx.moveTo(xOf(i),yOf(alts[i])); else ctx.lineTo(xOf(i),yOf(alts[i])); }
+          for (let i = 0; i < n; i++) {
+            i === 0 ? ctx.moveTo(xOf(i), yOf(alts[i])) : ctx.lineTo(xOf(i), yOf(alts[i]));
+          }
           ctx.strokeStyle = routeColor;
-          ctx.lineWidth   = 1.5;
+          ctx.lineWidth   = 1.8;
           ctx.lineJoin    = 'round';
+          ctx.lineCap     = 'round';
           ctx.stroke();
 
-          // Cursor
+          // Cursor vertical line (dashed, through profile)
           const cx = xOf(idx);
           ctx.save();
-          ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,ch);
-          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
-          ctx.setLineDash([3,3]); ctx.stroke(); ctx.restore();
+          ctx.setLineDash([3, 4]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+          ctx.lineWidth   = 1;
+          ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, ch - padB); ctx.stroke();
+          ctx.restore();
 
-          // Altitude label at cursor
-          const altLbl = Math.round(alts[idx]).toLocaleString() + ' ft';
-          const lx = Math.min(cx + 5, cw - 52);
-          ctx.fillStyle = routeColor;
-          ctx.font = `600 10px "Albert Sans",sans-serif`;
-          ctx.fillText(altLbl, lx, 14);
+          // Dot at current elevation on profile line
+          const cy = yOf(alts[idx]);
+          ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff'; ctx.fill();
+          ctx.beginPath(); ctx.arc(cx, cy, 2.8, 0, Math.PI * 2);
+          ctx.fillStyle = routeColor; ctx.fill();
+
+          // Progress bar track
+          const barY = ch - barH - 2;
+          ctx.fillStyle = 'rgba(255,255,255,0.07)';
+          ctx.beginPath(); ctx.roundRect(0, barY, cw, barH, 5); ctx.fill();
+
+          // Progress bar fill
+          if (pct > 0) {
+            const barGrad = ctx.createLinearGradient(0, 0, pct * cw, 0);
+            barGrad.addColorStop(0, routeColor + 'aa');
+            barGrad.addColorStop(1, routeColor);
+            ctx.fillStyle = barGrad;
+            ctx.beginPath(); ctx.roundRect(0, barY, pct * cw, barH, 5); ctx.fill();
+          }
+
+          // Playhead thumb on bar
+          const thumbX = pct * cw;
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.shadowBlur  = 6;
+          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff'; ctx.fill();
+          ctx.restore();
+          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = routeColor; ctx.fill();
+        }
+
+        // Info chips overlay
+        function updateChips(idx) {
+          if (!scrubInfo) return;
+          const pt  = allPts[Math.min(idx, n - 1)];
+          const utc = fmtUtc(pt.ts, true);
+          const alt = pt.altitude_ft != null ? Math.round(pt.altitude_ft).toLocaleString() + ' ft' : '';
+          const spd = pt.groundspeed_kts != null ? Math.round(pt.groundspeed_kts) + ' kts' : '';
+          const hdg = pt.track_deg != null ? Math.round(pt.track_deg) + '°' : '';
+          const chip = (val, label) => val
+            ? `<span style="background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.1);padding:2px 8px;border-radius:20px;font-size:10px;color:var(--champagne);white-space:nowrap;font-variant-numeric:tabular-nums">${label ? `<span style="font-size:9px;color:var(--faint);letter-spacing:.04em;margin-right:3px">${label}</span>` : ''}${val}</span>`
+            : '';
+          scrubInfo.innerHTML = chip(utc,'') + chip(alt,'ALT') + chip(spd,'GS') + chip(hdg,'HDG');
         }
 
         function updateScrubPos(idx) {
-          const pt = allPts[Math.min(idx, allPts.length - 1)];
+          scrubIdx   = Math.max(0, Math.min(n - 1, idx));
+          const pt   = allPts[scrubIdx];
           planeMkr.setLngLat([pt.lon, pt.lat]);
           planeEl.style.transform = `rotate(${pt.track_deg ?? 0}deg)`;
-          const utc  = new Date(pt.ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+'Z';
-          const alt  = pt.altitude_ft != null ? Math.round(pt.altitude_ft).toLocaleString()+' ft' : '';
-          const spd  = pt.groundspeed_kts != null ? Math.round(pt.groundspeed_kts)+' kts' : '';
-          const hdg  = pt.track_deg != null ? Math.round(pt.track_deg)+'°' : '';
-          scrubInfo.textContent = [utc,alt,spd,hdg].filter(Boolean).join(' · ');
-          drawElev(idx);
+          updateChips(scrubIdx);
+          drawElev(scrubIdx);
         }
 
-        // Initial render
-        requestAnimationFrame(() => { drawElev(0); updateScrubPos(0); });
-
-        scrubInput.addEventListener('input', () => updateScrubPos(parseInt(scrubInput.value)));
+        // Canvas pointer interaction — pixel-perfect alignment: same x↔idx mapping
+        // as drawElev's xOf(), so cursor and thumb always coincide.
+        function idxFromPointer(e) {
+          const rect = elevCanvas.getBoundingClientRect();
+          const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          return Math.round(pct * (n - 1));
+        }
+        let _dragging = false;
+        elevCanvas.addEventListener('pointerdown', e => {
+          _dragging = true;
+          elevCanvas.setPointerCapture(e.pointerId);
+          if (_playTimer) { clearInterval(_playTimer); _playTimer = null; playIcon.className = 'ph-bold ph-play'; }
+          updateScrubPos(idxFromPointer(e));
+        });
+        elevCanvas.addEventListener('pointermove', e => {
+          if (!_dragging) return;
+          updateScrubPos(idxFromPointer(e));
+        });
+        elevCanvas.addEventListener('pointerup', () => { _dragging = false; });
 
         // Play / pause
-        let _playTimer = null;
         if (playBtn) {
           playBtn.addEventListener('click', () => {
             if (_playTimer) {
@@ -4580,25 +4673,25 @@ async function initFlightDetailMap(f) {
               playIcon.className = 'ph-bold ph-play';
             } else {
               playIcon.className = 'ph-bold ph-pause';
-              let idx = parseInt(scrubInput.value);
-              if (idx >= allPts.length - 1) idx = 0;
+              let idx = scrubIdx >= n - 1 ? 0 : scrubIdx;
               _playTimer = setInterval(() => {
                 idx++;
-                if (idx >= allPts.length) {
+                if (idx >= n) {
                   clearInterval(_playTimer); _playTimer = null;
                   playIcon.className = 'ph-bold ph-play';
                   return;
                 }
-                scrubInput.value = idx;
                 updateScrubPos(idx);
               }, 160);
             }
           });
         }
 
-        // Redraw chart on resize
-        const _ro = new ResizeObserver(() => drawElev(parseInt(scrubInput.value)));
-        _ro.observe(elevCanvas);
+        // Resize — redraw at current index
+        new ResizeObserver(() => drawElev(scrubIdx)).observe(elevCanvas);
+
+        // Initial render
+        requestAnimationFrame(() => updateScrubPos(0));
       }
     }
   });

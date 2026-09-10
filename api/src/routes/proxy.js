@@ -637,11 +637,50 @@ export default async function proxyRoutes(fastify) {
         if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
       } catch (_) {}
     }
+    // 3. Last resort: match via FR24 flight-summary, scoring by airport + logbook duration
     if (!timeOut) {
-      return reply.status(400).send({ error: 'No time_out available — update the flight record or sync Gmail schedule' })
+      try {
+        const dayStart = new Date(dateStr + 'T06:00:00Z')
+        const dayEnd   = new Date(dayStart.getTime() + 24 * 3_600_000)
+        const data = await fr24Fetch('/api/flight-summary/full', {
+          registrations:        tail,
+          flight_datetime_from: dayStart.toISOString().slice(0, 19),
+          flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
+          limit:                20,
+        })
+        const candidates = Array.isArray(data?.data) ? data.data : []
+        if (candidates.length) {
+          const norm   = ic => ic?.toUpperCase().replace(/^K/, '') || ''
+          const logDep = norm(fl.departure_icao)
+          const logArr = norm(fl.arrival_icao)
+          const logMin = fl.total_duration ? parseFloat(fl.total_duration) * 60 : null
+          const scored = candidates.map(ff => {
+            let score = 0
+            if (logDep && norm(ff.orig_icao || '') === logDep)                       score += 4
+            if (logArr && norm(ff.dest_icao_actual || ff.dest_icao || '') === logArr) score += 4
+            if (logMin && ff.duration_min) {
+              const ratio = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
+              if (ratio > 0.8) score += 5
+              else if (ratio > 0.55) score += 3
+              else if (ratio > 0.35) score += 1
+            }
+            return { ff, score }
+          })
+          scored.sort((a, b) => b.score - a.score)
+          const best = scored[0]?.ff
+          if (best) {
+            timeOut = best.datetime_takeoff || best.first_seen || null
+            timeIn  = best.datetime_landed  || best.last_seen  || null
+            fastify.log.info({ flightId, tail, fr24_best: best.fr24_id, score: scored[0].score }, 'FR24 summary fallback matched')
+          }
+        }
+      } catch (_) {}
+    }
+    if (!timeOut) {
+      return reply.status(400).send({ error: 'No time window found — DB, Gmail, and FR24 summary all returned nothing' })
     }
 
-    // 3. Sweep window: time_out-5min → time_in+5min (or logbook duration + buffer)
+    // 4. Sweep window: time_out-5min → time_in+5min (or logbook duration + buffer)
     const t0 = new Date(timeOut).getTime() - 5 * 60_000
     let t1
     if (timeIn) {
@@ -786,8 +825,51 @@ export default async function proxyRoutes(fastify) {
         if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
       }
 
+      // Fall back to FR24 summary: score candidates by airport match + logbook duration
       if (!timeOut) {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_window', reason: 'no time_out in DB or Gmail' })
+        try {
+          const dayStart = new Date(dateStr + 'T06:00:00Z')
+          const dayEnd   = new Date(dayStart.getTime() + 24 * 3_600_000)
+          const data = await fr24Fetch('/api/flight-summary/full', {
+            registrations:        tail,
+            flight_datetime_from: dayStart.toISOString().slice(0, 19),
+            flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
+            limit:                20,
+          })
+          const candidates = Array.isArray(data?.data) ? data.data : []
+          if (candidates.length) {
+            const norm   = ic => ic?.toUpperCase().replace(/^K/, '') || ''
+            const logDep = norm(f.departure_icao)
+            const logArr = norm(f.arrival_icao)
+            const logMin = f.total_duration ? parseFloat(f.total_duration) * 60 : null
+            const scored = candidates.map(ff => {
+              let score = 0
+              if (logDep && norm(ff.orig_icao || '') === logDep)                       score += 4
+              if (logArr && norm(ff.dest_icao_actual || ff.dest_icao || '') === logArr) score += 4
+              if (logMin && ff.duration_min) {
+                const ratio = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
+                if (ratio > 0.8) score += 5
+                else if (ratio > 0.55) score += 3
+                else if (ratio > 0.35) score += 1
+              }
+              return { ff, score }
+            })
+            scored.sort((a, b) => b.score - a.score)
+            const best = scored[0]?.ff
+            if (best) {
+              timeOut = best.datetime_takeoff || best.first_seen || null
+              timeIn  = best.datetime_landed  || best.last_seen  || null
+              emit({ id: f.id, date: dateStr, tail, status: 'fr24_fallback', fr24_score: scored[0].score })
+            }
+          }
+          await sleep(FLIGHT_DELAY)
+        } catch (e) {
+          fastify.log.warn({ flight_id: f.id, tail, err: e.message }, 'FR24 summary fallback failed')
+        }
+      }
+
+      if (!timeOut) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_window', reason: 'no time_out in DB, Gmail, or FR24' })
         counts.no_window++
         continue
       }

@@ -556,6 +556,34 @@ export async function migrateV3() {
   }
 }
 
+// V12: persist NICE AIR Gmail schedule emails to DB
+export async function migrateV12() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS nice_air_schedules (
+        id          SERIAL PRIMARY KEY,
+        email_uid   BIGINT UNIQUE,
+        type        TEXT,
+        date_str    TEXT,
+        tail        TEXT,
+        pilot       TEXT,
+        cfi         TEXT,
+        start_local TEXT,
+        end_local   TEXT,
+        start_unix  BIGINT,
+        end_unix    BIGINT,
+        subject     TEXT,
+        received_at TIMESTAMPTZ,
+        synced_at   TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_nice_air_schedules_date_tail ON nice_air_schedules (date_str, tail);
+    `)
+  } finally {
+    client.release()
+  }
+}
+
 // V11: indexes on high-frequency correlated subquery columns
 export async function migrateV11() {
   const client = await pool.connect()

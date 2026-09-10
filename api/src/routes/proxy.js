@@ -622,10 +622,27 @@ export default async function proxyRoutes(fastify) {
     const tail    = fl.tail_number
     const dateStr = String(fl.date).slice(0, 10)
 
-    // 2. Determine time window — DB first, fall back to Gmail schedule
+    // 2. Determine time window — DB first, then nice_air_schedules table, then live Gmail
     let timeOut = fl.time_out
     let timeIn  = fl.time_in
     if (!timeOut || !timeIn) {
+      try {
+        const tailShort = tail.replace(/^N/, '')
+        // Query persisted schedules table first (fast, no IMAP round-trip)
+        const { rows: dbScheds } = await pool.query(`
+          SELECT start_unix, end_unix FROM nice_air_schedules
+          WHERE date_str = $1 AND type != 'cancelled'
+            AND (tail = $2 OR tail = $3)
+          ORDER BY start_unix ASC LIMIT 1
+        `, [dateStr, tail, tailShort])
+        if (dbScheds.length) {
+          if (dbScheds[0].start_unix) timeOut = timeOut || new Date(dbScheds[0].start_unix * 1000).toISOString()
+          if (dbScheds[0].end_unix)   timeIn  = timeIn  || new Date(dbScheds[0].end_unix   * 1000).toISOString()
+        }
+      } catch (_) {}
+    }
+    if (!timeOut || !timeIn) {
+      // Fall back to live Gmail if DB has no match (table may not be synced yet)
       try {
         const scheds    = await fetchNiceAirSchedules()
         const tailShort = tail.replace(/^N/, '')
@@ -804,20 +821,37 @@ export default async function proxyRoutes(fastify) {
     const STEP_MS      = 10_000
     const counts = { ok: 0, no_window: 0, no_positions: 0, errors: 0 }
 
-    // Fetch Gmail schedules once for all flights (cached internally)
-    let allScheds = []
-    try { allScheds = await fetchNiceAirSchedules() } catch (_) {}
+    // Load all nice_air_schedules from DB (one query, used across all flights)
+    let allDbScheds = []
+    try {
+      const { rows } = await pool.query(
+        `SELECT date_str, tail, start_unix, end_unix FROM nice_air_schedules WHERE type != 'cancelled'`
+      )
+      allDbScheds = rows
+    } catch (_) {}
+    // Also fetch live Gmail as fallback (cached internally for session)
+    let allGmailScheds = []
+    try { allGmailScheds = await fetchNiceAirSchedules() } catch (_) {}
 
     for (const f of toProcess) {
       const tail    = f.tail_number
       const dateStr = String(f.date).slice(0, 10)
 
-      // 1. Determine time window — DB first, fall back to Gmail schedule
+      // 1. Determine time window: DB fields → nice_air_schedules table → Gmail live
       let timeOut = f.time_out
       let timeIn  = f.time_in
       if (!timeOut || !timeIn) {
         const tailShort = tail.replace(/^N/, '')
-        const match = allScheds.find(s =>
+        const dbMatch = allDbScheds.find(s =>
+          s.date_str === dateStr &&
+          (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
+        )
+        if (dbMatch?.start_unix) timeOut = timeOut || new Date(dbMatch.start_unix * 1000).toISOString()
+        if (dbMatch?.end_unix)   timeIn  = timeIn  || new Date(dbMatch.end_unix   * 1000).toISOString()
+      }
+      if (!timeOut || !timeIn) {
+        const tailShort = tail.replace(/^N/, '')
+        const match = allGmailScheds.find(s =>
           s.date_str === dateStr && s.type !== 'cancelled' &&
           (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
         )
@@ -958,6 +992,45 @@ export default async function proxyRoutes(fastify) {
   fastify.post('/api/gmail/nice-air/refresh', async (req, reply) => {
     _niceAirCache = null
     return { ok: true }
+  })
+
+  // ── Sync NICE AIR Gmail schedules → DB ────────────────────────────────────────
+  // POST /api/gmail/nice-air/sync
+  // Reads all "NICE AIR" emails from Gmail IMAP, upserts each into nice_air_schedules.
+  // Idempotent — safe to call repeatedly. Invalidates in-memory cache.
+  fastify.post('/api/gmail/nice-air/sync', async (req, reply) => {
+    try {
+      const schedules = await fetchNiceAirSchedules()
+      _niceAirCache = { ts: Date.now(), data: schedules }
+
+      let inserted = 0, updated = 0
+      for (const s of schedules) {
+        if (!s.uid) continue
+        const { rowCount, rows } = await pool.query(`
+          INSERT INTO nice_air_schedules
+            (email_uid, type, date_str, tail, pilot, cfi,
+             start_local, end_local, start_unix, end_unix, subject, received_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          ON CONFLICT (email_uid) DO UPDATE SET
+            type=EXCLUDED.type, date_str=EXCLUDED.date_str,
+            tail=EXCLUDED.tail, pilot=EXCLUDED.pilot, cfi=EXCLUDED.cfi,
+            start_local=EXCLUDED.start_local, end_local=EXCLUDED.end_local,
+            start_unix=EXCLUDED.start_unix, end_unix=EXCLUDED.end_unix,
+            subject=EXCLUDED.subject, received_at=EXCLUDED.received_at,
+            synced_at=NOW()
+          RETURNING (xmax = 0) AS is_insert
+        `, [s.uid, s.type, s.date_str, s.tail, s.pilot, s.cfi,
+            s.start_local, s.end_local, s.start_unix, s.end_unix, s.subject,
+            s.received ? new Date(s.received) : null])
+        if (rows[0]?.is_insert) inserted++; else updated++
+      }
+
+      fastify.log.info({ total: schedules.length, inserted, updated }, 'NICE AIR Gmail sync complete')
+      return { ok: true, total: schedules.length, inserted, updated }
+    } catch (e) {
+      fastify.log.warn({ err: e.message }, 'NICE AIR Gmail sync failed')
+      return reply.status(502).send({ error: e.message })
+    }
   })
 
   // ── TAF via Aviation Weather Center ───────────────────────────────────────────

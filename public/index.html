@@ -1817,18 +1817,6 @@
 </div>
 
 <!-- OpenSky route-picker modal -->
-<div class="modal-overlay" id="route-picker-overlay" style="display:none"
-     onclick="if(event.target===this)closeRoutePicker()">
-  <div class="modal-box" style="max-width:580px">
-    <div class="modal-hd">
-      <span class="modal-title">Match ADS-B Track</span>
-      <button class="modal-close" onclick="closeRoutePicker()"><i class="ph-bold ph-x"></i></button>
-    </div>
-    <div class="modal-bd" id="route-picker-bd" style="padding:20px">
-      <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
-    </div>
-  </div>
-</div>
 
 <!-- Night sync results modal -->
 <div class="modal-overlay" id="night-sync-overlay" style="display:none"
@@ -3897,9 +3885,6 @@ async function showFlightDetail(id) {
           <button class="btn-ghost" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:5px 11px;color:var(--warn)">
             <i class="ph-bold ph-trash"></i>
           </button>
-          <button class="btn-ghost" id="find-route-btn" onclick="openRoutePicker(${f.id})" title="${f.has_track ? 'Refresh GPS route' : 'Fetch GPS route'}" style="font-size:12px;padding:5px 10px;color:var(--patina-text);border-color:var(--patina-text)40">
-            <i class="ph-bold ph-map-pin"></i>
-          </button>
         </div>
       </div>
       <div class="fd-hero-stats-bar">
@@ -3918,6 +3903,9 @@ async function showFlightDetail(id) {
         <div id="fd-schedule-wrap"></div>
       </div>
     </div>
+
+    <!-- ── Track auto-fetch status (shown while fetching or when no track) -->
+    ${!f.has_track ? `<div id="fd-track-fetch-status" style="margin-bottom:12px"></div>` : ''}
 
     <!-- ── Track Scrubber ────────────────────────────────── -->
     ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--deep)">
@@ -3998,8 +3986,13 @@ async function showFlightDetail(id) {
       .filter(s => s.type !== 'cancelled')
       .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0] || null;
 
-    if (sched) {
-      const schedOut = (sched.start_local || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
+    if (!sched) {
+      fdSchedWrap.innerHTML = `<div style="border-top:1px solid var(--rule);padding:9px 14px;display:flex;align-items:center;gap:7px">
+        <i class="ph-bold ph-envelope" style="color:var(--disabled);font-size:12px"></i>
+        <span style="font-size:11px;color:var(--faint)">No NICE AIR schedule on record for this flight</span>
+      </div>`;
+    } else {
+    const schedOut = (sched.start_local || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
       const schedIn  = (sched.end_local   || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—';
       const fmtLocal = iso => iso ? new Date(iso).toLocaleTimeString('en-US',
         { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' }) : null;
@@ -4037,7 +4030,7 @@ async function showFlightDetail(id) {
             ${sched.type === 'changed' ? `<div style="margin-top:8px;font-size:10px;color:oklch(80% 0.17 85)"><i class="ph-bold ph-warning"></i> Modified schedule.</div>` : ''}
           </div>
         </div>`;
-    }
+    } // end if (sched) else
     }); // end ensureNiceAirSchedules().then
   }
 
@@ -4158,50 +4151,48 @@ async function showFlightDetail(id) {
       });
   }
 
-  // Auto-load GPS track via OpenSky if aircraft has a Mode S hex and no track on record yet
-  if (!f.has_track && f.aircraft?.mode_s_hex) {
+  // Auto-fetch GPS track from FR24 for any flight that has none yet
+  if (!f.has_track) {
     autoLoadTrack(f);
   }
 }
 
-// ─── OpenSky auto-track loader ────────────────────────────────────────────────
-// Silently fetches GPS track from OpenSky for flights that have no track.
-// Uses the aircraft's Mode S hex + block-out time as the lookup anchor.
+// ─── FR24 auto-track loader ───────────────────────────────────────────────────
+// Silently fetches GPS track from FlightRadar24 when a flight has no stored track.
+// Uses time window from DB → Gmail schedule → FR24 summary scoring (by airport + duration).
+// On success, re-renders the full flight detail so the scrubber appears automatically.
 async function autoLoadTrack(f) {
-  if (!f || !f.aircraft?.mode_s_hex) return;
+  if (!f) return;
   const flightId = f.id;
-  const skipKey  = `osky-skip-${flightId}`;
-
+  const skipKey  = `fr24-skip-${flightId}`;
   if (sessionStorage.getItem(skipKey)) return;
 
-  const btn = document.getElementById('find-route-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle"></div>';
-  }
+  const statusEl = document.getElementById('fd-track-fetch-status');
+  if (statusEl) statusEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)">
+      <div class="spinner" style="width:10px;height:10px;border-width:2px;flex-shrink:0"></div>
+      Fetching GPS track from FlightRadar24…
+    </div>`;
 
   try {
-    const res = await fetch(`/api/external/auto-fetch-track/${flightId}`, { method: 'POST' })
+    const res = await fetch(`/api/external/auto-fetch-fr24-track/${flightId}`, { method: 'POST' })
       .then(r => r.json()).catch(() => null);
 
     if (!res?.success || !res.points_saved) {
       sessionStorage.setItem(skipKey, '1');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
+      if (statusEl) statusEl.innerHTML = '<span style="font-size:11px;color:var(--faint)">No GPS track available</span>';
       return;
     }
 
     const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
     if (fi >= 0) window._flights[fi].has_track = true;
 
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
-
-    if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
-    const fUpdated = (window._flights || []).find(x => String(x.id) === String(flightId));
-    if (fUpdated) requestAnimationFrame(() => initFlightDetailMap(fUpdated));
+    // Re-render the full detail so the scrubber HTML is injected with has_track=true
+    await showFlightDetail(flightId);
 
   } catch (e) {
     sessionStorage.setItem(skipKey, '1');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; }
+    if (statusEl) statusEl.innerHTML = '<span style="font-size:11px;color:var(--faint)">GPS track unavailable</span>';
   }
 }
 
@@ -4269,71 +4260,7 @@ function fmtUTCtoPT(iso) {
     .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
 }
 
-let _routePickerFlightId = null;
 
-function closeRoutePicker() {
-  document.getElementById('route-picker-overlay').style.display = 'none';
-  _routePickerFlightId = null;
-}
-
-async function openRoutePicker(flightId) {
-  // Use FR24 smart auto-match (airport + duration + Gmail schedule time)
-  const btn = document.getElementById('find-route-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle"></div>';
-    btn.title = 'Fetching from FlightRadar24…';
-  }
-  try {
-    const res = await fetch(`/api/external/auto-fetch-fr24-track/${flightId}`, { method: 'POST' })
-      .then(r => r.json()).catch(() => null);
-
-    if (res?.error) throw new Error(res.error);
-    if (!res?.success || !res.points_saved) throw new Error('No track points returned from FR24');
-
-    const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
-    if (fi >= 0) window._flights[fi].has_track = true;
-
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; btn.title = 'Refresh GPS route'; }
-    if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; }
-    const fUp = (window._flights || []).find(x => String(x.id) === String(flightId));
-    if (fUp) requestAnimationFrame(() => initFlightDetailMap(fUp));
-
-  } catch (e) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-map-pin"></i>'; btn.title = 'Fetch GPS route'; }
-    // Show a brief error badge near the button
-    const errEl = document.createElement('span');
-    errEl.style.cssText = 'font-size:11px;color:var(--warn);margin-left:6px';
-    errEl.textContent = e.message?.includes('configured') ? 'FR24 not configured' : 'FR24: no match';
-    btn?.parentElement?.appendChild(errEl);
-    setTimeout(() => errEl.remove(), 5000);
-  }
-}
-
-async function autoAttachTrack(flightId, icao24, firstSeenUnix) {
-  const btn = event.currentTarget;
-  btn.disabled = true;
-  btn.textContent = 'Attaching…';
-  try {
-    const res = await fetch('/api/external/attach-track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ flight_id: flightId, icao24, first_seen_unix: firstSeenUnix }),
-    }).then(r => r.json());
-
-    if (res.error) throw new Error(res.error);
-
-    const fi = (window._flights || []).findIndex(x => String(x.id) === String(flightId));
-    if (fi >= 0) window._flights[fi].has_track = true;
-
-    closeRoutePicker();
-    showFlightDetail(flightId);
-  } catch (e) {
-    btn.disabled = false;
-    btn.textContent = 'Attach GPS Track to Flight';
-    btn.insertAdjacentHTML('afterend', `<div style="font-size:12px;color:var(--warn);margin-top:8px">Error: ${esc(e.message)}</div>`);
-  }
-}
 
 async function initFlightDetailMap(f) {
   const container = document.getElementById('fd-map');
@@ -4392,9 +4319,14 @@ async function initFlightDetailMap(f) {
         data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
       });
       thisMap.addLayer({ id:'route-glow', type:'line', source:'route',
-        paint: { 'line-color': routeColor, 'line-width': 8, 'line-opacity': 0.25, 'line-blur': 6 } });
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': routeColor, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 10 } });
+      thisMap.addLayer({ id:'route-case', type:'line', source:'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': isLight ? '#ffffff' : '#000000', 'line-width': 5, 'line-opacity': 0.5 } });
       thisMap.addLayer({ id:'route-line', type:'line', source:'route',
-        paint: { 'line-color': routeColor, 'line-width': 3, 'line-opacity': 1.0 } });
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': routeColor, 'line-width': 2.5, 'line-opacity': 1.0 } });
 
       const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
       thisMap.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: 500 });

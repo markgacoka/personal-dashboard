@@ -566,6 +566,35 @@ export async function migrateV13() {
   }
 }
 
+// V14: seed additional Central Valley and Bay Area training airports
+export async function migrateV14() {
+  const client = await pool.connect()
+  try {
+    const airports = [
+      ['KMAE', 'Madera Municipal Airport',          'Madera',       36.9886, -120.1117,  255, 'small_airport'],
+      ['KFAT', 'Fresno Yosemite International',     'Fresno',       36.7762, -119.7182,  336, 'large_airport'],
+      ['KVIS', 'Visalia Municipal Airport',         'Visalia',      36.3187, -119.3928,  295, 'small_airport'],
+      ['KVCB', 'Nut Tree Airport',                  'Vacaville',    38.3769, -121.9625,   57, 'small_airport'],
+      ['KTRK', 'Truckee Tahoe Airport',             'Truckee',      39.3200, -120.1399, 5901, 'small_airport'],
+      ['KSMF', 'Sacramento International Airport',  'Sacramento',   38.6954, -121.5908,   27, 'large_airport'],
+      ['KSAC', 'Sacramento Executive Airport',      'Sacramento',   38.5125, -121.4926,   24, 'small_airport'],
+      ['KMER', 'Castle Airport',                    'Atwater',      37.3805, -120.5682,  191, 'small_airport'],
+      ['KAPC', 'Napa County Airport',               'Napa',         38.2132, -122.2808,   35, 'small_airport'],
+      ['KSFO', 'San Francisco International',       'San Francisco',37.6213, -122.3790,   13, 'large_airport'],
+      ['KNUQ', 'Moffett Federal Airfield',          'Mountain View',37.4161, -122.0494,   35, 'small_airport'],
+    ]
+    for (const [icao, name, city, lat, lon, elev, type] of airports) {
+      await client.query(
+        `INSERT INTO airports (icao,name,city,lat,lon,elevation_ft,type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (icao) DO NOTHING`,
+        [icao, name, city, lat, lon, elev, type]
+      )
+    }
+  } finally {
+    client.release()
+  }
+}
+
 // V12: persist NICE AIR Gmail schedule emails to DB
 export async function migrateV12() {
   const client = await pool.connect()

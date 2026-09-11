@@ -1,5 +1,5 @@
 import { pool } from '../db/client.js'
-import { fetchNiceAirSchedules } from '../services/gmail.js'
+import { fetchNiceAirSchedules, syncNiceAirToDB } from '../services/gmail.js'
 import { autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 const FLIGHT_SELECT = `
@@ -114,6 +114,8 @@ export default async function flightRoutes(fastify) {
     )
     const flightId = rows[0].id
 
+    // Sync latest NICE AIR Gmail schedules to DB so new entries have accurate time windows
+    syncNiceAirToDB(pool).catch(() => {})
     // Fire-and-forget OpenSky track fetch — fails silently if no Mode S hex or data unavailable
     autoFetchOpenSkyTrack(pool, flightId).catch(() => {})
 

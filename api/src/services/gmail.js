@@ -99,7 +99,8 @@ export async function fetchNiceAirSchedules() {
     await client.connect()
     const lock = await client.getMailboxLock('INBOX')
     try {
-      const uids = await client.search({ subject: 'NICE AIR' }, { uid: true })
+      // Search by sender — catches all schedule types regardless of subject wording
+      const uids = await client.search({ from: 'niceairaviation@paperlessfbo.net' }, { uid: true })
       for (const uid of uids) {
         for await (const msg of client.fetch(uid, { envelope: true, source: true }, { uid: true })) {
           const subject = (msg.envelope?.subject || '').replace(/=\?[^?]+\?[BQ]\?[^?]+\?=/gi, s => {
@@ -145,6 +146,34 @@ export async function fetchNiceAirSchedules() {
     await client.logout().catch(() => {})
   }
   return schedules
+}
+
+// Fetch all NICE AIR Gmail schedules and upsert them into the nice_air_schedules table.
+// Pass the pg pool as first argument. Returns { total, inserted, updated }.
+export async function syncNiceAirToDB(pool) {
+  const schedules = await fetchNiceAirSchedules()
+  let inserted = 0, updated = 0
+  for (const s of schedules) {
+    if (!s.uid) continue
+    const { rows } = await pool.query(`
+      INSERT INTO nice_air_schedules
+        (email_uid, type, date_str, tail, pilot, cfi,
+         start_local, end_local, start_unix, end_unix, subject, received_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      ON CONFLICT (email_uid) DO UPDATE SET
+        type=EXCLUDED.type, date_str=EXCLUDED.date_str,
+        tail=EXCLUDED.tail, pilot=EXCLUDED.pilot, cfi=EXCLUDED.cfi,
+        start_local=EXCLUDED.start_local, end_local=EXCLUDED.end_local,
+        start_unix=EXCLUDED.start_unix, end_unix=EXCLUDED.end_unix,
+        subject=EXCLUDED.subject, received_at=EXCLUDED.received_at,
+        synced_at=NOW()
+      RETURNING (xmax = 0) AS is_insert
+    `, [s.uid, s.type, s.date_str, s.tail, s.pilot, s.cfi,
+        s.start_local, s.end_local, s.start_unix, s.end_unix, s.subject,
+        s.received ? new Date(s.received) : null])
+    if (rows[0]?.is_insert) inserted++; else updated++
+  }
+  return { total: schedules.length, inserted, updated }
 }
 
 export async function fetchGarminCode() {

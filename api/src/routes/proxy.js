@@ -2,7 +2,7 @@
 import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-registry.js'
 import { pool } from '../db/client.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
-import { fetchNiceAirSchedules } from '../services/gmail.js'
+import { fetchNiceAirSchedules, syncNiceAirToDB } from '../services/gmail.js'
 import { getOskyToken, normalizeFr24Positions, normalizeOpenSkyPath, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
@@ -654,6 +654,29 @@ export default async function proxyRoutes(fastify) {
         if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
       } catch (_) {}
     }
+    // Date-only fallback: any non-cancelled schedule on this date (tail may differ from resource)
+    // e.g. solo in N739HE while dual slot was booked as N227AN — same pilot, same time window.
+    // If multiple schedules exist on the date, pick the one whose duration best matches logbook.
+    if (!timeOut) {
+      try {
+        const { rows: dateScheds } = await pool.query(`
+          SELECT start_unix, end_unix, (end_unix - start_unix) AS sched_sec
+          FROM nice_air_schedules
+          WHERE date_str = $1 AND type != 'cancelled' AND start_unix IS NOT NULL
+          ORDER BY start_unix ASC
+        `, [dateStr])
+        let chosen = dateScheds[0] || null
+        if (dateScheds.length > 1 && fl.total_duration) {
+          const logSec = parseFloat(fl.total_duration) * 3600
+          chosen = dateScheds.reduce((a, b) =>
+            Math.abs((a.sched_sec || 0) - logSec) <= Math.abs((b.sched_sec || 0) - logSec) ? a : b
+          )
+        }
+        if (chosen?.start_unix) timeOut = new Date(chosen.start_unix * 1000).toISOString()
+        if (chosen?.end_unix)   timeIn  = new Date(chosen.end_unix   * 1000).toISOString()
+        if (chosen) fastify.log.info({ flightId, tail, dateStr }, 'Using date-only schedule fallback')
+      } catch (_) {}
+    }
     // 3. Last resort: match via FR24 flight-summary, scoring by airport + logbook duration
     if (!timeOut) {
       try {
@@ -858,6 +881,25 @@ export default async function proxyRoutes(fastify) {
         if (match?.start_unix) timeOut = timeOut || new Date(match.start_unix * 1000).toISOString()
         if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
       }
+      // Date-only fallback: schedule resource may not match logbook tail (e.g. solo in
+      // N739HE while the dual slot was booked under N227AN). Use any non-cancelled
+      // schedule on the same date; if multiple, pick the best duration match.
+      if (!timeOut) {
+        const dateScheds = allDbScheds.filter(s => s.date_str === dateStr && s.start_unix)
+        if (dateScheds.length) {
+          let chosen = dateScheds[0]
+          if (dateScheds.length > 1 && f.total_duration) {
+            const logSec = parseFloat(f.total_duration) * 3600
+            chosen = dateScheds.reduce((a, b) =>
+              Math.abs((a.end_unix - a.start_unix || 0) - logSec) <=
+              Math.abs((b.end_unix - b.start_unix || 0) - logSec) ? a : b
+            )
+          }
+          timeOut = new Date(chosen.start_unix * 1000).toISOString()
+          if (chosen.end_unix) timeIn = new Date(chosen.end_unix * 1000).toISOString()
+          emit({ id: f.id, date: dateStr, tail, status: 'date_only_schedule', resource: chosen.tail || 'unknown' })
+        }
+      }
 
       // Fall back to FR24 summary: score candidates by airport match + logbook duration
       if (!timeOut) {
@@ -1000,33 +1042,10 @@ export default async function proxyRoutes(fastify) {
   // Idempotent — safe to call repeatedly. Invalidates in-memory cache.
   fastify.post('/api/gmail/nice-air/sync', async (req, reply) => {
     try {
-      const schedules = await fetchNiceAirSchedules()
-      _niceAirCache = { ts: Date.now(), data: schedules }
-
-      let inserted = 0, updated = 0
-      for (const s of schedules) {
-        if (!s.uid) continue
-        const { rowCount, rows } = await pool.query(`
-          INSERT INTO nice_air_schedules
-            (email_uid, type, date_str, tail, pilot, cfi,
-             start_local, end_local, start_unix, end_unix, subject, received_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-          ON CONFLICT (email_uid) DO UPDATE SET
-            type=EXCLUDED.type, date_str=EXCLUDED.date_str,
-            tail=EXCLUDED.tail, pilot=EXCLUDED.pilot, cfi=EXCLUDED.cfi,
-            start_local=EXCLUDED.start_local, end_local=EXCLUDED.end_local,
-            start_unix=EXCLUDED.start_unix, end_unix=EXCLUDED.end_unix,
-            subject=EXCLUDED.subject, received_at=EXCLUDED.received_at,
-            synced_at=NOW()
-          RETURNING (xmax = 0) AS is_insert
-        `, [s.uid, s.type, s.date_str, s.tail, s.pilot, s.cfi,
-            s.start_local, s.end_local, s.start_unix, s.end_unix, s.subject,
-            s.received ? new Date(s.received) : null])
-        if (rows[0]?.is_insert) inserted++; else updated++
-      }
-
-      fastify.log.info({ total: schedules.length, inserted, updated }, 'NICE AIR Gmail sync complete')
-      return { ok: true, total: schedules.length, inserted, updated }
+      const result = await syncNiceAirToDB(pool)
+      _niceAirCache = null // bust memory cache so next GET re-reads from DB
+      fastify.log.info(result, 'NICE AIR Gmail sync complete')
+      return { ok: true, ...result }
     } catch (e) {
       fastify.log.warn({ err: e.message }, 'NICE AIR Gmail sync failed')
       return reply.status(502).send({ error: e.message })

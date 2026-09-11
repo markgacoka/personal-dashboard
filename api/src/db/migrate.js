@@ -556,6 +556,16 @@ export async function migrateV3() {
   }
 }
 
+// V13: remove fabricated showcase flight — user has never flown N5624H or in IMC
+export async function migrateV13() {
+  const client = await pool.connect()
+  try {
+    await client.query(`DELETE FROM flights WHERE foreflight_source = 'showcase'`)
+  } finally {
+    client.release()
+  }
+}
+
 // V12: persist NICE AIR Gmail schedule emails to DB
 export async function migrateV12() {
   const client = await pool.connect()

@@ -288,4 +288,77 @@ export default async function flightRoutes(fastify) {
 
     return { updated: results.length, total: flights.length, results }
   })
+
+  // ── Sync NICE AIR schedule times → flights.time_out / time_in ────────────────
+  // For each flight (without time_out by default, or all with ?overwrite=true),
+  // find the best matching non-cancelled schedule from nice_air_schedules:
+  //   1. Exact tail match on same date
+  //   2. Any schedule on same date (date-only fallback) — handles solo in N739HE
+  //      while dual slot was booked as N227AN; duration used as tiebreaker.
+  // Does NOT touch logbook values (night, takeoffs, landings, etc.).
+  fastify.post('/api/flights/sync-schedules-to-times', async (req, reply) => {
+    const overwrite = req.query.overwrite === 'true'
+
+    const { rows: flights } = await pool.query(`
+      SELECT f.id, f.date::text, f.time_out, f.time_in, f.total_duration, ac.tail_number
+      FROM flights f
+      JOIN aircraft ac ON ac.id = f.aircraft_id
+      ${overwrite ? '' : 'WHERE f.time_out IS NULL'}
+    `)
+
+    const { rows: scheds } = await pool.query(`
+      SELECT date_str, tail, start_unix, end_unix
+      FROM nice_air_schedules
+      WHERE type != 'cancelled' AND start_unix IS NOT NULL
+    `)
+
+    const results = []
+    for (const f of flights) {
+      const dateStr   = String(f.date).slice(0, 10)
+      const tail      = f.tail_number
+      const tailShort = tail.replace(/^N/, '')
+      const dateScheds = scheds.filter(s => s.date_str === dateStr)
+      if (!dateScheds.length) continue
+
+      // 1. Prefer exact tail match
+      let chosen = dateScheds.find(s =>
+        s.tail === tail || s.tail?.replace(/^N/, '') === tailShort
+      ) || null
+
+      // 2. Date-only fallback: pick best duration match among remaining
+      if (!chosen) {
+        if (dateScheds.length === 1) {
+          chosen = dateScheds[0]
+        } else {
+          const logSec = f.total_duration ? parseFloat(f.total_duration) * 3600 : null
+          chosen = logSec
+            ? dateScheds.reduce((a, b) =>
+                Math.abs((a.end_unix - a.start_unix || 0) - logSec) <=
+                Math.abs((b.end_unix - b.start_unix || 0) - logSec) ? a : b
+              )
+            : dateScheds[0]
+        }
+      }
+
+      if (!chosen) continue
+
+      const timeOut = new Date(chosen.start_unix * 1000).toISOString()
+      const timeIn  = chosen.end_unix ? new Date(chosen.end_unix * 1000).toISOString() : null
+
+      await pool.query(
+        `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
+        [f.id, timeOut, timeIn]
+      )
+      results.push({
+        id:            f.id,
+        date:          dateStr,
+        tail,
+        schedule_tail: chosen.tail,
+        time_out:      timeOut.slice(0, 16),
+        time_in:       timeIn?.slice(0, 16) ?? null,
+      })
+    }
+
+    return { updated: results.length, total: flights.length, results }
+  })
 }

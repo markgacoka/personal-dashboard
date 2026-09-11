@@ -62,8 +62,8 @@ async function fr24Fetch(path, params = {}, _retries = 2) {
     signal: AbortSignal.timeout(20000),
   })
   if (r.status === 429 && _retries > 0) {
-    const retryAfter = parseInt(r.headers.get('Retry-After') || '65', 10)
-    const waitMs = Math.max(retryAfter * 1000, 65_000)
+    const retryAfter = parseInt(r.headers.get('Retry-After') || '10', 10)
+    const waitMs = Math.max(retryAfter * 1000, 5_000)
     console.log(`FR24 rate limited — waiting ${waitMs / 1000}s`)
     await new Promise(res => setTimeout(res, waitMs))
     return fr24Fetch(path, params, _retries - 1)
@@ -731,16 +731,16 @@ export default async function proxyRoutes(fastify) {
       t1 = t0 + 4 * 3_600_000
     }
 
-    // 4. Sweep timestamps at 10-second intervals
-    // Each call returns the last known position of the tail at that moment.
-    // Deduplicate by the position's own timestamp — avoids storing the same
-    // observation twice when consecutive sweep steps land on the same ADS-B fix.
-    const STEP_MS  = 10_000
+    // 4. Sweep timestamps: adaptive step so window always resolves in ≤500 queries,
+    // minimum 10s granularity. Hard deadline of 4 minutes caps wall-clock time.
+    const STEP_MS  = Math.max(10_000, Math.ceil((t1 - t0) / 500))
     const DELAY_MS = 250
+    const DEADLINE = Date.now() + 4 * 60_000
     const rawPositions = []
     let lastPosTs = null
 
     for (let ts = t0; ts <= t1; ts += STEP_MS) {
+      if (Date.now() > DEADLINE) { fastify.log.warn({ flightId, tail }, 'FR24 sweep deadline reached'); break }
       await new Promise(r => setTimeout(r, DELAY_MS))
       try {
         const posData = await fr24Fetch('/api/historic/flight-positions/full', {
@@ -841,7 +841,6 @@ export default async function proxyRoutes(fastify) {
     const sleep  = ms  => new Promise(res => setTimeout(res, ms))
     const QUERY_DELAY  = 200   // ms between FR24 API calls within a flight sweep
     const FLIGHT_DELAY = 5000  // ms between flights
-    const STEP_MS      = 10_000
     const counts = { ok: 0, no_window: 0, no_positions: 0, errors: 0 }
 
     // Load all nice_air_schedules from DB (one query, used across all flights)
@@ -961,15 +960,18 @@ export default async function proxyRoutes(fastify) {
         t1 = t0 + 4 * 3_600_000
       }
 
+      const stepMs = Math.max(10_000, Math.ceil((t1 - t0) / 500))
+      const FLIGHT_DEADLINE = Date.now() + 5 * 60_000
       emit({ id: f.id, date: dateStr, tail, status: 'sweeping',
              window_from: new Date(t0).toISOString(), window_to: new Date(t1).toISOString(),
-             steps: Math.ceil((t1 - t0) / STEP_MS) })
+             steps: Math.ceil((t1 - t0) / stepMs) })
 
       // 3. Sweep — each step queries the tail's position at that moment
       const rawPositions = []
       let lastPosTs = null
 
-      for (let ts = t0; ts <= t1; ts += STEP_MS) {
+      for (let ts = t0; ts <= t1; ts += stepMs) {
+        if (Date.now() > FLIGHT_DEADLINE) { fastify.log.warn({ flight_id: f.id, tail }, 'FR24 backfill flight deadline reached'); break }
         await sleep(QUERY_DELAY)
         try {
           const posData = await fr24Fetch('/api/historic/flight-positions/full', {

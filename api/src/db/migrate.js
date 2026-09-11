@@ -595,6 +595,28 @@ export async function migrateV14() {
   }
 }
 
+// V15: seed additional XC training airports
+export async function migrateV15() {
+  const client = await pool.connect()
+  try {
+    const airports = [
+      ['KMHR', 'Sacramento Mather Airport',    'Sacramento',  38.5539, -121.2976,  98, 'small_airport'],
+      ['KKIC', 'Mesa del Rey Airport',          'King City',   36.2283, -120.9917, 340, 'small_airport'],
+      ['KCVH', 'Hollister Municipal Airport',   'Hollister',   36.8933, -121.4105, 230, 'small_airport'],
+      ['KLSN', 'Los Banos Municipal Airport',   'Los Banos',   37.0631, -120.8697, 121, 'small_airport'],
+    ]
+    for (const [icao, name, city, lat, lon, elev, type] of airports) {
+      await client.query(
+        `INSERT INTO airports (icao,name,city,lat,lon,elevation_ft,type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (icao) DO NOTHING`,
+        [icao, name, city, lat, lon, elev, type]
+      )
+    }
+  } finally {
+    client.release()
+  }
+}
+
 // V12: persist NICE AIR Gmail schedule emails to DB
 export async function migrateV12() {
   const client = await pool.connect()

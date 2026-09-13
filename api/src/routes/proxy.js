@@ -151,7 +151,8 @@ async function runFaBackfill(toProcess, job, log) {
         continue
       }
 
-      // Score candidates by airport match + duration match
+      // Score for metadata — multi-leg flights (e.g. KRHV→KLSN→KRHV) appear as separate
+      // FA records. Fetch and merge tracks from ALL candidates so no leg is cut off.
       const norm   = ic => (ic || '').toUpperCase().replace(/^K/, '')
       const logDep = norm(f.departure_icao)
       const logArr = norm(f.arrival_icao)
@@ -168,28 +169,33 @@ async function runFaBackfill(toProcess, job, log) {
         return { ff, score }
       }).sort((a, b) => b.score - a.score)
 
-      const best = scored[0].ff
-      const faId = best.fa_flight_id
-      if (!faId) {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_fa_id' })
+      // Fetch track for every candidate and merge — captures all legs of the flight
+      const allPositions = []
+      const okFaIds = []
+      for (const { ff } of scored) {
+        if (!ff.fa_flight_id) continue
+        await sleep(300)
+        try {
+          const td  = await faFetch(`/history/flights/${encodeURIComponent(ff.fa_flight_id)}/track`)
+          const pts = normalizeFaPositions(td?.positions)
+          if (pts.length) { allPositions.push(...pts); okFaIds.push(ff.fa_flight_id) }
+        } catch (_) {}
+      }
+
+      // Deduplicate by timestamp and sort chronologically
+      const seen = new Map()
+      for (const p of allPositions) { if (p.ts && !seen.has(p.ts)) seen.set(p.ts, p) }
+      const merged = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+
+      if (!merged.length) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_positions', fa_flight_ids: okFaIds })
         if (job) job.counts.no_positions++
         await sleep(FA_FLIGHT_DELAY)
         continue
       }
 
-      // 2. Fetch track for the matched flight
-      await sleep(500)
-      const trackData = await faFetch(`/history/flights/${encodeURIComponent(faId)}/track`)
-      const positions = normalizeFaPositions(trackData?.positions)
-      if (!positions.length) {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_positions', fa_flight_id: faId })
-        if (job) job.counts.no_positions++
-        await sleep(FA_FLIGHT_DELAY)
-        continue
-      }
-
-      const saved = await saveTrackPoints(pool, f.id, positions)
-      emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, fa_flight_id: faId, score: scored[0].score })
+      const saved = await saveTrackPoints(pool, f.id, merged)
+      emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, fa_flight_ids: okFaIds, score: scored[0].score })
       if (job) job.counts.ok++
     } catch (e) {
       emit({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
@@ -726,20 +732,29 @@ export default async function proxyRoutes(fastify) {
         return { ff, score }
       }).sort((a, b) => b.score - a.score)
 
-      const best = scored[0].ff
-      if (!best.fa_flight_id) {
-        return { success: false, points_saved: 0, message: 'Matched flight has no fa_flight_id' }
+      // Fetch and merge all candidates — multi-leg flights split into separate FA records
+      const allPositions = []
+      const okFaIds = []
+      for (const { ff } of scored) {
+        if (!ff.fa_flight_id) continue
+        await new Promise(r => setTimeout(r, 300))
+        try {
+          const td  = await faFetch(`/history/flights/${encodeURIComponent(ff.fa_flight_id)}/track`)
+          const pts = normalizeFaPositions(td?.positions)
+          if (pts.length) { allPositions.push(...pts); okFaIds.push(ff.fa_flight_id) }
+        } catch (_) {}
       }
+      const seen = new Map()
+      for (const p of allPositions) { if (p.ts && !seen.has(p.ts)) seen.set(p.ts, p) }
+      const merged = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
 
-      const trackData = await faFetch(`/history/flights/${encodeURIComponent(best.fa_flight_id)}/track`)
-      const positions = normalizeFaPositions(trackData?.positions)
-      if (!positions.length) {
+      if (!merged.length) {
         return { success: false, points_saved: 0, message: 'No track positions from FlightAware' }
       }
 
-      const saved = await saveTrackPoints(pool, flightId, positions)
-      fastify.log.info({ flightId, tail, saved, fa_flight_id: best.fa_flight_id }, 'FlightAware track saved')
-      return { success: true, points_saved: saved, fa_flight_id: best.fa_flight_id, score: scored[0].score }
+      const saved = await saveTrackPoints(pool, flightId, merged)
+      fastify.log.info({ flightId, tail, saved, fa_flight_ids: okFaIds }, 'FlightAware track saved')
+      return { success: true, points_saved: saved, fa_flight_ids: okFaIds, score: scored[0].score }
     } catch (e) {
       fastify.log.warn({ flightId, tail, err: e.message }, 'FlightAware track fetch failed')
       return reply.status(502).send({ error: e.message })

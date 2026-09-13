@@ -289,6 +289,20 @@ export default async function flightRoutes(fastify) {
     return { updated: results.length, total: flights.length, results }
   })
 
+  // ── Query nice_air_schedules for specific dates ───────────────────────────────
+  fastify.get('/api/flights/schedules-by-date', async (req, reply) => {
+    const dates = (req.query.dates || '').split(',').filter(Boolean)
+    if (!dates.length) return reply.status(400).send({ error: 'dates param required' })
+    const { rows } = await pool.query(
+      `SELECT date_str, tail, type, start_unix, end_unix,
+              to_timestamp(start_unix) AS time_out, to_timestamp(end_unix) AS time_in
+       FROM nice_air_schedules
+       WHERE date_str = ANY($1) ORDER BY date_str, start_unix`,
+      [dates]
+    )
+    return rows
+  })
+
   // ── Sync NICE AIR schedule times → flights.time_out / time_in ────────────────
   // For each flight (without time_out by default, or all with ?overwrite=true),
   // find the best matching non-cancelled schedule from nice_air_schedules:

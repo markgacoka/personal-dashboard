@@ -98,6 +98,7 @@ async function runFaBackfill(toProcess, job, log) {
     const dateStr = String(f.date).slice(0, 10)
     const tailShort = tail.replace(/^N/, '')
 
+
     let timeOut = f.time_out
     let timeIn  = f.time_in
 
@@ -135,8 +136,8 @@ async function runFaBackfill(toProcess, job, log) {
     emit({ id: f.id, date: dateStr, tail, status: 'searching', window_from: winStart.toISOString(), window_to: winEnd.toISOString() })
 
     try {
-      // 1. Find matching flight(s) in the window
-      const flightsData = await faFetch(`/flights/${encodeURIComponent(tail)}`, {
+      // 1. Find matching flight(s) in the window — /history/* covers Jan 2011 onward
+      const flightsData = await faFetch(`/history/flights/${encodeURIComponent(tail)}`, {
         start: winStart.toISOString(),
         end:   winEnd.toISOString(),
         max_pages: 1,
@@ -178,7 +179,7 @@ async function runFaBackfill(toProcess, job, log) {
 
       // 2. Fetch track for the matched flight
       await sleep(500)
-      const trackData = await faFetch(`/flights/${encodeURIComponent(faId)}/track`)
+      const trackData = await faFetch(`/history/flights/${encodeURIComponent(faId)}/track`)
       const positions = normalizeFaPositions(trackData?.positions)
       if (!positions.length) {
         emit({ id: f.id, date: dateStr, tail, status: 'no_positions', fa_flight_id: faId })
@@ -699,7 +700,7 @@ export default async function proxyRoutes(fastify) {
       : new Date(new Date(timeOut).getTime() + 6 * 3_600_000)
 
     try {
-      const flightsData = await faFetch(`/flights/${encodeURIComponent(tail)}`, {
+      const flightsData = await faFetch(`/history/flights/${encodeURIComponent(tail)}`, {
         start: winStart.toISOString(),
         end:   winEnd.toISOString(),
         max_pages: 1,
@@ -730,7 +731,7 @@ export default async function proxyRoutes(fastify) {
         return { success: false, points_saved: 0, message: 'Matched flight has no fa_flight_id' }
       }
 
-      const trackData = await faFetch(`/flights/${encodeURIComponent(best.fa_flight_id)}/track`)
+      const trackData = await faFetch(`/history/flights/${encodeURIComponent(best.fa_flight_id)}/track`)
       const positions = normalizeFaPositions(trackData?.positions)
       if (!positions.length) {
         return { success: false, points_saved: 0, message: 'No track positions from FlightAware' }

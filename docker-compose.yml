@@ -45,6 +45,7 @@ services:
       - /var/www/app/.env
     volumes:
       - /var/www/app/garmin-session:/data/garmin-session
+      - /var/www/app/data:/app/data
     networks:
       - web
     labels:

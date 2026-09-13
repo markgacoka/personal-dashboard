@@ -15,6 +15,7 @@ import metarRoutes from './routes/metar.js'
 import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15 } from './db/migrate.js'
 import financeRoutes from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
+import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -77,6 +78,9 @@ if (process.env.DATABASE_URL) {
       await fastify.register(financeRoutes)
       fastify.log.info('Finance routes enabled')
     }
+    // Download FAA airspace on first boot + refresh every 28-day AIRAC cycle
+    scheduleFaaAirspaceRefresh(fastify.log)
+
     // Seed ACFTREF (8K rows) on first boot — runs in background, non-blocking
     isAcftrefEmpty().then(empty => {
       if (empty) {

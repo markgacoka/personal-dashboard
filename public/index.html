@@ -4296,9 +4296,11 @@ async function initFlightDetailMap(f) {
   thisMap.addControl(new maplibregl.ScaleControl({ unit: 'nautical' }), 'bottom-left');
   thisMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
-  // Satellite toggle
-  const _satWrap = document.createElement('div');
-  _satWrap.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+  // Satellite + Airspace toggles in one control group
+  const _mapCtrlWrap = document.createElement('div');
+  _mapCtrlWrap.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+
+  // Satellite button
   const _satBtn = document.createElement('button');
   _satBtn.title = 'Toggle satellite imagery';
   _satBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:14px;width:29px;height:29px';
@@ -4322,8 +4324,17 @@ async function initFlightDetailMap(f) {
       if (thisMap.getLayer('sat-layer')) thisMap.removeLayer('sat-layer');
     }
   });
-  _satWrap.appendChild(_satBtn);
-  thisMap.addControl({ onAdd: () => _satWrap, onRemove: () => {} }, 'top-right');
+
+  // Airspace button (wired to layers once the FAA data loads)
+  const _aspcBtn = document.createElement('button');
+  _aspcBtn.id    = 'fd-aspc-toggle';
+  _aspcBtn.title = 'Toggle FAA airspace (Class B/C/D)';
+  _aspcBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:13px;width:29px;height:29px';
+  _aspcBtn.innerHTML = '<i class="ph-bold ph-path"></i>';
+
+  _mapCtrlWrap.appendChild(_satBtn);
+  _mapCtrlWrap.appendChild(_aspcBtn);
+  thisMap.addControl({ onAdd: () => _mapCtrlWrap, onRemove: () => {} }, 'top-right');
 
   thisMap.on('load', async () => {
     if (_fdMap !== thisMap) return; // stale — a newer map replaced this one
@@ -4364,19 +4375,16 @@ async function initFlightDetailMap(f) {
       });
       thisMap.addLayer({ id:'route-glow', type:'line', source:'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': routeColor, 'line-width': 16, 'line-opacity': 0.14, 'line-blur': 12 } });
-      thisMap.addLayer({ id:'route-case', type:'line', source:'route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': isLight ? '#ffffff' : '#000000', 'line-width': 5.5, 'line-opacity': 0.45 } });
+        paint: { 'line-color': routeColor, 'line-width': 6, 'line-opacity': 0.08, 'line-blur': 4 } });
       thisMap.addLayer({ id:'route-line', type:'line', source:'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-width': 2.8,
-          'line-opacity': 1.0,
+          'line-width': 1.6,
+          'line-opacity': 0.92,
           'line-gradient': ['interpolate', ['linear'], ['line-progress'],
             0,   routeColor,
-            0.35, '#4da8ff',
-            0.65, '#00d4ff',
+            0.4, '#5ab4ff',
+            0.6, '#5ab4ff',
             1,   routeColor
           ]
         }
@@ -4426,16 +4434,9 @@ async function initFlightDetailMap(f) {
 
       for (const a of apts) {
         const aptEl = document.createElement('div');
-        aptEl.style.cssText = 'cursor:pointer;text-align:center;pointer-events:auto';
-        aptEl.innerHTML = `<svg viewBox="0 0 30 30" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="15" cy="15" r="13" fill="${dotStroke}" fill-opacity="0.82" stroke="${dotColor}" stroke-width="1.5"/>
-          <rect x="13.5" y="3.5" width="3" height="23" rx="1.2" fill="${dotColor}"/>
-          <rect x="3.5" y="13.5" width="23" height="3" rx="1.2" fill="${dotColor}"/>
-          <rect x="12.5" y="3" width="5" height="1.5" rx="0.5" fill="${dotColor}" opacity="0.45"/>
-          <rect x="12.5" y="25.5" width="5" height="1.5" rx="0.5" fill="${dotColor}" opacity="0.45"/>
-          <circle cx="15" cy="15" r="2.5" fill="${dotColor}"/>
-        </svg>
-        <div style="font-size:8.5px;font-weight:700;color:${dotColor};letter-spacing:.05em;text-shadow:0 1px 3px ${dotStroke},0 0 6px ${dotStroke};margin-top:1px;line-height:1">${a.icao}</div>`;
+        aptEl.style.cssText = 'cursor:pointer;text-align:center;pointer-events:auto;user-select:none';
+        aptEl.innerHTML = `<div style="width:9px;height:9px;border-radius:50%;background:${dotColor};border:2px solid ${dotStroke};margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>
+        <div style="font-size:9px;font-weight:700;font-family:system-ui,sans-serif;color:${dotColor};letter-spacing:.04em;text-shadow:-1px -1px 0 ${dotStroke},1px -1px 0 ${dotStroke},-1px 1px 0 ${dotStroke},1px 1px 0 ${dotStroke};margin-top:3px;white-space:nowrap;line-height:1">${a.icao}</div>`;
         aptEl.addEventListener('click', () => {
           const obs = metarCache[a.icao] || [];
           const metarHtml = obs.length
@@ -4482,32 +4483,23 @@ async function initFlightDetailMap(f) {
         // ── Plane marker ──────────────────────────────────────────────────────
         // markerOuter: MapLibre owns its transform (translate). planeEl: we rotate only.
         const markerOuter = document.createElement('div');
-        markerOuter.style.cssText = 'width:40px;height:40px;pointer-events:none';
+        markerOuter.style.cssText = 'width:30px;height:30px;pointer-events:none';
         const planeEl = document.createElement('div');
-        planeEl.style.cssText = 'width:40px;height:40px;transform-origin:center center;will-change:transform';
-        planeEl.innerHTML = `<svg viewBox="0 0 40 40" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+        planeEl.style.cssText = 'width:30px;height:30px;transform-origin:center center;will-change:transform';
+        planeEl.innerHTML = `<svg viewBox="0 0 30 30" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <filter id="psh${f.id}" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity=".7"/>
+            <filter id="psh${f.id}" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0.5" stdDeviation="0.8" flood-color="#000" flood-opacity=".55"/>
             </filter>
           </defs>
-          <g transform="translate(20,20)" filter="url(#psh${f.id})">
-            <!-- Fuselage -->
-            <path d="M0,-17 C1.6,-15 2.6,-8 2.6,2 C2.6,9 1.8,14 0,17 C-1.8,14 -2.6,9 -2.6,2 C-2.6,-8 -1.6,-15 0,-17 Z"
+          <g transform="translate(15,15)" filter="url(#psh${f.id})">
+            <path d="M0,-12 C0.9,-10 1.6,-5 1.6,1 C1.6,6 1,9 0,12 C-1,9 -1.6,6 -1.6,1 C-1.6,-5 -0.9,-10 0,-12 Z"
                   fill="${routeColor}"/>
-            <!-- Main wings (swept) -->
-            <path d="M-2.4,-1 L-19,7 L-18.5,10 L-2.4,4 Z" fill="${routeColor}" opacity=".9"/>
-            <path d="M2.4,-1  L19,7  L18.5,10  L2.4,4  Z"  fill="${routeColor}" opacity=".9"/>
-            <!-- Wing leading edge taper highlight -->
-            <path d="M-2.2,-1 L-19,7 L-18.8,7.8 L-2.2,0.2 Z" fill="rgba(255,255,255,.12)"/>
-            <path d="M2.2,-1  L19,7  L18.8,7.8  L2.2,0.2  Z"  fill="rgba(255,255,255,.12)"/>
-            <!-- Horizontal stabilizer -->
-            <path d="M-2.2,10 L-10,15 L-9.5,17 L-2.2,12.5 Z" fill="${routeColor}" opacity=".85"/>
-            <path d="M2.2,10  L10,15  L9.5,17   L2.2,12.5  Z"  fill="${routeColor}" opacity=".85"/>
-            <!-- Nose / prop disk -->
-            <ellipse cx="0" cy="-17" rx="5" ry="1.1" fill="rgba(255,255,255,.18)"/>
-            <!-- Cockpit -->
-            <ellipse cx="0" cy="-9" rx="1.6" ry="2.8" fill="rgba(255,255,255,.38)"/>
+            <path d="M-1.4,0 L-13,5.5 L-12.5,7 L-1.4,2 Z"  fill="${routeColor}"/>
+            <path d="M1.4,0  L13,5.5  L12.5,7  L1.4,2  Z"   fill="${routeColor}"/>
+            <path d="M-1.2,8 L-6.5,11 L-6.2,12 L-1.2,9.5 Z" fill="${routeColor}"/>
+            <path d="M1.2,8  L6.5,11  L6.2,12  L1.2,9.5  Z"  fill="${routeColor}"/>
+            <ellipse cx="0" cy="-7" rx="0.9" ry="1.6" fill="rgba(255,255,255,.45)"/>
           </g>
         </svg>`;
         markerOuter.appendChild(planeEl);
@@ -4535,9 +4527,9 @@ async function initFlightDetailMap(f) {
           ctx.scale(dpr, dpr);
 
           // Layout zones
-          const barH   = 10;
+          const barH   = 3;
           const padT   = 8;
-          const padB   = barH + 10;
+          const padB   = barH + 12;
           const padL   = 44;     // left space for altitude axis labels
           const profH  = ch - padT - padB;
           const chartW = cw - padL;
@@ -4625,34 +4617,31 @@ async function initFlightDetailMap(f) {
 
           // Dot at cursor on profile
           const cy = yOf(alts[idx]);
-          ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+          ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
           ctx.fillStyle = '#fff'; ctx.fill();
-          ctx.beginPath(); ctx.arc(cx, cy, 2.8, 0, Math.PI * 2);
+          ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2);
           ctx.fillStyle = routeColor; ctx.fill();
 
-          // Progress bar track
-          const barY = ch - barH - 2;
-          ctx.fillStyle = 'rgba(255,255,255,0.07)';
-          ctx.beginPath(); ctx.roundRect(padL, barY, chartW, barH, 5); ctx.fill();
+          // Progress bar track — slim 3px rail
+          const barY = ch - barH - 4;
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.beginPath(); ctx.roundRect(padL, barY, chartW, barH, barH / 2); ctx.fill();
 
           // Progress bar fill
           if (pct > 0) {
-            const barGrad = ctx.createLinearGradient(padL, 0, padL + pct * chartW, 0);
-            barGrad.addColorStop(0, routeColor + 'aa');
-            barGrad.addColorStop(1, routeColor);
-            ctx.fillStyle = barGrad;
-            ctx.beginPath(); ctx.roundRect(padL, barY, pct * chartW, barH, 5); ctx.fill();
+            ctx.fillStyle = routeColor;
+            ctx.beginPath(); ctx.roundRect(padL, barY, pct * chartW, barH, barH / 2); ctx.fill();
           }
 
-          // Playhead thumb
+          // Playhead thumb — small clean circle
           const thumbX = padL + pct * chartW;
-          ctx.save();
-          ctx.shadowColor = 'rgba(0,0,0,0.5)';
-          ctx.shadowBlur  = 6;
-          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 6, 0, Math.PI * 2);
-          ctx.fillStyle = '#fff'; ctx.fill();
-          ctx.restore();
-          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 3.5, 0, Math.PI * 2);
+          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 5, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.shadowColor = 'rgba(0,0,0,0.35)';
+          ctx.shadowBlur = 4;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 2.5, 0, Math.PI * 2);
           ctx.fillStyle = routeColor; ctx.fill();
         }
 
@@ -4674,7 +4663,7 @@ async function initFlightDetailMap(f) {
             }
           }
           const chip = (val, label) => val
-            ? `<span style="background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.1);padding:2px 8px;border-radius:20px;font-size:10px;color:var(--champagne);white-space:nowrap;font-variant-numeric:tabular-nums">${label ? `<span style="font-size:9px;color:var(--faint);letter-spacing:.04em;margin-right:3px">${label}</span>` : ''}${val}</span>`
+            ? `<span style="background:rgba(8,8,12,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:500;color:#f5edd0;white-space:nowrap;font-variant-numeric:tabular-nums">${label ? `<span style="font-size:8.5px;color:rgba(255,255,255,.48);letter-spacing:.06em;margin-right:4px;text-transform:uppercase">${label}</span>` : ''}${val}</span>`
             : '';
           scrubInfo.innerHTML = chip(utc,'') + chip(alt,'ALT') + chip(spd,'GS') + chip(hdg,'HDG') + chip(vs,'VS');
         }
@@ -4754,33 +4743,40 @@ async function initFlightDetailMap(f) {
       }
     }
 
-    // ── Airspace overlay (OpenAIP, graceful if unavailable) ───────────────────
-    fetch('/api/external/airspace')
+    // ── FAA Airspace overlay (toggle, AIRAC 28-day data) ─────────────────────
+    // Layers are hidden by default; airspace toggle button shows/hides them.
+    fetch('/api/external/faa-airspace')
       .then(r => r.ok ? r.json() : null)
       .then(fc => {
         if (!fc || _fdMap !== thisMap) return;
         thisMap.addSource('airspace', { type: 'geojson', data: fc });
-        // Class B fill
-        thisMap.addLayer({ id:'aspc-b-fill', type:'fill', source:'airspace',
-          filter: ['==', ['get','class'], 'B'],
-          paint:  { 'fill-color': '#0050cc', 'fill-opacity': 0.07 } }, 'route-glow');
-        thisMap.addLayer({ id:'aspc-b-line', type:'line', source:'airspace',
-          filter: ['==', ['get','class'], 'B'],
-          paint:  { 'line-color': '#2979ff', 'line-width': 1.8, 'line-opacity': 0.7 } }, 'route-glow');
-        // Class C fill
-        thisMap.addLayer({ id:'aspc-c-fill', type:'fill', source:'airspace',
-          filter: ['==', ['get','class'], 'C'],
-          paint:  { 'fill-color': '#aa00cc', 'fill-opacity': 0.06 } }, 'route-glow');
-        thisMap.addLayer({ id:'aspc-c-line', type:'line', source:'airspace',
-          filter: ['==', ['get','class'], 'C'],
-          paint:  { 'line-color': '#cc55dd', 'line-width': 1.5, 'line-dasharray': [2, 0], 'line-opacity': 0.65 } }, 'route-glow');
-        // Class D fill
-        thisMap.addLayer({ id:'aspc-d-fill', type:'fill', source:'airspace',
-          filter: ['==', ['get','class'], 'D'],
-          paint:  { 'fill-color': '#0055cc', 'fill-opacity': 0.04 } }, 'route-glow');
-        thisMap.addLayer({ id:'aspc-d-line', type:'line', source:'airspace',
-          filter: ['==', ['get','class'], 'D'],
-          paint:  { 'line-color': '#4499ee', 'line-width': 1.2, 'line-dasharray': [3, 3], 'line-opacity': 0.55 } }, 'route-glow');
+        const aspcLayers = [
+          // Class B — solid blue (SFO, LAX, etc.)
+          { id:'aspc-b-fill', type:'fill',   filter:['==',['get','CLASS'],'B'], paint:{'fill-color':'#1a6ef5','fill-opacity':0.07} },
+          { id:'aspc-b-line', type:'line',   filter:['==',['get','CLASS'],'B'], paint:{'line-color':'#2979ff','line-width':1.4,'line-opacity':0.75} },
+          // Class C — magenta (SJC, OAK, etc.)
+          { id:'aspc-c-fill', type:'fill',   filter:['==',['get','CLASS'],'C'], paint:{'fill-color':'#cc33cc','fill-opacity':0.05} },
+          { id:'aspc-c-line', type:'line',   filter:['==',['get','CLASS'],'C'], paint:{'line-color':'#dd55dd','line-width':1.2,'line-opacity':0.7} },
+          // Class D — dashed blue (KRHV, KPAO-area towers)
+          { id:'aspc-d-fill', type:'fill',   filter:['==',['get','CLASS'],'D'], paint:{'fill-color':'#1a6ef5','fill-opacity':0.03} },
+          { id:'aspc-d-line', type:'line',   filter:['==',['get','CLASS'],'D'], paint:{'line-color':'#4488ee','line-width':1.0,'line-opacity':0.6,'line-dasharray':[4,3]} },
+        ];
+        const beforeId = thisMap.getLayer('route-glow') ? 'route-glow' : undefined;
+        for (const cfg of aspcLayers) {
+          thisMap.addLayer({ id:cfg.id, type:cfg.type, source:'airspace',
+            filter:cfg.filter, paint:cfg.paint,
+            layout:{ visibility:'none' } }, beforeId);
+        }
+        // Wire the airspace toggle button (added earlier in the control panel)
+        const aspcBtn = document.getElementById('fd-aspc-toggle');
+        if (aspcBtn) {
+          aspcBtn.addEventListener('click', () => {
+            const vis = thisMap.getLayoutProperty('aspc-b-fill','visibility') === 'visible' ? 'none' : 'visible';
+            for (const cfg of aspcLayers) thisMap.setLayoutProperty(cfg.id,'visibility',vis);
+            aspcBtn.style.background = vis === 'visible' ? 'var(--amber,#d4a520)' : '';
+            aspcBtn.style.color      = vis === 'visible' ? '#000' : '';
+          });
+        }
       })
       .catch(() => {});
   });

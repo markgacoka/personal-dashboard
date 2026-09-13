@@ -63,7 +63,7 @@ jobs:
             "${{ env.VPS_USER }}@${{ env.VPS_HOST }}" bash << EOF
           set -euo pipefail
 
-          mkdir -p "${RELEASE_DIR}"
+          mkdir -p "${RELEASE_DIR}" "${DEPLOY_PATH}/data"
           tar xzf /tmp/deploy-${SHA}.tar.gz -C "${RELEASE_DIR}"
           rm /tmp/deploy-${SHA}.tar.gz
 

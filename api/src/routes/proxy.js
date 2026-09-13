@@ -296,7 +296,15 @@ export default async function proxyRoutes(fastify) {
           notes,type_code,category,aircraft_class,gear_type,is_complex,is_high_performance,mode_s_hex)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (tail_number) DO UPDATE SET
-         make=EXCLUDED.make, model=EXCLUDED.model,
+         make=EXCLUDED.make, model=EXCLUDED.model, year=COALESCE(EXCLUDED.year, aircraft.year),
+         engine_type=COALESCE(EXCLUDED.engine_type, aircraft.engine_type),
+         engine_hp=COALESCE(EXCLUDED.engine_hp, aircraft.engine_hp),
+         seats=COALESCE(EXCLUDED.seats, aircraft.seats),
+         ifr_equipped=EXCLUDED.ifr_equipped, glass_cockpit=EXCLUDED.glass_cockpit,
+         type_code=COALESCE(EXCLUDED.type_code, aircraft.type_code),
+         category=EXCLUDED.category, aircraft_class=EXCLUDED.aircraft_class,
+         gear_type=EXCLUDED.gear_type, is_complex=EXCLUDED.is_complex,
+         is_high_performance=EXCLUDED.is_high_performance,
          mode_s_hex=COALESCE(EXCLUDED.mode_s_hex, aircraft.mode_s_hex)
        RETURNING *`,
       [tail_number, make, model, year, engine_type, engine_hp, seats, ifr_equipped,

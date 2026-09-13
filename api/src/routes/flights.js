@@ -200,14 +200,12 @@ export default async function flightRoutes(fastify) {
   fastify.post('/api/instructors', async (req, reply) => {
     const { name, certificate = null, rating = null } = req.body || {}
     if (!name) return reply.status(400).send({ error: 'name required' })
+    const trimmed = name.trim()
+    const existing = await pool.query('SELECT * FROM instructors WHERE name = $1', [trimmed])
+    if (existing.rows.length) return reply.status(201).send(existing.rows[0])
     const { rows } = await pool.query(
-      `INSERT INTO instructors (name, certificate, rating)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (name) DO UPDATE SET
-         certificate = COALESCE(EXCLUDED.certificate, instructors.certificate),
-         rating      = COALESCE(EXCLUDED.rating, instructors.rating)
-       RETURNING *`,
-      [name.trim(), certificate, rating]
+      `INSERT INTO instructors (name, certificate, rating) VALUES ($1, $2, $3) RETURNING *`,
+      [trimmed, certificate, rating]
     )
     return reply.status(201).send(rows[0])
   })

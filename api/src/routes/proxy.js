@@ -77,7 +77,50 @@ function normalizeFaPositions(positions) {
     altitude_ft:     p.altitude != null ? p.altitude * 100 : null,
     groundspeed_kts: p.groundspeed,
     track_deg:       p.heading,
+    on_ground:       p.on_ground ?? false,
   })).filter(p => p.lat != null && p.lon != null)
+}
+
+// Proxy for "aircraft is on the ground" using FA track fields.
+// FA does not always emit on_ground; fall back to altitude + speed thresholds.
+function faOnGround(p) {
+  if (p.on_ground === true) return true
+  if (p.altitude_ft != null && p.groundspeed_kts != null) return p.altitude_ft < 500 && p.groundspeed_kts < 50
+  if (p.groundspeed_kts != null) return p.groundspeed_kts < 30
+  if (p.altitude_ft != null)     return p.altitude_ft < 300
+  return false
+}
+
+// Bound a merged, chronologically-sorted track to the schedule window.
+// Schedule times (time_out / time_in) are stored in UTC in the DB (the DB values
+// come from nice_air_schedules which converts PT → Unix → ISO at insert time).
+// FA timestamps are also UTC, so comparison is direct.
+// Start: drop any point before time_out.
+// End: crop at time_in, but extend past it until landing if the aircraft is still airborne.
+function boundFaTrack(positions, timeOut, timeIn) {
+  if (!positions.length) return positions
+  const t0 = timeOut ? new Date(timeOut).getTime() : -Infinity
+  const t1  = timeIn  ? new Date(timeIn).getTime()  :  Infinity
+
+  const fromStart = positions.filter(p => new Date(p.ts).getTime() >= t0)
+  if (!fromStart.length) return positions  // edge-case: keep all if window filter empties
+
+  if (t1 === Infinity) return fromStart   // no end bound — return everything from start
+
+  const inWindow  = fromStart.filter(p => new Date(p.ts).getTime() <= t1)
+  const afterEnd  = fromStart.filter(p => new Date(p.ts).getTime() >  t1)
+
+  const last = inWindow[inWindow.length - 1]
+  // Already landed or nothing beyond window — stop here
+  if (!last || faOnGround(last) || !afterEnd.length) return inWindow
+
+  // Still airborne at time_in — extend until landing is detected
+  const extended = [...inWindow]
+  for (const p of afterEnd) {
+    extended.push(p)
+    if (faOnGround(p)) break
+  }
+  return extended
 }
 
 // ── FA backfill core ──────────────────────────────────────────────────────────
@@ -182,19 +225,20 @@ async function runFaBackfill(toProcess, job, log) {
         } catch (_) {}
       }
 
-      // Deduplicate by timestamp and sort chronologically
+      // Deduplicate by timestamp, sort chronologically, then bound to schedule window
       const seen = new Map()
       for (const p of allPositions) { if (p.ts && !seen.has(p.ts)) seen.set(p.ts, p) }
-      const merged = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+      const merged  = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+      const bounded = boundFaTrack(merged, timeOut, timeIn)
 
-      if (!merged.length) {
+      if (!bounded.length) {
         emit({ id: f.id, date: dateStr, tail, status: 'no_positions', fa_flight_ids: okFaIds })
         if (job) job.counts.no_positions++
         await sleep(FA_FLIGHT_DELAY)
         continue
       }
 
-      const saved = await saveTrackPoints(pool, f.id, merged)
+      const saved = await saveTrackPoints(pool, f.id, bounded)
       emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, fa_flight_ids: okFaIds, score: scored[0].score })
       if (job) job.counts.ok++
     } catch (e) {
@@ -746,13 +790,14 @@ export default async function proxyRoutes(fastify) {
       }
       const seen = new Map()
       for (const p of allPositions) { if (p.ts && !seen.has(p.ts)) seen.set(p.ts, p) }
-      const merged = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+      const merged  = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+      const bounded = boundFaTrack(merged, timeOut, timeIn)
 
-      if (!merged.length) {
+      if (!bounded.length) {
         return { success: false, points_saved: 0, message: 'No track positions from FlightAware' }
       }
 
-      const saved = await saveTrackPoints(pool, flightId, merged)
+      const saved = await saveTrackPoints(pool, flightId, bounded)
       fastify.log.info({ flightId, tail, saved, fa_flight_ids: okFaIds }, 'FlightAware track saved')
       return { success: true, points_saved: saved, fa_flight_ids: okFaIds, score: scored[0].score }
     } catch (e) {

@@ -937,4 +937,54 @@ export default async function proxyRoutes(fastify) {
       return { taf: null, icao }
     }
   })
+
+  // ── OpenAIP airspace (cached 24h) ─────────────────────────────────────────
+  let _airspaceCache = null
+  let _airspaceCacheAt = 0
+  const AIRSPACE_TTL = 24 * 60 * 60 * 1000 // 24 h
+
+  fastify.get('/api/external/airspace', async (req, reply) => {
+    const key = process.env.OPENAIP_CLIENT_ID
+    if (!key) return reply.code(503).send({ error: 'OPENAIP_CLIENT_ID not configured' })
+
+    const now = Date.now()
+    if (_airspaceCache && (now - _airspaceCacheAt) < AIRSPACE_TTL) {
+      return _airspaceCache
+    }
+
+    // Bounding box covering continental western US GA airspace
+    const bbox = '-125,32,-113,42'
+    const classes = ['A','B','C','D','E'].join(',')
+    const url = `https://api.core.openaip.net/api/airspaces?bbox=${bbox}&classes=${classes}&page=1&limit=300`
+
+    try {
+      const r = await fetch(url, {
+        headers: { 'x-openaip-client-id': key, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!r.ok) {
+        fastify.log.warn({ status: r.status }, 'OpenAIP airspace fetch failed')
+        return reply.code(502).send({ error: 'OpenAIP request failed', status: r.status })
+      }
+      const data = await r.json()
+      const features = (data.items || []).map(item => ({
+        type: 'Feature',
+        properties: {
+          id:    item._id,
+          name:  item.name,
+          class: item.class,
+          type:  item.type,
+          upper: item.upperLimit,
+          lower: item.lowerLimit,
+        },
+        geometry: item.geometry,
+      }))
+      _airspaceCache = { type: 'FeatureCollection', features }
+      _airspaceCacheAt = now
+      return _airspaceCache
+    } catch (e) {
+      fastify.log.warn({ err: e.message }, 'OpenAIP airspace error')
+      return reply.code(502).send({ error: e.message })
+    }
+  })
 }

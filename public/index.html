@@ -3910,16 +3910,28 @@ async function showFlightDetail(id) {
     <!-- ── Track Scrubber ────────────────────────────────── -->
     ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--deep)">
       <div style="position:relative">
-        <canvas id="fd-elev-chart" style="display:block;width:100%;height:128px;cursor:crosshair;touch-action:none"></canvas>
-        <div id="fd-scrubber-info" style="position:absolute;top:8px;left:10px;right:10px;display:flex;gap:5px;flex-wrap:wrap;pointer-events:none"></div>
+        <canvas id="fd-elev-chart" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none"></canvas>
+        <div id="fd-scrubber-info" style="position:absolute;top:8px;left:50px;right:10px;display:flex;gap:5px;flex-wrap:wrap;pointer-events:none"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--raised);border-top:1px solid var(--rule)">
+      <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--raised);border-top:1px solid var(--rule)">
+        <button id="fd-skip-start-btn" title="Skip to start" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <i class="ph-bold ph-skip-back" style="font-size:11px"></i>
+        </button>
         <button id="fd-play-btn" title="Play" style="width:28px;height:28px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
           <i class="ph-bold ph-play" id="fd-play-icon" style="font-size:12px"></i>
         </button>
-        <span id="fd-time-start" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+        <button id="fd-skip-end-btn" title="Skip to end" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <i class="ph-bold ph-skip-forward" style="font-size:11px"></i>
+        </button>
+        <span id="fd-time-start" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:2px"></span>
         <div style="flex:1"></div>
         <span id="fd-time-end" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+        <select id="fd-speed-sel" title="Playback speed" style="margin-left:6px;background:var(--graphite);border:1px solid var(--rule);color:var(--muted);border-radius:4px;padding:2px 4px;font-size:10px;cursor:pointer;outline:none">
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+          <option value="8">8×</option>
+        </select>
       </div>
     </div>` : ''}
 
@@ -4279,8 +4291,39 @@ async function initFlightDetailMap(f) {
     zoom: 8,
     attributionControl: false,
   });
-  thisMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  thisMap.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: false }), 'top-right');
+  thisMap.addControl(new maplibregl.FullscreenControl(), 'top-right');
+  thisMap.addControl(new maplibregl.ScaleControl({ unit: 'nautical' }), 'bottom-left');
   thisMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  // Satellite toggle
+  const _satWrap = document.createElement('div');
+  _satWrap.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+  const _satBtn = document.createElement('button');
+  _satBtn.title = 'Toggle satellite imagery';
+  _satBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:14px;width:29px;height:29px';
+  _satBtn.innerHTML = '<i class="ph-bold ph-globe-hemisphere-west"></i>';
+  let _satOn = false;
+  _satBtn.addEventListener('click', () => {
+    _satOn = !_satOn;
+    _satBtn.style.background = _satOn ? 'var(--amber,#d4a520)' : '';
+    _satBtn.style.color = _satOn ? '#000' : '';
+    if (_satOn) {
+      if (!thisMap.getSource('sat')) {
+        thisMap.addSource('sat', {
+          type: 'raster',
+          tiles: ['https://server.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+          tileSize: 256, attribution: '© Esri'
+        });
+      }
+      const before = thisMap.getLayer('route-glow') ? 'route-glow' : undefined;
+      thisMap.addLayer({ id:'sat-layer', type:'raster', source:'sat', paint:{'raster-opacity':0.88} }, before);
+    } else {
+      if (thisMap.getLayer('sat-layer')) thisMap.removeLayer('sat-layer');
+    }
+  });
+  _satWrap.appendChild(_satBtn);
+  thisMap.addControl({ onAdd: () => _satWrap, onRemove: () => {} }, 'top-right');
 
   thisMap.on('load', async () => {
     if (_fdMap !== thisMap) return; // stale — a newer map replaced this one
@@ -4316,17 +4359,28 @@ async function initFlightDetailMap(f) {
     if (coords.length >= 2) {
       thisMap.addSource('route', {
         type: 'geojson',
+        lineMetrics: true,
         data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
       });
       thisMap.addLayer({ id:'route-glow', type:'line', source:'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': routeColor, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 10 } });
+        paint: { 'line-color': routeColor, 'line-width': 16, 'line-opacity': 0.14, 'line-blur': 12 } });
       thisMap.addLayer({ id:'route-case', type:'line', source:'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': isLight ? '#ffffff' : '#000000', 'line-width': 5, 'line-opacity': 0.5 } });
+        paint: { 'line-color': isLight ? '#ffffff' : '#000000', 'line-width': 5.5, 'line-opacity': 0.45 } });
       thisMap.addLayer({ id:'route-line', type:'line', source:'route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': routeColor, 'line-width': 2.5, 'line-opacity': 1.0 } });
+        paint: {
+          'line-width': 2.8,
+          'line-opacity': 1.0,
+          'line-gradient': ['interpolate', ['linear'], ['line-progress'],
+            0,   routeColor,
+            0.35, '#4da8ff',
+            0.65, '#00d4ff',
+            1,   routeColor
+          ]
+        }
+      });
 
       const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
       thisMap.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: 500 });
@@ -4370,38 +4424,37 @@ async function initFlightDetailMap(f) {
       }));
       if (_fdMap !== thisMap) return; // stale after METAR fetches
 
-      thisMap.addSource('apts', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: apts.map(a => ({
-          type: 'Feature',
-          properties: { icao: a.icao, name: a.name || '' },
-          geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
-        })) },
-      });
-      thisMap.addLayer({ id:'apts-dot', type:'circle', source:'apts',
-        paint: { 'circle-radius': 5, 'circle-color': dotColor, 'circle-stroke-width': 2, 'circle-stroke-color': dotStroke } });
-      thisMap.addLayer({ id:'apts-lbl', type:'symbol', source:'apts',
-        layout: { 'text-field': ['get','icao'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-font':['Noto Sans Regular'] },
-        paint:  { 'text-color': lblColor, 'text-halo-color': lblHalo, 'text-halo-width': 1.5 } });
-
-      thisMap.on('click', 'apts-dot', e => {
-        const p = e.features[0].properties;
-        const obs = metarCache[p.icao] || [];
-        const metarHtml = obs.length
-          ? obs.map(o => {
-              const t = o.valid ? new Date(o.valid)
-                .toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC' }) + 'Z' : '';
-              return `<div style="margin-top:6px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;opacity:.6">${o.leg}${t ? ' · ' + t : ''}</span><br>
-                <code style="font-size:10px;word-break:break-all">${o.metar}</code></div>`;
-            }).join('')
-          : '<div style="margin-top:6px;font-size:11px;opacity:.6">No METAR available</div>';
-        new maplibregl.Popup({ offset: 10, closeButton: false, maxWidth: '320px' })
-          .setLngLat(e.features[0].geometry.coordinates)
-          .setHTML(`<strong>${p.icao}</strong>${p.name ? '<br><span style="font-size:11px">' + p.name + '</span>' : ''}${metarHtml}`)
+      for (const a of apts) {
+        const aptEl = document.createElement('div');
+        aptEl.style.cssText = 'cursor:pointer;text-align:center;pointer-events:auto';
+        aptEl.innerHTML = `<svg viewBox="0 0 30 30" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="15" cy="15" r="13" fill="${dotStroke}" fill-opacity="0.82" stroke="${dotColor}" stroke-width="1.5"/>
+          <rect x="13.5" y="3.5" width="3" height="23" rx="1.2" fill="${dotColor}"/>
+          <rect x="3.5" y="13.5" width="23" height="3" rx="1.2" fill="${dotColor}"/>
+          <rect x="12.5" y="3" width="5" height="1.5" rx="0.5" fill="${dotColor}" opacity="0.45"/>
+          <rect x="12.5" y="25.5" width="5" height="1.5" rx="0.5" fill="${dotColor}" opacity="0.45"/>
+          <circle cx="15" cy="15" r="2.5" fill="${dotColor}"/>
+        </svg>
+        <div style="font-size:8.5px;font-weight:700;color:${dotColor};letter-spacing:.05em;text-shadow:0 1px 3px ${dotStroke},0 0 6px ${dotStroke};margin-top:1px;line-height:1">${a.icao}</div>`;
+        aptEl.addEventListener('click', () => {
+          const obs = metarCache[a.icao] || [];
+          const metarHtml = obs.length
+            ? obs.map(o => {
+                const t = o.valid ? new Date(o.valid)
+                  .toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'UTC' }) + ' UTC' : '';
+                return `<div style="margin-top:6px"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;opacity:.6">${o.leg}${t ? ' · ' + t : ''}</span><br>
+                  <code style="font-size:10px;word-break:break-all">${o.metar}</code></div>`;
+              }).join('')
+            : '<div style="margin-top:6px;font-size:11px;opacity:.6">No METAR available</div>';
+          new maplibregl.Popup({ offset: [0,-22], closeButton: false, maxWidth: '320px' })
+            .setLngLat([a.lon, a.lat])
+            .setHTML(`<strong>${a.icao}</strong>${a.name ? '<br><span style="font-size:11px">' + a.name + '</span>' : ''}${metarHtml}`)
+            .addTo(thisMap);
+        });
+        new maplibregl.Marker({ element: aptEl, anchor: 'top' })
+          .setLngLat([a.lon, a.lat])
           .addTo(thisMap);
-      });
-      thisMap.on('mouseenter', 'apts-dot', () => thisMap.getCanvas().style.cursor = 'pointer');
-      thisMap.on('mouseleave', 'apts-dot', () => thisMap.getCanvas().style.cursor = '');
+      }
     }
 
     // ── Track scrubber + animated plane marker ────────────────────────────────
@@ -4420,33 +4473,41 @@ async function initFlightDetailMap(f) {
         let _playTimer = null;
 
         // Time range labels
-        const fmtUtc = (ts, sec) => new Date(ts).toLocaleTimeString('en-US',{
-          hour:'2-digit', minute:'2-digit', ...(sec ? {second:'2-digit'} : {}), timeZone:'UTC'
-        }) + 'Z';
-        if (timeStart) timeStart.textContent = fmtUtc(allPts[0].ts, false);
-        if (timeEnd)   timeEnd.textContent   = fmtUtc(allPts[allPts.length-1].ts, false);
+        const fmtTime = (ts, sec) => new Date(ts).toLocaleTimeString('en-US',{
+          hour:'2-digit', minute:'2-digit', ...(sec ? {second:'2-digit'} : {}), hour12:false, timeZone:'UTC'
+        }) + ' UTC';
+        if (timeStart) timeStart.textContent = fmtTime(allPts[0].ts, false);
+        if (timeEnd)   timeEnd.textContent   = fmtTime(allPts[allPts.length-1].ts, false);
 
         // ── Plane marker ──────────────────────────────────────────────────────
         // markerOuter: MapLibre owns its transform (translate). planeEl: we rotate only.
         const markerOuter = document.createElement('div');
-        markerOuter.style.cssText = 'width:36px;height:36px;pointer-events:none';
+        markerOuter.style.cssText = 'width:40px;height:40px;pointer-events:none';
         const planeEl = document.createElement('div');
-        planeEl.style.cssText = 'width:36px;height:36px;transform-origin:center center;will-change:transform';
-        planeEl.innerHTML = `<svg viewBox="0 0 36 36" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+        planeEl.style.cssText = 'width:40px;height:40px;transform-origin:center center;will-change:transform';
+        planeEl.innerHTML = `<svg viewBox="0 0 40 40" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <filter id="psh${f.id}" x="-60%" y="-60%" width="220%" height="220%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="2.5" flood-color="#000" flood-opacity=".65"/>
+            <filter id="psh${f.id}" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity=".7"/>
             </filter>
           </defs>
-          <g transform="translate(18,18)" filter="url(#psh${f.id})">
-            <path d="M0,-15 C1.8,-13 2.8,-7 2.8,1 C2.8,8 2,13 0,16 C-2,13 -2.8,8 -2.8,1 C-2.8,-7 -1.8,-13 0,-15 Z"
+          <g transform="translate(20,20)" filter="url(#psh${f.id})">
+            <!-- Fuselage -->
+            <path d="M0,-17 C1.6,-15 2.6,-8 2.6,2 C2.6,9 1.8,14 0,17 C-1.8,14 -2.6,9 -2.6,2 C-2.6,-8 -1.6,-15 0,-17 Z"
                   fill="${routeColor}"/>
-            <path d="M-2.5,1 L-15,9 L-14,12 L-2.5,5 Z" fill="${routeColor}" opacity=".92"/>
-            <path d="M2.5,1 L15,9 L14,12 L2.5,5 Z"     fill="${routeColor}" opacity=".92"/>
-            <path d="M-2,12 L-9,17 L-8.5,19 L-2,14 Z"  fill="${routeColor}" opacity=".82"/>
-            <path d="M2,12 L9,17 L8.5,19 L2,14 Z"      fill="${routeColor}" opacity=".82"/>
-            <ellipse cx="0" cy="-15" rx="4.5" ry="1.2"  fill="rgba(255,255,255,.2)"/>
-            <ellipse cx="0" cy="-10" rx="1.3" ry="2.2"  fill="rgba(255,255,255,.38)"/>
+            <!-- Main wings (swept) -->
+            <path d="M-2.4,-1 L-19,7 L-18.5,10 L-2.4,4 Z" fill="${routeColor}" opacity=".9"/>
+            <path d="M2.4,-1  L19,7  L18.5,10  L2.4,4  Z"  fill="${routeColor}" opacity=".9"/>
+            <!-- Wing leading edge taper highlight -->
+            <path d="M-2.2,-1 L-19,7 L-18.8,7.8 L-2.2,0.2 Z" fill="rgba(255,255,255,.12)"/>
+            <path d="M2.2,-1  L19,7  L18.8,7.8  L2.2,0.2  Z"  fill="rgba(255,255,255,.12)"/>
+            <!-- Horizontal stabilizer -->
+            <path d="M-2.2,10 L-10,15 L-9.5,17 L-2.2,12.5 Z" fill="${routeColor}" opacity=".85"/>
+            <path d="M2.2,10  L10,15  L9.5,17   L2.2,12.5  Z"  fill="${routeColor}" opacity=".85"/>
+            <!-- Nose / prop disk -->
+            <ellipse cx="0" cy="-17" rx="5" ry="1.1" fill="rgba(255,255,255,.18)"/>
+            <!-- Cockpit -->
+            <ellipse cx="0" cy="-9" rx="1.6" ry="2.8" fill="rgba(255,255,255,.38)"/>
           </g>
         </svg>`;
         markerOuter.appendChild(planeEl);
@@ -4460,10 +4521,13 @@ async function initFlightDetailMap(f) {
         const altMx = Math.max(...alts) || altMn + 1;
         const n     = allPts.length;
 
+        const spds   = allPts.map(p => p.groundspeed_kts ?? 0);
+        const spdMx  = Math.max(...spds, 1);
+
         function drawElev(idx) {
-          const dpr = window.devicePixelRatio || 1;
-          const cw  = elevCanvas.offsetWidth;
-          const ch  = elevCanvas.offsetHeight;
+          const dpr    = window.devicePixelRatio || 1;
+          const cw     = elevCanvas.offsetWidth;
+          const ch     = elevCanvas.offsetHeight;
           if (!cw || !ch) return;
           elevCanvas.width  = cw * dpr;
           elevCanvas.height = ch * dpr;
@@ -4471,48 +4535,86 @@ async function initFlightDetailMap(f) {
           ctx.scale(dpr, dpr);
 
           // Layout zones
-          const barH  = 10;   // progress bar height at bottom
-          const padT  = 8;    // top clearance
-          const padB  = barH + 8;  // bottom clearance (above bar)
-          const profH = ch - padT - padB;
+          const barH   = 10;
+          const padT   = 8;
+          const padB   = barH + 10;
+          const padL   = 44;     // left space for altitude axis labels
+          const profH  = ch - padT - padB;
+          const chartW = cw - padL;
 
-          const xOf = i => (i / (n - 1)) * cw;
-          const yOf = a => padT + profH - ((a - altMn) / (altMx - altMn)) * profH;
-          const pct = idx / (n - 1);
+          const xOf = i => padL + (i / Math.max(n - 1, 1)) * chartW;
+          const yOf = a => altMx === altMn ? padT + profH / 2
+            : padT + profH - ((a - altMn) / (altMx - altMn)) * profH;
+          const pct = idx / Math.max(n - 1, 1);
 
-          // Background: subtle grid lines
+          // Full-width subtle grid lines
           ctx.strokeStyle = 'rgba(255,255,255,0.04)';
           ctx.lineWidth   = 1;
           for (let g = 1; g < 4; g++) {
             const gy = padT + (profH / 4) * g;
-            ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(cw, gy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(cw, gy); ctx.stroke();
           }
 
-          // Gradient fill under profile
+          // Left axis separator
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, ch - padB); ctx.stroke();
+
+          // Y-axis altitude labels (ft)
+          ctx.font = '8.5px system-ui,sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          for (let g = 0; g <= 4; g++) {
+            const aVal = altMn + ((altMx - altMn) / 4) * (4 - g);
+            const gy   = padT + (profH / 4) * g;
+            const lbl  = aVal >= 10000 ? Math.round(aVal / 1000) + 'k\'' :
+                         aVal >= 1000  ? (aVal / 1000).toFixed(1) + 'k\'' :
+                                         Math.round(aVal) + '\'';
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillText(lbl, padL - 5, gy);
+          }
+
+          // Gradient fill under altitude profile
           const grad = ctx.createLinearGradient(0, padT, 0, ch - padB);
-          grad.addColorStop(0,   routeColor + '50');
-          grad.addColorStop(0.6, routeColor + '18');
+          grad.addColorStop(0,   routeColor + '48');
+          grad.addColorStop(0.6, routeColor + '14');
           grad.addColorStop(1,   routeColor + '04');
           ctx.beginPath();
-          ctx.moveTo(0, ch - padB);
+          ctx.moveTo(xOf(0), ch - padB);
           for (let i = 0; i < n; i++) ctx.lineTo(xOf(i), yOf(alts[i]));
-          ctx.lineTo(cw, ch - padB);
+          ctx.lineTo(xOf(n - 1), ch - padB);
           ctx.closePath();
           ctx.fillStyle = grad;
           ctx.fill();
 
-          // Profile line
+          // Groundspeed dashed overlay (normalized to chart height)
+          ctx.save();
+          ctx.setLineDash([4, 5]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.lineWidth = 1.1;
+          ctx.lineJoin  = 'round';
+          ctx.lineCap   = 'round';
+          ctx.beginPath();
+          for (let i = 0; i < n; i++) {
+            const sx = xOf(i);
+            const sy = padT + profH - (spds[i] / spdMx) * profH;
+            i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+          }
+          ctx.stroke();
+          ctx.restore();
+
+          // Altitude profile line
           ctx.beginPath();
           for (let i = 0; i < n; i++) {
             i === 0 ? ctx.moveTo(xOf(i), yOf(alts[i])) : ctx.lineTo(xOf(i), yOf(alts[i]));
           }
           ctx.strokeStyle = routeColor;
-          ctx.lineWidth   = 1.8;
+          ctx.lineWidth   = 2;
           ctx.lineJoin    = 'round';
           ctx.lineCap     = 'round';
           ctx.stroke();
 
-          // Cursor vertical line (dashed, through profile)
+          // Cursor vertical line
           const cx = xOf(idx);
           ctx.save();
           ctx.setLineDash([3, 4]);
@@ -4521,7 +4623,7 @@ async function initFlightDetailMap(f) {
           ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, ch - padB); ctx.stroke();
           ctx.restore();
 
-          // Dot at current elevation on profile line
+          // Dot at cursor on profile
           const cy = yOf(alts[idx]);
           ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
           ctx.fillStyle = '#fff'; ctx.fill();
@@ -4531,19 +4633,19 @@ async function initFlightDetailMap(f) {
           // Progress bar track
           const barY = ch - barH - 2;
           ctx.fillStyle = 'rgba(255,255,255,0.07)';
-          ctx.beginPath(); ctx.roundRect(0, barY, cw, barH, 5); ctx.fill();
+          ctx.beginPath(); ctx.roundRect(padL, barY, chartW, barH, 5); ctx.fill();
 
           // Progress bar fill
           if (pct > 0) {
-            const barGrad = ctx.createLinearGradient(0, 0, pct * cw, 0);
+            const barGrad = ctx.createLinearGradient(padL, 0, padL + pct * chartW, 0);
             barGrad.addColorStop(0, routeColor + 'aa');
             barGrad.addColorStop(1, routeColor);
             ctx.fillStyle = barGrad;
-            ctx.beginPath(); ctx.roundRect(0, barY, pct * cw, barH, 5); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(padL, barY, pct * chartW, barH, 5); ctx.fill();
           }
 
-          // Playhead thumb on bar
-          const thumbX = pct * cw;
+          // Playhead thumb
+          const thumbX = padL + pct * chartW;
           ctx.save();
           ctx.shadowColor = 'rgba(0,0,0,0.5)';
           ctx.shadowBlur  = 6;
@@ -4558,14 +4660,23 @@ async function initFlightDetailMap(f) {
         function updateChips(idx) {
           if (!scrubInfo) return;
           const pt  = allPts[Math.min(idx, n - 1)];
-          const utc = fmtUtc(pt.ts, true);
+          const utc = fmtTime(pt.ts, true);
           const alt = pt.altitude_ft != null ? Math.round(pt.altitude_ft).toLocaleString() + ' ft' : '';
           const spd = pt.groundspeed_kts != null ? Math.round(pt.groundspeed_kts) + ' kts' : '';
           const hdg = pt.track_deg != null ? Math.round(pt.track_deg) + '°' : '';
+          let vs = '';
+          if (idx > 0 && pt.altitude_ft != null) {
+            const prev = allPts[idx - 1];
+            const dtSec = (new Date(pt.ts) - new Date(prev.ts)) / 1000;
+            if (dtSec > 0 && prev.altitude_ft != null) {
+              const fpm = ((pt.altitude_ft - prev.altitude_ft) / dtSec) * 60;
+              if (Math.abs(fpm) > 80) vs = (fpm > 0 ? '+' : '') + Math.round(fpm / 10) * 10 + ' fpm';
+            }
+          }
           const chip = (val, label) => val
             ? `<span style="background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.1);padding:2px 8px;border-radius:20px;font-size:10px;color:var(--champagne);white-space:nowrap;font-variant-numeric:tabular-nums">${label ? `<span style="font-size:9px;color:var(--faint);letter-spacing:.04em;margin-right:3px">${label}</span>` : ''}${val}</span>`
             : '';
-          scrubInfo.innerHTML = chip(utc,'') + chip(alt,'ALT') + chip(spd,'GS') + chip(hdg,'HDG');
+          scrubInfo.innerHTML = chip(utc,'') + chip(alt,'ALT') + chip(spd,'GS') + chip(hdg,'HDG') + chip(vs,'VS');
         }
 
         function updateScrubPos(idx) {
@@ -4577,11 +4688,12 @@ async function initFlightDetailMap(f) {
           drawElev(scrubIdx);
         }
 
-        // Canvas pointer interaction — pixel-perfect alignment: same x↔idx mapping
-        // as drawElev's xOf(), so cursor and thumb always coincide.
+        // Canvas pointer interaction — x mapping matches drawElev's xOf(i)=padL+i/n*chartW
         function idxFromPointer(e) {
-          const rect = elevCanvas.getBoundingClientRect();
-          const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          const rect   = elevCanvas.getBoundingClientRect();
+          const padL   = 44;
+          const chartW = rect.width - padL;
+          const pct    = Math.max(0, Math.min(1, (e.clientX - rect.left - padL) / chartW));
           return Math.round(pct * (n - 1));
         }
         let _dragging = false;
@@ -4597,7 +4709,20 @@ async function initFlightDetailMap(f) {
         });
         elevCanvas.addEventListener('pointerup', () => { _dragging = false; });
 
-        // Play / pause
+        // Skip to start / end
+        const skipStartBtn = document.getElementById('fd-skip-start-btn');
+        const skipEndBtn   = document.getElementById('fd-skip-end-btn');
+        const speedSel     = document.getElementById('fd-speed-sel');
+        if (skipStartBtn) skipStartBtn.addEventListener('click', () => {
+          if (_playTimer) { clearInterval(_playTimer); _playTimer = null; playIcon.className = 'ph-bold ph-play'; }
+          updateScrubPos(0);
+        });
+        if (skipEndBtn) skipEndBtn.addEventListener('click', () => {
+          if (_playTimer) { clearInterval(_playTimer); _playTimer = null; playIcon.className = 'ph-bold ph-play'; }
+          updateScrubPos(n - 1);
+        });
+
+        // Play / pause with speed selector
         if (playBtn) {
           playBtn.addEventListener('click', () => {
             if (_playTimer) {
@@ -4606,6 +4731,8 @@ async function initFlightDetailMap(f) {
             } else {
               playIcon.className = 'ph-bold ph-pause';
               let idx = scrubIdx >= n - 1 ? 0 : scrubIdx;
+              const speed    = speedSel ? Number(speedSel.value) : 1;
+              const interval = Math.max(16, Math.round(160 / speed));
               _playTimer = setInterval(() => {
                 idx++;
                 if (idx >= n) {
@@ -4614,7 +4741,7 @@ async function initFlightDetailMap(f) {
                   return;
                 }
                 updateScrubPos(idx);
-              }, 160);
+              }, interval);
             }
           });
         }
@@ -4626,6 +4753,36 @@ async function initFlightDetailMap(f) {
         requestAnimationFrame(() => updateScrubPos(0));
       }
     }
+
+    // ── Airspace overlay (OpenAIP, graceful if unavailable) ───────────────────
+    fetch('/api/external/airspace')
+      .then(r => r.ok ? r.json() : null)
+      .then(fc => {
+        if (!fc || _fdMap !== thisMap) return;
+        thisMap.addSource('airspace', { type: 'geojson', data: fc });
+        // Class B fill
+        thisMap.addLayer({ id:'aspc-b-fill', type:'fill', source:'airspace',
+          filter: ['==', ['get','class'], 'B'],
+          paint:  { 'fill-color': '#0050cc', 'fill-opacity': 0.07 } }, 'route-glow');
+        thisMap.addLayer({ id:'aspc-b-line', type:'line', source:'airspace',
+          filter: ['==', ['get','class'], 'B'],
+          paint:  { 'line-color': '#2979ff', 'line-width': 1.8, 'line-opacity': 0.7 } }, 'route-glow');
+        // Class C fill
+        thisMap.addLayer({ id:'aspc-c-fill', type:'fill', source:'airspace',
+          filter: ['==', ['get','class'], 'C'],
+          paint:  { 'fill-color': '#aa00cc', 'fill-opacity': 0.06 } }, 'route-glow');
+        thisMap.addLayer({ id:'aspc-c-line', type:'line', source:'airspace',
+          filter: ['==', ['get','class'], 'C'],
+          paint:  { 'line-color': '#cc55dd', 'line-width': 1.5, 'line-dasharray': [2, 0], 'line-opacity': 0.65 } }, 'route-glow');
+        // Class D fill
+        thisMap.addLayer({ id:'aspc-d-fill', type:'fill', source:'airspace',
+          filter: ['==', ['get','class'], 'D'],
+          paint:  { 'fill-color': '#0055cc', 'fill-opacity': 0.04 } }, 'route-glow');
+        thisMap.addLayer({ id:'aspc-d-line', type:'line', source:'airspace',
+          filter: ['==', ['get','class'], 'D'],
+          paint:  { 'line-color': '#4499ee', 'line-width': 1.2, 'line-dasharray': [3, 3], 'line-opacity': 0.55 } }, 'route-glow');
+      })
+      .catch(() => {});
   });
 }
 

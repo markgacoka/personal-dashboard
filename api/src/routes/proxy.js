@@ -959,6 +959,22 @@ export default async function proxyRoutes(fastify) {
     }
   })
 
+  // ── FlightAware AeroAPI probe — returns raw response for schema discovery ────
+  fastify.get('/api/external/fa-probe', async (req, reply) => {
+    const key = process.env.FLIGHTAWARE_API_KEY
+    if (!key) return reply.status(500).send({ error: 'FLIGHTAWARE_API_KEY not set' })
+    const { ident = 'N739HE', start = '2025-07-30', end = '2025-07-31', fa_flight_id } = req.query
+    const FA_BASE = 'https://aeroapi.flightaware.com/aeroapi'
+    const headers = { 'x-apikey': key, Accept: 'application/json; charset=UTF-8' }
+    if (fa_flight_id) {
+      const r = await fetch(`${FA_BASE}/flights/${encodeURIComponent(fa_flight_id)}/track`, { headers })
+      return { status: r.status, body: await r.json().catch(() => r.text()) }
+    }
+    const url = `${FA_BASE}/flights/${encodeURIComponent(ident)}?start=${start}T00:00:00Z&end=${end}T23:59:59Z&max_pages=1`
+    const r = await fetch(url, { headers })
+    return { status: r.status, url, body: await r.json().catch(() => r.text()) }
+  })
+
   // ── FlightRadar24: batch backfill all flights without tracks ──────────────────
   // POST /api/external/fr24-backfill?overwrite=false[&limit=N][&async=true]
   // Default: streams NDJSON until complete.

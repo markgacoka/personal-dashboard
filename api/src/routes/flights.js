@@ -197,6 +197,21 @@ export default async function flightRoutes(fastify) {
     return rows
   })
 
+  fastify.post('/api/instructors', async (req, reply) => {
+    const { name, certificate = null, rating = null } = req.body || {}
+    if (!name) return reply.status(400).send({ error: 'name required' })
+    const { rows } = await pool.query(
+      `INSERT INTO instructors (name, certificate, rating)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (name) DO UPDATE SET
+         certificate = COALESCE(EXCLUDED.certificate, instructors.certificate),
+         rating      = COALESCE(EXCLUDED.rating, instructors.rating)
+       RETURNING *`,
+      [name.trim(), certificate, rating]
+    )
+    return reply.status(201).send(rows[0])
+  })
+
   fastify.get('/api/airports/:icao', async (req, reply) => {
     const { rows } = await pool.query('SELECT * FROM airports WHERE icao = $1', [req.params.icao.toUpperCase()])
     if (!rows.length) return reply.status(404).send({ error: 'Airport not found' })

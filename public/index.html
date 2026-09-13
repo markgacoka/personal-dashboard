@@ -3908,25 +3908,25 @@ async function showFlightDetail(id) {
     ${!f.has_track ? `<div id="fd-track-fetch-status" style="margin-bottom:12px"></div>` : ''}
 
     <!-- ── Track Scrubber ────────────────────────────────── -->
-    ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:var(--deep)">
-      <div style="position:relative">
-        <canvas id="fd-elev-chart" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none"></canvas>
+    ${f.has_track ? `<div id="fd-scrubber-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--rule);border-radius:var(--r-md);overflow:hidden;background:#12111a">
+      <div style="position:relative;background:#12111a">
+        <canvas id="fd-elev-chart" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none;background:#12111a"></canvas>
         <div id="fd-scrubber-info" style="position:absolute;top:8px;left:50px;right:10px;display:flex;gap:5px;flex-wrap:wrap;pointer-events:none"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--raised);border-top:1px solid var(--rule)">
-        <button id="fd-skip-start-btn" title="Skip to start" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:#1c1a28;border-top:1px solid rgba(255,255,255,0.08)">
+        <button id="fd-skip-start-btn" title="Skip to start" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.7);cursor:pointer;display:flex;align-items:center;justify-content:center">
           <i class="ph-bold ph-skip-back" style="font-size:11px"></i>
         </button>
-        <button id="fd-play-btn" title="Play" style="width:28px;height:28px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <button id="fd-play-btn" title="Play" style="width:28px;height:28px;flex-shrink:0;border-radius:50%;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.1);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center">
           <i class="ph-bold ph-play" id="fd-play-icon" style="font-size:12px"></i>
         </button>
-        <button id="fd-skip-end-btn" title="Skip to end" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid var(--rule);background:var(--graphite);color:var(--champagne);cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <button id="fd-skip-end-btn" title="Skip to end" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.7);cursor:pointer;display:flex;align-items:center;justify-content:center">
           <i class="ph-bold ph-skip-forward" style="font-size:11px"></i>
         </button>
-        <span id="fd-time-start" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:2px"></span>
+        <span id="fd-time-start" style="font-size:10px;color:rgba(255,255,255,0.45);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:2px"></span>
         <div style="flex:1"></div>
-        <span id="fd-time-end" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
-        <select id="fd-speed-sel" title="Playback speed" style="margin-left:6px;background:var(--graphite);border:1px solid var(--rule);color:var(--muted);border-radius:4px;padding:2px 4px;font-size:10px;cursor:pointer;outline:none">
+        <span id="fd-time-end" style="font-size:10px;color:rgba(255,255,255,0.45);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+        <select id="fd-speed-sel" title="Playback speed" style="margin-left:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.6);border-radius:4px;padding:2px 4px;font-size:10px;cursor:pointer;outline:none">
           <option value="1">1×</option>
           <option value="2">2×</option>
           <option value="4">4×</option>
@@ -4516,6 +4516,23 @@ async function initFlightDetailMap(f) {
         const spds   = allPts.map(p => p.groundspeed_kts ?? 0);
         const spdMx  = Math.max(...spds, 1);
 
+        // Cardinal spline helper — smooth curve through all (x,y) points
+        function cardinalSplinePath(ctx, pts, tension) {
+          if (pts.length < 2) return;
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[Math.max(i - 1, 0)];
+            const p1 = pts[i];
+            const p2 = pts[i + 1];
+            const p3 = pts[Math.min(i + 2, pts.length - 1)];
+            const cp1x = p1[0] + (p2[0] - p0[0]) * tension;
+            const cp1y = p1[1] + (p2[1] - p0[1]) * tension;
+            const cp2x = p2[0] - (p3[0] - p1[0]) * tension;
+            const cp2y = p2[1] - (p3[1] - p1[1]) * tension;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2[0], p2[1]);
+          }
+        }
+
         function drawElev(idx) {
           const dpr    = window.devicePixelRatio || 1;
           const cw     = elevCanvas.offsetWidth;
@@ -4526,33 +4543,43 @@ async function initFlightDetailMap(f) {
           const ctx = elevCanvas.getContext('2d');
           ctx.scale(dpr, dpr);
 
+          // Always-dark background (aviation instrument convention)
+          ctx.fillStyle = '#12111a';
+          ctx.fillRect(0, 0, cw, ch);
+
           // Layout zones
           const barH   = 3;
-          const padT   = 8;
-          const padB   = barH + 12;
-          const padL   = 44;     // left space for altitude axis labels
+          const padT   = 14;
+          const padB   = barH + 16;
+          const padL   = 46;
           const profH  = ch - padT - padB;
-          const chartW = cw - padL;
+          const chartW = cw - padL - 6;  // small right margin
 
           const xOf = i => padL + (i / Math.max(n - 1, 1)) * chartW;
           const yOf = a => altMx === altMn ? padT + profH / 2
             : padT + profH - ((a - altMn) / (altMx - altMn)) * profH;
-          const pct = idx / Math.max(n - 1, 1);
+          const pct  = idx / Math.max(n - 1, 1);
+          const groundY = yOf(altMn); // baseline (lowest point)
 
-          // Full-width subtle grid lines
-          ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+          // Grid lines — 4 horizontal bands
+          ctx.strokeStyle = 'rgba(255,255,255,0.055)';
           ctx.lineWidth   = 1;
           for (let g = 1; g < 4; g++) {
             const gy = padT + (profH / 4) * g;
-            ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(cw, gy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + chartW, gy); ctx.stroke();
           }
 
-          // Left axis separator
-          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-          ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, ch - padB); ctx.stroke();
+          // Ground baseline — solid line at minimum altitude
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.lineWidth   = 1;
+          ctx.beginPath(); ctx.moveTo(padL, groundY); ctx.lineTo(padL + chartW, groundY); ctx.stroke();
 
-          // Y-axis altitude labels (ft)
+          // Left axis separator
+          ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(padL, padT - 4); ctx.lineTo(padL, ch - padB + 4); ctx.stroke();
+
+          // Y-axis altitude labels
           ctx.font = '8.5px system-ui,sans-serif';
           ctx.textAlign = 'right';
           ctx.textBaseline = 'middle';
@@ -4561,70 +4588,85 @@ async function initFlightDetailMap(f) {
             const gy   = padT + (profH / 4) * g;
             const lbl  = aVal >= 10000 ? Math.round(aVal / 1000) + 'k\'' :
                          aVal >= 1000  ? (aVal / 1000).toFixed(1) + 'k\'' :
-                                         Math.round(aVal) + '\'';
-            ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.fillText(lbl, padL - 5, gy);
+                                         Math.round(aVal / 50) * 50 + '\'';
+            ctx.fillStyle = (g === 4 || g === 0) ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.28)';
+            ctx.fillText(lbl, padL - 6, gy);
           }
 
-          // Gradient fill under altitude profile
-          const grad = ctx.createLinearGradient(0, padT, 0, ch - padB);
-          grad.addColorStop(0,   routeColor + '48');
-          grad.addColorStop(0.6, routeColor + '14');
-          grad.addColorStop(1,   routeColor + '04');
+          // Pre-compute smoothed point arrays
+          const altPts = Array.from({length: n}, (_, i) => [xOf(i), yOf(alts[i])]);
+          const spdPts = Array.from({length: n}, (_, i) => [xOf(i), padT + profH - (spds[i] / spdMx) * profH]);
+
+          // Gradient fill under altitude profile (render before line)
+          const fillGrad = ctx.createLinearGradient(0, padT, 0, groundY);
+          fillGrad.addColorStop(0,   routeColor + '55');
+          fillGrad.addColorStop(0.5, routeColor + '22');
+          fillGrad.addColorStop(1,   routeColor + '06');
           ctx.beginPath();
-          ctx.moveTo(xOf(0), ch - padB);
-          for (let i = 0; i < n; i++) ctx.lineTo(xOf(i), yOf(alts[i]));
-          ctx.lineTo(xOf(n - 1), ch - padB);
+          ctx.moveTo(altPts[0][0], groundY);
+          cardinalSplinePath(ctx, altPts, 0.18);
+          ctx.lineTo(altPts[n-1][0], groundY);
           ctx.closePath();
-          ctx.fillStyle = grad;
+          ctx.fillStyle = fillGrad;
           ctx.fill();
 
-          // Groundspeed dashed overlay (normalized to chart height)
+          // Groundspeed dashed overlay (white, normalized)
           ctx.save();
-          ctx.setLineDash([4, 5]);
-          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-          ctx.lineWidth = 1.1;
+          ctx.setLineDash([3, 4]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.38)';
+          ctx.lineWidth = 1;
           ctx.lineJoin  = 'round';
           ctx.lineCap   = 'round';
           ctx.beginPath();
-          for (let i = 0; i < n; i++) {
-            const sx = xOf(i);
-            const sy = padT + profH - (spds[i] / spdMx) * profH;
-            i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
-          }
+          cardinalSplinePath(ctx, spdPts, 0.18);
           ctx.stroke();
           ctx.restore();
 
-          // Altitude profile line
+          // Altitude profile line (solid, coloured)
           ctx.beginPath();
-          for (let i = 0; i < n; i++) {
-            i === 0 ? ctx.moveTo(xOf(i), yOf(alts[i])) : ctx.lineTo(xOf(i), yOf(alts[i]));
-          }
+          cardinalSplinePath(ctx, altPts, 0.18);
           ctx.strokeStyle = routeColor;
-          ctx.lineWidth   = 2;
+          ctx.lineWidth   = 1.6;
           ctx.lineJoin    = 'round';
           ctx.lineCap     = 'round';
           ctx.stroke();
 
+          // Legend — bottom-right, inside chart
+          ctx.font = '7.5px system-ui,sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'bottom';
+          const legY = ch - padB - 4;
+          ctx.fillStyle = routeColor + 'cc';
+          ctx.fillText('ALT', padL + chartW, legY);
+          ctx.save();
+          ctx.setLineDash([3,4]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 1;
+          const legW = 14, legX = padL + chartW - 28, legLineY = legY - 4;
+          ctx.beginPath(); ctx.moveTo(legX, legLineY); ctx.lineTo(legX + legW, legLineY); ctx.stroke();
+          ctx.restore();
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillText('GS', legX - 2, legY);
+
           // Cursor vertical line
           const cx = xOf(idx);
           ctx.save();
-          ctx.setLineDash([3, 4]);
-          ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+          ctx.setLineDash([2, 3]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
           ctx.lineWidth   = 1;
           ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, ch - padB); ctx.stroke();
           ctx.restore();
 
-          // Dot at cursor on profile
-          const cy = yOf(alts[idx]);
+          // Dot at cursor position on profile
+          const cy = altPts[idx][1];
           ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
           ctx.fillStyle = '#fff'; ctx.fill();
           ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2);
           ctx.fillStyle = routeColor; ctx.fill();
 
-          // Progress bar track — slim 3px rail
+          // Progress bar track
           const barY = ch - barH - 4;
-          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
           ctx.beginPath(); ctx.roundRect(padL, barY, chartW, barH, barH / 2); ctx.fill();
 
           // Progress bar fill
@@ -4633,11 +4675,11 @@ async function initFlightDetailMap(f) {
             ctx.beginPath(); ctx.roundRect(padL, barY, pct * chartW, barH, barH / 2); ctx.fill();
           }
 
-          // Playhead thumb — small clean circle
+          // Playhead thumb
           const thumbX = padL + pct * chartW;
           ctx.beginPath(); ctx.arc(thumbX, barY + barH / 2, 5, 0, Math.PI * 2);
           ctx.fillStyle = '#fff';
-          ctx.shadowColor = 'rgba(0,0,0,0.35)';
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
           ctx.shadowBlur = 4;
           ctx.fill();
           ctx.shadowBlur = 0;

@@ -11,7 +11,7 @@ const FLIGHT_SELECT = `
     f.night_takeoffs, f.night_landings, f.night_landings_full_stop,
     f.holds, f.distance_nm, f.hobbs_start, f.hobbs_end, f.tach_start, f.tach_end,
     f.time_out, f.time_in, f.flight_review, f.checkride, f.ipc,
-    f.ground_training, f.simulated_flight, f.foreflight_source,
+    f.ground_training, f.simulated_flight, f.foreflight_source AS source,
     f.remarks, f.instructor_comments,
     f.instructor_id,
     EXISTS(SELECT 1 FROM track_log_points tlp WHERE tlp.flight_id = f.id) AS has_track,

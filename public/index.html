@@ -1876,14 +1876,19 @@ const SPLIT_META = {
 };
 
 const TYPE_CFG = {
-  dual:          { color: '#3b82f6', label: 'Dual'      },
-  maneuvers:     { color: '#14b8a6', label: 'Maneuvers' },
-  pattern:       { color: '#22c55e', label: 'Pattern'   },
-  'x-country':   { color: '#818cf8', label: 'X-Country' },
-  night:         { color: '#f59e0b', label: 'Night'     },
-  instrument:    { color: '#38bdf8', label: 'Instrument'},
-  solo:          { color: '#f472b6', label: 'Solo'      },
-  checkride_prep:{ color: '#fb923c', label: 'Checkride Prep' },
+  discovery:     { color: '#a78bfa', label: 'Discovery'        },
+  dual:          { color: '#3b82f6', label: 'Dual'             },
+  maneuvers:     { color: '#14b8a6', label: 'Maneuvers'        },
+  pattern:       { color: '#22c55e', label: 'Traffic Patterns' },
+  uncontrolled:  { color: '#84cc16', label: 'Uncontrolled Arpt'},
+  soft_short:    { color: '#10b981', label: 'Soft/Short Field' },
+  'x-country':   { color: '#818cf8', label: 'X-Country'        },
+  night:         { color: '#f59e0b', label: 'Night'            },
+  instrument:    { color: '#38bdf8', label: 'Instrument'       },
+  pre_solo:      { color: '#fb923c', label: 'Pre-Solo'         },
+  solo:          { color: '#f472b6', label: 'Solo'             },
+  solo_xc:       { color: '#e879f9', label: 'Solo X-Country'   },
+  checkride_prep:{ color: '#f97316', label: 'Checkride Prep'   },
 };
 
 const VIEW_TITLES = {
@@ -3973,7 +3978,7 @@ async function showFlightDetail(id) {
       </div>` : ''}
     </div>` : ''}
 
-    ${f.foreflight_source && f.foreflight_source !== 'manual' ? `<div style="font-size:11px;color:var(--faint)">Imported from ForeFlight</div>` : ''}
+    ${f.source && f.source !== 'manual' ? `<div style="font-size:11px;color:var(--faint)">Source: ${esc(f.source)}</div>` : ''}
     ${(f.hobbs_start&&f.hobbs_end)||(f.tach_start&&f.tach_end) ? `
     <div style="display:flex;gap:16px;font-size:11px;color:var(--faint);margin-top:8px">
       ${(f.hobbs_start&&f.hobbs_end) ? `<span>Hobbs ${f.hobbs_start} → ${f.hobbs_end}</span>` : ''}

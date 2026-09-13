@@ -3,7 +3,7 @@ import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-r
 import { pool } from '../db/client.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
 import { fetchNiceAirSchedules, syncNiceAirToDB } from '../services/gmail.js'
-import { getOskyToken, normalizeFr24Positions, normalizeOpenSkyPath, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
+import { getOskyToken, normalizeOpenSkyPath, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
 function parseCsvLine(line) {
@@ -41,46 +41,49 @@ async function dbQuery(sql, params) {
   try { return (await pool.query(sql, params)).rows } catch { return null }
 }
 
-// ── FlightRadar24 API v1 ──────────────────────────────────────────────────────
-// Env var: FR24_API_TOKEN  (Bearer token from fr24api.flightradar24.com)
-// Essential plan: historical flights up to 2 years.
-// Docs: https://fr24api.flightradar24.com/docs
-const FR24_BASE = 'https://fr24api.flightradar24.com'
-const _fr24Cache = new Map() // key `tail/YYYY-MM-DD` → { ts, flights[] }
+// ── FlightAware AeroAPI v4 ────────────────────────────────────────────────────
+// Env var: FLIGHTAWARE_API_KEY
+// Standard plan: historical flight data, 5 result-sets/second
+const FA_BASE = 'https://aeroapi.flightaware.com/aeroapi'
 
-async function fr24Fetch(path, params = {}, _retries = 2) {
-  const token = process.env.FR24_API_TOKEN
-  if (!token) throw new Error('FR24_API_TOKEN not configured')
-  const url = new URL(FR24_BASE + path)
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v))
+async function faFetch(path, params = {}) {
+  const key = process.env.FLIGHTAWARE_API_KEY
+  if (!key) throw new Error('FLIGHTAWARE_API_KEY not configured')
+  const url = new URL(FA_BASE + path)
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) url.searchParams.set(k, String(v))
+  }
   const r = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Accept-Version': 'v1',
-      Accept: 'application/json',
-    },
+    headers: { 'x-apikey': key, Accept: 'application/json; charset=UTF-8' },
     signal: AbortSignal.timeout(20000),
   })
-  if (r.status === 429 && _retries > 0) {
-    const retryAfter = parseInt(r.headers.get('Retry-After') || '10', 10)
-    const waitMs = Math.max(retryAfter * 1000, 5_000)
-    console.log(`FR24 rate limited — waiting ${waitMs / 1000}s`)
-    await new Promise(res => setTimeout(res, waitMs))
-    return fr24Fetch(path, params, _retries - 1)
+  if (r.status === 429) {
+    const wait = parseInt(r.headers.get('Retry-After') || '5', 10) * 1000
+    await new Promise(res => setTimeout(res, wait))
+    return faFetch(path, params)
   }
   if (!r.ok) {
-    const body = await r.text().catch(() => r.statusText)
-    throw new Error(`FlightRadar24 ${r.status}: ${body}`)
+    const body = await r.json().catch(() => ({}))
+    throw new Error(`FlightAware ${r.status}: ${body.detail || body.title || r.statusText}`)
   }
   return r.json()
 }
 
+function normalizeFaPositions(positions) {
+  return (positions || []).map(p => ({
+    ts:              p.timestamp,
+    lat:             p.latitude,
+    lon:             p.longitude,
+    altitude_ft:     p.altitude != null ? p.altitude * 100 : null,
+    groundspeed_kts: p.groundspeed,
+    track_deg:       p.heading,
+  })).filter(p => p.lat != null && p.lon != null)
+}
 
-// ── FR24 backfill core — shared by streaming and async modes ─────────────────
-const QUERY_DELAY  = 200   // ms between FR24 position queries within one sweep
-const FLIGHT_DELAY = 3000  // ms between flights
+// ── FA backfill core ──────────────────────────────────────────────────────────
+const FA_FLIGHT_DELAY = 1000  // 1s between flights (Standard = 5 req/s, 2 calls/flight)
 
-async function runFr24Backfill(toProcess, job, log) {
+async function runFaBackfill(toProcess, job, log) {
   const sleep = ms => new Promise(r => setTimeout(r, ms))
   const emit  = obj => { if (job) { job.log.push(obj); if (job.log.length > 200) job.log.shift() } }
 
@@ -89,26 +92,19 @@ async function runFr24Backfill(toProcess, job, log) {
     const { rows } = await pool.query(`SELECT date_str, tail, start_unix, end_unix FROM nice_air_schedules WHERE type != 'cancelled'`)
     allDbScheds = rows
   } catch (_) {}
-  let allGmailScheds = []
-  try { allGmailScheds = await fetchNiceAirSchedules() } catch (_) {}
 
   for (const f of toProcess) {
     const tail    = f.tail_number
     const dateStr = String(f.date).slice(0, 10)
+    const tailShort = tail.replace(/^N/, '')
 
     let timeOut = f.time_out
     let timeIn  = f.time_in
-    const tailShort = tail.replace(/^N/, '')
 
     if (!timeOut || !timeIn) {
       const dbMatch = allDbScheds.find(s => s.date_str === dateStr && (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort))
       if (dbMatch?.start_unix) timeOut = timeOut || new Date(dbMatch.start_unix * 1000).toISOString()
       if (dbMatch?.end_unix)   timeIn  = timeIn  || new Date(dbMatch.end_unix   * 1000).toISOString()
-    }
-    if (!timeOut || !timeIn) {
-      const match = allGmailScheds.find(s => s.date_str === dateStr && s.type !== 'cancelled' && (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort))
-      if (match?.start_unix) timeOut = timeOut || new Date(match.start_unix * 1000).toISOString()
-      if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
     }
     if (!timeOut) {
       const dateScheds = allDbScheds.filter(s => s.date_str === dateStr && s.start_unix)
@@ -120,91 +116,89 @@ async function runFr24Backfill(toProcess, job, log) {
         }
         timeOut = new Date(chosen.start_unix * 1000).toISOString()
         if (chosen.end_unix) timeIn = new Date(chosen.end_unix * 1000).toISOString()
-        emit({ id: f.id, date: dateStr, tail, status: 'date_only_schedule' })
       }
     }
 
     if (!timeOut) {
-      // FR24 summary fallback
-      try {
-        const dayStart = new Date(dateStr + 'T06:00:00Z')
-        const dayEnd   = new Date(dayStart.getTime() + 24 * 3_600_000)
-        const data = await fr24Fetch('/api/flight-summary/full', { registrations: tail, flight_datetime_from: dayStart.toISOString().slice(0, 19), flight_datetime_to: dayEnd.toISOString().slice(0, 19), limit: 20 })
-        const candidates = Array.isArray(data?.data) ? data.data : []
-        if (candidates.length) {
-          const norm   = ic => ic?.toUpperCase().replace(/^K/, '') || ''
-          const logDep = norm(f.departure_icao), logArr = norm(f.arrival_icao)
-          const logMin = f.total_duration ? parseFloat(f.total_duration) * 60 : null
-          const scored = candidates.map(ff => {
-            let score = 0
-            if (ff.orig_icao && norm(ff.orig_icao) === logDep) score += 3
-            if ((ff.dest_icao_actual || ff.dest_icao) && norm(ff.dest_icao_actual || ff.dest_icao) === logArr) score += 3
-            if (logMin && ff.datetime_takeoff && ff.datetime_landed) {
-              const diff = Math.abs((new Date(ff.datetime_landed) - new Date(ff.datetime_takeoff)) / 60000 - logMin)
-              score += diff < 10 ? 4 : diff < 20 ? 2 : 0
-            }
-            return { ...ff, score }
-          }).sort((a, b) => b.score - a.score)
-          const best = scored[0]
-          if (best.score >= 4) {
-            emit({ id: f.id, date: dateStr, tail, status: 'fr24_fallback', fr24_score: best.score })
-            timeOut = best.datetime_takeoff || best.first_seen
-            timeIn  = best.datetime_landed  || best.last_seen
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (!timeOut) {
-      emit({ id: f.id, date: dateStr, tail, status: 'no_window', reason: 'no time_out in DB, Gmail, or FR24' })
+      emit({ id: f.id, date: dateStr, tail, status: 'no_window', reason: 'no time_out in DB or schedules' })
       if (job) job.counts.no_window++
-      await sleep(FLIGHT_DELAY)
+      await sleep(FA_FLIGHT_DELAY)
       continue
     }
 
-    // Sweep timestamps within window
-    const winStart = new Date(timeOut)
-    const winEnd   = timeIn ? new Date(timeIn) : new Date(winStart.getTime() + 4 * 3_600_000)
-    const STEP_MS  = Math.max(10_000, Math.floor((winEnd - winStart) / 500))
-    const steps    = Math.ceil((winEnd - winStart) / STEP_MS)
-    emit({ id: f.id, date: dateStr, tail, status: 'sweeping', window_from: winStart.toISOString(), window_to: winEnd.toISOString(), steps })
+    // Build a ±2h search window around departure time
+    const winStart = new Date(new Date(timeOut).getTime() - 2 * 3_600_000)
+    const winEnd   = timeIn
+      ? new Date(new Date(timeIn).getTime() + 2 * 3_600_000)
+      : new Date(new Date(timeOut).getTime() + 6 * 3_600_000)
 
-    const seen = new Map()
-    for (let i = 0; i < steps; i++) {
-      const ts = new Date(winStart.getTime() + i * STEP_MS).toISOString().slice(0, 19)
-      try {
-        const data = await fr24Fetch('/api/historic/flight-positions/full', { registration: tail, timestamp: ts, limit: 10 })
-        const positions = Array.isArray(data?.data) ? data.data : []
-        for (const p of positions) {
-          const key = p.timestamp || p.ts
-          if (key && !seen.has(key)) seen.set(key, p)
-        }
-      } catch (e) {
-        if (e.message?.includes('429')) { await sleep(30_000); i-- }
-      }
-      await sleep(QUERY_DELAY)
-    }
+    emit({ id: f.id, date: dateStr, tail, status: 'searching', window_from: winStart.toISOString(), window_to: winEnd.toISOString() })
 
-    const rawPositions = [...seen.values()]
-    const normalized   = normalizeFr24Positions(rawPositions)
     try {
-      const saved = await saveTrackPoints(pool, f.id, normalized)
-      if (saved) {
-        emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, raw: rawPositions.length })
-        if (job) job.counts.ok++
-      } else {
-        emit({ id: f.id, date: dateStr, tail, status: 'no_positions', raw: rawPositions.length })
+      // 1. Find matching flight(s) in the window
+      const flightsData = await faFetch(`/flights/${encodeURIComponent(tail)}`, {
+        start: winStart.toISOString(),
+        end:   winEnd.toISOString(),
+        max_pages: 1,
+      })
+      const candidates = Array.isArray(flightsData?.flights) ? flightsData.flights : []
+
+      if (!candidates.length) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_fa_flight' })
         if (job) job.counts.no_positions++
+        await sleep(FA_FLIGHT_DELAY)
+        continue
       }
+
+      // Score candidates by airport match + duration match
+      const norm   = ic => (ic || '').toUpperCase().replace(/^K/, '')
+      const logDep = norm(f.departure_icao)
+      const logArr = norm(f.arrival_icao)
+      const logMin = f.total_duration ? parseFloat(f.total_duration) * 60 : null
+      const scored = candidates.map(ff => {
+        let score = 0
+        if (logDep && norm(ff.origin?.code || '') === logDep)      score += 4
+        if (logArr && norm(ff.destination?.code || '') === logArr)  score += 4
+        if (logMin && ff.actual_off && ff.actual_on) {
+          const durMin = (new Date(ff.actual_on) - new Date(ff.actual_off)) / 60000
+          const ratio  = Math.min(logMin, durMin) / Math.max(logMin, durMin)
+          score += ratio > 0.8 ? 5 : ratio > 0.55 ? 3 : ratio > 0.35 ? 1 : 0
+        }
+        return { ff, score }
+      }).sort((a, b) => b.score - a.score)
+
+      const best = scored[0].ff
+      const faId = best.fa_flight_id
+      if (!faId) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_fa_id' })
+        if (job) job.counts.no_positions++
+        await sleep(FA_FLIGHT_DELAY)
+        continue
+      }
+
+      // 2. Fetch track for the matched flight
+      await sleep(500)
+      const trackData = await faFetch(`/flights/${encodeURIComponent(faId)}/track`)
+      const positions = normalizeFaPositions(trackData?.positions)
+      if (!positions.length) {
+        emit({ id: f.id, date: dateStr, tail, status: 'no_positions', fa_flight_id: faId })
+        if (job) job.counts.no_positions++
+        await sleep(FA_FLIGHT_DELAY)
+        continue
+      }
+
+      const saved = await saveTrackPoints(pool, f.id, positions)
+      emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, fa_flight_id: faId, score: scored[0].score })
+      if (job) job.counts.ok++
     } catch (e) {
       emit({ id: f.id, date: dateStr, tail, status: 'error', reason: e.message })
       if (job) job.counts.errors++
     }
-    await sleep(FLIGHT_DELAY)
+    await sleep(FA_FLIGHT_DELAY)
   }
 
   if (job) { job.done = true; job.counts.processed = toProcess.length }
-  log?.info({ counts: job?.counts }, 'FR24 backfill complete')
+  log?.info({ counts: job?.counts }, 'FlightAware backfill complete')
 }
 
 export default async function proxyRoutes(fastify) {
@@ -645,101 +639,14 @@ export default async function proxyRoutes(fastify) {
     return result
   })
 
-  // ── FlightRadar24: raw diagnostic call (pass any params, see raw response) ───
-  // GET /api/external/fr24-raw?path=/api/...&param1=val1
-  // POST /api/external/fr24-raw  body: { path, ...params }
-  fastify.get('/api/external/fr24-raw', async (req, reply) => {
-    const { path: apiPath = '/api/flight-summary/full', ...params } = req.query
-    try {
-      const data = await fr24Fetch(apiPath, params)
-      return { ok: true, data }
-    } catch (e) {
-      return reply.status(200).send({ ok: false, error: e.message })
-    }
-  })
-  fastify.post('/api/external/fr24-raw', async (req, reply) => {
-    const { path: apiPath = '/api/flight-summary/full', ...params } = req.body || {}
-    try {
-      const token = process.env.FR24_API_TOKEN
-      if (!token) return reply.status(200).send({ ok: false, error: 'FR24_API_TOKEN not configured' })
-      const url = new URL(FR24_BASE + apiPath)
-      const r = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Accept-Version': 'v1',
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params),
-        signal: AbortSignal.timeout(20000),
-      })
-      const body = await r.text()
-      try { return { ok: r.ok, status: r.status, data: JSON.parse(body) } }
-      catch { return { ok: r.ok, status: r.status, data: body } }
-    } catch (e) {
-      return reply.status(200).send({ ok: false, error: e.message })
-    }
-  })
-
-  // ── FlightRadar24: flights by tail + date ────────────────────────────────────
-  // GET /api/external/fr24-flights/:tail?date=YYYY-MM-DD
-  // Returns FR24 flights list for a Pacific-day window. Cached 1h in memory.
-  fastify.get('/api/external/fr24-flights/:tail', async (req, reply) => {
-    const tail = req.params.tail.toUpperCase().replace(/[^A-Z0-9]/g, '')
-    const date = req.query.date // YYYY-MM-DD
-    if (!date) return reply.status(400).send({ error: 'date required (YYYY-MM-DD)' })
-
-    const cacheKey = `${tail}/${date}`
-    const hit = _fr24Cache.get(cacheKey)
-    if (hit && Date.now() - hit.ts < 3_600_000) return { flights: hit.flights, source: 'cache' }
-
-    // Pacific-day UTC window: PST is UTC-8, PDT is UTC-7.
-    // Use UTC-8 worst case: day starts at 08:00 UTC, add 26h buffer for full coverage.
-    const dayStart = new Date(date + 'T08:00:00Z')
-    const dayEnd   = new Date(dayStart.getTime() + 26 * 3_600_000)
-
-    try {
-      const data = await fr24Fetch('/api/flight-summary/full', {
-        registrations:        tail,
-        flight_datetime_from: dayStart.toISOString().slice(0, 19),
-        flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
-        limit:                20,
-      })
-      const raw  = Array.isArray(data?.data) ? data.data : []
-      const flights = raw.map(f => ({
-        fr24_id:        f.fr24_id,
-        ident:          f.callsign || f.flight || tail,
-        departure_icao: f.orig_icao || null,
-        arrival_icao:   f.dest_icao_actual || f.dest_icao || null,
-        departure_time: f.datetime_takeoff || f.first_seen || null,
-        arrival_time:   f.datetime_landed  || f.last_seen  || null,
-        first_seen_unix: f.datetime_takeoff
-          ? Math.floor(new Date(f.datetime_takeoff).getTime() / 1000) : null,
-        duration_min: (f.datetime_takeoff && f.datetime_landed)
-          ? Math.round((new Date(f.datetime_landed) - new Date(f.datetime_takeoff)) / 60000)
-          : null,
-      }))
-      _fr24Cache.set(cacheKey, { ts: Date.now(), flights })
-      return { flights, source: 'fr24' }
-    } catch (e) {
-      fastify.log.warn({ tail, date, err: e.message }, 'FR24 flights lookup failed')
-      return reply.status(502).send({ error: e.message })
-    }
-  })
-
-  // ── FlightRadar24: auto-fetch track by time-window sweep ─────────────────────
-  // POST /api/external/auto-fetch-fr24-track/:flight_id
-  // Sweeps timestamps within the flight's schedule window at 10-second intervals,
-  // querying historic/flight-positions/full for the tail at each step.
-  // Deduplicates by position timestamp, saves to track_log_points.
-  fastify.post('/api/external/auto-fetch-fr24-track/:flight_id', async (req, reply) => {
+  // ── FlightAware: auto-fetch track for a single flight ────────────────────────
+  // POST /api/external/auto-fetch-fa-track/:flight_id
+  fastify.post('/api/external/auto-fetch-fa-track/:flight_id', async (req, reply) => {
     const flightId = parseInt(req.params.flight_id)
-    if (!process.env.FR24_API_TOKEN) {
-      return reply.status(503).send({ error: 'FR24_API_TOKEN not configured' })
+    if (!process.env.FLIGHTAWARE_API_KEY) {
+      return reply.status(503).send({ error: 'FLIGHTAWARE_API_KEY not configured' })
     }
 
-    // 1. Read flight + aircraft from DB
     const { rows } = await pool.query(`
       SELECT f.id, f.date::text, f.departure_icao, f.arrival_icao,
              f.time_out, f.time_in, f.total_duration,
@@ -753,13 +660,11 @@ export default async function proxyRoutes(fastify) {
     const tail    = fl.tail_number
     const dateStr = String(fl.date).slice(0, 10)
 
-    // 2. Determine time window — DB first, then nice_air_schedules table, then live Gmail
     let timeOut = fl.time_out
     let timeIn  = fl.time_in
     if (!timeOut || !timeIn) {
       try {
         const tailShort = tail.replace(/^N/, '')
-        // Query persisted schedules table first (fast, no IMAP round-trip)
         const { rows: dbScheds } = await pool.query(`
           SELECT start_unix, end_unix FROM nice_air_schedules
           WHERE date_str = $1 AND type != 'cancelled'
@@ -772,216 +677,91 @@ export default async function proxyRoutes(fastify) {
         }
       } catch (_) {}
     }
-    if (!timeOut || !timeIn) {
-      // Fall back to live Gmail if DB has no match (table may not be synced yet)
-      try {
-        const scheds    = await fetchNiceAirSchedules()
-        const tailShort = tail.replace(/^N/, '')
-        const match     = scheds.find(s =>
-          s.date_str === dateStr && s.type !== 'cancelled' &&
-          (s.tail === tail || s.tail?.replace(/^N/, '') === tailShort)
-        )
-        if (match?.start_unix) timeOut = timeOut || new Date(match.start_unix * 1000).toISOString()
-        if (match?.end_unix)   timeIn  = timeIn  || new Date(match.end_unix   * 1000).toISOString()
-      } catch (_) {}
-    }
-    // Date-only fallback: any non-cancelled schedule on this date (tail may differ from resource)
-    // e.g. solo in N739HE while dual slot was booked as N227AN — same pilot, same time window.
-    // If multiple schedules exist on the date, pick the one whose duration best matches logbook.
     if (!timeOut) {
       try {
         const { rows: dateScheds } = await pool.query(`
-          SELECT start_unix, end_unix, (end_unix - start_unix) AS sched_sec
-          FROM nice_air_schedules
+          SELECT start_unix, end_unix FROM nice_air_schedules
           WHERE date_str = $1 AND type != 'cancelled' AND start_unix IS NOT NULL
           ORDER BY start_unix ASC
         `, [dateStr])
-        let chosen = dateScheds[0] || null
-        if (dateScheds.length > 1 && fl.total_duration) {
-          const logSec = parseFloat(fl.total_duration) * 3600
-          chosen = dateScheds.reduce((a, b) =>
-            Math.abs((a.sched_sec || 0) - logSec) <= Math.abs((b.sched_sec || 0) - logSec) ? a : b
-          )
-        }
+        const chosen = dateScheds[0]
         if (chosen?.start_unix) timeOut = new Date(chosen.start_unix * 1000).toISOString()
-        if (chosen?.end_unix)   timeIn  = new Date(chosen.end_unix   * 1000).toISOString()
-        if (chosen) fastify.log.info({ flightId, tail, dateStr }, 'Using date-only schedule fallback')
-      } catch (_) {}
-    }
-    // 3. Last resort: match via FR24 flight-summary, scoring by airport + logbook duration
-    if (!timeOut) {
-      try {
-        const dayStart = new Date(dateStr + 'T06:00:00Z')
-        const dayEnd   = new Date(dayStart.getTime() + 24 * 3_600_000)
-        const data = await fr24Fetch('/api/flight-summary/full', {
-          registrations:        tail,
-          flight_datetime_from: dayStart.toISOString().slice(0, 19),
-          flight_datetime_to:   dayEnd.toISOString().slice(0, 19),
-          limit:                20,
-        })
-        const candidates = Array.isArray(data?.data) ? data.data : []
-        if (candidates.length) {
-          const norm   = ic => ic?.toUpperCase().replace(/^K/, '') || ''
-          const logDep = norm(fl.departure_icao)
-          const logArr = norm(fl.arrival_icao)
-          const logMin = fl.total_duration ? parseFloat(fl.total_duration) * 60 : null
-          const scored = candidates.map(ff => {
-            let score = 0
-            if (logDep && norm(ff.orig_icao || '') === logDep)                       score += 4
-            if (logArr && norm(ff.dest_icao_actual || ff.dest_icao || '') === logArr) score += 4
-            if (logMin && ff.duration_min) {
-              const ratio = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
-              if (ratio > 0.8) score += 5
-              else if (ratio > 0.55) score += 3
-              else if (ratio > 0.35) score += 1
-            }
-            return { ff, score }
-          })
-          scored.sort((a, b) => b.score - a.score)
-          const best = scored[0]?.ff
-          if (best) {
-            timeOut = best.datetime_takeoff || best.first_seen || null
-            timeIn  = best.datetime_landed  || best.last_seen  || null
-            fastify.log.info({ flightId, tail, fr24_best: best.fr24_id, score: scored[0].score }, 'FR24 summary fallback matched')
-          }
-        }
+        if (chosen?.end_unix)   timeIn  = new Date(chosen.end_unix * 1000).toISOString()
       } catch (_) {}
     }
     if (!timeOut) {
-      return reply.status(400).send({ error: 'No time window found — DB, Gmail, and FR24 summary all returned nothing' })
+      return reply.status(400).send({ error: 'No time window found in DB or schedules' })
     }
 
-    // 4. Sweep window: time_out-5min → time_in+5min (or logbook duration + buffer)
-    const t0 = new Date(timeOut).getTime() - 5 * 60_000
-    let t1
-    if (timeIn) {
-      t1 = new Date(timeIn).getTime() + 5 * 60_000
-    } else if (fl.total_duration) {
-      t1 = new Date(timeOut).getTime() + parseFloat(fl.total_duration) * 3_600_000 + 10 * 60_000
-    } else {
-      t1 = t0 + 4 * 3_600_000
-    }
+    const winStart = new Date(new Date(timeOut).getTime() - 2 * 3_600_000)
+    const winEnd   = timeIn
+      ? new Date(new Date(timeIn).getTime() + 2 * 3_600_000)
+      : new Date(new Date(timeOut).getTime() + 6 * 3_600_000)
 
-    // 4. Sweep timestamps: adaptive step so window always resolves in ≤500 queries,
-    // minimum 10s granularity. Hard deadline of 4 minutes caps wall-clock time.
-    const STEP_MS  = Math.max(10_000, Math.ceil((t1 - t0) / 500))
-    const DELAY_MS = 250
-    const DEADLINE = Date.now() + 4 * 60_000
-    const rawPositions = []
-    let lastPosTs = null
-
-    for (let ts = t0; ts <= t1; ts += STEP_MS) {
-      if (Date.now() > DEADLINE) { fastify.log.warn({ flightId, tail }, 'FR24 sweep deadline reached'); break }
-      await new Promise(r => setTimeout(r, DELAY_MS))
-      try {
-        const posData = await fr24Fetch('/api/historic/flight-positions/full', {
-          registrations: tail,
-          timestamp:     Math.floor(ts / 1000),
-        })
-        const pts = Array.isArray(posData?.data) ? posData.data : []
-        const pt  = pts[0]
-        if (!pt) continue
-        if (pt.timestamp === lastPosTs) continue
-        lastPosTs = pt.timestamp
-        rawPositions.push(pt)
-      } catch (_) {}
-    }
-
-    if (!rawPositions.length) {
-      return reply.status(200).send({
-        success: false, points_saved: 0,
-        window_from: new Date(t0).toISOString(), window_to: new Date(t1).toISOString(),
-        message: 'No positions from FR24 in window',
+    try {
+      const flightsData = await faFetch(`/flights/${encodeURIComponent(tail)}`, {
+        start: winStart.toISOString(),
+        end:   winEnd.toISOString(),
+        max_pages: 1,
       })
-    }
+      const candidates = Array.isArray(flightsData?.flights) ? flightsData.flights : []
+      if (!candidates.length) {
+        return { success: false, points_saved: 0, message: 'No FlightAware flights found in window' }
+      }
 
-    const normalized = normalizeFr24Positions(rawPositions)
-    const saved = await saveTrackPoints(pool, flightId, normalized)
-    fastify.log.info({ flightId, tail, saved, window_min: Math.round((t1 - t0) / 60000) }, 'FR24 time-window track saved')
+      const norm   = ic => (ic || '').toUpperCase().replace(/^K/, '')
+      const logDep = norm(fl.departure_icao)
+      const logArr = norm(fl.arrival_icao)
+      const logMin = fl.total_duration ? parseFloat(fl.total_duration) * 60 : null
+      const scored = candidates.map(ff => {
+        let score = 0
+        if (logDep && norm(ff.origin?.code || '') === logDep)     score += 4
+        if (logArr && norm(ff.destination?.code || '') === logArr) score += 4
+        if (logMin && ff.actual_off && ff.actual_on) {
+          const durMin = (new Date(ff.actual_on) - new Date(ff.actual_off)) / 60000
+          const ratio  = Math.min(logMin, durMin) / Math.max(logMin, durMin)
+          score += ratio > 0.8 ? 5 : ratio > 0.55 ? 3 : ratio > 0.35 ? 1 : 0
+        }
+        return { ff, score }
+      }).sort((a, b) => b.score - a.score)
+
+      const best = scored[0].ff
+      if (!best.fa_flight_id) {
+        return { success: false, points_saved: 0, message: 'Matched flight has no fa_flight_id' }
+      }
+
+      const trackData = await faFetch(`/flights/${encodeURIComponent(best.fa_flight_id)}/track`)
+      const positions = normalizeFaPositions(trackData?.positions)
+      if (!positions.length) {
+        return { success: false, points_saved: 0, message: 'No track positions from FlightAware' }
+      }
+
+      const saved = await saveTrackPoints(pool, flightId, positions)
+      fastify.log.info({ flightId, tail, saved, fa_flight_id: best.fa_flight_id }, 'FlightAware track saved')
+      return { success: true, points_saved: saved, fa_flight_id: best.fa_flight_id, score: scored[0].score }
+    } catch (e) {
+      fastify.log.warn({ flightId, tail, err: e.message }, 'FlightAware track fetch failed')
+      return reply.status(502).send({ error: e.message })
+    }
+  })
+
+  // ── FlightAware: backfill job state ──────────────────────────────────────────
+  let _faJob = null // { started, done, counts, log[] }
+
+  fastify.get('/api/external/fa-backfill-status', async (req, reply) => {
+    if (!_faJob) return { running: false, started: false }
     return {
-      success:      true,
-      points_saved: saved,
-      total_points: rawPositions.length,
-      window_from:  new Date(t0).toISOString(),
-      window_to:    new Date(t1).toISOString(),
+      running:    !_faJob.done,
+      done:       _faJob.done,
+      started_at: _faJob.started,
+      counts:     _faJob.counts,
+      recent:     _faJob.log.slice(-10),
     }
   })
 
-  // ── FlightRadar24: attach GPS track to a flight record ────────────────────────
-  // POST /api/external/attach-fr24-track  body: { flight_id, fr24_id, registration, first_seen, last_seen }
-  // Samples positions at 5-minute intervals across the flight duration.
-  fastify.post('/api/external/attach-fr24-track', async (req, reply) => {
-    const { flight_id, fr24_id, registration, first_seen, last_seen } = req.body || {}
-    if (!flight_id || !fr24_id || !registration || !first_seen || !last_seen) {
-      return reply.status(400).send({ error: 'flight_id, fr24_id, registration, first_seen, last_seen required' })
-    }
-
-    const firstSeenTs = Math.floor(new Date(first_seen).getTime() / 1000)
-    const lastSeenTs  = Math.floor(new Date(last_seen).getTime()  / 1000)
-    const SAMPLE_STEP = 300
-
-    const rawPositions = []
-    for (let ts = firstSeenTs + SAMPLE_STEP; ts <= lastSeenTs; ts += SAMPLE_STEP) {
-      await new Promise(r => setTimeout(r, 1000))
-      try {
-        const posData = await fr24Fetch('/api/historic/flight-positions/full', {
-          registrations: registration,
-          timestamp: ts,
-        })
-        const pts = Array.isArray(posData?.data) ? posData.data : []
-        const pt  = pts.find(p => p.fr24_id === fr24_id)
-        if (pt) rawPositions.push(pt)
-      } catch (_) {}
-    }
-
-    if (!rawPositions.length) {
-      return { success: false, points_saved: 0, total_points: 0, message: 'No track positions from FR24' }
-    }
-
-    const normalized = normalizeFr24Positions(rawPositions)
-    const saved = await saveTrackPoints(pool, flight_id, normalized)
-    fastify.log.info({ flight_id, fr24_id, saved }, 'FR24 track attached')
-    return { success: true, points_saved: saved, total_points: rawPositions.length }
-  })
-
-  // ── FlightRadar24: backfill job state ────────────────────────────────────────
-  let _fr24Job = null // { started, done, counts, log[] }
-
-  // GET /api/external/fr24-backfill-status — poll async backfill progress
-  fastify.get('/api/external/fr24-backfill-status', async (req, reply) => {
-    if (!_fr24Job) return { running: false, started: false }
-    return {
-      running: !_fr24Job.done,
-      done: _fr24Job.done,
-      started_at: _fr24Job.started,
-      counts: _fr24Job.counts,
-      recent: _fr24Job.log.slice(-10),
-    }
-  })
-
-  // ── FlightAware AeroAPI probe — returns raw response for schema discovery ────
-  fastify.get('/api/external/fa-probe', async (req, reply) => {
-    const key = process.env.FLIGHTAWARE_API_KEY
-    if (!key) return reply.status(500).send({ error: 'FLIGHTAWARE_API_KEY not set' })
-    const { ident = 'N739HE', start = '2025-07-30', end = '2025-07-31', fa_flight_id, path } = req.query
-    const FA_BASE = 'https://aeroapi.flightaware.com/aeroapi'
-    const headers = { 'x-apikey': key, Accept: 'application/json; charset=UTF-8' }
-    if (fa_flight_id) {
-      const r = await fetch(`${FA_BASE}/flights/${encodeURIComponent(fa_flight_id)}/track`, { headers })
-      return { status: r.status, body: await r.json().catch(() => r.text()) }
-    }
-    // Allow probing arbitrary paths for endpoint discovery
-    const basePath = path || 'flights'
-    const url = `${FA_BASE}/${basePath}/${encodeURIComponent(ident)}?start=${start}T00:00:00Z&end=${end}T23:59:59Z&max_pages=1`
-    const r = await fetch(url, { headers })
-    return { status: r.status, url, body: await r.json().catch(() => r.text()) }
-  })
-
-  // ── FlightRadar24: batch backfill all flights without tracks ──────────────────
-  // POST /api/external/fr24-backfill?overwrite=false[&limit=N][&async=true]
-  // Default: streams NDJSON until complete.
-  // ?async=true: fires background job and returns immediately; poll /fr24-backfill-status.
-  fastify.post('/api/external/fr24-backfill', async (req, reply) => {
+  // ── FlightAware: batch backfill all flights without tracks ───────────────────
+  // POST /api/external/fa-backfill?overwrite=false[&limit=N][&async=true]
+  fastify.post('/api/external/fa-backfill', async (req, reply) => {
     const overwrite = req.query.overwrite === 'true'
     const limitN    = req.query.limit ? parseInt(req.query.limit) : null
     const asyncMode = req.query.async === 'true'
@@ -1000,29 +780,28 @@ export default async function proxyRoutes(fastify) {
     if (limitN) toProcess = toProcess.slice(0, limitN)
 
     if (asyncMode) {
-      if (_fr24Job && !_fr24Job.done) return { started: false, error: 'backfill already running' }
-      _fr24Job = { started: new Date().toISOString(), done: false, counts: { ok:0, no_window:0, no_positions:0, errors:0 }, log: [] }
-      // Run in background — detached from request lifecycle
-      setImmediate(() => runFr24Backfill(toProcess, _fr24Job, fastify.log).catch(() => { if (_fr24Job) _fr24Job.done = true }))
+      if (_faJob && !_faJob.done) return { started: false, error: 'backfill already running' }
+      _faJob = { started: new Date().toISOString(), done: false, counts: { ok: 0, no_window: 0, no_positions: 0, errors: 0 }, log: [] }
+      setImmediate(() => runFaBackfill(toProcess, _faJob, fastify.log).catch(() => { if (_faJob) _faJob.done = true }))
       return { started: true, total: toProcess.length }
     }
 
-    // Streaming mode: delegate to shared function, emit to HTTP response
-    const streamJob = { done: false, counts: { ok:0, no_window:0, no_positions:0, errors:0 }, log: [] }
+    // Streaming NDJSON mode
+    const streamJob = { done: false, counts: { ok: 0, no_window: 0, no_positions: 0, errors: 0 }, log: [] }
     reply.raw.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'X-Accel-Buffering': 'no' })
-    // Pipe job log entries to the HTTP stream in real time
     let logIdx = 0
     const flushInterval = setInterval(() => {
       while (logIdx < streamJob.log.length) reply.raw.write(JSON.stringify(streamJob.log[logIdx++]) + '\n')
     }, 500)
-    await runFr24Backfill(toProcess, streamJob, fastify.log)
+    await runFaBackfill(toProcess, streamJob, fastify.log)
     clearInterval(flushInterval)
     while (logIdx < streamJob.log.length) reply.raw.write(JSON.stringify(streamJob.log[logIdx++]) + '\n')
     const summary = { type: 'summary', total: flights.length, processed: toProcess.length, ...streamJob.counts }
-    fastify.log.info(summary, 'FR24 backfill complete')
+    fastify.log.info(summary, 'FlightAware backfill complete')
     reply.raw.write(JSON.stringify(summary) + '\n')
     reply.raw.end()
   })
+
 
   // ── NICE AIR schedule emails from Gmail ──────────────────────────────────────
   // Reads all "NICE AIR" schedule emails and returns parsed reservations.

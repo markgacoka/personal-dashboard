@@ -29,16 +29,25 @@ const WHERE = "CLASS IN ('B','C','D')"
 // request comfortably fast.
 const PAGE_SIZE = 250
 
-async function fetchFeatureServicePage(offset) {
+async function fetchFeatureServicePage(offset, attempt = 1) {
   const url =
     `${FS_BASE}/query?where=${encodeURIComponent(WHERE)}` +
     `&outFields=${encodeURIComponent(FIELDS)}` +
     `&outSR=4326&geometryPrecision=5&f=geojson` +
     `&resultOffset=${offset}` +
     `&resultRecordCount=${PAGE_SIZE}`
-  const r = await fetch(url, { signal: AbortSignal.timeout(45_000) })
-  if (!r.ok) throw new Error(`ArcGIS feature service ${r.status}`)
-  return r.json()
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(45_000) })
+    if (!r.ok) throw new Error(`ArcGIS feature service ${r.status}`)
+    return await r.json()
+  } catch (e) {
+    // This endpoint occasionally drops a connection or 504s mid-pagination;
+    // a couple of short retries clears most of them without risking a
+    // runaway loop (bounded attempts, not indefinite).
+    if (attempt >= 3) throw e
+    await new Promise(r => setTimeout(r, 500 * attempt))
+    return fetchFeatureServicePage(offset, attempt + 1)
+  }
 }
 
 export async function downloadFaaAirspace(log) {
@@ -49,8 +58,13 @@ export async function downloadFaaAirspace(log) {
   let offset = 0
   while (true) {
     const page = await fetchFeatureServicePage(offset)
-    features.push(...(page.features ?? []))
-    if (!page.exceededTransferLimit) break
+    const got = page.features ?? []
+    features.push(...got)
+    // exceededTransferLimit only fires when the service's own cap truncates
+    // a request — it stays unset when we explicitly ask for a page smaller
+    // than that cap, which we always do here. A short page is the reliable
+    // "no more records" signal instead.
+    if (got.length < PAGE_SIZE) break
     offset += PAGE_SIZE
     // Throttle slightly to avoid overwhelming the service
     await new Promise(r => setTimeout(r, 200))

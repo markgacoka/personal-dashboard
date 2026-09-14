@@ -90,16 +90,22 @@ export async function getFaaAirspace(log) {
   return _memCache
 }
 
+const CHECK_MS = 24 * 60 * 60 * 1000 // 1 day
+
 export function scheduleFaaAirspaceRefresh(log) {
   // Download on startup (non-blocking)
   getFaaAirspace(log).catch(e =>
     log?.warn({ err: e.message }, 'FAA airspace initial download failed')
   )
-  // Refresh every 28 days
+  // Check daily whether a refresh is due, rather than scheduling a single
+  // 28-day setInterval directly: Node's timer delay is a 32-bit signed int
+  // (max ~24.8 days), so AIRAC_MS (28 days) overflows it and the interval
+  // fires immediately and repeatedly instead of once every 28 days.
   setInterval(() => {
-    _memCache = null // force re-download even if disk cache is fresh
+    if (Date.now() - _memCacheAt < AIRAC_MS) return // not due yet
+    _memCache = null // force re-download
     getFaaAirspace(log).catch(e =>
       log?.warn({ err: e.message }, 'FAA airspace scheduled refresh failed')
     )
-  }, AIRAC_MS)
+  }, CHECK_MS)
 }

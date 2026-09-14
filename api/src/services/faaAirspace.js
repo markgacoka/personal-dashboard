@@ -1,5 +1,8 @@
-// FAA Airspace Boundary — AIRAC 28-day cycle download + disk cache
-// Source: https://adds-faa.opendata.arcgis.com/datasets/faa::airspace-boundary-1/about
+// FAA Class Airspace (B/C/D) — AIRAC 28-day cycle download + disk cache
+// Source: https://adds-faa.opendata.arcgis.com/datasets/c6a62360338e408cb1512366ad61559e_0
+// (Not the "Airspace Boundary" dataset — that one covers ARTCC/FIR/enroute
+// boundaries and has no Class B/C/D polygons. "Class Airspace" is the
+// sectional-chart layer that actually has them.)
 // The FAA publishes updates on a 28-day AIRAC cycle; we re-download on the same cadence.
 import { writeFile, readFile, stat, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
@@ -9,18 +12,21 @@ const DATA_DIR = process.env.DATA_DIR || '/app/data'
 const CACHE_FILE = resolve(DATA_DIR, 'faa-airspace.json')
 const AIRAC_MS = 28 * 24 * 60 * 60 * 1000 // 28 days
 
-// ArcGIS feature service for FAA airspace — paginated REST query
+// ArcGIS feature service for FAA class airspace — paginated REST query
 const FS_BASE =
-  'https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/Airspace_Boundary/FeatureServer/0'
+  'https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/Class_Airspace/FeatureServer/0'
 
 // Fields we care about for rendering + popups
-const FIELDS = 'NAME,LOWER_VAL,UPPER_VAL,TYPE_CODE,LOCAL_TYPE,CLASS,EXCLUSION'
+const FIELDS = 'NAME,LOWER_VAL,UPPER_VAL,TYPE_CODE,LOCAL_TYPE,CLASS'
+// Only the classes we render (B/C/D) — Class A is a single nationwide shell
+// above FL180 and isn't useful on a local flight map.
+const WHERE = "CLASS IN ('B','C','D')"
 
 async function fetchFeatureServicePage(offset, pageSize = 1000) {
   const url =
-    `${FS_BASE}/query?where=1%3D1` +
+    `${FS_BASE}/query?where=${encodeURIComponent(WHERE)}` +
     `&outFields=${encodeURIComponent(FIELDS)}` +
-    `&f=geojson` +
+    `&outSR=4326&f=geojson` +
     `&resultOffset=${offset}` +
     `&resultRecordCount=${pageSize}`
   const r = await fetch(url, { signal: AbortSignal.timeout(30_000) })
@@ -31,29 +37,7 @@ async function fetchFeatureServicePage(offset, pageSize = 1000) {
 export async function downloadFaaAirspace(log) {
   await mkdir(DATA_DIR, { recursive: true })
 
-  // Try the ArcGIS Hub direct GeoJSON export first (no pagination needed)
-  const hubUrl =
-    'https://adds-faa.opendata.arcgis.com/datasets/faa::airspace-boundary-1.geojson'
-  try {
-    log?.info('Downloading FAA airspace from Hub GeoJSON export…')
-    const r = await fetch(hubUrl, { signal: AbortSignal.timeout(120_000) })
-    if (r.ok) {
-      const text = await r.text()
-      // Validate it's actually GeoJSON
-      const fc = JSON.parse(text)
-      if (fc.type === 'FeatureCollection' && Array.isArray(fc.features)) {
-        await writeFile(CACHE_FILE, text)
-        log?.info({ features: fc.features.length }, 'FAA airspace cached from Hub export')
-        return fc
-      }
-    }
-    log?.warn({ status: r.status }, 'Hub GeoJSON export returned non-OK; falling back to feature service')
-  } catch (e) {
-    log?.warn({ err: e.message }, 'Hub GeoJSON export failed; falling back to feature service')
-  }
-
-  // Fallback: paginate the ArcGIS feature service
-  log?.info('Downloading FAA airspace via feature service (paginated)…')
+  log?.info('Downloading FAA class airspace via feature service (paginated)…')
   const features = []
   let offset = 0
   while (true) {
@@ -64,9 +48,14 @@ export async function downloadFaaAirspace(log) {
     // Throttle slightly to avoid overwhelming the service
     await new Promise(r => setTimeout(r, 200))
   }
+  if (!features.length) {
+    // Don't lock in an empty result for 28 days — surface the failure instead
+    // so the next request retries rather than serving a permanently blank layer.
+    throw new Error('FAA feature service returned zero features')
+  }
   const fc = { type: 'FeatureCollection', features }
   await writeFile(CACHE_FILE, JSON.stringify(fc))
-  log?.info({ features: features.length }, 'FAA airspace cached from feature service')
+  log?.info({ features: features.length }, 'FAA class airspace cached from feature service')
   return fc
 }
 
@@ -79,12 +68,13 @@ export async function getFaaAirspace(log) {
   // Memory cache still fresh
   if (_memCache && now - _memCacheAt < AIRAC_MS) return _memCache
 
-  // Disk cache fresh enough
+  // Disk cache fresh enough (and non-empty — an empty cache is treated as invalid)
   if (existsSync(CACHE_FILE)) {
     try {
       const s = await stat(CACHE_FILE)
-      if (now - s.mtimeMs < AIRAC_MS) {
-        _memCache = JSON.parse(await readFile(CACHE_FILE, 'utf8'))
+      const cached = JSON.parse(await readFile(CACHE_FILE, 'utf8'))
+      if (now - s.mtimeMs < AIRAC_MS && cached.features?.length) {
+        _memCache = cached
         _memCacheAt = s.mtimeMs
         log?.info({ features: _memCache.features?.length }, 'FAA airspace loaded from disk cache')
         return _memCache

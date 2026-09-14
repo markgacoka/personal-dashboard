@@ -946,8 +946,8 @@ export default async function proxyRoutes(fastify) {
     }
   })
 
-  // ── FAA Airspace Boundary (AIRAC 28-day cycle, pre-downloaded by scheduler) ──
-  // Data from: https://adds-faa.opendata.arcgis.com/datasets/faa::airspace-boundary-1/about
+  // ── FAA Class Airspace B/C/D (AIRAC 28-day cycle, pre-downloaded by scheduler) ──
+  // Data from: https://adds-faa.opendata.arcgis.com/datasets/c6a62360338e408cb1512366ad61559e_0
   // The faaAirspace service downloads + caches on first boot and every 28 days.
   fastify.get('/api/external/faa-airspace', async (req, reply) => {
     try {

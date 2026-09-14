@@ -874,203 +874,165 @@
     .fd-pv { font-size: 12px; color: var(--champagne); font-weight: 600; }
 
     /* ── Pilot Credentials ───────────────────────────────── */
-    .cert-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 20px; margin-bottom: 28px;
-    }
-    @media (max-width: 800px) { .cert-grid { grid-template-columns: 1fr; } }
+    .cert-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
 
     .cert-card {
-      border-radius: 14px; overflow: hidden;
+      border-radius: 12px; overflow: hidden;
       border: 1px solid var(--rule);
-      background: var(--surface, var(--raised));
-      display: flex; flex-direction: column;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      background: var(--raised);
+      box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 3px 10px rgba(0,0,0,.04);
     }
 
-    /* Student pilot — deep teal header */
-    .cert-header-pilot {
-      background: linear-gradient(145deg,
-        oklch(24% 0.07 188) 0%,
-        oklch(19% 0.055 196) 55%,
-        oklch(15% 0.04 210) 100%);
-      padding: 22px 24px 20px;
-      position: relative; overflow: hidden;
-    }
-    .cert-header-pilot::before {
-      content: '';
-      position: absolute; right: -30px; top: -30px;
-      width: 160px; height: 160px; border-radius: 50%;
-      background: radial-gradient(circle, oklch(76% 0.088 190 / 0.07) 0%, transparent 70%);
-    }
+    /* Accent bars */
+    .cert-accent { height: 4px; }
+    .cert-accent.pilot  { background: linear-gradient(90deg, oklch(52% 0.15 178), oklch(62% 0.13 186)); }
+    .cert-accent.medical{ background: linear-gradient(90deg, oklch(48% 0.15 248), oklch(58% 0.13 258)); }
 
-    /* Medical — deep navy header */
-    .cert-header-medical {
-      background: linear-gradient(145deg,
-        oklch(22% 0.055 245) 0%,
-        oklch(17% 0.04 255) 55%,
-        oklch(13% 0.025 265) 100%);
-      padding: 22px 24px 20px;
-      position: relative; overflow: hidden;
+    /* Card header — always light background */
+    .cert-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 18px 24px 16px; gap: 16px;
+      border-bottom: 1px solid var(--rule);
     }
-    .cert-header-medical::before {
-      content: '';
-      position: absolute; right: -30px; top: -30px;
-      width: 160px; height: 160px; border-radius: 50%;
-      background: radial-gradient(circle, oklch(72% 0.10 255 / 0.07) 0%, transparent 70%);
+    .cert-head-left { min-width: 0; }
+    .cert-type-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--disabled);
+      margin-bottom: 2px;
     }
-
-    .cert-issuer {
-      font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
-      text-transform: uppercase; color: oklch(62% 0.04 188);
-      margin-bottom: 5px;
+    .cert-name {
+      font-size: 22px; font-weight: 800; color: var(--body-text);
+      letter-spacing: -0.01em; line-height: 1.1; margin-bottom: 3px;
     }
-    .cert-type-line {
-      font-size: 10px; font-weight: 700; letter-spacing: 0.10em;
-      text-transform: uppercase; color: oklch(55% 0.05 188);
-      margin-bottom: 6px;
+    .cert-org { font-size: 11px; color: var(--faint); }
+    .cert-head-right {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;
     }
-    .cert-title {
-      font-size: 26px; font-weight: 800; letter-spacing: 0.02em;
-      color: oklch(93% 0.025 188); line-height: 1.1; margin-bottom: 16px;
+    .cert-num {
+      font-size: 12px; font-family: 'Alumni Sans', monospace;
+      letter-spacing: 0.07em; color: var(--muted); font-weight: 600;
     }
-    .cert-title-medical { color: oklch(92% 0.025 250); }
-
-    .cert-name-row {
-      display: flex; align-items: flex-end; justify-content: space-between;
-      gap: 12px; margin-bottom: 14px;
-    }
-    .cert-holder-name {
-      font-size: 14px; font-weight: 700; letter-spacing: 0.06em;
-      text-transform: uppercase; color: oklch(82% 0.06 70);
-    }
-    .cert-number {
-      font-size: 11px; font-family: 'Alumni Sans', monospace;
-      letter-spacing: 0.08em; color: oklch(55% 0.04 188);
-      font-weight: 600; white-space: nowrap; padding-bottom: 1px;
-    }
-
-    .cert-status-badge {
+    .cert-valid-pill {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 9px; font-weight: 800; letter-spacing: 0.10em;
-      text-transform: uppercase; padding: 4px 10px;
-      border-radius: 20px;
+      font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px;
     }
-    .cert-status-badge.good {
-      background: oklch(65% 0.13 155 / 0.22);
-      color: oklch(80% 0.14 150);
-      border: 1px solid oklch(65% 0.13 155 / 0.45);
+    .cert-valid-pill.good {
+      background: oklch(55% 0.15 155 / 0.11);
+      color: oklch(36% 0.14 152);
+      border: 1px solid oklch(55% 0.15 155 / 0.28);
     }
-    .cert-status-badge.warn {
-      background: oklch(70% 0.15 70 / 0.22);
-      color: oklch(80% 0.15 70);
-      border: 1px solid oklch(70% 0.15 70 / 0.45);
+    .cert-valid-pill.warn {
+      background: oklch(62% 0.17 68 / 0.11);
+      color: oklch(40% 0.14 62);
+      border: 1px solid oklch(62% 0.17 68 / 0.28);
     }
-
-    /* Header badge variant (inside dark header) */
-    .cert-header-badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 9px; font-weight: 800; letter-spacing: 0.10em;
-      text-transform: uppercase; padding: 4px 10px; border-radius: 20px;
-    }
-    .cert-header-badge.good {
-      background: oklch(65% 0.13 155 / 0.22);
-      color: oklch(82% 0.14 150);
-      border: 1px solid oklch(65% 0.13 155 / 0.50);
+    .cert-valid-pill.crit {
+      background: oklch(55% 0.16 20 / 0.11);
+      color: oklch(38% 0.14 18);
+      border: 1px solid oklch(55% 0.16 20 / 0.28);
     }
 
-    .cert-body { padding: 20px 22px; flex: 1; display: flex; flex-direction: column; gap: 18px; }
+    /* Two-column main body */
+    .cert-main {
+      display: grid; grid-template-columns: 260px 1fr;
+    }
+    @media (max-width: 700px) { .cert-main { grid-template-columns: 1fr; } }
 
-    .cert-section-label {
+    /* Left: Validity column */
+    .cert-val-col {
+      padding: 20px 22px;
+      border-right: 1px solid var(--rule);
+      background: var(--graphite);
+      display: flex; flex-direction: column; justify-content: center; gap: 0;
+    }
+    .cert-val-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--disabled); margin-bottom: 6px;
+    }
+    .cert-days-num {
+      font-size: 38px; font-weight: 900; letter-spacing: -0.03em; line-height: 1;
+      margin-bottom: 2px;
+    }
+    .cert-days-num.good  { color: oklch(38% 0.16 155); }
+    .cert-days-num.warn  { color: oklch(42% 0.18 68); }
+    .cert-days-num.crit  { color: oklch(40% 0.16 20); }
+    .cert-days-word {
+      font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 16px;
+    }
+    .cert-bar-track {
+      height: 4px; border-radius: 2px; background: var(--rule);
+      overflow: hidden; margin-bottom: 8px;
+    }
+    .cert-bar-fill { height: 100%; border-radius: 2px; transition: width 0.9s cubic-bezier(.4,0,.2,1); }
+    .cert-bar-fill.good { background: oklch(55% 0.15 155); }
+    .cert-bar-fill.warn { background: oklch(62% 0.17 68); }
+    .cert-bar-fill.crit { background: oklch(55% 0.16 20); }
+    .cert-date-range {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .cert-date-item {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    }
+    .cert-date-key { font-size: 9px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--disabled); }
+    .cert-date-val { font-size: 12px; font-weight: 500; color: var(--body-text); }
+
+    /* Right: Data column */
+    .cert-data-col {
+      padding: 20px 24px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .cert-section {  }
+    .cert-section-head {
       font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
       text-transform: uppercase; color: var(--disabled);
-      margin-bottom: 10px; display: flex; align-items: center; gap: 7px;
+      margin-bottom: 7px; padding-bottom: 5px;
+      border-bottom: 1px solid var(--rule);
     }
-    .cert-section-label i { font-size: 12px; color: var(--faint); }
-    .cert-section-label::after {
-      content: ''; flex: 1; height: 1px; background: var(--rule);
+    .cert-pairs {
+      display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: baseline;
     }
-
-    /* Inline key-value row */
-    .cert-kv-row {
-      display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: baseline;
-    }
-    .cert-kv {
-      display: flex; align-items: baseline; gap: 5px;
-    }
-    .cert-k {
+    .cert-pair { display: flex; align-items: baseline; gap: 5px; }
+    .cert-pk {
       font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
-      text-transform: uppercase; color: var(--disabled);
+      text-transform: uppercase; color: var(--faint);
     }
-    .cert-v {
+    .cert-pv {
       font-size: 13px; font-weight: 500; color: var(--body-text);
     }
-    .cert-v.mono {
-      font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; font-size: 14px;
-    }
-    .cert-v.accent { color: var(--champagne); font-weight: 600; }
+    .cert-pv.mono { font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; font-size: 14px; }
+    .cert-pv.accent { color: var(--champagne); font-weight: 600; }
 
-    .cert-limitation {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 11px 14px; border-radius: var(--r-sm);
+    /* Limitation blocks — left-border style, always light bg */
+    .cert-limit {
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 9px 12px; border-radius: 6px;
       font-size: 13px; font-weight: 500; line-height: 1.4;
+      border-left: 3px solid;
     }
-    .cert-limitation i { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-    .cert-limitation.warn {
-      background: oklch(47% 0.15 48 / 0.12);
-      border: 1px solid oklch(60% 0.15 48 / 0.35);
-      color: oklch(50% 0.10 48);
+    .cert-limit i { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .cert-limit.warn {
+      background: #fef7ee;
+      border-left-color: #d97706;
+      color: #78350f;
     }
-    @media (prefers-color-scheme: dark) {
-      .cert-limitation.warn { color: oklch(78% 0.12 55); background: oklch(22% 0.06 48 / 0.55); }
+    .cert-limit.warn i { color: #d97706; }
+    .cert-limit.ok {
+      background: #f0fdf4;
+      border-left-color: #16a34a;
+      color: #14532d;
     }
-    .cert-limitation.warn i { color: oklch(62% 0.16 50); }
-    .cert-limitation.ok {
-      background: oklch(48% 0.13 155 / 0.10);
-      border: 1px solid oklch(55% 0.12 155 / 0.30);
-      color: oklch(38% 0.09 155);
-    }
-    @media (prefers-color-scheme: dark) {
-      .cert-limitation.ok { color: oklch(76% 0.12 145); background: oklch(20% 0.05 155 / 0.55); }
-    }
-    .cert-limitation.ok i { color: oklch(55% 0.14 155); }
+    .cert-limit.ok i { color: #16a34a; }
 
-    /* Validity block */
-    .cert-validity {
-      background: var(--graphite);
-      border-radius: 10px;
-      border: 1px solid var(--rule);
-      padding: 14px 16px;
-    }
-    .cert-validity-dates {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 12px; gap: 8px;
-    }
-    .cert-validity-col { display: flex; flex-direction: column; gap: 2px; }
-    .cert-validity-col.right { text-align: right; align-items: flex-end; }
-    .cert-vkey { font-size: 9px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--disabled); }
-    .cert-vdate { font-size: 13px; font-weight: 600; color: var(--body-text); }
-    .cert-bar-track { height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
-    .cert-bar-fill { height: 100%; border-radius: 3px; transition: width 0.9s cubic-bezier(.4,0,.2,1); }
-    .cert-bar-fill.good { background: linear-gradient(90deg, oklch(60% 0.14 155), oklch(68% 0.15 155)); }
-    .cert-bar-fill.warn { background: linear-gradient(90deg, oklch(65% 0.15 70), oklch(72% 0.16 70)); }
-    .cert-bar-fill.crit { background: linear-gradient(90deg, oklch(58% 0.16 20), oklch(66% 0.17 20)); }
-    .cert-validity-bottom {
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .cert-elapsed { font-size: 10px; color: var(--disabled); }
-    .cert-days-remaining { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
-    .cert-days-remaining.good { color: oklch(56% 0.15 155); }
-    .cert-days-remaining.warn { color: oklch(60% 0.17 70); }
-    .cert-days-remaining.crit { color: oklch(58% 0.16 20); }
-
-    .cert-footer {
-      padding: 10px 22px;
+    /* Footer */
+    .cert-foot {
+      padding: 9px 24px;
       border-top: 1px solid var(--rule);
       display: flex; align-items: center; gap: 8px;
-      font-size: 11px; color: var(--disabled); background: var(--graphite);
+      font-size: 11px; color: var(--disabled);
+      background: var(--graphite);
     }
-    .cert-footer i { font-size: 12px; }
+    .cert-foot i { font-size: 12px; }
 
     /* Overview credential strip on logbook page */
     .cred-strip {
@@ -4992,165 +4954,157 @@ function renderCertificates() {
   const spCls   = certValidityClass(spDays)
   const medCls  = certValidityClass(medDays)
 
-  function validityBlock(issueLabel, issueDate, expiryDate, daysLeft, pct, cls) {
-    return `<div class="cert-validity">
-      <div class="cert-validity-dates">
-        <div class="cert-validity-col">
-          <div class="cert-vkey">${issueLabel}</div>
-          <div class="cert-vdate">${fmtCertDate(issueDate)}</div>
+  function fmtDateShort(d) {
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  }
+
+  function valCol(label, issueDate, expiryDate, daysLeft, pct, cls) {
+    return `
+      <div class="cert-val-col">
+        <div class="cert-val-label">Valid for</div>
+        <div class="cert-days-num ${cls}">${daysLeft.toLocaleString()}</div>
+        <div class="cert-days-word">days remaining</div>
+        <div class="cert-bar-track">
+          <div class="cert-bar-fill ${cls}" style="width:${pct}%"></div>
         </div>
-        <div class="cert-validity-col right">
-          <div class="cert-vkey">Expires</div>
-          <div class="cert-vdate">${fmtCertDate(expiryDate)}</div>
+        <div class="cert-date-range">
+          <div class="cert-date-item">
+            <span class="cert-date-key">${label}</span>
+            <span class="cert-date-val">${fmtCertDate(issueDate)}</span>
+          </div>
+          <div class="cert-date-item">
+            <span class="cert-date-key">Expires</span>
+            <span class="cert-date-val">${fmtCertDate(expiryDate)}</span>
+          </div>
         </div>
-      </div>
-      <div class="cert-bar-track">
-        <div class="cert-bar-fill ${cls}" style="width:${pct}%"></div>
-      </div>
-      <div class="cert-validity-bottom">
-        <div class="cert-elapsed">${pct}% elapsed</div>
-        <div class="cert-days-remaining ${cls}">${daysLeft.toLocaleString()} days remaining</div>
-      </div>
+      </div>`
+  }
+
+  function section(title, content) {
+    return `<div class="cert-section">
+      <div class="cert-section-head">${title}</div>
+      ${content}
     </div>`
   }
 
+  function pairs(kvs) {
+    return `<div class="cert-pairs">${kvs.map(([k,v,extra]) =>
+      `<div class="cert-pair"><span class="cert-pk">${k}</span><span class="cert-pv${extra ? ' '+extra : ''}">${v}</span></div>`
+    ).join('')}</div>`
+  }
+
   container.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
       <div>
         <div style="font-size:14px;font-weight:700;color:var(--body-text)">Pilot Credentials</div>
         <div style="font-size:11px;color:var(--faint);margin-top:3px">U.S. Department of Transportation · Federal Aviation Administration</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <div class="cert-status-badge ${spCls}">
-          <i class="ph-bold ph-airplane"></i> Student Pilot · ${spDays.toLocaleString()} days valid
-        </div>
-        <div class="cert-status-badge ${medCls}">
-          <i class="ph-bold ph-first-aid-kit"></i> 3rd Class Medical · ${medDays.toLocaleString()} days valid
-        </div>
+        <div class="cert-valid-pill ${spCls}"><i class="ph-bold ph-check-circle"></i> Student Pilot · ${spDays.toLocaleString()} days</div>
+        <div class="cert-valid-pill ${medCls}"><i class="ph-bold ph-check-circle"></i> 3rd Class Medical · ${medDays.toLocaleString()} days</div>
       </div>
     </div>
 
-    <div class="cert-grid">
+    <div class="cert-list">
 
-      <!-- ── Student Pilot Certificate ────────────────────── -->
+      <!-- ── Student Pilot Certificate ─────────────────────────────────────── -->
       <div class="cert-card">
-        <div class="cert-header-pilot">
-          <div class="cert-issuer">U.S. Dept. of Transportation · FAA</div>
-          <div class="cert-type-line">Certificate of Qualification</div>
-          <div class="cert-title">Student Pilot</div>
-          <div class="cert-name-row">
-            <div class="cert-holder-name">${esc(sp.name)}</div>
-            <div class="cert-number">№ ${esc(sp.certNumber)}</div>
+        <div class="cert-accent pilot"></div>
+        <div class="cert-head">
+          <div class="cert-head-left">
+            <div class="cert-type-label">Student Pilot Certificate · Certificate of Qualification</div>
+            <div class="cert-name">${esc(sp.name)}</div>
+            <div class="cert-org">U.S. Dept. of Transportation · Federal Aviation Administration</div>
           </div>
-          <div class="cert-header-badge good">
-            <i class="ph-bold ph-check-circle"></i> Valid · ${spDays.toLocaleString()} days remaining
-          </div>
-        </div>
-
-        <div class="cert-body">
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-user"></i> Identity</div>
-            <div class="cert-kv-row">
-              <div class="cert-kv"><span class="cert-k">Nationality</span><span class="cert-v">${esc(sp.nationality)}</span></div>
-              <div class="cert-kv"><span class="cert-k">DOB</span><span class="cert-v">Sep 25, 2000</span></div>
-              <div class="cert-kv"><span class="cert-k">Sex</span><span class="cert-v">${esc(sp.sex)}</span></div>
+          <div class="cert-head-right">
+            <div class="cert-num">№ ${esc(sp.certNumber)}</div>
+            <div class="cert-valid-pill ${spCls}">
+              <i class="ph-bold ph-check-circle"></i> Valid
             </div>
           </div>
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical</div>
-            <div class="cert-kv-row">
-              <div class="cert-kv"><span class="cert-k">Height</span><span class="cert-v">${esc(sp.height)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Weight</span><span class="cert-v">${esc(sp.weight)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Hair</span><span class="cert-v">${esc(sp.hair)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Eyes</span><span class="cert-v">${esc(sp.eyes)}</span></div>
-            </div>
-          </div>
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-warning"></i> Limitations</div>
-            ${sp.limitations.map(l => `<div class="cert-limitation warn">
-              <i class="ph-bold ph-prohibit"></i>
-              <span>${esc(l)}</span>
-            </div>`).join('')}
-          </div>
-
-          ${validityBlock('Date of Issue', sp.issueDate, sp.expiryDate, spDays, spPct, spCls)}
-
         </div>
-
-        <div class="cert-footer">
+        <div class="cert-main">
+          ${valCol('Issued', sp.issueDate, sp.expiryDate, spDays, spPct, spCls)}
+          <div class="cert-data-col">
+            ${section('Identity', pairs([
+              ['Nationality', esc(sp.nationality)],
+              ['Date of Birth', 'Sep 25, 2000'],
+              ['Sex', esc(sp.sex)],
+            ]))}
+            ${section('Physical Characteristics', pairs([
+              ['Height', esc(sp.height)],
+              ['Weight', esc(sp.weight)],
+              ['Hair', esc(sp.hair)],
+              ['Eyes', esc(sp.eyes)],
+            ]))}
+            ${section('Limitations', sp.limitations.map(l =>
+              `<div class="cert-limit warn"><i class="ph-bold ph-prohibit"></i><span>${esc(l)}</span></div>`
+            ).join(''))}
+          </div>
+        </div>
+        <div class="cert-foot">
           <i class="ph-bold ph-airplane"></i>
           Certificate No. ${esc(sp.certNumber)} · Issued ${fmtCertDate(sp.issueDate)} · Signed by ${esc(sp.administrator)}, Administrator
         </div>
       </div>
 
-      <!-- ── Third Class Medical Certificate ──────────────── -->
+      <!-- ── Third Class Medical Certificate ───────────────────────────────── -->
       <div class="cert-card">
-        <div class="cert-header-medical">
-          <div class="cert-issuer">U.S. Dept. of Transportation · FAA</div>
-          <div class="cert-type-line">Airman Medical Certificate</div>
-          <div class="cert-title cert-title-medical">Third Class</div>
-          <div class="cert-name-row">
-            <div class="cert-holder-name">${esc(med.name)}</div>
-            <div class="cert-number">ID ${esc(med.applicantId)}</div>
+        <div class="cert-accent medical"></div>
+        <div class="cert-head">
+          <div class="cert-head-left">
+            <div class="cert-type-label">Airman Medical Certificate · Third Class</div>
+            <div class="cert-name">${esc(med.name)}</div>
+            <div class="cert-org">U.S. Dept. of Transportation · Federal Aviation Administration</div>
           </div>
-          <div class="cert-header-badge good">
-            <i class="ph-bold ph-check-circle"></i> Valid · ${medDays.toLocaleString()} days remaining
+          <div class="cert-head-right">
+            <div class="cert-num">ID ${esc(med.applicantId)}</div>
+            <div class="cert-valid-pill ${medCls}">
+              <i class="ph-bold ph-check-circle"></i> Valid
+            </div>
           </div>
         </div>
-
-        <div class="cert-body">
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-person"></i> Physical</div>
-            <div class="cert-kv-row">
-              <div class="cert-kv"><span class="cert-k">Height</span><span class="cert-v">${esc(med.height)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Weight</span><span class="cert-v">${esc(med.weight)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Hair</span><span class="cert-v">${esc(med.hair)}</span></div>
-              <div class="cert-kv"><span class="cert-k">Eyes</span><span class="cert-v">${esc(med.eyes)}</span></div>
-            </div>
+        <div class="cert-main">
+          ${valCol('Examined', med.examDate, med.expiryDate, medDays, medPct, medCls)}
+          <div class="cert-data-col">
+            ${section('Physical Characteristics', pairs([
+              ['Height', esc(med.height)],
+              ['Weight', esc(med.weight)],
+              ['Hair', esc(med.hair)],
+              ['Eyes', esc(med.eyes)],
+            ]))}
+            ${section('Examiner', `
+              <div class="cert-pairs" style="flex-direction:column;align-items:flex-start;gap:5px">
+                <div class="cert-pair"><span class="cert-pk">AME</span><span class="cert-pv accent">${esc(med.examiner)}</span></div>
+                <div style="display:flex;gap:20px;flex-wrap:wrap">
+                  <div class="cert-pair"><span class="cert-pk">Designation</span><span class="cert-pv mono">${esc(med.examDesig)}</span></div>
+                  <div class="cert-pair"><span class="cert-pk">Control No.</span><span class="cert-pv mono">${esc(med.controlNo)}</span></div>
+                </div>
+              </div>`
+            )}
+            ${section('Limitations',
+              `<div class="cert-limit ok"><i class="ph-bold ph-check-circle"></i><span>None — standard privileges apply</span></div>`
+            )}
           </div>
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-stethoscope"></i> Examiner</div>
-            <div class="cert-kv-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-              <div class="cert-kv"><span class="cert-k">AME</span><span class="cert-v accent">${esc(med.examiner)}</span></div>
-              <div style="display:flex;gap:20px;flex-wrap:wrap">
-                <div class="cert-kv"><span class="cert-k">Desig.</span><span class="cert-v mono">${esc(med.examDesig)}</span></div>
-                <div class="cert-kv"><span class="cert-k">Control</span><span class="cert-v mono">${esc(med.controlNo)}</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="cert-section-label"><i class="ph-bold ph-check-circle"></i> Limitations</div>
-            <div class="cert-limitation ok">
-              <i class="ph-bold ph-check-circle"></i>
-              <span>None — standard privileges apply</span>
-            </div>
-          </div>
-
-          ${validityBlock('Date of Examination', med.examDate, med.expiryDate, medDays, medPct, medCls)}
-
         </div>
-
-        <div class="cert-footer">
+        <div class="cert-foot">
           <i class="ph-bold ph-first-aid-kit"></i>
           ${esc(med.formNo)} · Control ${esc(med.controlNo)} · Examined ${fmtCertDate(med.examDate)}
         </div>
       </div>
+
     </div>
 
-    <!-- ── FAA Regulatory Reference ─────────────────────────── -->
-    <div class="section-label" style="margin-bottom:14px;margin-top:4px">Regulatory Notes</div>
+    <!-- ── FAA Regulatory Reference ─────────────────────────────────────────── -->
+    <div class="section-label" style="margin-bottom:12px">Regulatory Notes</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px">
-      <div style="background:var(--raised);border:1px solid var(--rule);border-top:2px solid var(--patina-text);border-radius:var(--r-sm);padding:14px 16px">
-        <div style="font-size:11px;font-weight:700;color:var(--patina-text);margin-bottom:10px;display:flex;align-items:center;gap:6px;letter-spacing:.02em">
-          <i class="ph-bold ph-airplane"></i> Student Pilot (14 CFR 61.19)
+      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:7px">
+          <span style="width:3px;height:14px;background:oklch(52% 0.15 178);border-radius:2px;flex-shrink:0"></span>
+          <span style="font-size:11px;font-weight:700;color:var(--body-text)">Student Pilot</span>
+          <span style="font-size:10px;color:var(--faint);font-family:'Alumni Sans',monospace;letter-spacing:.04em">14 CFR 61.19</span>
         </div>
-        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding-left:16px;margin:0">
+        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding:12px 16px 12px 28px;margin:0">
           <li>Valid 60 calendar months from month of issue (under age 40)</li>
           <li>Solo flight requires current medical + instructor endorsement</li>
           <li>Cannot carry passengers — solo only</li>
@@ -5158,16 +5112,18 @@ function renderCertificates() {
           <li>Night solo requires 14 CFR 61.87(o) endorsement</li>
         </ul>
       </div>
-      <div style="background:var(--raised);border:1px solid var(--rule);border-top:2px solid oklch(58% 0.13 255);border-radius:var(--r-sm);padding:14px 16px">
-        <div style="font-size:11px;font-weight:700;color:oklch(58% 0.13 255);margin-bottom:10px;display:flex;align-items:center;gap:6px;letter-spacing:.02em">
-          <i class="ph-bold ph-first-aid-kit"></i> Third Class Medical (14 CFR 61.23)
+      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:7px">
+          <span style="width:3px;height:14px;background:oklch(48% 0.15 248);border-radius:2px;flex-shrink:0"></span>
+          <span style="font-size:11px;font-weight:700;color:var(--body-text)">Third Class Medical</span>
+          <span style="font-size:10px;color:var(--faint);font-family:'Alumni Sans',monospace;letter-spacing:.04em">14 CFR 61.23</span>
         </div>
-        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding-left:16px;margin:0">
+        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding:12px 16px 12px 28px;margin:0">
           <li>Valid 60 calendar months from examination date (under age 40)</li>
           <li>Required for student, recreational &amp; private pilot operations</li>
           <li>Must be current before any solo flight</li>
           <li>BasicMed (14 CFR 61.113(i)) available as alternative after PPL</li>
-          <li>Next exam due: <strong style="color:var(--champagne)">${fmtCertDate(med.expiryDate)}</strong></li>
+          <li>Next exam due: <strong style="color:var(--body-text)">${fmtCertDate(med.expiryDate)}</strong></li>
         </ul>
       </div>
     </div>

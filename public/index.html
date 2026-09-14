@@ -271,7 +271,7 @@
     .back-sep { width: 1px; height: 16px; background: var(--rule); flex-shrink: 0; }
     .topbar-title {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 18px; font-weight: 300;
+      font-size: 18px; font-weight: 600;
       letter-spacing: 0.01em;
       color: var(--champagne);
       flex: 1;
@@ -374,7 +374,7 @@
     /* ── Weather card ───────────────────────────────────────── */
     .wx-header { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--rule); }
     .wx-header-left { flex:1; min-width:0; }
-    .wx-airport { font-size:18px; font-weight:300; color:var(--champagne); font-family:'Alumni Sans',sans-serif; letter-spacing:0.01em; line-height:1.15; }
+    .wx-airport { font-size:18px; font-weight:600; color:var(--champagne); font-family:'Alumni Sans',sans-serif; letter-spacing:0.01em; line-height:1.15; }
     .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:4px; }
     .wx-pills { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:8px; }
     .wx-verdict { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.05em; }
@@ -440,16 +440,20 @@
     .cur-row {
       display: grid; grid-template-columns: 1fr auto;
       align-items: center; gap: 10px;
-      padding: 10px 13px;
+      padding: 10px 10px 10px 13px;
       border-radius: var(--r-sm);
+      border-left: 3px solid transparent;
       background: var(--deep);
       transition: background 0.15s;
     }
-    .cur-row.cr-current  { background: var(--success-bg); }
-    .cur-row.cr-expiring { background: var(--warning-bg); }
-    .cur-row.cr-grace    { background: var(--warning-bg); }
-    .cur-row.cr-lapsed   { background: var(--danger-bg); }
-    .cur-row.cr-na       { background: var(--deep); }
+    .cur-row.cr-current  { border-color: oklch(55% 0.14 155); background: oklch(55% 0.14 155 / 0.06); }
+    .cur-row.cr-expiring { border-color: oklch(60% 0.15 75);  background: oklch(60% 0.15 75  / 0.06); }
+    .cur-row.cr-grace    { border-color: oklch(60% 0.15 55);  background: oklch(60% 0.15 55  / 0.05); }
+    .cur-row.cr-lapsed   { border-color: oklch(50% 0.14 20);  background: oklch(50% 0.14 20  / 0.05); }
+    .cur-row.cr-na       { border-color: var(--rule-strong);  }
+    [data-theme="light"] .cur-row.cr-current  { background: oklch(55% 0.14 155 / 0.07); }
+    [data-theme="light"] .cur-row.cr-lapsed   { background: oklch(50% 0.14 20  / 0.06); }
+    [data-theme="light"] .cur-row.cr-expiring { background: oklch(60% 0.15 75  / 0.07); }
     .cur-name { font-size: 14px; font-weight: 600; color: var(--champagne); line-height: 1.25; }
     .cur-reg  { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; color: var(--faint); margin-left: 5px; font-family: 'Alumni Sans', monospace; }
     .cur-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
@@ -497,6 +501,8 @@
       background: var(--raised);
     }
     .act-row {
+      display: block;
+      color: inherit; text-decoration: none;
       border-bottom: 1px solid var(--rule);
       border-left: 2px solid transparent;
       cursor: pointer;
@@ -757,9 +763,16 @@
       border-radius: var(--r-md) var(--r-md) 0 0;
       position: relative; overflow: hidden;
     }
+    /* Subtle tinted top-left accent strip */
+    .fd-hero::before {
+      content: ''; position: absolute; left: 0; top: 0;
+      width: 4px; height: 100%; background: var(--type-color, var(--patina-text));
+      pointer-events: none;
+    }
     .fd-hero-top {
       display: flex; justify-content: space-between;
       align-items: flex-start; gap: 16px; position: relative; z-index: 1;
+      padding-left: 12px;
     }
     .fd-hero-chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -783,7 +796,7 @@
       display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; padding-top: 4px;
     }
     .fd-hero-stats-bar {
-      display: flex; margin-top: 18px; position: relative; z-index: 1;
+      display: flex; margin-top: 18px; position: relative; z-index: 1; padding-left: 12px;
       border-top: 1px solid var(--rule);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
@@ -1051,8 +1064,8 @@
     .ch-ov-left { padding-right: 16px; border-right: 1px solid var(--rule); }
     .ch-ov-right { padding-left: 16px; }
     .ch-ov-num {
-      font-family: 'Alumni Sans', monospace; font-size: 36px; font-weight: 600;
-      letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+      font-size: 32px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
       color: var(--champagne); line-height: 1; margin-bottom: 3px;
     }
     .ch-ov-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
@@ -1259,7 +1272,7 @@
     }
     .modal-title {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 18px; font-weight: 300; letter-spacing: 0.01em;
+      font-size: 18px; font-weight: 600; letter-spacing: 0.01em;
       color: var(--champagne); flex: 1;
     }
     .modal-close {
@@ -3878,7 +3891,7 @@ async function showFlightDetail(id) {
   document.getElementById('flight-detail-content').innerHTML = `
 
     <!-- ── Hero ─────────────────────────────────────────── -->
-    <div class="fd-hero">
+    <div class="fd-hero" style="--type-color:${color}">
       <div class="fd-hero-top">
         <div>
           <div class="fd-hero-chip" style="background:${color}1a;border:1px solid ${color}40;color:${color}">
@@ -7079,7 +7092,7 @@ function buildChessTCContent(d, tc) {
     <div class="grid-2" style="margin-bottom:16px">
       <div class="ov-card">
         <div class="ov-card-hd">${monthName(0)} &middot; ${tm.count} games</div>
-        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:600;color:var(--champagne);line-height:1;margin-bottom:4px">
+        <div class="te-score" style="color:var(--champagne);margin-bottom:4px">
           ${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &thinsp;${deltaHtml(tm)}
         </div>
         <div class="ch-wld"><span class="ch-w">W ${tm.win}</span><span class="ch-l">L ${tm.loss}</span><span class="ch-d">D ${tm.draw}</span></div>
@@ -7087,7 +7100,7 @@ function buildChessTCContent(d, tc) {
       </div>
       <div class="ov-card">
         <div class="ov-card-hd">${monthName(1)} &middot; ${lm.count} games</div>
-        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:600;color:var(--champagne);line-height:1;margin-bottom:4px">
+        <div class="te-score" style="color:var(--champagne);margin-bottom:4px">
           ${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &thinsp;${deltaHtml(lm)}
         </div>
         <div class="ch-wld"><span class="ch-w">W ${lm.win}</span><span class="ch-l">L ${lm.loss}</span><span class="ch-d">D ${lm.draw}</span></div>

@@ -57,6 +57,33 @@
       /* ── State ────────────────────────────────────────── */
       --warn:  oklch(58% 0.15 35);
 
+      /* ── Semantic status system ───────────────────────────
+         One shared vocabulary for every status pill, badge, delta,
+         and currency row across the app: success / warning / danger /
+         info / severe, each with a text color and a matching low-alpha
+         background + border for filled treatments. Dark values here;
+         light-theme block below supplies the readable counterparts. */
+      --success:        oklch(70% 0.13 155);
+      --success-bg:     oklch(55% 0.14 155 / 0.14);
+      --success-border: oklch(55% 0.14 155 / 0.4);
+      --warning:        oklch(76% 0.15 72);
+      --warning-bg:     oklch(60% 0.15 72 / 0.15);
+      --warning-border: oklch(60% 0.15 72 / 0.4);
+      --danger:         oklch(70% 0.14 20);
+      --danger-bg:      oklch(50% 0.14 20 / 0.15);
+      --danger-border:  oklch(50% 0.14 20 / 0.4);
+      --info:           oklch(76% 0.088 190);
+      --info-bg:        oklch(70% 0.12 188 / 0.14);
+      --info-border:    oklch(70% 0.12 188 / 0.4);
+      --severe:         oklch(76% 0.13 330);
+      --severe-bg:      oklch(60% 0.15 330 / 0.15);
+      --severe-border:  oklch(60% 0.15 330 / 0.4);
+
+      /* Fixed ink for text sitting on saturated categorical chips
+         (sport/flight-type accents) — never remapped per theme, because
+         those accent hues keep roughly the same mid-lightness in both. */
+      --ink-on-accent:  oklch(14% 0 0);
+
       /* ── Radii ────────────────────────────────────────── */
       --r-xs: 2px;
       --r-sm: 4px;
@@ -77,6 +104,22 @@
       --faint:      oklch(55% 0.012 95);
       --rule:       oklch(25% 0.02 95 / 0.13);
       --rule-strong:oklch(74% 0.09 82 / 0.5);
+
+      --success:        oklch(38% 0.13 155);
+      --success-bg:     oklch(55% 0.14 155 / 0.10);
+      --success-border: oklch(55% 0.14 155 / 0.35);
+      --warning:        oklch(45% 0.13 68);
+      --warning-bg:     oklch(60% 0.15 72 / 0.14);
+      --warning-border: oklch(60% 0.15 72 / 0.4);
+      --danger:         oklch(46% 0.16 20);
+      --danger-bg:      oklch(50% 0.14 20 / 0.09);
+      --danger-border:  oklch(50% 0.14 20 / 0.3);
+      --info:           oklch(42% 0.09 190);
+      --info-bg:        oklch(70% 0.12 188 / 0.12);
+      --info-border:    oklch(70% 0.12 188 / 0.4);
+      --severe:         oklch(44% 0.14 330);
+      --severe-bg:      oklch(60% 0.15 330 / 0.12);
+      --severe-border:  oklch(60% 0.15 330 / 0.4);
     }
 
     /* ── Browser surfaces ──────────────────────────────────── */
@@ -335,14 +378,14 @@
     .wx-airport-meta { font-size:12px; color:var(--muted); margin-top:4px; }
     .wx-pills { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:8px; }
     .wx-verdict { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.05em; }
-    .wx-verdict.go   { background:oklch(16% 0.05 155); color:oklch(72% 0.13 155); border:1px solid oklch(26% 0.07 155); }
-    .wx-verdict.caut { background:oklch(18% 0.06 70);  color:oklch(76% 0.14 70);  border:1px solid oklch(28% 0.09 70); }
-    .wx-verdict.nogo { background:oklch(16% 0.06 20);  color:oklch(70% 0.12 20);  border:1px solid oklch(26% 0.08 20); }
+    .wx-verdict.go   { background:var(--success-bg); color:var(--success); border:1px solid var(--success-border); }
+    .wx-verdict.caut { background:var(--warning-bg); color:var(--warning); border:1px solid var(--warning-border); }
+    .wx-verdict.nogo { background:var(--danger-bg);  color:var(--danger);  border:1px solid var(--danger-border); }
     .wx-cat-pill { display:inline-block; padding:4px 10px; border-radius:5px; font-size:12px; font-weight:700; letter-spacing:.05em; }
-    .wx-cat-pill.VFR  { background:oklch(17% 0.04 145); color:oklch(70% 0.11 145); border:1px solid oklch(27% 0.06 145); }
-    .wx-cat-pill.MVFR { background:oklch(17% 0.04 225); color:oklch(70% 0.10 225); border:1px solid oklch(27% 0.06 225); }
-    .wx-cat-pill.IFR  { background:oklch(17% 0.05 20);  color:oklch(70% 0.12 20);  border:1px solid oklch(27% 0.07 20); }
-    .wx-cat-pill.LIFR { background:oklch(17% 0.05 330); color:oklch(70% 0.11 330); border:1px solid oklch(27% 0.07 330); }
+    .wx-cat-pill.VFR  { background:var(--success-bg); color:var(--success); border:1px solid var(--success-border); }
+    .wx-cat-pill.MVFR { background:var(--info-bg);    color:var(--info);    border:1px solid var(--info-border); }
+    .wx-cat-pill.IFR  { background:var(--danger-bg);  color:var(--danger);  border:1px solid var(--danger-border); }
+    .wx-cat-pill.LIFR { background:var(--severe-bg);  color:var(--severe);  border:1px solid var(--severe-border); }
     .wx-body { display:grid; grid-template-columns:185px 1fr 1fr; gap:0; }
     @media (max-width:760px) { .wx-body { grid-template-columns:1fr; } }
     .wx-col { padding:0 16px; border-right:1px solid var(--rule); }
@@ -359,10 +402,10 @@
     .wx-footer-link:first-child { padding-left:0; }
     .wx-footer-link:hover { color:var(--champagne); }
     .wx-raw { font-size:11px; color:var(--faint); font-family:var(--mono,monospace); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:10px; }
-    .wx-notam-count { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; margin-left:4px; }
+    .wx-notam-count { background:var(--warning-bg); color:var(--warning); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; margin-left:4px; }
     .wx-age { font-size:12px; color:var(--faint); }
     .wx-inline-hdr { font-size:10px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--faint); padding:11px 0 6px; border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:7px; }
-    .wx-inline-hdr .wx-count-badge { background:oklch(24% 0.10 75); color:oklch(82% 0.18 75); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:0; text-transform:none; }
+    .wx-inline-hdr .wx-count-badge { background:var(--warning-bg); color:var(--warning); padding:2px 7px; border-radius:3px; font-size:11px; font-weight:700; letter-spacing:0; text-transform:none; }
     .wx-raw-taf { font-size:11px; color:var(--muted); font-family:var(--mono,monospace); padding:8px 0; border-bottom:1px solid var(--rule); white-space:pre-wrap; word-break:break-all; line-height:1.65; }
     .wx-taf-fcst { display:grid; grid-template-columns:60px 1fr; gap:3px 10px; padding:6px 0; border-bottom:1px solid var(--rule); font-size:12px; align-items:start; }
     .wx-taf-fcst:last-child { border-bottom:none; }
@@ -373,6 +416,10 @@
     .wx-notam-item:last-child { border-bottom:none; padding-bottom:4px; }
     .wx-notam-hdr { display:flex; align-items:center; gap:7px; margin-bottom:5px; flex-wrap:wrap; }
     .wx-notam-type { font-size:10px; font-weight:700; letter-spacing:0.05em; padding:3px 7px; border-radius:3px; white-space:nowrap; line-height:1.4; }
+    .wx-notam-type--danger  { background:var(--danger-bg);  color:var(--danger); }
+    .wx-notam-type--info    { background:var(--info-bg);    color:var(--info); }
+    .wx-notam-type--warning { background:var(--warning-bg); color:var(--warning); }
+    .wx-notam-type--neutral { background:var(--graphite-2); color:var(--muted); }
     .wx-notam-id { font-size:10px; color:var(--faint); font-family:var(--mono,monospace); }
     .wx-notam-exp { font-size:10px; color:var(--faint); margin-left:auto; white-space:nowrap; }
     .wx-notam-txt { color:var(--muted); line-height:1.65; word-break:break-word; font-size:12px; }
@@ -393,20 +440,16 @@
     .cur-row {
       display: grid; grid-template-columns: 1fr auto;
       align-items: center; gap: 10px;
-      padding: 10px 10px 10px 13px;
+      padding: 10px 13px;
       border-radius: var(--r-sm);
-      border-left: 3px solid transparent;
       background: var(--deep);
       transition: background 0.15s;
     }
-    .cur-row.cr-current  { border-color: oklch(55% 0.14 155); background: oklch(55% 0.14 155 / 0.06); }
-    .cur-row.cr-expiring { border-color: oklch(60% 0.15 75);  background: oklch(60% 0.15 75  / 0.06); }
-    .cur-row.cr-grace    { border-color: oklch(60% 0.15 55);  background: oklch(60% 0.15 55  / 0.05); }
-    .cur-row.cr-lapsed   { border-color: oklch(50% 0.14 20);  background: oklch(50% 0.14 20  / 0.05); }
-    .cur-row.cr-na       { border-color: var(--rule-strong);  }
-    [data-theme="light"] .cur-row.cr-current  { background: oklch(55% 0.14 155 / 0.07); }
-    [data-theme="light"] .cur-row.cr-lapsed   { background: oklch(50% 0.14 20  / 0.06); }
-    [data-theme="light"] .cur-row.cr-expiring { background: oklch(60% 0.15 75  / 0.07); }
+    .cur-row.cr-current  { background: var(--success-bg); }
+    .cur-row.cr-expiring { background: var(--warning-bg); }
+    .cur-row.cr-grace    { background: var(--warning-bg); }
+    .cur-row.cr-lapsed   { background: var(--danger-bg); }
+    .cur-row.cr-na       { background: var(--deep); }
     .cur-name { font-size: 14px; font-weight: 600; color: var(--champagne); line-height: 1.25; }
     .cur-reg  { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; color: var(--faint); margin-left: 5px; font-family: 'Alumni Sans', monospace; }
     .cur-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
@@ -525,7 +568,7 @@
       transition: border-color 0.15s, color 0.15s, background 0.15s;
     }
     .act-chip:hover { color: var(--muted); border-color: var(--muted); }
-    .act-chip.active { border-color: transparent; color: var(--ground); }
+    .act-chip.active { border-color: transparent; color: var(--ink-on-accent); }
     .act-chip[data-sport="all"].active      { background: var(--muted); }
     .act-chip[data-sport="running"].active  { background: var(--run); }
     .act-chip[data-sport="cycling"].active  { background: var(--bike); color: var(--gold-ink); }
@@ -665,7 +708,7 @@
       font-family: inherit; letter-spacing: 0.03em; transition: all 0.15s;
     }
     .fl-filter-btn:hover { border-color: var(--champagne); color: var(--champagne); }
-    .fl-filter-btn.active { border-color: var(--patina-text); color: var(--patina-text); background: oklch(45% 0.1 145 / 0.12); }
+    .fl-filter-btn.active { border-color: var(--info); color: var(--info); background: var(--info-bg); }
     .fl-list {
       border-radius: var(--r-sm); overflow: hidden;
       border: 1px solid var(--rule);
@@ -714,16 +757,9 @@
       border-radius: var(--r-md) var(--r-md) 0 0;
       position: relative; overflow: hidden;
     }
-    /* Subtle tinted top-left accent strip */
-    .fd-hero::before {
-      content: ''; position: absolute; left: 0; top: 0;
-      width: 4px; height: 100%; background: var(--type-color, var(--patina-text));
-      pointer-events: none;
-    }
     .fd-hero-top {
       display: flex; justify-content: space-between;
       align-items: flex-start; gap: 16px; position: relative; z-index: 1;
-      padding-left: 12px;
     }
     .fd-hero-chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -747,7 +783,7 @@
       display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; padding-top: 4px;
     }
     .fd-hero-stats-bar {
-      display: flex; margin-top: 18px; position: relative; z-index: 1; padding-left: 12px;
+      display: flex; margin-top: 18px; position: relative; z-index: 1;
       border-top: 1px solid var(--rule);
       overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
@@ -915,6 +951,7 @@
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: 10px 0; border-top: 1px solid var(--rule); padding-top: 14px;
     }
+    @media (max-width: 480px) { .cdoc-phys { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
     .cdoc-phys-item { display: flex; flex-direction: column; gap: 4px; }
     .cdoc-phys-k { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
     .cdoc-phys-v { font-size: 12px; font-weight: 500; color: var(--body-text); }
@@ -934,7 +971,7 @@
       letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--champagne);
     }
     .cdoc-countdown.warn { color: var(--warn); }
-    .cdoc-countdown.crit { color: oklch(58% 0.20 15); }
+    .cdoc-countdown.crit { color: var(--danger); }
     .cdoc-countdown-sub {
       font-size: 10px; font-weight: 600; letter-spacing: 0.10em;
       text-transform: uppercase; color: var(--faint); margin-top: 4px; margin-bottom: 20px;
@@ -993,7 +1030,7 @@
     }
     .ch-wld { display: flex; gap: 16px; font-size: 14px; font-weight: 600; margin-top: 6px; }
     .ch-w { color: var(--patina-text); }
-    .ch-l { color: oklch(58% 0.20 15); }
+    .ch-l { color: var(--danger); }
     .ch-d { color: var(--muted); }
     .ch-winpct { font-size: 11px; color: var(--faint); margin-top: 6px; }
     .ch-res-badge {
@@ -1002,7 +1039,7 @@
       width: 28px; height: 20px; border-radius: var(--r-sm);
     }
     .ch-res-badge.W { background: color-mix(in oklch, var(--patina-text) 18%, transparent); color: var(--patina-text); }
-    .ch-res-badge.L { background: color-mix(in oklch, oklch(58% 0.20 15) 18%, transparent); color: oklch(58% 0.20 15); }
+    .ch-res-badge.L { background: var(--danger-bg); color: var(--danger); }
     .ch-res-badge.D { background: var(--graphite); color: var(--muted); }
     .ch-game-opp { font-size: 14px; color: var(--champagne); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ch-game-meta { font-size: 12px; color: var(--faint); }
@@ -1039,22 +1076,14 @@
 
     /* ── Readiness status pill + delta badge ─────────────── */
     .rd-pill { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:5px 13px;border-radius:20px;letter-spacing:.02em; }
-    .rd-pill.nogo  { background:oklch(14% 0.04 20);color:oklch(70% 0.14 20);border:1px solid oklch(24% 0.06 20); }
-    .rd-pill.caut  { background:oklch(15% 0.05 70);color:oklch(74% 0.15 70);border:1px solid oklch(25% 0.08 70); }
-    .rd-pill.go    { background:oklch(13% 0.04 155);color:oklch(70% 0.13 155);border:1px solid oklch(23% 0.06 155); }
-    .rd-pill.muted { background:oklch(15% 0.002 95);color:oklch(60% 0 0);border:1px solid oklch(22% 0.003 95); }
+    .rd-pill.nogo  { background:var(--danger-bg);  color:var(--danger);  border:1px solid var(--danger-border); }
+    .rd-pill.caut  { background:var(--warning-bg); color:var(--warning); border:1px solid var(--warning-border); }
+    .rd-pill.go    { background:var(--success-bg); color:var(--success); border:1px solid var(--success-border); }
+    .rd-pill.muted { background:var(--graphite-2); color:var(--muted);  border:1px solid var(--rule); }
     .rd-delta { display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px; }
-    .rd-delta.neg { background:oklch(14% 0.04 20);color:oklch(68% 0.12 20); }
-    .rd-delta.pos { background:oklch(13% 0.04 155);color:oklch(68% 0.13 155); }
-    .rd-delta.neu { background:oklch(15% 0.002 95);color:oklch(55% 0 0); }
-    /* light-mode overrides */
-    [data-theme="light"] .rd-pill.nogo  { background:#fde8e8;color:#b03030;border-color:#f5c6c6; }
-    [data-theme="light"] .rd-pill.caut  { background:#fef5e4;color:#8a6010;border-color:#f5dfa0; }
-    [data-theme="light"] .rd-pill.go    { background:#e8f5ee;color:#237a50;border-color:#b6e0ca; }
-    [data-theme="light"] .rd-pill.muted { background:#ededea;color:#666660;border-color:#d8d8d5; }
-    [data-theme="light"] .rd-delta.neg  { background:#fde8e8;color:#b03030; }
-    [data-theme="light"] .rd-delta.pos  { background:#e8f5ee;color:#237a50; }
-    [data-theme="light"] .rd-delta.neu  { background:#ededea;color:#666660; }
+    .rd-delta.neg { background:var(--danger-bg);  color:var(--danger); }
+    .rd-delta.pos { background:var(--success-bg); color:var(--success); }
+    .rd-delta.neu { background:var(--graphite-2); color:var(--muted); }
 
     /* ── MapLibre overrides ──────────────────────────────── */
     .maplibregl-popup-content {
@@ -1095,6 +1124,10 @@
       letter-spacing: 0.09em; text-transform: uppercase;
     }
     .chart-sublabel { font-size: 11px; color: var(--faint); font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.8; }
+    .chart-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 120px; font-size: 12px; color: var(--faint);
+    }
 
     /* ── Tremor-style KPI tiles (readiness card) ──────────── */
     .kpi-tiles { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 14px; }
@@ -1179,6 +1212,8 @@
       padding: 9px 16px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
     }
     .btn-ghost:hover { color: var(--body-text); border-color: var(--muted); }
+    .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sm { font-size: 12px; padding: 5px 12px; }
     .btn-link {
       display: inline-flex; align-items: center; gap: 5px;
       background: none; border: none; padding: 0;
@@ -1362,20 +1397,31 @@
 
     @media (max-width: 700px) {
       .fl-kpis { display: none; }
+      .topbar { padding: 0 16px; }
+      .nav-date { display: none; }
       .sidebar { width: 52px; }
-      .sb-logo { display: none !important; }
+      .sidebar .sb-head { padding: 0; justify-content: center; }
+      .sidebar .sb-head .avatar { display: none; }
+      .sidebar .sb-logo { display: none !important; }
+      .sidebar .sb-group-hdr {
+        padding: 0; justify-content: center;
+        margin-top: 10px; height: 20px;
+        border-top: 1px solid var(--rule);
+      }
+      .sidebar .sb-group-hdr span, .sidebar .sb-caret { display: none; }
+      .sidebar .sb-group-items { max-height: 200px !important; }
+      .sidebar .sb-item { padding: 0; justify-content: center; margin: 2px 4px; }
+      .sidebar .sb-lbl { display: none; }
       .view-scroller { padding: 20px 16px 40px; }
-      .flight-route-label { font-size: 24px; }
+      .fd-route-hero { font-size: 28px; }
     }
 
     /* ── Finance ──────────────────────────────────────────── */
     .fin-nw-hero { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
     .fin-nw-amt  { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
     .fin-nw-delta { font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
-    .fin-nw-delta.pos { background: #0e1f18; color: #4aaa80; }
-    .fin-nw-delta.neg { background: #221414; color: #cc5050; }
-    [data-theme="light"] .fin-nw-delta.pos { background: #e8f5ee; color: #237a50; }
-    [data-theme="light"] .fin-nw-delta.neg { background: #fde8e8; color: #b03030; }
+    .fin-nw-delta.pos { background: var(--success-bg); color: var(--success); }
+    .fin-nw-delta.neg { background: var(--danger-bg);  color: var(--danger); }
     .fin-acct-list { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; }
     .fin-acct-row  { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
     .fin-acct-row:last-child { border-bottom: none; }
@@ -1442,15 +1488,13 @@
     .fin-inst-type { font-size: 11px; color: var(--faint); margin-top: 1px; }
     .fin-inst-connected {
       display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; font-weight: 600; color: #4aaa80;
+      font-size: 10px; font-weight: 600; color: var(--success);
       margin-top: 5px; letter-spacing: 0.02em; text-transform: uppercase;
     }
     .fin-inst-connected::before {
       content: ''; width: 5px; height: 5px; border-radius: 50%;
-      background: #4aaa80; flex-shrink: 0;
+      background: var(--success); flex-shrink: 0;
     }
-    [data-theme="light"] .fin-inst-connected { color: #237a50; }
-    [data-theme="light"] .fin-inst-connected::before { background: #237a50; }
     .fin-inst-rm {
       background: none; border: none; color: var(--faint);
       cursor: pointer; padding: 6px; border-radius: var(--r-sm);
@@ -1458,13 +1502,6 @@
       font-size: 14px; transition: color 0.15s, background 0.15s;
     }
     .fin-inst-rm:hover { color: var(--warn); background: var(--graphite); }
-    .fin-link-btn {
-      display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
-      padding: 6px 14px; border-radius: var(--r-sm);
-      background: var(--gold); color: var(--deep); border: none;
-      cursor: pointer; font-weight: 600; font-family: inherit;
-    }
-    .fin-link-btn:hover { opacity: .88; }
     .fin-add-card {
       background: none; border: 1px dashed var(--rule);
       border-radius: var(--r-md); padding: 14px 16px;
@@ -1676,10 +1713,10 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span class="view-subhdr">Flight Log</span>
             <span id="fl-subtitle" class="data-note" style="flex:1"></span>
-            <button class="btn-ghost" id="sync-night-btn" onclick="syncNightData()" style="padding:6px 12px;font-size:12px;color:var(--patina-text);border-color:var(--patina-text)" title="Sync block-out/in times from Gmail schedules">
+            <button class="btn-ghost btn-sm" id="sync-night-btn" onclick="syncNightData()" style="color:var(--patina-text);border-color:var(--patina-text)" title="Sync block-out/in times from Gmail schedules">
               <i class="ph-bold ph-clock"></i> Sync Times
             </button>
-            <button class="btn-primary" onclick="openFlightModal()" style="padding:6px 14px;font-size:12px">
+            <button class="btn-primary btn-sm" onclick="openFlightModal()">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
           </div>
@@ -1695,11 +1732,11 @@
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
           </div>
           <div id="fl-pagination" style="display:none;align-items:center;justify-content:space-between;padding:10px 4px;gap:12px">
-            <button class="btn-ghost" id="fl-prev" onclick="flPageStep(-1)" style="font-size:12px;padding:5px 12px">
+            <button class="btn-ghost btn-sm" id="fl-prev" onclick="flPageStep(-1)">
               <i class="ph-bold ph-caret-left"></i> Prev
             </button>
             <span id="fl-page-label" style="font-size:12px;color:var(--muted)"></span>
-            <button class="btn-ghost" id="fl-next" onclick="flPageStep(1)" style="font-size:12px;padding:5px 12px">
+            <button class="btn-ghost btn-sm" id="fl-next" onclick="flPageStep(1)">
               Next <i class="ph-bold ph-caret-right"></i>
             </button>
           </div>
@@ -1731,7 +1768,7 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
             <span class="view-subhdr">Finances</span>
             <span class="data-note" id="fin-sync-status" style="flex:1"></span>
-            <button class="btn-ghost" onclick="finSync()" style="padding:5px 12px;font-size:12px" id="fin-sync-btn">
+            <button class="btn-ghost btn-sm" onclick="finSync()" id="fin-sync-btn">
               <i class="ph-bold ph-arrows-clockwise"></i> Sync
             </button>
           </div>
@@ -2545,20 +2582,13 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
   const notamLoading = notamData?.loading === true;
   const notamUnavailable = notamData?.unavailable === true;
 
-  const NOTAM_TYPE_STYLE = {
-    TFR: 'background:oklch(20% 0.12 30);color:oklch(78% 0.18 30)',
-    FDC: 'background:oklch(20% 0.12 30);color:oklch(78% 0.18 30)',
-    IAP: 'background:oklch(20% 0.10 255);color:oklch(74% 0.14 255)',
-    ODP: 'background:oklch(20% 0.10 255);color:oklch(74% 0.14 255)',
-    RWY: 'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
-    TWY: 'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
-    OBST:'background:oklch(22% 0.10 75);color:oklch(80% 0.18 75)',
-    NAV: 'background:oklch(20% 0.08 230);color:oklch(72% 0.14 230)',
-    COM: 'background:oklch(20% 0.08 230);color:oklch(72% 0.14 230)',
-    SVC: 'background:oklch(20% 0.08 150);color:oklch(72% 0.14 150)',
-    D:   'background:oklch(22% 0.06 75);color:oklch(72% 0.12 75)',
-    N:   'background:oklch(20% 0.06 230);color:oklch(68% 0.10 230)',
-    O:   'background:oklch(20% 0.05 150);color:oklch(68% 0.10 150)',
+  // Categorical grouping onto the shared semantic tokens (danger/info/warning/neutral)
+  // instead of one-off literal colors, so this badge themes correctly in light mode too.
+  const NOTAM_TYPE_CAT = {
+    TFR: 'danger', FDC: 'danger',
+    IAP: 'info', ODP: 'info', NAV: 'info', COM: 'info', N: 'info',
+    RWY: 'warning', TWY: 'warning', OBST: 'warning', D: 'warning',
+    SVC: 'neutral', O: 'neutral',
   };
   const NOTAM_TYPE_LABEL = {
     IAP:'Approach', ODP:'Departure', TFR:'Flight Restriction', FDC:'Regulatory',
@@ -2566,7 +2596,7 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
     SVC:'Service', NAV:'Navaid', AD:'Aerodrome', PROCEDURE:'Procedure',
     STAR:'Arrival', D:'General', N:'Local', O:'Other',
   };
-  function notamTypeStyle(t) { return NOTAM_TYPE_STYLE[(t||'').toUpperCase()] || NOTAM_TYPE_STYLE.O; }
+  function notamTypeClass(t) { return 'wx-notam-type--' + (NOTAM_TYPE_CAT[(t||'').toUpperCase()] || 'neutral'); }
   function notamTypeLabel(t) {
     const k = (t||'').toUpperCase();
     return NOTAM_TYPE_LABEL[k] || (k.slice(0,8) || '—');
@@ -2632,7 +2662,7 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
           const exp  = fmtNotamDate(n.endDate);
           return `<div class="wx-notam-item">
             <div class="wx-notam-hdr">
-              <span class="wx-notam-type" style="${notamTypeStyle(n.type)}">${esc(notamTypeLabel(n.type))}</span>
+              <span class="wx-notam-type ${notamTypeClass(n.type)}">${esc(notamTypeLabel(n.type))}</span>
               ${n.id ? `<span class="wx-notam-id">${esc(n.id)}</span>` : ''}
               ${exp ? `<span class="wx-notam-exp">expires ${esc(exp)}</span>` : ''}
             </div>
@@ -2663,7 +2693,7 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
           <span class="wx-taf-time">${esc(fmtTafTime(f.from))}${f.to?` – ${esc(fmtTafTime(f.to))}`:''}</span>
         </div>`;
       }).join('')
-    : (taf?.raw ? `<div class="wx-raw-taf">${esc(taf.raw)}</div>` : `<div style="font-size:11px;color:var(--faint);padding:6px 0">TAF not available</div>`);
+    : (taf?.raw ? `<div class="wx-raw-taf">${esc(taf.raw)}</div>` : `<div class="chart-empty" style="height:auto;padding:6px 0;justify-content:flex-start">TAF not available</div>`);
   const tafCountBadge = taf?.fcsts?.length ? `<span class="wx-count-badge">${taf.fcsts.length}</span>` : '';
 
   // ── Compass SVG (multi-runway) ───────────────────────────────────────────────
@@ -3186,7 +3216,7 @@ function buildZonesChart(activities) {
     }
   }
   const el = document.getElementById('chart-zones');
-  if (!hasData) { el.style.height = 'auto'; el.textContent = 'No zone data'; return; }
+  if (!hasData) { el.style.height = 'auto'; el.className = 'chart-empty'; el.textContent = 'No zone data for this period'; return; }
   _cjsRender(el, {
     type: 'bar',
     data: {
@@ -3848,7 +3878,7 @@ async function showFlightDetail(id) {
   document.getElementById('flight-detail-content').innerHTML = `
 
     <!-- ── Hero ─────────────────────────────────────────── -->
-    <div class="fd-hero" style="--type-color:${color}">
+    <div class="fd-hero">
       <div class="fd-hero-top">
         <div>
           <div class="fd-hero-chip" style="background:${color}1a;border:1px solid ${color}40;color:${color}">
@@ -3864,10 +3894,10 @@ async function showFlightDetail(id) {
           </div>
         </div>
         <div class="fd-hero-actions">
-          <button class="btn-ghost" onclick="openFlightModal(${f.id})" style="font-size:12px;padding:5px 11px">
+          <button class="btn-ghost btn-sm" onclick="openFlightModal(${f.id})">
             <i class="ph-bold ph-pencil-simple"></i> Edit
           </button>
-          <button class="btn-ghost" onclick="confirmDeleteFlight(${f.id})" style="font-size:12px;padding:5px 11px;color:var(--warn)">
+          <button class="btn-ghost btn-sm" onclick="confirmDeleteFlight(${f.id})" style="color:var(--warn)">
             <i class="ph-bold ph-trash"></i>
           </button>
         </div>
@@ -4529,7 +4559,7 @@ async function initFlightDetailMap(f) {
           ctx.scale(dpr, dpr);
 
           // Theme-aware palette — isLight is captured from loadFdMap() closure
-          const _bg   = isLight ? '#f5f0ea' : '#12111a';
+          const _bg   = isLight ? '#f5f0ea' : '#1a1912';
           const _grid = isLight ? 'rgba(0,0,0,0.06)'  : 'rgba(255,255,255,0.055)';
           const _base = isLight ? 'rgba(0,0,0,0.2)'   : 'rgba(255,255,255,0.18)';
           const _axis = isLight ? 'rgba(0,0,0,0.1)'   : 'rgba(255,255,255,0.1)';

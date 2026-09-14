@@ -1018,6 +1018,108 @@
     .cred-chip .cred-name { color: var(--body-text); font-weight: 500; }
     .cred-chip .cred-exp { color: var(--muted); }
 
+    /* ── Chess ──────────────────────────────────────────── */
+
+    .ch-ratings {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .ch-stat {
+      padding: 22px 20px; border-right: 1px solid var(--rule);
+      display: flex; flex-direction: column;
+    }
+    .ch-stat:last-child { border-right: none; }
+    .ch-stat-type {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--disabled); margin-bottom: 10px;
+    }
+    .ch-stat-num {
+      font-family: 'Alumni Sans', monospace;
+      font-size: 40px; font-weight: 400; line-height: 1;
+      letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+      color: var(--body-text); margin-bottom: 12px;
+    }
+    .ch-stat-rule { border: none; border-top: 1px solid var(--rule); margin: 0 0 11px; }
+    .ch-stat-detail { display: flex; flex-direction: column; gap: 4px; }
+    .ch-stat-best { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+    .ch-stat-sub { font-size: 11px; color: var(--faint); }
+
+    .ch-monthly {
+      display: grid; grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .ch-month { padding: 20px; border-right: 1px solid var(--rule); }
+    .ch-month:last-child { border-right: none; background: var(--graphite); }
+    .ch-month-hd {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--disabled); margin-bottom: 14px;
+    }
+    .ch-month-rating {
+      font-size: 22px; font-weight: 300; letter-spacing: 0.02em;
+      color: var(--body-text); font-variant-numeric: tabular-nums; margin-bottom: 4px;
+    }
+    .ch-month-range { font-size: 11px; color: var(--faint); margin-bottom: 14px; }
+    .ch-wld { display: flex; gap: 16px; font-size: 13.5px; font-weight: 600; }
+    .ch-w { color: #0f766e; }
+    .ch-l { color: #991b1b; }
+    .ch-d { color: var(--muted); }
+    .ch-winpct { font-size: 11px; color: var(--faint); margin-top: 6px; }
+
+    .ch-spark-wrap {
+      border: 1px solid var(--rule); border-radius: var(--r-sm);
+      padding: 16px 20px 14px; margin-bottom: 20px;
+    }
+    .ch-spark-hd {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--disabled); margin-bottom: 12px;
+    }
+
+    .ch-games {
+      border: 1px solid var(--rule); border-radius: var(--r-sm);
+      overflow: hidden; margin-bottom: 28px;
+    }
+    .ch-games-hd {
+      padding: 9px 16px; border-bottom: 1px solid var(--rule);
+      background: var(--graphite);
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--disabled);
+      display: grid; grid-template-columns: 36px 1fr 74px 60px 70px;
+      gap: 8px; align-items: center;
+    }
+    .ch-game {
+      display: grid; grid-template-columns: 36px 1fr 74px 60px 70px;
+      gap: 8px; padding: 10px 16px;
+      border-top: 1px solid var(--rule);
+      align-items: center; text-decoration: none; color: inherit;
+    }
+    .ch-game:hover { background: var(--graphite); }
+    .ch-res { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; }
+    .ch-res-W { color: #0f766e; }
+    .ch-res-L { color: #991b1b; }
+    .ch-res-D { color: var(--muted); }
+    .ch-opp { font-size: 12.5px; color: var(--body-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-opp-rating { font-size: 10.5px; color: var(--faint); font-family: 'Alumni Sans', monospace; }
+    .ch-my-rating { font-size: 12px; color: var(--muted); font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; }
+    .ch-color { font-size: 10px; color: var(--disabled); }
+    .ch-date { font-size: 11px; color: var(--faint); }
+
+    /* Chess overview widget */
+    .ch-ov { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .ch-ov-left { padding-right: 16px; border-right: 1px solid var(--rule); }
+    .ch-ov-right { padding-left: 16px; }
+    .ch-ov-num {
+      font-family: 'Alumni Sans', monospace; font-size: 36px; font-weight: 400;
+      letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+      color: var(--body-text); line-height: 1; margin-bottom: 3px;
+    }
+    .ch-ov-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--disabled); }
+    .ch-ov-delta { font-size: 11px; color: var(--faint); margin-top: 4px; }
+    .ch-ov-month { font-size: 10px; color: var(--disabled); font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; margin-bottom: 8px; }
+    .ch-ov-wld { display: flex; gap: 12px; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .ch-ov-sub { font-size: 11px; color: var(--faint); }
+
     .approach-tag {
       display: inline-flex; align-items: center;
       font-size: 12px; font-weight: 400; padding: 3px 10px;
@@ -1541,6 +1643,17 @@
           <span class="sb-lbl">Link Accounts</span>
         </div>
       </div>
+
+      <div class="sb-group-hdr" id="sbh-chess">
+        <span>Chess</span>
+        <i class="ph-bold ph-caret-down sb-caret"></i>
+      </div>
+      <div class="sb-group-items" id="sbi-chess">
+        <div class="sb-item" data-view="chess">
+          <i class="ph-bold ph-horse"></i>
+          <span class="sb-lbl">Progress</span>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -1614,6 +1727,11 @@
               <div id="chart-zones"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Chess overview widget -->
+        <div class="section" id="chess-overview-section">
+          <div id="chess-overview-card" class="ov-card skel" style="min-height:88px"></div>
         </div>
       </div>
 
@@ -1730,6 +1848,13 @@
         </div>
       </div>
 
+      <!-- CHESS ─────────────────────────────────────────────── -->
+      <div class="view" id="view-chess">
+        <div class="section-first" id="chess-content">
+          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
     </div><!-- /view-scroller -->
   </div><!-- /main-wrap -->
 
@@ -1837,6 +1962,7 @@ const VIEW_TITLES = {
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
   'log-flight': 'Log Flight',
   finances: 'Finances', 'fin-accounts': 'Linked Accounts',
+  chess: 'Chess Progress',
 };
 
 // ─── lazy init flags ──────────────────────────────────────────────────────────
@@ -2052,6 +2178,10 @@ function route(view, id) {
       showView('certificates', { title: 'Pilot Credentials' });
       renderCertificates();
       break;
+    case 'chess':
+      showView('chess', { title: 'Chess Progress' });
+      renderChessView();
+      break;
     default:
       showView('overview', { title: 'Overview' });
   }
@@ -2064,7 +2194,7 @@ document.querySelectorAll('.sb-item').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
-['fitness','flights','finances'].forEach(grp => {
+['fitness','flights','finances','chess'].forEach(grp => {
   const hdr   = document.getElementById('sbh-' + grp);
   const items = document.getElementById('sbi-' + grp);
   if (!hdr||!items) return;
@@ -6851,6 +6981,211 @@ if (!localStorage.getItem('med-seeded')) {
   localStorage.setItem('med-seeded',  '1');
 }
 
+// ─── Chess ───────────────────────────────────────────────────────────────────
+let _chessData = null
+
+async function loadChessData() {
+  try {
+    const data = await fetch('/api/chess/stats').then(r => r.ok ? r.json() : Promise.reject(r))
+    _chessData = data
+    renderChessOverview(data)
+  } catch (_) {
+    document.getElementById('chess-overview-card').innerHTML =
+      `<div class="ov-card-hd">Chess</div><div style="font-size:12px;color:var(--faint);padding:4px 0">Stats unavailable</div>`
+    document.getElementById('chess-overview-card').classList.remove('skel')
+  }
+}
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function renderChessOverview(d) {
+  const el = document.getElementById('chess-overview-card')
+  if (!el) return
+  el.classList.remove('skel')
+
+  const now = new Date()
+  const monthLabel = MONTH_NAMES[now.getMonth()].slice(0, 3)
+  const tm = d.thisMonth
+  const delta = (tm.ratingEnd != null && tm.ratingStart != null) ? tm.ratingEnd - tm.ratingStart : null
+  const deltaStr = delta === null ? '' : delta >= 0 ? `↑${delta}` : `↓${Math.abs(delta)}`
+  const deltaCol = delta === null ? 'var(--faint)' : delta >= 0 ? '#0f766e' : '#991b1b'
+  const winPct = tm.count > 0 ? Math.round((tm.win / tm.count) * 100) : 0
+
+  el.innerHTML = `
+    <div class="ov-card-hd">Chess
+      <button onclick="navigate('chess')" style="font-size:11px;color:var(--faint);background:none;border:none;cursor:pointer;padding:0;font-family:inherit">Full view →</button>
+    </div>
+    <div class="ch-ov">
+      <div class="ch-ov-left">
+        <div class="ch-ov-num">${d.rapid.current ?? '—'}</div>
+        <div class="ch-ov-lbl">Rapid</div>
+        <div class="ch-ov-delta" style="color:${deltaCol}">${deltaStr} ${monthLabel} &middot; Tactics best ${d.tactics.highest ?? '—'}</div>
+      </div>
+      <div class="ch-ov-right">
+        <div class="ch-ov-month">${monthLabel} &middot; ${tm.count} games</div>
+        <div class="ch-ov-wld">
+          <span class="ch-w">W ${tm.win}</span>
+          <span class="ch-l">L ${tm.loss}</span>
+          <span class="ch-d">D ${tm.draw}</span>
+        </div>
+        <div class="ch-ov-sub">${winPct}% win rate &middot; ${esc(d.league ?? '')} league</div>
+      </div>
+    </div>
+  `
+}
+
+function chessSparkline(games, accentColor) {
+  if (!games || games.length < 2) return ''
+  const ratings = games.map(g => g.rating).filter(Boolean)
+  if (ratings.length < 2) return ''
+  const min = Math.min(...ratings) - 20
+  const max = Math.max(...ratings) + 20
+  const W = 520, H = 56, n = ratings.length
+  const pts = ratings.map((r, i) => {
+    const x = (i / (n - 1)) * W
+    const y = H - ((r - min) / (max - min)) * H
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:56px;display:block">
+    <polyline points="${pts}" fill="none" stroke="${accentColor}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+    ${ratings.map((r, i) => {
+      const x = (i / (n - 1)) * W
+      const y = H - ((r - min) / (max - min)) * H
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${accentColor}" opacity="0.7"/>`
+    }).join('')}
+  </svg>`
+}
+
+function renderChessView() {
+  const el = document.getElementById('chess-content')
+  if (!el) return
+  if (!_chessData) {
+    el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>'
+    fetch('/api/chess/stats').then(r => r.json()).then(d => { _chessData = d; renderChessView() }).catch(() => {
+      el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--faint);font-size:13px">Chess stats unavailable</div>'
+    })
+    return
+  }
+
+  const d = _chessData
+  const now = new Date()
+  const tm = d.thisMonth, lm = d.lastMonth
+  const tmWinPct = tm.count > 0 ? ((tm.win / tm.count) * 100).toFixed(0) : 0
+  const lmWinPct = lm.count > 0 ? ((lm.win / lm.count) * 100).toFixed(0) : 0
+  const tmDelta = (tm.ratingEnd != null && tm.ratingStart != null) ? tm.ratingEnd - tm.ratingStart : null
+  const lmDelta = (lm.ratingEnd != null && lm.ratingStart != null) ? lm.ratingEnd - lm.ratingStart : null
+
+  function deltaStr(d) {
+    if (d === null) return ''
+    return d >= 0 ? `<span style="color:#0f766e">↑ ${d}</span>` : `<span style="color:#991b1b">↓ ${Math.abs(d)}</span>`
+  }
+
+  function monthName(offset) {
+    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1)
+    return MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear()
+  }
+
+  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--champagne').trim() || '#c9a96e'
+
+  const recentHtml = d.recentGames.length === 0
+    ? '<div style="padding:20px 16px;color:var(--faint);font-size:12px">No rapid games this month</div>'
+    : d.recentGames.slice().reverse().map(g => {
+        const dt = new Date(g.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const colorLbl = g.color === 'w' ? 'White' : 'Black'
+        return `<a class="ch-game" href="${esc(g.url)}" target="_blank" rel="noopener">
+          <span class="ch-res ch-res-${g.result}">${g.result}</span>
+          <span class="ch-opp">${esc(g.opponent)}<br><span class="ch-opp-rating">${g.oppRating ?? '?'}</span></span>
+          <span class="ch-my-rating">${g.rating ?? '?'}</span>
+          <span class="ch-color">${colorLbl}</span>
+          <span class="ch-date">${dt}</span>
+        </a>`
+      }).join('')
+
+  el.innerHTML = `
+    <div style="margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
+      <div style="font-size:13px;font-weight:700;color:var(--body-text);margin-bottom:3px">Chess Progress</div>
+      <div style="font-size:11px;color:var(--faint)">chess.com &middot; ${esc(d.username)} &middot; ${esc(d.league ?? '')} league</div>
+    </div>
+
+    <div class="ch-ratings">
+      <div class="ch-stat">
+        <div class="ch-stat-type">Rapid</div>
+        <div class="ch-stat-num">${d.rapid.current ?? '—'}</div>
+        <hr class="ch-stat-rule">
+        <div class="ch-stat-detail">
+          <span class="ch-stat-best">Best: ${d.rapid.best ?? '—'}</span>
+          <span class="ch-stat-sub">All-time: W${d.rapid.record.win} L${d.rapid.record.loss} D${d.rapid.record.draw}</span>
+        </div>
+      </div>
+      <div class="ch-stat">
+        <div class="ch-stat-type">Blitz</div>
+        <div class="ch-stat-num">${d.blitz.current ?? '—'}</div>
+        <hr class="ch-stat-rule">
+        <div class="ch-stat-detail">
+          <span class="ch-stat-best">Best: ${d.blitz.best ?? '—'}</span>
+          <span class="ch-stat-sub">All-time: W${d.blitz.record.win} L${d.blitz.record.loss} D${d.blitz.record.draw}</span>
+        </div>
+      </div>
+      <div class="ch-stat">
+        <div class="ch-stat-type">Tactics</div>
+        <div class="ch-stat-num">${d.tactics.highest ?? '—'}</div>
+        <hr class="ch-stat-rule">
+        <div class="ch-stat-detail">
+          <span class="ch-stat-best">Highest rating</span>
+          <span class="ch-stat-sub">Puzzle Rush best: ${d.puzzleRush.best ?? '—'}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:12px">Monthly Performance</div>
+    <div class="ch-monthly">
+      <div class="ch-month">
+        <div class="ch-month-hd">${monthName(0)} &middot; ${tm.count} rapid games</div>
+        <div class="ch-month-rating">${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &nbsp;${deltaStr(tmDelta)}</div>
+        <div class="ch-month-range">Rating range this month</div>
+        <div class="ch-wld">
+          <span class="ch-w">W ${tm.win}</span>
+          <span class="ch-l">L ${tm.loss}</span>
+          <span class="ch-d">D ${tm.draw}</span>
+        </div>
+        <div class="ch-winpct">${tmWinPct}% win rate</div>
+      </div>
+      <div class="ch-month">
+        <div class="ch-month-hd">${monthName(1)} &middot; ${lm.count} rapid games</div>
+        <div class="ch-month-rating">${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &nbsp;${deltaStr(lmDelta)}</div>
+        <div class="ch-month-range">Rating range last month</div>
+        <div class="ch-wld">
+          <span class="ch-w">W ${lm.win}</span>
+          <span class="ch-l">L ${lm.loss}</span>
+          <span class="ch-d">D ${lm.draw}</span>
+        </div>
+        <div class="ch-winpct">${lmWinPct}% win rate</div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:12px">Rating Trend &mdash; Last 15 Rapid Games</div>
+    <div class="ch-spark-wrap">
+      ${chessSparkline(d.recentGames, accentColor)}
+      ${d.recentGames.length < 2 ? '<div style="font-size:12px;color:var(--faint);padding:8px 0">Not enough games this month to plot trend</div>' : ''}
+    </div>
+
+    <div class="section-label" style="margin-bottom:12px">Recent Games</div>
+    <div class="ch-games">
+      <div class="ch-games-hd">
+        <span>Result</span><span>Opponent</span><span>My Rating</span><span>Color</span><span>Date</span>
+      </div>
+      ${recentHtml}
+    </div>
+
+    <div style="text-align:center;margin-bottom:8px">
+      <a href="https://www.chess.com/member/${esc(d.username)}" target="_blank" rel="noopener"
+         style="font-size:12px;color:var(--faint);text-decoration:none">
+        View full profile on chess.com →
+      </a>
+    </div>
+  `
+}
+
 // ─── bootstrap ────────────────────────────────────────────────────────────────
 (async function main() {
   const [athlete, activities, daily] = await Promise.all([
@@ -6885,6 +7220,7 @@ if (!localStorage.getItem('med-seeded')) {
   });
 
   loadFinanceOverview().catch(() => {});
+  loadChessData().catch(() => {});
 
   route();
 })().catch(err => {

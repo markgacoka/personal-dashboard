@@ -12,6 +12,7 @@ import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
+import chessRoutes from './routes/chess.js'
 import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15 } from './db/migrate.js'
 import financeRoutes from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
@@ -35,6 +36,7 @@ await fastify.register(fastifyStatic, {
 
 await fastify.register(proxyRoutes)
 await fastify.register(metarRoutes)
+await fastify.register(chessRoutes)
 
 fastify.get('/health', async () => ({ ok: true }))
 

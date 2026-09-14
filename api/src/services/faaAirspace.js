@@ -22,14 +22,21 @@ const FIELDS = 'NAME,LOWER_VAL,UPPER_VAL,TYPE_CODE,LOCAL_TYPE,CLASS'
 // above FL180 and isn't useful on a local flight map.
 const WHERE = "CLASS IN ('B','C','D')"
 
-async function fetchFeatureServicePage(offset, pageSize = 1000) {
+// Airspace polygons carry a lot of vertices; a 1000-record page can run to
+// tens of megabytes of GeoJSON and blow past a 30s timeout on this host's
+// path to the service. Smaller pages + reduced coordinate precision (still
+// far finer than needed for a boundary line on a flight map) keep each
+// request comfortably fast.
+const PAGE_SIZE = 250
+
+async function fetchFeatureServicePage(offset) {
   const url =
     `${FS_BASE}/query?where=${encodeURIComponent(WHERE)}` +
     `&outFields=${encodeURIComponent(FIELDS)}` +
-    `&outSR=4326&f=geojson` +
+    `&outSR=4326&geometryPrecision=5&f=geojson` +
     `&resultOffset=${offset}` +
-    `&resultRecordCount=${pageSize}`
-  const r = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+    `&resultRecordCount=${PAGE_SIZE}`
+  const r = await fetch(url, { signal: AbortSignal.timeout(45_000) })
   if (!r.ok) throw new Error(`ArcGIS feature service ${r.status}`)
   return r.json()
 }
@@ -44,7 +51,7 @@ export async function downloadFaaAirspace(log) {
     const page = await fetchFeatureServicePage(offset)
     features.push(...(page.features ?? []))
     if (!page.exceededTransferLimit) break
-    offset += 1000
+    offset += PAGE_SIZE
     // Throttle slightly to avoid overwhelming the service
     await new Promise(r => setTimeout(r, 200))
   }

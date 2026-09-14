@@ -14,11 +14,11 @@ async function chessGet(path) {
 
 const LOSS_RESULTS = new Set(['checkmated', 'resigned', 'timeout', 'abandoned', 'lose'])
 
-function summarizeMonth(games) {
-  const rapid = (games || []).filter(g => g.time_class === 'rapid').sort((a, b) => a.end_time - b.end_time)
-  if (!rapid.length) return { count: 0, win: 0, loss: 0, draw: 0, ratingStart: null, ratingEnd: null }
+function summarizeMonth(games, timeClass) {
+  const filtered = (games || []).filter(g => g.time_class === timeClass).sort((a, b) => a.end_time - b.end_time)
+  if (!filtered.length) return { count: 0, win: 0, loss: 0, draw: 0, ratingStart: null, ratingEnd: null }
   let win = 0, loss = 0, draw = 0, ratingStart = null, ratingEnd = null
-  for (const g of rapid) {
+  for (const g of filtered) {
     const mine = g.white.username.toLowerCase() === USERNAME ? g.white : g.black
     if (ratingStart === null) ratingStart = mine.rating
     ratingEnd = mine.rating
@@ -26,7 +26,28 @@ function summarizeMonth(games) {
     else if (LOSS_RESULTS.has(mine.result)) loss++
     else draw++
   }
-  return { count: rapid.length, win, loss, draw, ratingStart, ratingEnd }
+  return { count: filtered.length, win, loss, draw, ratingStart, ratingEnd }
+}
+
+function extractRecent(games, timeClass, limit = 20) {
+  return (games || [])
+    .filter(g => g.time_class === timeClass)
+    .sort((a, b) => a.end_time - b.end_time)
+    .slice(-limit)
+    .map(g => {
+      const isW = g.white.username.toLowerCase() === USERNAME
+      const mine = isW ? g.white : g.black
+      const opp  = isW ? g.black : g.white
+      return {
+        ts:        g.end_time,
+        rating:    mine.rating,
+        result:    mine.result === 'win' ? 'W' : LOSS_RESULTS.has(mine.result) ? 'L' : 'D',
+        color:     isW ? 'w' : 'b',
+        opponent:  opp.username,
+        oppRating: opp.rating,
+        url:       g.url,
+      }
+    })
 }
 
 export default async function chessRoutes(fastify) {
@@ -50,45 +71,34 @@ export default async function chessRoutes(fastify) {
         chessGet(`/player/${USERNAME}/games/${ly}/${lm}`).catch(() => ({ games: [] })),
       ])
 
-      const recentRapid = (thisData.games || [])
-        .filter(g => g.time_class === 'rapid')
-        .sort((a, b) => a.end_time - b.end_time)
-        .slice(-15)
-        .map(g => {
-          const isW = g.white.username.toLowerCase() === USERNAME
-          const mine = isW ? g.white : g.black
-          const opp  = isW ? g.black : g.white
-          return {
-            ts: g.end_time,
-            rating: mine.rating,
-            result: mine.result === 'win' ? 'W' : LOSS_RESULTS.has(mine.result) ? 'L' : 'D',
-            color: isW ? 'w' : 'b',
-            opponent: opp.username,
-            oppRating: opp.rating,
-            url: g.url,
-          }
-        })
+      const thisGames = thisData.games || []
+      const lastGames = lastData.games || []
 
       _cache = {
-        username: profile.username,
-        league: profile.league,
+        username:  profile.username,
+        league:    profile.league,
         lastOnline: profile.last_online,
+        joined:    profile.joined,
+        avatar:    profile.avatar,
         rapid: {
-          current: stats.chess_rapid?.last?.rating ?? null,
-          best:    stats.chess_rapid?.best?.rating ?? null,
-          record:  stats.chess_rapid?.record ?? { win: 0, loss: 0, draw: 0 },
+          current:   stats.chess_rapid?.last?.rating ?? null,
+          best:      stats.chess_rapid?.best?.rating ?? null,
+          record:    stats.chess_rapid?.record ?? { win: 0, loss: 0, draw: 0 },
+          thisMonth: summarizeMonth(thisGames, 'rapid'),
+          lastMonth: summarizeMonth(lastGames, 'rapid'),
+          recent:    extractRecent(thisGames, 'rapid', 20),
         },
         blitz: {
-          current: stats.chess_blitz?.last?.rating ?? null,
-          best:    stats.chess_blitz?.best?.rating ?? null,
-          record:  stats.chess_blitz?.record ?? { win: 0, loss: 0, draw: 0 },
+          current:   stats.chess_blitz?.last?.rating ?? null,
+          best:      stats.chess_blitz?.best?.rating ?? null,
+          record:    stats.chess_blitz?.record ?? { win: 0, loss: 0, draw: 0 },
+          thisMonth: summarizeMonth(thisGames, 'blitz'),
+          lastMonth: summarizeMonth(lastGames, 'blitz'),
+          recent:    extractRecent(thisGames, 'blitz', 20),
         },
         tactics:    { highest: stats.tactics?.highest?.rating ?? null },
         puzzleRush: { best: stats.puzzle_rush?.best?.score ?? null },
-        thisMonth:  summarizeMonth(thisData.games),
-        lastMonth:  summarizeMonth(lastData.games),
-        recentGames: recentRapid,
-        fetchedAt: Date.now(),
+        fetchedAt:  Date.now(),
       }
       _cacheAt = Date.now()
       return _cache

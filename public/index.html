@@ -873,132 +873,95 @@
     .fd-pk { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
     .fd-pv { font-size: 12px; color: var(--champagne); font-weight: 600; }
 
-    /* ── Pilot Credentials — Document Register ──────────────── */
+    /* ── Pilot Credentials ──────────────────────────────────── */
 
-    .cdoc-list { display: flex; flex-direction: column; gap: 32px; margin-bottom: 36px; }
+    .cdoc-list { display: flex; flex-direction: column; gap: 24px; margin-bottom: 28px; }
 
-    .cdoc {
-      border: 1px solid var(--rule);
-      border-radius: var(--r-sm);
-      overflow: hidden;
-    }
+    .cdoc { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; background: var(--raised); }
 
-    /* Header band */
     .cdoc-head {
       display: flex; align-items: flex-start; justify-content: space-between;
-      padding: 12px 24px; gap: 16px;
-      background: var(--graphite); border-bottom: 1px solid var(--rule);
+      padding: 10px 18px; gap: 16px;
+      background: var(--deep); border-bottom: 1px solid var(--rule);
     }
     .cdoc-head-l { display: flex; flex-direction: column; gap: 3px; }
-    .cdoc-type {
-      font-size: 9.5px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
-    }
-    .cdoc-type.pilot   { color: #0369a1; }
-    .cdoc-type.medical { color: #1d4ed8; }
-    .cdoc-authority { font-size: 10px; color: var(--disabled); letter-spacing: 0.01em; }
+    .cdoc-type { font-size: 10px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; }
+    .cdoc-type.pilot   { color: var(--patina-text); }
+    .cdoc-type.medical { color: var(--swim); }
+    .cdoc-authority { font-size: 11px; color: var(--faint); }
     .cdoc-docnum {
-      font-family: 'Alumni Sans', monospace;
-      font-size: 14px; letter-spacing: 0.10em; color: var(--muted);
+      font-family: 'Alumni Sans', monospace; font-size: 13px;
+      letter-spacing: 0.08em; color: var(--muted);
       font-variant-numeric: tabular-nums; flex-shrink: 0; align-self: center;
     }
 
-    /* Body */
     .cdoc-body {
-      display: grid; grid-template-columns: 1fr 196px;
-      padding: 28px 24px; gap: 0; align-items: start;
+      display: grid; grid-template-columns: 1fr 188px;
+      padding: 20px 18px; gap: 0; align-items: start;
     }
     @media (max-width: 580px) { .cdoc-body { grid-template-columns: 1fr; } }
 
-    /* Left: identity */
     .cdoc-name {
-      font-size: 27px; font-weight: 300; letter-spacing: 0.18em;
-      text-transform: uppercase; color: var(--body-text); line-height: 1;
-      margin-bottom: 18px;
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 26px; font-weight: 300; letter-spacing: 0.04em;
+      color: var(--champagne); line-height: 1.15; margin-bottom: 16px;
     }
-    .cdoc-meta { display: flex; flex-direction: column; gap: 7px; margin-bottom: 20px; }
-    .cdoc-mrow { display: flex; align-items: baseline; font-size: 12.5px; }
-    .cdoc-mk { color: var(--faint); min-width: 136px; flex-shrink: 0; }
-    .cdoc-mv { color: var(--body-text); font-weight: 500; }
+    .cdoc-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .cdoc-mrow { display: flex; align-items: baseline; font-size: 12px; }
+    .cdoc-mk { color: var(--faint); min-width: 128px; flex-shrink: 0; }
+    .cdoc-mv { color: var(--muted); font-weight: 500; }
 
-    /* Physical strip */
     .cdoc-phys {
       display: grid; grid-template-columns: repeat(4, 1fr);
-      gap: 10px 0; border-top: 1px solid var(--rule); padding-top: 16px;
+      gap: 10px 0; border-top: 1px solid var(--rule); padding-top: 14px;
     }
-    .cdoc-phys-item { display: flex; flex-direction: column; gap: 5px; }
-    .cdoc-phys-k {
-      font-size: 8.5px; font-weight: 700; letter-spacing: 0.10em;
-      text-transform: uppercase; color: var(--disabled);
-    }
-    .cdoc-phys-v { font-size: 13px; font-weight: 500; color: var(--body-text); }
+    .cdoc-phys-item { display: flex; flex-direction: column; gap: 4px; }
+    .cdoc-phys-k { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+    .cdoc-phys-v { font-size: 12px; font-weight: 500; color: var(--body-text); }
 
-    /* AME block (medical only) */
-    .cdoc-ame {
-      margin-top: 20px; border-top: 1px solid var(--rule); padding-top: 16px;
-      display: flex; flex-direction: column; gap: 2px;
-    }
-    .cdoc-ame-name { font-size: 13px; font-weight: 600; color: var(--body-text); }
+    .cdoc-ame { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; display: flex; flex-direction: column; gap: 2px; }
+    .cdoc-ame-name { font-size: 13px; font-weight: 600; color: var(--champagne); }
     .cdoc-ame-role { font-size: 11px; color: var(--faint); margin-top: 1px; }
-    .cdoc-ame-ids {
-      font-size: 11px; color: var(--disabled);
-      font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; margin-top: 5px;
-    }
+    .cdoc-ame-ids { font-size: 11px; color: var(--disabled); font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; margin-top: 4px; }
 
-    /* Right: expiry countdown */
     .cdoc-right {
       display: flex; flex-direction: column; align-items: flex-end; text-align: right;
-      padding-left: 24px; border-left: 1px solid var(--rule);
+      padding-left: 20px; border-left: 1px solid var(--rule);
     }
     .cdoc-countdown {
-      font-family: 'Alumni Sans', monospace;
-      font-size: 52px; font-weight: 400; line-height: 1;
-      letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
-      color: var(--body-text);
+      font-family: 'Alumni Sans', sans-serif;
+      font-size: 44px; font-weight: 700; line-height: 1;
+      letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--champagne);
     }
-    .cdoc-countdown.warn { color: #92400e; }
-    .cdoc-countdown.crit { color: #991b1b; }
+    .cdoc-countdown.warn { color: var(--warn); }
+    .cdoc-countdown.crit { color: oklch(58% 0.20 15); }
     .cdoc-countdown-sub {
-      font-size: 8.5px; font-weight: 700; letter-spacing: 0.20em;
-      text-transform: uppercase; color: var(--disabled);
-      margin-top: 4px; margin-bottom: 22px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.10em;
+      text-transform: uppercase; color: var(--faint); margin-top: 4px; margin-bottom: 20px;
     }
-    .cdoc-dates {
-      display: flex; flex-direction: column; gap: 13px;
-      border-top: 1px solid var(--rule); padding-top: 16px; width: 100%;
-    }
-    .cdoc-date { display: flex; flex-direction: column; gap: 3px; }
-    .cdoc-dk {
-      font-size: 8.5px; font-weight: 700; letter-spacing: 0.15em;
-      text-transform: uppercase; color: var(--disabled);
-    }
-    .cdoc-dv { font-size: 13px; font-weight: 500; color: var(--body-text); }
+    .cdoc-dates { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--rule); padding-top: 14px; width: 100%; }
+    .cdoc-date { display: flex; flex-direction: column; gap: 2px; }
+    .cdoc-dk { font-size: 10px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: var(--faint); }
+    .cdoc-dv { font-size: 12px; font-weight: 600; color: var(--body-text); font-variant-numeric: tabular-nums; }
 
-    /* Footer */
     .cdoc-foot {
-      padding: 10px 24px; border-top: 1px solid var(--rule);
-      background: var(--graphite); display: flex; align-items: center;
+      padding: 9px 18px; border-top: 1px solid var(--rule);
+      background: var(--deep); display: flex; align-items: center;
       justify-content: space-between; gap: 16px; flex-wrap: wrap;
     }
-    .cdoc-foot-lim { font-size: 11px; color: var(--faint); font-style: italic; }
-    .cdoc-foot-sig { font-size: 11px; color: var(--disabled); }
+    .cdoc-foot-lim { font-size: 12px; color: var(--muted); font-style: italic; }
+    .cdoc-foot-sig { font-size: 12px; color: var(--faint); }
 
-    /* Regulatory reference */
     .cdoc-regs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 580px) { .cdoc-regs { grid-template-columns: 1fr; } }
-    .cdoc-reg { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; }
+    .cdoc-reg { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; background: var(--raised); }
     .cdoc-reg-head {
-      padding: 11px 16px; border-bottom: 1px solid var(--rule);
+      padding: 10px 16px; border-bottom: 1px solid var(--rule); background: var(--deep);
       display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
     }
-    .cdoc-reg-title { font-size: 12px; font-weight: 700; color: var(--body-text); }
-    .cdoc-reg-cfr {
-      font-size: 10px; color: var(--faint);
-      font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; flex-shrink: 0;
-    }
-    .cdoc-reg ul {
-      font-size: 12px; color: var(--body-text); line-height: 1.9;
-      padding: 12px 16px 14px 30px; margin: 0;
-    }
+    .cdoc-reg-title { font-size: 12px; font-weight: 600; color: var(--body-text); }
+    .cdoc-reg-cfr { font-size: 10px; color: var(--faint); font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; flex-shrink: 0; }
+    .cdoc-reg ul { font-size: 12px; color: var(--muted); line-height: 1.9; padding: 12px 16px 14px 30px; margin: 0; }
 
     /* Overview credential strip on logbook page */
     .cred-strip {
@@ -1019,91 +982,32 @@
     .cred-chip .cred-exp { color: var(--muted); }
 
     /* ── Chess ──────────────────────────────────────────── */
-
-    .ch-ratings {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden;
-      margin-bottom: 20px;
+    .ch-profile-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 2px solid var(--rule); object-fit: cover; flex-shrink: 0;
     }
-    .ch-stat {
-      padding: 22px 20px; border-right: 1px solid var(--rule);
-      display: flex; flex-direction: column;
+    .ch-badge {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--patina-text);
     }
-    .ch-stat:last-child { border-right: none; }
-    .ch-stat-type {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.18em;
-      text-transform: uppercase; color: var(--disabled); margin-bottom: 10px;
-    }
-    .ch-stat-num {
-      font-family: 'Alumni Sans', monospace;
-      font-size: 40px; font-weight: 400; line-height: 1;
-      letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
-      color: var(--body-text); margin-bottom: 12px;
-    }
-    .ch-stat-rule { border: none; border-top: 1px solid var(--rule); margin: 0 0 11px; }
-    .ch-stat-detail { display: flex; flex-direction: column; gap: 4px; }
-    .ch-stat-best { font-size: 11.5px; color: var(--muted); font-weight: 500; }
-    .ch-stat-sub { font-size: 11px; color: var(--faint); }
-
-    .ch-monthly {
-      display: grid; grid-template-columns: 1fr 1fr;
-      border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden;
-      margin-bottom: 20px;
-    }
-    .ch-month { padding: 20px; border-right: 1px solid var(--rule); }
-    .ch-month:last-child { border-right: none; background: var(--graphite); }
-    .ch-month-hd {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
-      text-transform: uppercase; color: var(--disabled); margin-bottom: 14px;
-    }
-    .ch-month-rating {
-      font-size: 22px; font-weight: 300; letter-spacing: 0.02em;
-      color: var(--body-text); font-variant-numeric: tabular-nums; margin-bottom: 4px;
-    }
-    .ch-month-range { font-size: 11px; color: var(--faint); margin-bottom: 14px; }
-    .ch-wld { display: flex; gap: 16px; font-size: 13.5px; font-weight: 600; }
-    .ch-w { color: #0f766e; }
-    .ch-l { color: #991b1b; }
+    .ch-wld { display: flex; gap: 16px; font-size: 14px; font-weight: 600; margin-top: 6px; }
+    .ch-w { color: var(--patina-text); }
+    .ch-l { color: oklch(58% 0.20 15); }
     .ch-d { color: var(--muted); }
     .ch-winpct { font-size: 11px; color: var(--faint); margin-top: 6px; }
-
-    .ch-spark-wrap {
-      border: 1px solid var(--rule); border-radius: var(--r-sm);
-      padding: 16px 20px 14px; margin-bottom: 20px;
+    .ch-res-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.06em;
+      width: 28px; height: 20px; border-radius: var(--r-sm);
     }
-    .ch-spark-hd {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
-      text-transform: uppercase; color: var(--disabled); margin-bottom: 12px;
-    }
-
-    .ch-games {
-      border: 1px solid var(--rule); border-radius: var(--r-sm);
-      overflow: hidden; margin-bottom: 28px;
-    }
-    .ch-games-hd {
-      padding: 9px 16px; border-bottom: 1px solid var(--rule);
-      background: var(--graphite);
-      font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--disabled);
-      display: grid; grid-template-columns: 36px 1fr 74px 60px 70px;
-      gap: 8px; align-items: center;
-    }
-    .ch-game {
-      display: grid; grid-template-columns: 36px 1fr 74px 60px 70px;
-      gap: 8px; padding: 10px 16px;
-      border-top: 1px solid var(--rule);
-      align-items: center; text-decoration: none; color: inherit;
-    }
-    .ch-game:hover { background: var(--graphite); }
-    .ch-res { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; }
-    .ch-res-W { color: #0f766e; }
-    .ch-res-L { color: #991b1b; }
-    .ch-res-D { color: var(--muted); }
-    .ch-opp { font-size: 12.5px; color: var(--body-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ch-opp-rating { font-size: 10.5px; color: var(--faint); font-family: 'Alumni Sans', monospace; }
-    .ch-my-rating { font-size: 12px; color: var(--muted); font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; }
-    .ch-color { font-size: 10px; color: var(--disabled); }
-    .ch-date { font-size: 11px; color: var(--faint); }
+    .ch-res-badge.W { background: color-mix(in oklch, var(--patina-text) 18%, transparent); color: var(--patina-text); }
+    .ch-res-badge.L { background: color-mix(in oklch, oklch(58% 0.20 15) 18%, transparent); color: oklch(58% 0.20 15); }
+    .ch-res-badge.D { background: var(--graphite); color: var(--muted); }
+    .ch-game-opp { font-size: 12.5px; color: var(--body-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-game-meta { font-size: 11px; color: var(--faint); font-family: 'Alumni Sans', monospace; }
+    .act-chip[data-tc="rapid"].active { background: var(--patina-text); }
+    .act-chip[data-tc="blitz"].active  { background: var(--gold); color: var(--gold-ink); }
 
     /* Chess overview widget */
     .ch-ov { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
@@ -1112,7 +1016,7 @@
     .ch-ov-num {
       font-family: 'Alumni Sans', monospace; font-size: 36px; font-weight: 400;
       letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
-      color: var(--body-text); line-height: 1; margin-bottom: 3px;
+      color: var(--champagne); line-height: 1; margin-bottom: 3px;
     }
     .ch-ov-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--disabled); }
     .ch-ov-delta { font-size: 11px; color: var(--faint); margin-top: 4px; }
@@ -2092,11 +1996,15 @@ function _cjsRender(el, config, height = 175) {
 }
 
 function rebuildCharts() {
-  if (!window._actsArr) return;
-  buildVolumeChart(window._actsArr);
-  buildLoadChart(window._actsArr);
-  buildHRChart(window._actsArr);
-  buildZonesChart(window._actsArr);
+  if (window._actsArr) {
+    buildVolumeChart(window._actsArr);
+    buildLoadChart(window._actsArr);
+    buildHRChart(window._actsArr);
+    buildZonesChart(window._actsArr);
+  }
+  if (_chessData && document.getElementById('chess-rating-chart')) {
+    buildChessRatingChart(_chessData[_chessTC]?.recent || []);
+  }
 }
 
 // ─── view / router ────────────────────────────────────────────────────────────
@@ -6983,6 +6891,7 @@ if (!localStorage.getItem('med-seeded')) {
 
 // ─── Chess ───────────────────────────────────────────────────────────────────
 let _chessData = null
+let _chessTC   = 'rapid'
 
 async function loadChessData() {
   try {
@@ -6990,9 +6899,9 @@ async function loadChessData() {
     _chessData = data
     renderChessOverview(data)
   } catch (_) {
-    document.getElementById('chess-overview-card').innerHTML =
-      `<div class="ov-card-hd">Chess</div><div style="font-size:12px;color:var(--faint);padding:4px 0">Stats unavailable</div>`
-    document.getElementById('chess-overview-card').classList.remove('skel')
+    const el = document.getElementById('chess-overview-card')
+    el.innerHTML = `<div class="ov-card-hd">Chess</div><div style="font-size:12px;color:var(--faint);padding:4px 0">Stats unavailable</div>`
+    el.classList.remove('skel')
   }
 }
 
@@ -7005,15 +6914,15 @@ function renderChessOverview(d) {
 
   const now = new Date()
   const monthLabel = MONTH_NAMES[now.getMonth()].slice(0, 3)
-  const tm = d.thisMonth
+  const tm = d.rapid.thisMonth
   const delta = (tm.ratingEnd != null && tm.ratingStart != null) ? tm.ratingEnd - tm.ratingStart : null
   const deltaStr = delta === null ? '' : delta >= 0 ? `↑${delta}` : `↓${Math.abs(delta)}`
-  const deltaCol = delta === null ? 'var(--faint)' : delta >= 0 ? '#0f766e' : '#991b1b'
+  const deltaCol = delta === null ? 'var(--faint)' : delta >= 0 ? 'var(--patina-text)' : 'oklch(58% 0.20 15)'
   const winPct = tm.count > 0 ? Math.round((tm.win / tm.count) * 100) : 0
 
   el.innerHTML = `
     <div class="ov-card-hd">Chess
-      <button onclick="navigate('chess')" style="font-size:11px;color:var(--faint);background:none;border:none;cursor:pointer;padding:0;font-family:inherit">Full view →</button>
+      <button onclick="navigate('chess')">Full view →</button>
     </div>
     <div class="ch-ov">
       <div class="ch-ov-left">
@@ -7034,146 +6943,126 @@ function renderChessOverview(d) {
   `
 }
 
-function chessSparkline(games, accentColor) {
-  if (!games || games.length < 2) return ''
-  const ratings = games.map(g => g.rating).filter(Boolean)
-  if (ratings.length < 2) return ''
-  const min = Math.min(...ratings) - 20
-  const max = Math.max(...ratings) + 20
-  const W = 520, H = 56, n = ratings.length
-  const pts = ratings.map((r, i) => {
-    const x = (i / (n - 1)) * W
-    const y = H - ((r - min) / (max - min)) * H
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:56px;display:block">
-    <polyline points="${pts}" fill="none" stroke="${accentColor}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
-    ${ratings.map((r, i) => {
-      const x = (i / (n - 1)) * W
-      const y = H - ((r - min) / (max - min)) * H
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${accentColor}" opacity="0.7"/>`
-    }).join('')}
-  </svg>`
+function setChessTC(tc) {
+  _chessTC = tc
+  document.querySelectorAll('.act-chip[data-tc]').forEach(c => c.classList.toggle('active', c.dataset.tc === tc))
+  if (_chessData) buildChessTCContent(_chessData, tc)
 }
 
-function renderChessView() {
-  const el = document.getElementById('chess-content')
-  if (!el) return
-  if (!_chessData) {
-    el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>'
-    fetch('/api/chess/stats').then(r => r.json()).then(d => { _chessData = d; renderChessView() }).catch(() => {
-      el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--faint);font-size:13px">Chess stats unavailable</div>'
-    })
+function buildChessRatingChart(recent) {
+  const el = document.getElementById('chess-rating-chart')
+  if (!el || !window.Chart) return
+  const games = (recent || []).filter(g => g.rating)
+  if (games.length < 2) {
+    el.innerHTML = '<div style="padding:20px;color:var(--faint);font-size:12px">Not enough games to plot trend</div>'
     return
   }
+  const cfg = getChartCfg()
+  const labels = games.map(g => new Date(g.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+  const ratings = games.map(g => g.rating)
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--champagne').trim() || '#c9a96e'
+  _cjsRender(el, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Rating',
+        data: ratings,
+        borderColor: accent,
+        backgroundColor: accent + '22',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...cfg.tt,
+          callbacks: {
+            label: c => `Rating: ${c.raw}`,
+            title: items => labels[items[0]?.dataIndex] || '',
+          }
+        },
+      },
+      scales: {
+        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 8, maxRotation: 0 } },
+        y: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => v } },
+      }
+    }
+  }, 160)
+}
 
-  const d = _chessData
-  const now = new Date()
-  const tm = d.thisMonth, lm = d.lastMonth
-  const tmWinPct = tm.count > 0 ? ((tm.win / tm.count) * 100).toFixed(0) : 0
-  const lmWinPct = lm.count > 0 ? ((lm.win / lm.count) * 100).toFixed(0) : 0
-  const tmDelta = (tm.ratingEnd != null && tm.ratingStart != null) ? tm.ratingEnd - tm.ratingStart : null
-  const lmDelta = (lm.ratingEnd != null && lm.ratingStart != null) ? lm.ratingEnd - lm.ratingStart : null
+function buildChessTCContent(d, tc) {
+  const container = document.getElementById('chess-tc-content')
+  if (!container) return
 
-  function deltaStr(d) {
-    if (d === null) return ''
-    return d >= 0 ? `<span style="color:#0f766e">↑ ${d}</span>` : `<span style="color:#991b1b">↓ ${Math.abs(d)}</span>`
-  }
+  const tc_d = d[tc]
+  const now   = new Date()
 
   function monthName(offset) {
-    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1)
-    return MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear()
+    const dt = new Date(now.getFullYear(), now.getMonth() - offset, 1)
+    return MONTH_NAMES[dt.getMonth()].slice(0, 3) + ' ' + dt.getFullYear()
   }
+  function deltaHtml(m) {
+    const v = (m.ratingEnd != null && m.ratingStart != null) ? m.ratingEnd - m.ratingStart : null
+    if (v === null) return '<span style="color:var(--faint)">—</span>'
+    return v >= 0
+      ? `<span style="color:var(--patina-text)">↑ ${v}</span>`
+      : `<span style="color:oklch(58% 0.20 15)">↓ ${Math.abs(v)}</span>`
+  }
+  function winPct(m) { return m.count > 0 ? Math.round((m.win / m.count) * 100) : 0 }
 
-  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--champagne').trim() || '#c9a96e'
+  const tm = tc_d.thisMonth, lm = tc_d.lastMonth
 
-  const recentHtml = d.recentGames.length === 0
-    ? '<div style="padding:20px 16px;color:var(--faint);font-size:12px">No rapid games this month</div>'
-    : d.recentGames.slice().reverse().map(g => {
+  const recentHtml = !(tc_d.recent?.length)
+    ? '<div style="padding:20px 16px;color:var(--faint);font-size:12px">No games this month</div>'
+    : tc_d.recent.slice().reverse().map(g => {
         const dt = new Date(g.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        const colorLbl = g.color === 'w' ? 'White' : 'Black'
-        return `<a class="ch-game" href="${esc(g.url)}" target="_blank" rel="noopener">
-          <span class="ch-res ch-res-${g.result}">${g.result}</span>
-          <span class="ch-opp">${esc(g.opponent)}<br><span class="ch-opp-rating">${g.oppRating ?? '?'}</span></span>
-          <span class="ch-my-rating">${g.rating ?? '?'}</span>
-          <span class="ch-color">${colorLbl}</span>
-          <span class="ch-date">${dt}</span>
+        const clr = g.color === 'w' ? '♔' : '♚'
+        const lcol = g.result === 'W' ? 'var(--patina-text)' : g.result === 'L' ? 'oklch(58% 0.20 15)' : 'var(--rule-strong)'
+        return `<a class="act-row" href="${esc(g.url)}" target="_blank" rel="noopener"
+          style="display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center;text-decoration:none;border-left-color:${lcol}">
+          <span class="ch-res-badge ${g.result}">${g.result}</span>
+          <span>
+            <span class="ch-game-opp">${esc(g.opponent)}</span>
+            <span class="ch-game-meta" style="display:block">${clr} ${g.oppRating ?? '?'} &middot; my ${g.rating ?? '?'}</span>
+          </span>
+          <span class="ch-game-meta" style="text-align:right">${dt}</span>
         </a>`
       }).join('')
 
-  el.innerHTML = `
-    <div style="margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
-      <div style="font-size:13px;font-weight:700;color:var(--body-text);margin-bottom:3px">Chess Progress</div>
-      <div style="font-size:11px;color:var(--faint)">chess.com &middot; ${esc(d.username)} &middot; ${esc(d.league ?? '')} league</div>
-    </div>
-
-    <div class="ch-ratings">
-      <div class="ch-stat">
-        <div class="ch-stat-type">Rapid</div>
-        <div class="ch-stat-num">${d.rapid.current ?? '—'}</div>
-        <hr class="ch-stat-rule">
-        <div class="ch-stat-detail">
-          <span class="ch-stat-best">Best: ${d.rapid.best ?? '—'}</span>
-          <span class="ch-stat-sub">All-time: W${d.rapid.record.win} L${d.rapid.record.loss} D${d.rapid.record.draw}</span>
+  container.innerHTML = `
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="ov-card">
+        <div class="ov-card-hd">${monthName(0)} &middot; ${tm.count} games</div>
+        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:300;color:var(--champagne);line-height:1;margin-bottom:4px">
+          ${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &thinsp;${deltaHtml(tm)}
         </div>
+        <div class="ch-wld"><span class="ch-w">W ${tm.win}</span><span class="ch-l">L ${tm.loss}</span><span class="ch-d">D ${tm.draw}</span></div>
+        <div class="ch-winpct">${winPct(tm)}% win rate</div>
       </div>
-      <div class="ch-stat">
-        <div class="ch-stat-type">Blitz</div>
-        <div class="ch-stat-num">${d.blitz.current ?? '—'}</div>
-        <hr class="ch-stat-rule">
-        <div class="ch-stat-detail">
-          <span class="ch-stat-best">Best: ${d.blitz.best ?? '—'}</span>
-          <span class="ch-stat-sub">All-time: W${d.blitz.record.win} L${d.blitz.record.loss} D${d.blitz.record.draw}</span>
+      <div class="ov-card">
+        <div class="ov-card-hd">${monthName(1)} &middot; ${lm.count} games</div>
+        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:300;color:var(--champagne);line-height:1;margin-bottom:4px">
+          ${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &thinsp;${deltaHtml(lm)}
         </div>
-      </div>
-      <div class="ch-stat">
-        <div class="ch-stat-type">Tactics</div>
-        <div class="ch-stat-num">${d.tactics.highest ?? '—'}</div>
-        <hr class="ch-stat-rule">
-        <div class="ch-stat-detail">
-          <span class="ch-stat-best">Highest rating</span>
-          <span class="ch-stat-sub">Puzzle Rush best: ${d.puzzleRush.best ?? '—'}</span>
-        </div>
+        <div class="ch-wld"><span class="ch-w">W ${lm.win}</span><span class="ch-l">L ${lm.loss}</span><span class="ch-d">D ${lm.draw}</span></div>
+        <div class="ch-winpct">${winPct(lm)}% win rate</div>
       </div>
     </div>
 
-    <div class="section-label" style="margin-bottom:12px">Monthly Performance</div>
-    <div class="ch-monthly">
-      <div class="ch-month">
-        <div class="ch-month-hd">${monthName(0)} &middot; ${tm.count} rapid games</div>
-        <div class="ch-month-rating">${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &nbsp;${deltaStr(tmDelta)}</div>
-        <div class="ch-month-range">Rating range this month</div>
-        <div class="ch-wld">
-          <span class="ch-w">W ${tm.win}</span>
-          <span class="ch-l">L ${tm.loss}</span>
-          <span class="ch-d">D ${tm.draw}</span>
-        </div>
-        <div class="ch-winpct">${tmWinPct}% win rate</div>
-      </div>
-      <div class="ch-month">
-        <div class="ch-month-hd">${monthName(1)} &middot; ${lm.count} rapid games</div>
-        <div class="ch-month-rating">${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &nbsp;${deltaStr(lmDelta)}</div>
-        <div class="ch-month-range">Rating range last month</div>
-        <div class="ch-wld">
-          <span class="ch-w">W ${lm.win}</span>
-          <span class="ch-l">L ${lm.loss}</span>
-          <span class="ch-d">D ${lm.draw}</span>
-        </div>
-        <div class="ch-winpct">${lmWinPct}% win rate</div>
-      </div>
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-label">Rating Trend <span class="chart-sublabel">${tc_d.recent?.length ?? 0} recent games</span></div>
+      <div id="chess-rating-chart"></div>
     </div>
 
-    <div class="section-label" style="margin-bottom:12px">Rating Trend &mdash; Last 15 Rapid Games</div>
-    <div class="ch-spark-wrap">
-      ${chessSparkline(d.recentGames, accentColor)}
-      ${d.recentGames.length < 2 ? '<div style="font-size:12px;color:var(--faint);padding:8px 0">Not enough games this month to plot trend</div>' : ''}
-    </div>
-
-    <div class="section-label" style="margin-bottom:12px">Recent Games</div>
-    <div class="ch-games">
-      <div class="ch-games-hd">
-        <span>Result</span><span>Opponent</span><span>My Rating</span><span>Color</span><span>Date</span>
-      </div>
+    <div class="section-label" style="margin-bottom:10px">Recent Games</div>
+    <div class="act-list" style="margin-bottom:28px">
       ${recentHtml}
     </div>
 
@@ -7184,6 +7073,72 @@ function renderChessView() {
       </a>
     </div>
   `
+
+  buildChessRatingChart(tc_d.recent)
+}
+
+function renderChessView() {
+  const el = document.getElementById('chess-content')
+  if (!el) return
+  if (!_chessData) {
+    el.innerHTML = '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>'
+    fetch('/api/chess/stats').then(r => r.json()).then(d => { _chessData = d; renderChessOverview(d); renderChessView() }).catch(() => {
+      el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--faint);font-size:13px">Chess stats unavailable</div>'
+    })
+    return
+  }
+
+  const d = _chessData
+  const joined = d.joined ? new Date(d.joined * 1000).getFullYear() : null
+  const lastOn  = d.lastOnline ? new Date(d.lastOnline * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+
+  el.innerHTML = `
+    <div class="detail-header" style="display:flex;gap:18px;align-items:flex-start">
+      ${d.avatar ? `<img class="ch-profile-avatar" src="${esc(d.avatar)}" alt="avatar">` : ''}
+      <div style="flex:1;min-width:0">
+        <div class="detail-sport-chip">
+          <i class="ph ph-horse"></i>
+          chess.com &middot; ${esc(d.league ?? '')} league
+        </div>
+        <div class="detail-title">${esc(d.username)}</div>
+        <div style="font-size:12px;color:var(--faint);margin-top:4px">
+          ${joined ? `Member since ${joined}` : ''}${lastOn ? ` &middot; Last online ${lastOn}` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-tiles" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
+      <div class="kpi-tile">
+        <div class="kpi-big">${d.rapid.current ?? '—'}</div>
+        <div class="kpi-lbl">Rapid</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-big" style="font-size:20px">${d.rapid.best ?? '—'}</div>
+        <div class="kpi-lbl">Rapid Best</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-big">${d.blitz.current ?? '—'}</div>
+        <div class="kpi-lbl">Blitz</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-big" style="font-size:20px">${d.blitz.best ?? '—'}</div>
+        <div class="kpi-lbl">Blitz Best</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="kpi-big">${d.tactics.highest ?? '—'}</div>
+        <div class="kpi-lbl">Tactics</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-bottom:20px">
+      <button class="act-chip ${_chessTC === 'rapid' ? 'active' : ''}" data-tc="rapid" onclick="setChessTC('rapid')">Rapid</button>
+      <button class="act-chip ${_chessTC === 'blitz' ? 'active' : ''}" data-tc="blitz" onclick="setChessTC('blitz')">Blitz</button>
+    </div>
+
+    <div id="chess-tc-content"></div>
+  `
+
+  buildChessTCContent(d, _chessTC)
 }
 
 // ─── bootstrap ────────────────────────────────────────────────────────────────

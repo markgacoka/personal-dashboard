@@ -1084,7 +1084,7 @@
 
     /* ── Chart card ──────────────────────────────────────── */
     .chart-card {
-      background: var(--raised);
+      background: var(--graphite);
       border: 1px solid var(--rule);
       border-radius: var(--r-md);
       padding: 14px 16px 10px;
@@ -6960,7 +6960,9 @@ function buildChessRatingChart(recent) {
   const cfg = getChartCfg()
   const labels = games.map(g => new Date(g.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
   const ratings = games.map(g => g.rating)
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--champagne').trim() || '#c9a96e'
+  // patina-text (teal) matches the Rapid chip; oklch alpha syntax avoids the hex-append bug
+  const lineClr = 'oklch(76% 0.088 190)'
+  const fillClr = 'oklch(76% 0.088 190 / 0.12)'
   _cjsRender(el, {
     type: 'line',
     data: {
@@ -6968,8 +6970,9 @@ function buildChessRatingChart(recent) {
       datasets: [{
         label: 'Rating',
         data: ratings,
-        borderColor: accent,
-        backgroundColor: accent + '22',
+        borderColor: lineClr,
+        backgroundColor: fillClr,
+        pointBackgroundColor: lineClr,
         borderWidth: 2,
         pointRadius: 3,
         pointHoverRadius: 5,
@@ -7020,23 +7023,28 @@ function buildChessTCContent(d, tc) {
   const tm = tc_d.thisMonth, lm = tc_d.lastMonth
 
   const recentHtml = !(tc_d.recent?.length)
-    ? '<div style="padding:20px 16px;color:var(--faint);font-size:12px">No games this month</div>'
+    ? '<div class="act-summary" style="color:var(--faint);font-size:12px">No games this month</div>'
     : tc_d.recent.slice().reverse().map(g => {
         const dt = new Date(g.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        const clr = g.color === 'w' ? '♔' : '♚'
+        const colorPiece = g.color === 'w' ? '♔' : '♚'
         const lcol = g.result === 'W' ? 'var(--patina-text)' : g.result === 'L' ? 'oklch(58% 0.20 15)' : 'var(--rule-strong)'
+        const iconBg = g.result === 'W' ? 'oklch(76% 0.088 190 / 0.15)' : g.result === 'L' ? 'oklch(58% 0.20 15 / 0.12)' : 'var(--graphite)'
+        const iconClr = g.result === 'W' ? 'var(--patina-text)' : g.result === 'L' ? 'oklch(58% 0.20 15)' : 'var(--muted)'
         return `<a class="act-row" href="${esc(g.url)}" target="_blank" rel="noopener"
-          style="display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center;text-decoration:none;border-left-color:${lcol}">
-          <span class="ch-res-badge ${g.result}">${g.result}</span>
-          <span>
-            <span class="ch-game-opp">${esc(g.opponent)}</span>
-            <span class="ch-game-meta" style="display:block">${clr} ${g.oppRating ?? '?'} &middot; my ${g.rating ?? '?'}</span>
-          </span>
-          <span class="ch-game-meta" style="text-align:right">${dt}</span>
+          style="text-decoration:none;border-left-color:${lcol}">
+          <div class="act-summary">
+            <div class="act-icon" style="background:${iconBg};color:${iconClr};font-size:13px;font-weight:800;letter-spacing:0.04em">${g.result}</div>
+            <div class="act-body">
+              <div class="act-name">${esc(g.opponent)}</div>
+              <div class="act-meta">${colorPiece} opp ${g.oppRating ?? '?'} &middot; my ${g.rating ?? '?'}</div>
+            </div>
+            <span class="ch-game-meta" style="flex-shrink:0">${dt}</span>
+          </div>
         </a>`
       }).join('')
 
   container.innerHTML = `
+    <div class="section-label" style="margin-bottom:12px">Monthly Performance</div>
     <div class="grid-2" style="margin-bottom:16px">
       <div class="ov-card">
         <div class="ov-card-hd">${monthName(0)} &middot; ${tm.count} games</div>

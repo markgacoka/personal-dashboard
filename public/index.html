@@ -873,166 +873,132 @@
     .fd-pk { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
     .fd-pv { font-size: 12px; color: var(--champagne); font-weight: 600; }
 
-    /* ── Pilot Credentials ───────────────────────────────── */
-    .cert-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
+    /* ── Pilot Credentials — Document Register ──────────────── */
 
-    .cert-card {
-      border-radius: 12px; overflow: hidden;
+    .cdoc-list { display: flex; flex-direction: column; gap: 32px; margin-bottom: 36px; }
+
+    .cdoc {
       border: 1px solid var(--rule);
-      background: var(--raised);
-      box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 3px 10px rgba(0,0,0,.04);
+      border-radius: var(--r-sm);
+      overflow: hidden;
     }
 
-    /* Accent bars */
-    .cert-accent { height: 4px; }
-    .cert-accent.pilot  { background: linear-gradient(90deg, oklch(52% 0.15 178), oklch(62% 0.13 186)); }
-    .cert-accent.medical{ background: linear-gradient(90deg, oklch(48% 0.15 248), oklch(58% 0.13 258)); }
-
-    /* Card header — always light background */
-    .cert-head {
+    /* Header band */
+    .cdoc-head {
       display: flex; align-items: flex-start; justify-content: space-between;
-      padding: 18px 24px 16px; gap: 16px;
-      border-bottom: 1px solid var(--rule);
+      padding: 12px 24px; gap: 16px;
+      background: var(--graphite); border-bottom: 1px solid var(--rule);
     }
-    .cert-head-left { min-width: 0; }
-    .cert-type-label {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+    .cdoc-head-l { display: flex; flex-direction: column; gap: 3px; }
+    .cdoc-type {
+      font-size: 9.5px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+    }
+    .cdoc-type.pilot   { color: #0369a1; }
+    .cdoc-type.medical { color: #1d4ed8; }
+    .cdoc-authority { font-size: 10px; color: var(--disabled); letter-spacing: 0.01em; }
+    .cdoc-docnum {
+      font-family: 'Alumni Sans', monospace;
+      font-size: 14px; letter-spacing: 0.10em; color: var(--muted);
+      font-variant-numeric: tabular-nums; flex-shrink: 0; align-self: center;
+    }
+
+    /* Body */
+    .cdoc-body {
+      display: grid; grid-template-columns: 1fr 196px;
+      padding: 28px 24px; gap: 0; align-items: start;
+    }
+    @media (max-width: 580px) { .cdoc-body { grid-template-columns: 1fr; } }
+
+    /* Left: identity */
+    .cdoc-name {
+      font-size: 27px; font-weight: 300; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--body-text); line-height: 1;
+      margin-bottom: 18px;
+    }
+    .cdoc-meta { display: flex; flex-direction: column; gap: 7px; margin-bottom: 20px; }
+    .cdoc-mrow { display: flex; align-items: baseline; font-size: 12.5px; }
+    .cdoc-mk { color: var(--faint); min-width: 136px; flex-shrink: 0; }
+    .cdoc-mv { color: var(--body-text); font-weight: 500; }
+
+    /* Physical strip */
+    .cdoc-phys {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 10px 0; border-top: 1px solid var(--rule); padding-top: 16px;
+    }
+    .cdoc-phys-item { display: flex; flex-direction: column; gap: 5px; }
+    .cdoc-phys-k {
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.10em;
       text-transform: uppercase; color: var(--disabled);
-      margin-bottom: 2px;
     }
-    .cert-name {
-      font-size: 22px; font-weight: 800; color: var(--body-text);
-      letter-spacing: -0.01em; line-height: 1.1; margin-bottom: 3px;
+    .cdoc-phys-v { font-size: 13px; font-weight: 500; color: var(--body-text); }
+
+    /* AME block (medical only) */
+    .cdoc-ame {
+      margin-top: 20px; border-top: 1px solid var(--rule); padding-top: 16px;
+      display: flex; flex-direction: column; gap: 2px;
     }
-    .cert-org { font-size: 11px; color: var(--faint); }
-    .cert-head-right {
-      display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;
-    }
-    .cert-num {
-      font-size: 12px; font-family: 'Alumni Sans', monospace;
-      letter-spacing: 0.07em; color: var(--muted); font-weight: 600;
-    }
-    .cert-valid-pill {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-      padding: 4px 10px; border-radius: 20px;
-    }
-    .cert-valid-pill.good {
-      background: oklch(55% 0.15 155 / 0.11);
-      color: oklch(36% 0.14 152);
-      border: 1px solid oklch(55% 0.15 155 / 0.28);
-    }
-    .cert-valid-pill.warn {
-      background: oklch(62% 0.17 68 / 0.11);
-      color: oklch(40% 0.14 62);
-      border: 1px solid oklch(62% 0.17 68 / 0.28);
-    }
-    .cert-valid-pill.crit {
-      background: oklch(55% 0.16 20 / 0.11);
-      color: oklch(38% 0.14 18);
-      border: 1px solid oklch(55% 0.16 20 / 0.28);
+    .cdoc-ame-name { font-size: 13px; font-weight: 600; color: var(--body-text); }
+    .cdoc-ame-role { font-size: 11px; color: var(--faint); margin-top: 1px; }
+    .cdoc-ame-ids {
+      font-size: 11px; color: var(--disabled);
+      font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; margin-top: 5px;
     }
 
-    /* Two-column main body */
-    .cert-main {
-      display: grid; grid-template-columns: 260px 1fr;
+    /* Right: expiry countdown */
+    .cdoc-right {
+      display: flex; flex-direction: column; align-items: flex-end; text-align: right;
+      padding-left: 24px; border-left: 1px solid var(--rule);
     }
-    @media (max-width: 700px) { .cert-main { grid-template-columns: 1fr; } }
-
-    /* Left: Validity column */
-    .cert-val-col {
-      padding: 20px 22px;
-      border-right: 1px solid var(--rule);
-      background: var(--graphite);
-      display: flex; flex-direction: column; justify-content: center; gap: 0;
+    .cdoc-countdown {
+      font-family: 'Alumni Sans', monospace;
+      font-size: 52px; font-weight: 400; line-height: 1;
+      letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+      color: var(--body-text);
     }
-    .cert-val-label {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--disabled); margin-bottom: 6px;
-    }
-    .cert-days-num {
-      font-size: 38px; font-weight: 900; letter-spacing: -0.03em; line-height: 1;
-      margin-bottom: 2px;
-    }
-    .cert-days-num.good  { color: oklch(38% 0.16 155); }
-    .cert-days-num.warn  { color: oklch(42% 0.18 68); }
-    .cert-days-num.crit  { color: oklch(40% 0.16 20); }
-    .cert-days-word {
-      font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 16px;
-    }
-    .cert-bar-track {
-      height: 4px; border-radius: 2px; background: var(--rule);
-      overflow: hidden; margin-bottom: 8px;
-    }
-    .cert-bar-fill { height: 100%; border-radius: 2px; transition: width 0.9s cubic-bezier(.4,0,.2,1); }
-    .cert-bar-fill.good { background: oklch(55% 0.15 155); }
-    .cert-bar-fill.warn { background: oklch(62% 0.17 68); }
-    .cert-bar-fill.crit { background: oklch(55% 0.16 20); }
-    .cert-date-range {
-      display: flex; flex-direction: column; gap: 3px;
-    }
-    .cert-date-item {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-    }
-    .cert-date-key { font-size: 9px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--disabled); }
-    .cert-date-val { font-size: 12px; font-weight: 500; color: var(--body-text); }
-
-    /* Right: Data column */
-    .cert-data-col {
-      padding: 20px 24px;
-      display: flex; flex-direction: column; gap: 16px;
-    }
-    .cert-section {  }
-    .cert-section-head {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+    .cdoc-countdown.warn { color: #92400e; }
+    .cdoc-countdown.crit { color: #991b1b; }
+    .cdoc-countdown-sub {
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.20em;
       text-transform: uppercase; color: var(--disabled);
-      margin-bottom: 7px; padding-bottom: 5px;
-      border-bottom: 1px solid var(--rule);
+      margin-top: 4px; margin-bottom: 22px;
     }
-    .cert-pairs {
-      display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: baseline;
+    .cdoc-dates {
+      display: flex; flex-direction: column; gap: 13px;
+      border-top: 1px solid var(--rule); padding-top: 16px; width: 100%;
     }
-    .cert-pair { display: flex; align-items: baseline; gap: 5px; }
-    .cert-pk {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
-      text-transform: uppercase; color: var(--faint);
+    .cdoc-date { display: flex; flex-direction: column; gap: 3px; }
+    .cdoc-dk {
+      font-size: 8.5px; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--disabled);
     }
-    .cert-pv {
-      font-size: 13px; font-weight: 500; color: var(--body-text);
-    }
-    .cert-pv.mono { font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; font-size: 14px; }
-    .cert-pv.accent { color: var(--champagne); font-weight: 600; }
-
-    /* Limitation blocks — left-border style, always light bg */
-    .cert-limit {
-      display: flex; align-items: flex-start; gap: 9px;
-      padding: 9px 12px; border-radius: 6px;
-      font-size: 13px; font-weight: 500; line-height: 1.4;
-      border-left: 3px solid;
-    }
-    .cert-limit i { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
-    .cert-limit.warn {
-      background: #fef7ee;
-      border-left-color: #d97706;
-      color: #78350f;
-    }
-    .cert-limit.warn i { color: #d97706; }
-    .cert-limit.ok {
-      background: #f0fdf4;
-      border-left-color: #16a34a;
-      color: #14532d;
-    }
-    .cert-limit.ok i { color: #16a34a; }
+    .cdoc-dv { font-size: 13px; font-weight: 500; color: var(--body-text); }
 
     /* Footer */
-    .cert-foot {
-      padding: 9px 24px;
-      border-top: 1px solid var(--rule);
-      display: flex; align-items: center; gap: 8px;
-      font-size: 11px; color: var(--disabled);
-      background: var(--graphite);
+    .cdoc-foot {
+      padding: 10px 24px; border-top: 1px solid var(--rule);
+      background: var(--graphite); display: flex; align-items: center;
+      justify-content: space-between; gap: 16px; flex-wrap: wrap;
     }
-    .cert-foot i { font-size: 12px; }
+    .cdoc-foot-lim { font-size: 11px; color: var(--faint); font-style: italic; }
+    .cdoc-foot-sig { font-size: 11px; color: var(--disabled); }
+
+    /* Regulatory reference */
+    .cdoc-regs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 580px) { .cdoc-regs { grid-template-columns: 1fr; } }
+    .cdoc-reg { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; }
+    .cdoc-reg-head {
+      padding: 11px 16px; border-bottom: 1px solid var(--rule);
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    }
+    .cdoc-reg-title { font-size: 12px; font-weight: 700; color: var(--body-text); }
+    .cdoc-reg-cfr {
+      font-size: 10px; color: var(--faint);
+      font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; flex-shrink: 0;
+    }
+    .cdoc-reg ul {
+      font-size: 12px; color: var(--body-text); line-height: 1.9;
+      padding: 12px 16px 14px 30px; margin: 0;
+    }
 
     /* Overview credential strip on logbook page */
     .cred-strip {
@@ -4949,181 +4915,148 @@ function renderCertificates() {
 
   const spDays  = certDaysLeft(sp.expiryDate)
   const medDays = certDaysLeft(med.expiryDate)
-  const spPct   = certBarPct(sp.issueDate, sp.expiryDate)
-  const medPct  = certBarPct(med.examDate, med.expiryDate)
   const spCls   = certValidityClass(spDays)
   const medCls  = certValidityClass(medDays)
 
-  function fmtDateShort(d) {
-    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  function mrow(k, v) {
+    return `<div class="cdoc-mrow"><span class="cdoc-mk">${k}</span><span class="cdoc-mv">${v}</span></div>`
   }
 
-  function valCol(label, issueDate, expiryDate, daysLeft, pct, cls) {
-    return `
-      <div class="cert-val-col">
-        <div class="cert-val-label">Valid for</div>
-        <div class="cert-days-num ${cls}">${daysLeft.toLocaleString()}</div>
-        <div class="cert-days-word">days remaining</div>
-        <div class="cert-bar-track">
-          <div class="cert-bar-fill ${cls}" style="width:${pct}%"></div>
-        </div>
-        <div class="cert-date-range">
-          <div class="cert-date-item">
-            <span class="cert-date-key">${label}</span>
-            <span class="cert-date-val">${fmtCertDate(issueDate)}</span>
-          </div>
-          <div class="cert-date-item">
-            <span class="cert-date-key">Expires</span>
-            <span class="cert-date-val">${fmtCertDate(expiryDate)}</span>
-          </div>
-        </div>
-      </div>`
-  }
-
-  function section(title, content) {
-    return `<div class="cert-section">
-      <div class="cert-section-head">${title}</div>
-      ${content}
-    </div>`
-  }
-
-  function pairs(kvs) {
-    return `<div class="cert-pairs">${kvs.map(([k,v,extra]) =>
-      `<div class="cert-pair"><span class="cert-pk">${k}</span><span class="cert-pv${extra ? ' '+extra : ''}">${v}</span></div>`
-    ).join('')}</div>`
+  function phys(k, v) {
+    return `<div class="cdoc-phys-item"><span class="cdoc-phys-k">${k}</span><span class="cdoc-phys-v">${v}</span></div>`
   }
 
   container.innerHTML = `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--rule)">
-      <div>
-        <div style="font-size:14px;font-weight:700;color:var(--body-text)">Pilot Credentials</div>
-        <div style="font-size:11px;color:var(--faint);margin-top:3px">U.S. Department of Transportation · Federal Aviation Administration</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <div class="cert-valid-pill ${spCls}"><i class="ph-bold ph-check-circle"></i> Student Pilot · ${spDays.toLocaleString()} days</div>
-        <div class="cert-valid-pill ${medCls}"><i class="ph-bold ph-check-circle"></i> 3rd Class Medical · ${medDays.toLocaleString()} days</div>
-      </div>
+    <div style="margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--rule)">
+      <div style="font-size:13px;font-weight:700;color:var(--body-text);margin-bottom:3px">Pilot Credentials</div>
+      <div style="font-size:11px;color:var(--faint)">U.S. Department of Transportation &middot; Federal Aviation Administration</div>
     </div>
 
-    <div class="cert-list">
+    <div class="cdoc-list">
 
-      <!-- ── Student Pilot Certificate ─────────────────────────────────────── -->
-      <div class="cert-card">
-        <div class="cert-accent pilot"></div>
-        <div class="cert-head">
-          <div class="cert-head-left">
-            <div class="cert-type-label">Student Pilot Certificate · Certificate of Qualification</div>
-            <div class="cert-name">${esc(sp.name)}</div>
-            <div class="cert-org">U.S. Dept. of Transportation · Federal Aviation Administration</div>
+      <!-- Student Pilot Certificate -->
+      <div class="cdoc">
+        <div class="cdoc-head">
+          <div class="cdoc-head-l">
+            <span class="cdoc-type pilot">Student Pilot Certificate</span>
+            <span class="cdoc-authority">U.S. Dept. of Transportation &middot; Federal Aviation Administration</span>
           </div>
-          <div class="cert-head-right">
-            <div class="cert-num">№ ${esc(sp.certNumber)}</div>
-            <div class="cert-valid-pill ${spCls}">
-              <i class="ph-bold ph-check-circle"></i> Valid
+          <span class="cdoc-docnum">№&thinsp;${esc(sp.certNumber)}</span>
+        </div>
+        <div class="cdoc-body">
+          <div>
+            <div class="cdoc-name">${esc(sp.name)}</div>
+            <div class="cdoc-meta">
+              ${mrow('Date of Birth', 'September 25, 2000')}
+              ${mrow('Nationality', esc(sp.nationality))}
+              ${mrow('Sex', esc(sp.sex))}
+            </div>
+            <div class="cdoc-phys">
+              ${phys('Height', esc(sp.height))}
+              ${phys('Weight', esc(sp.weight))}
+              ${phys('Hair', esc(sp.hair))}
+              ${phys('Eyes', esc(sp.eyes))}
+            </div>
+          </div>
+          <div class="cdoc-right">
+            <div class="cdoc-countdown ${spCls}">${spDays.toLocaleString()}</div>
+            <div class="cdoc-countdown-sub">days remaining</div>
+            <div class="cdoc-dates">
+              <div class="cdoc-date">
+                <span class="cdoc-dk">Valid through</span>
+                <span class="cdoc-dv">${fmtCertDate(sp.expiryDate)}</span>
+              </div>
+              <div class="cdoc-date">
+                <span class="cdoc-dk">Issued</span>
+                <span class="cdoc-dv">${fmtCertDate(sp.issueDate)}</span>
+              </div>
             </div>
           </div>
         </div>
-        <div class="cert-main">
-          ${valCol('Issued', sp.issueDate, sp.expiryDate, spDays, spPct, spCls)}
-          <div class="cert-data-col">
-            ${section('Identity', pairs([
-              ['Nationality', esc(sp.nationality)],
-              ['Date of Birth', 'Sep 25, 2000'],
-              ['Sex', esc(sp.sex)],
-            ]))}
-            ${section('Physical Characteristics', pairs([
-              ['Height', esc(sp.height)],
-              ['Weight', esc(sp.weight)],
-              ['Hair', esc(sp.hair)],
-              ['Eyes', esc(sp.eyes)],
-            ]))}
-            ${section('Limitations', sp.limitations.map(l =>
-              `<div class="cert-limit warn"><i class="ph-bold ph-prohibit"></i><span>${esc(l)}</span></div>`
-            ).join(''))}
-          </div>
-        </div>
-        <div class="cert-foot">
-          <i class="ph-bold ph-airplane"></i>
-          Certificate No. ${esc(sp.certNumber)} · Issued ${fmtCertDate(sp.issueDate)} · Signed by ${esc(sp.administrator)}, Administrator
+        <div class="cdoc-foot">
+          <span class="cdoc-foot-lim">* ${esc(sp.limitations[0])}</span>
+          <span class="cdoc-foot-sig">Signed: ${esc(sp.administrator)}, Administrator</span>
         </div>
       </div>
 
-      <!-- ── Third Class Medical Certificate ───────────────────────────────── -->
-      <div class="cert-card">
-        <div class="cert-accent medical"></div>
-        <div class="cert-head">
-          <div class="cert-head-left">
-            <div class="cert-type-label">Airman Medical Certificate · Third Class</div>
-            <div class="cert-name">${esc(med.name)}</div>
-            <div class="cert-org">U.S. Dept. of Transportation · Federal Aviation Administration</div>
+      <!-- Third Class Medical Certificate -->
+      <div class="cdoc">
+        <div class="cdoc-head">
+          <div class="cdoc-head-l">
+            <span class="cdoc-type medical">Airman Medical Certificate &middot; Third Class</span>
+            <span class="cdoc-authority">U.S. Dept. of Transportation &middot; Federal Aviation Administration &middot; ${esc(med.formNo)}</span>
           </div>
-          <div class="cert-head-right">
-            <div class="cert-num">ID ${esc(med.applicantId)}</div>
-            <div class="cert-valid-pill ${medCls}">
-              <i class="ph-bold ph-check-circle"></i> Valid
+          <span class="cdoc-docnum">ID&thinsp;${esc(med.applicantId)}</span>
+        </div>
+        <div class="cdoc-body">
+          <div>
+            <div class="cdoc-name">${esc(med.name)}</div>
+            <div class="cdoc-meta">
+              ${mrow('Date of Birth', esc(med.dob))}
+              ${mrow('Sex', esc(med.sex))}
+            </div>
+            <div class="cdoc-phys">
+              ${phys('Height', esc(med.height))}
+              ${phys('Weight', esc(med.weight))}
+              ${phys('Hair', esc(med.hair))}
+              ${phys('Eyes', esc(med.eyes))}
+            </div>
+            <div class="cdoc-ame">
+              <span class="cdoc-ame-name">${esc(med.examiner)}</span>
+              <span class="cdoc-ame-role">Aviation Medical Examiner</span>
+              <span class="cdoc-ame-ids">Designee ${esc(med.examDesig)} &middot; Control ${esc(med.controlNo)}</span>
+            </div>
+          </div>
+          <div class="cdoc-right">
+            <div class="cdoc-countdown ${medCls}">${medDays.toLocaleString()}</div>
+            <div class="cdoc-countdown-sub">days remaining</div>
+            <div class="cdoc-dates">
+              <div class="cdoc-date">
+                <span class="cdoc-dk">Valid through</span>
+                <span class="cdoc-dv">${fmtCertDate(med.expiryDate)}</span>
+              </div>
+              <div class="cdoc-date">
+                <span class="cdoc-dk">Examined</span>
+                <span class="cdoc-dv">${fmtCertDate(med.examDate)}</span>
+              </div>
             </div>
           </div>
         </div>
-        <div class="cert-main">
-          ${valCol('Examined', med.examDate, med.expiryDate, medDays, medPct, medCls)}
-          <div class="cert-data-col">
-            ${section('Physical Characteristics', pairs([
-              ['Height', esc(med.height)],
-              ['Weight', esc(med.weight)],
-              ['Hair', esc(med.hair)],
-              ['Eyes', esc(med.eyes)],
-            ]))}
-            ${section('Examiner', `
-              <div class="cert-pairs" style="flex-direction:column;align-items:flex-start;gap:5px">
-                <div class="cert-pair"><span class="cert-pk">AME</span><span class="cert-pv accent">${esc(med.examiner)}</span></div>
-                <div style="display:flex;gap:20px;flex-wrap:wrap">
-                  <div class="cert-pair"><span class="cert-pk">Designation</span><span class="cert-pv mono">${esc(med.examDesig)}</span></div>
-                  <div class="cert-pair"><span class="cert-pk">Control No.</span><span class="cert-pv mono">${esc(med.controlNo)}</span></div>
-                </div>
-              </div>`
-            )}
-            ${section('Limitations',
-              `<div class="cert-limit ok"><i class="ph-bold ph-check-circle"></i><span>None — standard privileges apply</span></div>`
-            )}
-          </div>
-        </div>
-        <div class="cert-foot">
-          <i class="ph-bold ph-first-aid-kit"></i>
-          ${esc(med.formNo)} · Control ${esc(med.controlNo)} · Examined ${fmtCertDate(med.examDate)}
+        <div class="cdoc-foot">
+          <span class="cdoc-foot-lim">* No limitations — standard privileges apply</span>
+          <span class="cdoc-foot-sig">${esc(med.formNo)} &middot; Control ${esc(med.controlNo)}</span>
         </div>
       </div>
 
     </div>
 
-    <!-- ── FAA Regulatory Reference ─────────────────────────────────────────── -->
+    <!-- Regulatory Notes -->
     <div class="section-label" style="margin-bottom:12px">Regulatory Notes</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px">
-      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden">
-        <div style="padding:10px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:7px">
-          <span style="width:3px;height:14px;background:oklch(52% 0.15 178);border-radius:2px;flex-shrink:0"></span>
-          <span style="font-size:11px;font-weight:700;color:var(--body-text)">Student Pilot</span>
-          <span style="font-size:10px;color:var(--faint);font-family:'Alumni Sans',monospace;letter-spacing:.04em">14 CFR 61.19</span>
+    <div class="cdoc-regs" style="margin-bottom:32px">
+      <div class="cdoc-reg">
+        <div class="cdoc-reg-head">
+          <span class="cdoc-reg-title">Student Pilot</span>
+          <span class="cdoc-reg-cfr">14 CFR 61.19</span>
         </div>
-        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding:12px 16px 12px 28px;margin:0">
+        <ul>
           <li>Valid 60 calendar months from month of issue (under age 40)</li>
           <li>Solo flight requires current medical + instructor endorsement</li>
-          <li>Cannot carry passengers — solo only</li>
+          <li>Cannot carry passengers &mdash; solo only</li>
           <li>Solo XC requires separate endorsements per 14 CFR 61.93</li>
           <li>Night solo requires 14 CFR 61.87(o) endorsement</li>
         </ul>
       </div>
-      <div style="background:var(--raised);border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden">
-        <div style="padding:10px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:7px">
-          <span style="width:3px;height:14px;background:oklch(48% 0.15 248);border-radius:2px;flex-shrink:0"></span>
-          <span style="font-size:11px;font-weight:700;color:var(--body-text)">Third Class Medical</span>
-          <span style="font-size:10px;color:var(--faint);font-family:'Alumni Sans',monospace;letter-spacing:.04em">14 CFR 61.23</span>
+      <div class="cdoc-reg">
+        <div class="cdoc-reg-head">
+          <span class="cdoc-reg-title">Third Class Medical</span>
+          <span class="cdoc-reg-cfr">14 CFR 61.23</span>
         </div>
-        <ul style="font-size:12px;color:var(--body-text);line-height:1.9;padding:12px 16px 12px 28px;margin:0">
+        <ul>
           <li>Valid 60 calendar months from examination date (under age 40)</li>
           <li>Required for student, recreational &amp; private pilot operations</li>
           <li>Must be current before any solo flight</li>
           <li>BasicMed (14 CFR 61.113(i)) available as alternative after PPL</li>
-          <li>Next exam due: <strong style="color:var(--body-text)">${fmtCertDate(med.expiryDate)}</strong></li>
+          <li>Next exam due: <strong>${fmtCertDate(med.expiryDate)}</strong></li>
         </ul>
       </div>
     </div>

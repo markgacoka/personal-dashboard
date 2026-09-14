@@ -82,12 +82,18 @@ export async function downloadFaaAirspace(log) {
 
 let _memCache = null
 let _memCacheAt = 0
+let _inFlight = null
 
 export async function getFaaAirspace(log) {
   const now = Date.now()
 
   // Memory cache still fresh
   if (_memCache && now - _memCacheAt < AIRAC_MS) return _memCache
+
+  // A download is already in progress (e.g. several requests arrived before
+  // the first one populated the cache) — share it instead of each caller
+  // kicking off its own full multi-page fetch.
+  if (_inFlight) return _inFlight
 
   // Disk cache fresh enough (and non-empty — an empty cache is treated as invalid)
   if (existsSync(CACHE_FILE)) {
@@ -106,7 +112,8 @@ export async function getFaaAirspace(log) {
   }
 
   // Need a fresh download
-  _memCache = await downloadFaaAirspace(log)
+  _inFlight = downloadFaaAirspace(log).finally(() => { _inFlight = null })
+  _memCache = await _inFlight
   _memCacheAt = now
   return _memCache
 }

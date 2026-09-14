@@ -407,7 +407,7 @@
     [data-theme="light"] .cur-row.cr-current  { background: oklch(55% 0.14 155 / 0.07); }
     [data-theme="light"] .cur-row.cr-lapsed   { background: oklch(50% 0.14 20  / 0.06); }
     [data-theme="light"] .cur-row.cr-expiring { background: oklch(60% 0.15 75  / 0.07); }
-    .cur-name { font-size: 13px; font-weight: 500; color: var(--champagne); line-height: 1.25; }
+    .cur-name { font-size: 14px; font-weight: 600; color: var(--champagne); line-height: 1.25; }
     .cur-reg  { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; color: var(--faint); margin-left: 5px; font-family: 'Alumni Sans', monospace; }
     .cur-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
     .cur-status { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
@@ -556,7 +556,7 @@
     }
     .detail-title {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 28px; font-weight: 300;
+      font-size: 28px; font-weight: 600;
       color: var(--champagne);
       letter-spacing: -0.01em; line-height: 1.15;
     }
@@ -733,7 +733,7 @@
     }
     .fd-route-hero {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 46px; font-weight: 300;
+      font-size: 46px; font-weight: 600;
       color: var(--champagne);
       letter-spacing: -0.01em; line-height: 1;
       margin-bottom: 6px;
@@ -903,7 +903,7 @@
 
     .cdoc-name {
       font-family: 'Alumni Sans', sans-serif;
-      font-size: 26px; font-weight: 300; letter-spacing: 0.04em;
+      font-size: 26px; font-weight: 600; letter-spacing: 0.04em;
       color: var(--champagne); line-height: 1.15; margin-bottom: 16px;
     }
     .cdoc-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
@@ -7049,7 +7049,7 @@ function buildChessTCContent(d, tc) {
     <div class="grid-2" style="margin-bottom:16px">
       <div class="ov-card">
         <div class="ov-card-hd">${monthName(0)} &middot; ${tm.count} games</div>
-        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:300;color:var(--champagne);line-height:1;margin-bottom:4px">
+        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:600;color:var(--champagne);line-height:1;margin-bottom:4px">
           ${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &thinsp;${deltaHtml(tm)}
         </div>
         <div class="ch-wld"><span class="ch-w">W ${tm.win}</span><span class="ch-l">L ${tm.loss}</span><span class="ch-d">D ${tm.draw}</span></div>
@@ -7057,7 +7057,7 @@ function buildChessTCContent(d, tc) {
       </div>
       <div class="ov-card">
         <div class="ov-card-hd">${monthName(1)} &middot; ${lm.count} games</div>
-        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:300;color:var(--champagne);line-height:1;margin-bottom:4px">
+        <div style="font-family:'Alumni Sans',sans-serif;font-size:32px;font-weight:600;color:var(--champagne);line-height:1;margin-bottom:4px">
           ${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &thinsp;${deltaHtml(lm)}
         </div>
         <div class="ch-wld"><span class="ch-w">W ${lm.win}</span><span class="ch-l">L ${lm.loss}</span><span class="ch-d">D ${lm.draw}</span></div>

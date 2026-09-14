@@ -758,7 +758,7 @@
     }
     .fd-hstat:last-child { border-right: none; }
     .fd-hstat-label {
-      font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em;
       color: var(--faint); margin-bottom: 4px; white-space: nowrap;
     }
     .fd-hstat-val {
@@ -856,14 +856,14 @@
       display: grid; grid-template-columns: 1fr 1fr;
       gap: 6px 10px; margin-bottom: 10px;
     }
-    .fd-ac-spec-label { font-size: 9px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-ac-spec-label { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; }
     .fd-ac-spec-val { font-size: 11px; color: var(--body-text); font-weight: 500; }
     .fd-perf-section {
       border-top: 1px solid var(--rule);
       padding-top: 8px; margin-top: 2px;
     }
     .fd-perf-label {
-      font-size: 9px; color: var(--faint); text-transform: uppercase;
+      font-size: 10px; color: var(--faint); text-transform: uppercase;
       letter-spacing: 0.06em; margin-bottom: 6px;
     }
     .fd-perf-grid {
@@ -916,7 +916,7 @@
       gap: 10px 0; border-top: 1px solid var(--rule); padding-top: 14px;
     }
     .cdoc-phys-item { display: flex; flex-direction: column; gap: 4px; }
-    .cdoc-phys-k { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+    .cdoc-phys-k { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
     .cdoc-phys-v { font-size: 12px; font-weight: 500; color: var(--body-text); }
 
     .cdoc-ame { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; display: flex; flex-direction: column; gap: 2px; }
@@ -1004,8 +1004,8 @@
     .ch-res-badge.W { background: color-mix(in oklch, var(--patina-text) 18%, transparent); color: var(--patina-text); }
     .ch-res-badge.L { background: color-mix(in oklch, oklch(58% 0.20 15) 18%, transparent); color: oklch(58% 0.20 15); }
     .ch-res-badge.D { background: var(--graphite); color: var(--muted); }
-    .ch-game-opp { font-size: 12.5px; color: var(--body-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ch-game-meta { font-size: 11px; color: var(--faint); font-family: 'Alumni Sans', monospace; }
+    .ch-game-opp { font-size: 14px; color: var(--champagne); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-game-meta { font-size: 12px; color: var(--faint); }
     .act-chip[data-tc="rapid"].active { background: var(--patina-text); }
     .act-chip[data-tc="blitz"].active  { background: var(--gold); color: var(--gold-ink); }
 
@@ -1018,7 +1018,7 @@
       letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
       color: var(--champagne); line-height: 1; margin-bottom: 3px;
     }
-    .ch-ov-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--disabled); }
+    .ch-ov-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
     .ch-ov-delta { font-size: 11px; color: var(--faint); margin-top: 4px; }
     .ch-ov-month { font-size: 10px; color: var(--disabled); font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; margin-bottom: 8px; }
     .ch-ov-wld { display: flex; gap: 12px; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
@@ -2728,7 +2728,7 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
 
     <!-- Inline NOTAMs -->
     <div style="margin-top:4px">
-      <div class="wx-inline-hdr"><i class="ph-bold ph-warning"></i> NOTAMs / TFRs <span class="wx-count-badge">${nCount > 0 ? nCount : 0}</span>${nCount > 30 ? `<span style="font-size:9px;color:var(--faint);letter-spacing:0;text-transform:none">(showing 30)</span>` : ''}</div>
+      <div class="wx-inline-hdr"><i class="ph-bold ph-warning"></i> NOTAMs / TFRs <span class="wx-count-badge">${nCount > 0 ? nCount : 0}</span>${nCount > 30 ? `<span style="font-size:10px;color:var(--faint);letter-spacing:0;text-transform:none">(showing 30)</span>` : ''}</div>
       ${notamHtml}
     </div>
 
@@ -3946,13 +3946,13 @@ async function showFlightDetail(id) {
 
       ${f.remarks ? `
       <div style="border-left:3px solid var(--patina-text);padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0;margin-bottom:8px">
-        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Remarks</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Remarks</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.6">${esc(f.remarks)}</div>
       </div>` : ''}
 
       ${f.instructor_comments ? `
       <div style="border-left:3px solid ${TYPE_CFG.dual.color};padding:10px 14px;background:var(--raised);border-radius:0 var(--r-sm) var(--r-sm) 0">
-        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Instructor Comments</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px">Instructor Comments</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.6">${esc(f.instructor_comments)}</div>
       </div>` : ''}
     </div>` : ''}
@@ -7121,7 +7121,7 @@ function renderChessView() {
         <div class="kpi-lbl">Rapid</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big" style="font-size:20px">${d.rapid.best ?? '—'}</div>
+        <div class="kpi-big">${d.rapid.best ?? '—'}</div>
         <div class="kpi-lbl">Rapid Best</div>
       </div>
       <div class="kpi-tile">
@@ -7129,7 +7129,7 @@ function renderChessView() {
         <div class="kpi-lbl">Blitz</div>
       </div>
       <div class="kpi-tile">
-        <div class="kpi-big" style="font-size:20px">${d.blitz.best ?? '—'}</div>
+        <div class="kpi-big">${d.blitz.best ?? '—'}</div>
         <div class="kpi-lbl">Blitz Best</div>
       </div>
       <div class="kpi-tile">

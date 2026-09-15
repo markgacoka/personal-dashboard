@@ -961,4 +961,17 @@ export default async function proxyRoutes(fastify) {
       return reply.code(503).send({ error: 'Airspace data unavailable', detail: e.message })
     }
   })
+
+  // ── US public-use airports (nationwide, 28-day cycle, pre-downloaded) ──────
+  fastify.get('/api/external/us-airports', async (req, reply) => {
+    try {
+      const { getUsAirports } = await import('../services/usAirports.js')
+      const fc = await getUsAirports(fastify.log)
+      reply.header('Cache-Control', 'public, max-age=86400')
+      return fc
+    } catch (e) {
+      fastify.log.warn({ err: e.message }, 'US airports serve error')
+      return reply.code(503).send({ error: 'Airport data unavailable', detail: e.message })
+    }
+  })
 }

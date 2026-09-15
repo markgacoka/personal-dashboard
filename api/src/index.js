@@ -17,6 +17,7 @@ import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrate
 import financeRoutes from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
+import { scheduleUsAirportsRefresh } from './services/usAirports.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -82,6 +83,8 @@ if (process.env.DATABASE_URL) {
     }
     // Download FAA airspace on first boot + refresh every 28-day AIRAC cycle
     scheduleFaaAirspaceRefresh(fastify.log)
+    // Download nationwide US airports on first boot + refresh every 28 days
+    scheduleUsAirportsRefresh(fastify.log)
     // Sync flight block times from Gmail schedules on first boot + every 6h
     scheduleNightSync(fastify.log)
 

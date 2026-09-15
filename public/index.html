@@ -4350,7 +4350,19 @@ async function initFlightDetailMap(f) {
           tileSize: 256, attribution: '© Esri'
         });
       }
-      const before = thisMap.getLayer('route-glow') ? 'route-glow' : undefined;
+      // Insert below every overlay layer currently on the map, not just one
+      // fixed anchor — satellite is opaque raster imagery, so if it lands
+      // above any of them (airspace, airports, route) it covers them
+      // entirely. Airspace and the airports layer load asynchronously and
+      // can finish before or after this click, so find whichever overlay is
+      // actually bottom-most in the live style right now rather than
+      // assuming a fixed order.
+      const overlayIds = ['us-airports-dot','aspc-b-fill','aspc-b-line','aspc-c-fill','aspc-c-line','aspc-d-fill','aspc-d-line','route-glow'];
+      const styleLayerIds = thisMap.getStyle().layers.map(l => l.id);
+      const present = overlayIds.filter(id => styleLayerIds.includes(id));
+      const before = present.length
+        ? present.reduce((bottom, id) => styleLayerIds.indexOf(id) < styleLayerIds.indexOf(bottom) ? id : bottom)
+        : undefined;
       thisMap.addLayer({ id:'sat-layer', type:'raster', source:'sat', paint:{'raster-opacity':0.88} }, before);
     } else {
       if (thisMap.getLayer('sat-layer')) thisMap.removeLayer('sat-layer');
@@ -4863,6 +4875,29 @@ async function initFlightDetailMap(f) {
             aspcBtn.style.color      = vis === 'visible' ? '#000' : '';
           });
         }
+      })
+      .catch(() => {});
+
+    // ── US airports (nationwide reference layer) ─────────────────────────────
+    // Small, dim dots so they read as background context — the flight's own
+    // departure/via/arrival airports keep their existing larger dot+ICAO
+    // label markers (added above) so they stay visually distinct.
+    fetch('/api/external/us-airports')
+      .then(r => r.ok ? r.json() : null)
+      .then(fc => {
+        if (!fc || _fdMap !== thisMap) return;
+        thisMap.addSource('us-airports', { type: 'geojson', data: fc });
+        const beforeId = thisMap.getLayer('aspc-b-fill') ? 'aspc-b-fill'
+                        : thisMap.getLayer('route-glow')  ? 'route-glow' : undefined;
+        thisMap.addLayer({
+          id: 'us-airports-dot', type: 'circle', source: 'us-airports',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 0.6, 8, 1.4, 12, 2.4],
+            'circle-color': isLight ? '#8a8a8a' : '#7a7a7a',
+            'circle-opacity': 0.55,
+            'circle-stroke-width': 0,
+          },
+        }, beforeId);
       })
       .catch(() => {});
   });

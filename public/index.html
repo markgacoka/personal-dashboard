@@ -4892,10 +4892,12 @@ async function initFlightDetailMap(f) {
         thisMap.addLayer({
           id: 'us-airports-dot', type: 'circle', source: 'us-airports',
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 0.6, 8, 1.4, 12, 2.4],
-            'circle-color': isLight ? '#8a8a8a' : '#7a7a7a',
-            'circle-opacity': 0.55,
-            'circle-stroke-width': 0,
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 1.4, 8, 2.8, 12, 4.5],
+            'circle-color': isLight ? '#7a7a7a' : '#9a9a9a',
+            'circle-opacity': 0.75,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': isLight ? '#ffffff' : '#0a0909',
+            'circle-stroke-opacity': 0.6,
           },
         }, beforeId);
       })

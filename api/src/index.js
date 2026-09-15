@@ -8,7 +8,7 @@ import authRoutes from './routes/auth.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
-import flightRoutes from './routes/flights.js'
+import flightRoutes, { scheduleNightSync } from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
@@ -82,6 +82,8 @@ if (process.env.DATABASE_URL) {
     }
     // Download FAA airspace on first boot + refresh every 28-day AIRAC cycle
     scheduleFaaAirspaceRefresh(fastify.log)
+    // Sync flight block times from Gmail schedules on first boot + every 6h
+    scheduleNightSync(fastify.log)
 
     // Seed ACFTREF (8K rows) on first boot — runs in background, non-blocking
     isAcftrefEmpty().then(empty => {

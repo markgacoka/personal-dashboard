@@ -17,6 +17,19 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
+      /* ── Motion tokens (transitions-dev shared scale) ────── */
+      --duration-stagger:   40ms;
+      --duration-micro:     80ms;
+      --duration-quick:     150ms;
+      --duration-fast:      250ms;
+      --duration-medium:    350ms;
+      --duration-slow:      400ms;
+      --duration-very-slow: 500ms;
+      --ease-smooth-out:    cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-in-out:        ease-in-out;
+      --ease-out:           ease-out;
+      --ease-bounce:        cubic-bezier(0.34, 1.36, 0.64, 1);
+
       /* ── Surfaces ──────────────────────────────────────── */
       --ground:        oklch(7% 0.006 95);
       --deep:          oklch(4% 0.004 95);
@@ -211,11 +224,26 @@
       transition: color 0.15s;
     }
     .sb-group-hdr:hover { color: var(--muted); }
-    .sb-caret { margin-left: auto; font-size: 10px; flex-shrink: 0; transition: transform 0.18s; }
-    .sb-group-hdr.closed .sb-caret { transform: rotate(-90deg); }
+    .sb-caret { margin-left: auto; font-size: 10px; flex-shrink: 0; transform: scaleY(1); transform-origin: center; transition: transform var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)); }
+    .sb-group-hdr.closed .sb-caret { transform: scaleY(-1); }
 
-    .sb-group-items { max-height: 200px; overflow: hidden; transition: max-height 0.2s ease; }
-    .sb-group-items.closed { max-height: 0; }
+    /* transitions-dev accordion pattern: grid-template-rows 0fr<->1fr needs
+       no JS height measurement and animates any content size cleanly. */
+    .sb-group-items {
+      display: grid; grid-template-rows: 1fr;
+      transition: grid-template-rows var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1));
+    }
+    .sb-group-items.closed { grid-template-rows: 0fr; }
+    .sb-group-items-inner {
+      overflow: hidden;
+      opacity: 1; filter: blur(0);
+      transition: opacity var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)),
+                  filter var(--duration-fast, 250ms) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1));
+    }
+    .sb-group-items.closed .sb-group-items-inner { opacity: 0; filter: blur(2px); }
+    @media (prefers-reduced-motion: reduce) {
+      .sb-caret, .sb-group-items, .sb-group-items-inner { transition: none !important; }
+    }
 
     .sb-item {
       height: 34px; display: flex; align-items: center; gap: 10px;
@@ -236,7 +264,7 @@
     }
     .sidebar.collapsed .sb-group-hdr span,
     .sidebar.collapsed .sb-caret { display: none; }
-    .sidebar.collapsed .sb-group-items { max-height: 200px !important; }
+    .sidebar.collapsed .sb-group-items { grid-template-rows: 1fr !important; }
     .sidebar.collapsed .sb-item { padding: 0; justify-content: center; margin: 2px 4px; }
     .sidebar.collapsed .sb-lbl { display: none; }
 
@@ -700,7 +728,7 @@
       padding: 0;
       margin-bottom: 16px;
     }
-    .dp { display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; padding: 14px 16px; }
+    .dp { display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; padding: 20px 16px; }
     .dp:first-child { padding-left: 20px; }
     .dp:last-child  { padding-right: 20px; }
     .dp-n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); line-height: 1; }
@@ -1253,7 +1281,7 @@
       display: flex; align-items: center; justify-content: center;
       padding: 16px;
       backdrop-filter: blur(3px);
-      animation: mo-fade 0.15s ease;
+      animation: mo-fade var(--duration-quick) var(--ease-smooth-out);
     }
     @keyframes mo-fade { from { opacity: 0 } to { opacity: 1 } }
     .modal-box {
@@ -1262,9 +1290,12 @@
       max-height: 92vh; display: flex; flex-direction: column;
       overflow: hidden;
       box-shadow: 0 28px 72px oklch(0% 0 0 / 0.45);
-      animation: mo-up 0.18s ease;
+      animation: mo-up var(--duration-fast) var(--ease-smooth-out);
     }
-    @keyframes mo-up { from { transform: translateY(14px); opacity: 0.6 } to { transform: none; opacity: 1 } }
+    @keyframes mo-up { from { transform: translateY(14px) scale(var(--scale-large, 0.96)); opacity: 0.6 } to { transform: none; opacity: 1 } }
+    @media (prefers-reduced-motion: reduce) {
+      .modal-overlay, .modal-box { animation: none !important; }
+    }
     .modal-hd {
       display: flex; align-items: center; gap: 12px;
       padding: 15px 20px; flex-shrink: 0;
@@ -1422,7 +1453,7 @@
         border-top: 1px solid var(--rule);
       }
       .sidebar .sb-group-hdr span, .sidebar .sb-caret { display: none; }
-      .sidebar .sb-group-items { max-height: 200px !important; }
+      .sidebar .sb-group-items { grid-template-rows: 1fr !important; }
       .sidebar .sb-item { padding: 0; justify-content: center; margin: 2px 4px; }
       .sidebar .sb-lbl { display: none; }
       .view-scroller { padding: 20px 16px 40px; }
@@ -1562,18 +1593,18 @@
         <span>Fitness</span>
         <i class="ph-bold ph-caret-down sb-caret"></i>
       </div>
-      <div class="sb-group-items" id="sbi-fitness">
+      <div class="sb-group-items" id="sbi-fitness"><div class="sb-group-items-inner">
         <div class="sb-item" data-view="activities">
           <i class="ph-bold ph-activity"></i>
           <span class="sb-lbl">Activities</span>
         </div>
-      </div>
+      </div></div>
 
       <div class="sb-group-hdr" id="sbh-flights">
         <span>Flights</span>
         <i class="ph-bold ph-caret-down sb-caret"></i>
       </div>
-      <div class="sb-group-items" id="sbi-flights">
+      <div class="sb-group-items" id="sbi-flights"><div class="sb-group-items-inner">
         <div class="sb-item" data-view="logbook">
           <i class="ph-bold ph-book-open"></i>
           <span class="sb-lbl">Logbook</span>
@@ -1582,13 +1613,13 @@
           <i class="ph-bold ph-identification-card"></i>
           <span class="sb-lbl">Credentials</span>
         </div>
-      </div>
+      </div></div>
 
       <div class="sb-group-hdr" id="sbh-finances">
         <span>Finances</span>
         <i class="ph-bold ph-caret-down sb-caret"></i>
       </div>
-      <div class="sb-group-items" id="sbi-finances">
+      <div class="sb-group-items" id="sbi-finances"><div class="sb-group-items-inner">
         <div class="sb-item" data-view="finances">
           <i class="ph-bold ph-chart-line-up"></i>
           <span class="sb-lbl">Dashboard</span>
@@ -1597,18 +1628,18 @@
           <i class="ph-bold ph-plugs"></i>
           <span class="sb-lbl">Link Accounts</span>
         </div>
-      </div>
+      </div></div>
 
       <div class="sb-group-hdr" id="sbh-chess">
         <span>Chess</span>
         <i class="ph-bold ph-caret-down sb-caret"></i>
       </div>
-      <div class="sb-group-items" id="sbi-chess">
+      <div class="sb-group-items" id="sbi-chess"><div class="sb-group-items-inner">
         <div class="sb-item" data-view="chess">
-          <i class="ph-bold ph-horse"></i>
+          <svg viewBox="0 0 256 256" fill="currentColor" style="width:14px;height:14px;flex-shrink:0" aria-hidden="true"><circle cx="128" cy="76" r="36"/><polygon points="104,112 152,112 176,196 80,196"/><rect x="64" y="196" width="128" height="26" rx="8"/></svg>
           <span class="sb-lbl">Progress</span>
         </div>
-      </div>
+      </div></div>
     </div>
   </nav>
 
@@ -1726,9 +1757,6 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span class="view-subhdr">Flight Log</span>
             <span id="fl-subtitle" class="data-note" style="flex:1"></span>
-            <button class="btn-ghost btn-sm" id="sync-night-btn" onclick="syncNightData()" style="color:var(--patina-text);border-color:var(--patina-text)" title="Sync block-out/in times from Gmail schedules">
-              <i class="ph-bold ph-clock"></i> Sync Times
-            </button>
             <button class="btn-primary btn-sm" onclick="openFlightModal()">
               <i class="ph-bold ph-plus"></i> Log Flight
             </button>
@@ -1839,20 +1867,6 @@
 
 <!-- OpenSky route-picker modal -->
 
-<!-- Night sync results modal -->
-<div class="modal-overlay" id="night-sync-overlay" style="display:none"
-     onclick="if(event.target===this)closeNightSync()">
-  <div class="modal-box" style="max-width:680px">
-    <div class="modal-hd">
-      <span class="modal-title"><i class="ph-bold ph-clock" style="color:var(--patina-text);margin-right:6px"></i>Schedule Time Sync</span>
-      <button class="modal-close" onclick="closeNightSync()"><i class="ph-bold ph-x"></i></button>
-    </div>
-    <div class="modal-bd" id="night-sync-bd" style="padding:20px;max-height:70vh;overflow-y:auto">
-      <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
-    </div>
-  </div>
-</div>
-
 <script>
 'use strict';
 
@@ -1863,7 +1877,7 @@ const SPORT_CFG = {
   running:    { color: '#5db87c', icon: 'ph-person-simple-run',  label: 'Running'    },
   cycling:    { color: '#c99c3a', icon: 'ph-bicycle',             label: 'Cycling'    },
   swimming:   { color: '#5a88c0', icon: 'ph-person-simple-swim',  label: 'Swimming'   },
-  rowing:     { color: '#b85e7a', icon: 'ph-person-simple-row',   label: 'Rowing'     },
+  rowing:     { color: '#b85e7a', icon: 'ph-sailboat',             label: 'Rowing'     },
   walking:    { color: '#8aaa7a', icon: 'ph-person-simple-walk',  label: 'Walking'    },
   hiking:     { color: '#a89060', icon: 'ph-mountains',           label: 'Hiking'     },
   strength:   { color: '#c07850', icon: 'ph-barbell',             label: 'Strength'   },
@@ -1923,14 +1937,26 @@ const VIEW_TITLES = {
 // ─── lazy init flags ──────────────────────────────────────────────────────────
 let _fdMap = null;
 let _actMap = null;
+let _currentView = null;
+let _currentFlightId = null;
+let _currentActivityId = null;
 
 // ─── theme ────────────────────────────────────────────────────────────────────
-let theme = localStorage.getItem('dash-theme') || 'dark';
+let theme = localStorage.getItem('dash-theme') || 'light';
 applyTheme(theme);
 function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
   const icon = document.getElementById('theme-icon');
   if (icon) icon.className = 'ph-bold ' + (t === 'dark' ? 'ph-sun' : 'ph-moon');
+  // MapLibre base styles (dark-matter / positron) are chosen once at map
+  // creation time and don't follow CSS variables, so a theme switch has to
+  // explicitly rebuild any map that's currently on screen.
+  if (_currentView === 'flight-detail' && _currentFlightId != null) {
+    const f = (window._flights||[]).find(fl => String(fl.id) === String(_currentFlightId));
+    if (f) { if (_fdMap) { try { _fdMap.remove(); } catch(_) {} _fdMap = null; } requestAnimationFrame(() => initFlightDetailMap(f)); }
+  } else if (_currentView === 'activity-detail' && _currentActivityId != null) {
+    showActivityDetail(_currentActivityId);
+  }
 }
 document.getElementById('theme-btn').addEventListener('click', () => {
   theme = theme === 'dark' ? 'light' : 'dark';
@@ -2060,6 +2086,9 @@ function rebuildCharts() {
 
 // ─── view / router ────────────────────────────────────────────────────────────
 function showView(viewId, opts = {}) {
+  _currentView = viewId;
+  if (viewId !== 'flight-detail') _currentFlightId = null;
+  if (viewId !== 'activity-detail') _currentActivityId = null;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const el = document.getElementById('view-' + viewId);
   if (el) el.classList.add('active');
@@ -3173,7 +3202,11 @@ function buildLoadChart(activities) {
 
 function buildHRChart(activities) {
   const cfg = getChartCfg();
-  const cutoff = Date.now() - 7*86400000;
+  // Anchor the rolling window to the most recent activity rather than the
+  // wall-clock date, so the last 7 days of training always show data
+  // instead of going blank on days nothing was logged yet.
+  const latest = activities.reduce((max, a) => Math.max(max, new Date(a.startTimeLocal||0).getTime()), 0);
+  const cutoff = (latest || Date.now()) - 7*86400000;
   const dayMap = {};
   for (const a of activities) {
     const ts = new Date(a.startTimeLocal).getTime();
@@ -3215,10 +3248,13 @@ function buildHRChart(activities) {
 function buildZonesChart(activities) {
   const cfg = getChartCfg();
   document.getElementById('zones-label').textContent = '· last 7d';
-  const cutoff = Date.now() - 7*86400000;
+  const arr = Array.isArray(activities) ? activities : (activities ? [activities] : []);
+  // Anchor to the most recent activity rather than the wall-clock date —
+  // see buildHRChart for why.
+  const latest = arr.reduce((max, a) => Math.max(max, new Date(a.startTimeLocal||0).getTime()), 0);
+  const cutoff = (latest || Date.now()) - 7*86400000;
   const zoneMins = [0, 0, 0, 0, 0];
   let hasData = false;
-  const arr = Array.isArray(activities) ? activities : (activities ? [activities] : []);
   for (const a of arr) {
     const ts = new Date(a.startTimeLocal||0).getTime();
     if (ts < cutoff) continue;
@@ -3399,6 +3435,7 @@ async function showActivityDetail(id) {
     back: 'activities',
     title: a.activityName || label,
   });
+  _currentActivityId = id;
 
   const content = document.getElementById('activity-detail-content');
   const heroKpis = [
@@ -3764,7 +3801,19 @@ function renderFlights(flights) {
   _flPage = Math.max(0, Math.min(pages - 1, _flPage));
   const page = flights.slice(_flPage * FL_PER_PAGE, (_flPage + 1) * FL_PER_PAGE);
 
-  document.getElementById('fl-list').innerHTML = page.map(f => {
+  // Group by month, same pattern as the Activities list
+  const groups = [];
+  let lastKey = null;
+  for (const f of page) {
+    const d = new Date(f.date);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (key !== lastKey) { groups.push({ label, rows: [] }); lastKey = key; }
+    groups[groups.length - 1].rows.push(f);
+  }
+
+  document.getElementById('fl-list').innerHTML = groups.map(g =>
+    `<div class="act-month-hdr">${g.label}</div>` + g.rows.map(f => {
     const color   = typeColor(f.training_type);
     const id      = f.id;
     const soloTag = f.solo > 0 && !f.dual_given
@@ -3814,7 +3863,7 @@ function renderFlights(flights) {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('')).join('');
 
   document.querySelectorAll('.fl-row').forEach(row => {
     row.addEventListener('click', () => navigate('flight', row.dataset.flid));
@@ -3845,6 +3894,7 @@ async function showFlightDetail(id) {
     back: 'logbook',
     title: routeLabel(f),
   });
+  _currentFlightId = id;
 
   // All non-zero stats for the hero bar
   const heroStats = [
@@ -4235,71 +4285,6 @@ async function autoLoadTrack(f) {
     if (statusEl) statusEl.innerHTML = '<span style="font-size:11px;color:var(--faint)">GPS track unavailable</span>';
   }
 }
-
-
-// ─── Night data sync ──────────────────────────────────────────────────────────
-function closeNightSync() {
-  document.getElementById('night-sync-overlay').style.display = 'none';
-}
-
-async function syncNightData() {
-  const btn = document.getElementById('sync-night-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Syncing…'; }
-  document.getElementById('night-sync-overlay').style.display = 'flex';
-  document.getElementById('night-sync-bd').innerHTML =
-    '<div style="padding:40px;text-align:center"><div class="spinner"></div><div style="margin-top:12px;font-size:12px;color:var(--muted)">Matching Gmail schedules…</div></div>';
-
-  try {
-    const res = await fetch('/api/flights/backfill-night', { method: 'POST' }).then(r => r.json());
-    const results = res.results || [];
-
-    const tableRows = results.map(r => `
-      <tr>
-        <td style="color:var(--patina-text)">${r.date}</td>
-        <td>${esc(r.tail)}</td>
-        <td style="font-variant-numeric:tabular-nums">${r.time_out ? fmtUTCtoPT(r.time_out) : '—'}</td>
-        <td style="font-variant-numeric:tabular-nums">${r.time_in  ? fmtUTCtoPT(r.time_in)  : '—'}</td>
-      </tr>`).join('');
-
-    document.getElementById('night-sync-bd').innerHTML = `
-      <div style="display:flex;gap:24px;margin-bottom:16px;align-items:center">
-        <div style="text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--champagne)">${res.updated}</div>
-          <div style="font-size:11px;color:var(--muted)">Flights matched</div>
-        </div>
-        <div style="font-size:11px;color:var(--faint)">${res.total - res.updated} flights had no matching Gmail schedule (July 2025 flights predate Gmail history)</div>
-      </div>
-      ${results.length ? `
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="border-bottom:1px solid var(--rule);color:var(--muted);text-align:left">
-              <th style="padding:6px 8px">Date</th>
-              <th style="padding:6px 8px">Tail</th>
-              <th style="padding:6px 8px">Block Out (PT)</th>
-              <th style="padding:6px 8px">Block In (PT)</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>` : '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No flights matched any Gmail schedule.</div>'}
-    `;
-
-    if (res.updated > 0) await loadFlights();
-  } catch (e) {
-    document.getElementById('night-sync-bd').innerHTML =
-      `<div style="padding:20px;color:var(--warn);font-size:13px">Sync failed: ${esc(e.message)}</div>`;
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph-bold ph-moon"></i> Sync Times'; }
-  }
-}
-
-function fmtUTCtoPT(iso) {
-  if (!iso) return '—';
-  return new Date(iso.includes('T') ? iso : iso + 'Z')
-    .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
-}
-
 
 
 async function initFlightDetailMap(f) {
@@ -7149,7 +7134,7 @@ function renderChessView() {
       ${d.avatar ? `<img class="ch-profile-avatar" src="${esc(d.avatar)}" alt="avatar">` : ''}
       <div style="flex:1;min-width:0">
         <div class="detail-sport-chip">
-          <i class="ph ph-horse"></i>
+          <svg viewBox="0 0 256 256" fill="currentColor" style="width:12px;height:12px;flex-shrink:0" aria-hidden="true"><circle cx="128" cy="76" r="36"/><polygon points="104,112 152,112 176,196 80,196"/><rect x="64" y="196" width="128" height="26" rx="8"/></svg>
           chess.com &middot; ${esc(d.league ?? '')} league
         </div>
         <div class="detail-title">${esc(d.username)}</div>

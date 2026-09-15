@@ -46,6 +46,68 @@ const FLIGHT_SELECT = `
   LEFT JOIN instructors i ON i.id = f.instructor_id
 `
 
+// Sets time_out (block out) and time_in (block in) from NICE AIR Gmail
+// schedules. Does not touch any logbook values — night, takeoffs, landings
+// are source-of-truth. Safe to re-run: only fills fields that aren't
+// already set (ForeFlight import takes precedence).
+export async function backfillNightTimes(log) {
+  const { rows: flights } = await pool.query(`
+    SELECT f.id, f.date::text, f.time_out, f.time_in, ac.tail_number
+    FROM flights f
+    JOIN aircraft ac ON ac.id = f.aircraft_id
+  `)
+
+  let schedules = []
+  try { schedules = await fetchNiceAirSchedules() } catch (e) {
+    log?.warn({ err: e.message }, 'Gmail fetch failed during schedule sync')
+  }
+
+  // Keep latest non-cancelled schedule per date+tail
+  const schedMap = new Map()
+  for (const s of schedules) {
+    if (!s.date_str || !s.tail || s.type === 'cancelled' || !s.start_unix) continue
+    const key = `${s.date_str}/${s.tail.replace(/^N/, '')}`
+    const existing = schedMap.get(key)
+    if (!existing || (s.received || '') > (existing.received || '')) schedMap.set(key, s)
+  }
+
+  const results = []
+  for (const f of flights) {
+    const dateStr   = String(f.date).slice(0, 10)
+    const tailShort = (f.tail_number || '').replace(/^N/, '')
+    const sched     = schedMap.get(`${dateStr}/${tailShort}`)
+    if (!sched) continue
+
+    // Only set if not already recorded (ForeFlight import takes precedence)
+    const timeOut = f.time_out || new Date(sched.start_unix * 1000).toISOString()
+    const timeIn  = f.time_in  || (sched.end_unix ? new Date(sched.end_unix * 1000).toISOString() : null)
+
+    await pool.query(
+      `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
+      [f.id, timeOut, timeIn]
+    )
+
+    results.push({
+      id:       f.id,
+      date:     dateStr,
+      tail:     f.tail_number,
+      time_out: timeOut?.slice(0, 16),
+      time_in:  timeIn?.slice(0, 16),
+    })
+  }
+
+  return { updated: results.length, total: flights.length, results }
+}
+
+const NIGHT_SYNC_CHECK_MS = 6 * 60 * 60 * 1000 // 6h — safely within setInterval's 32-bit delay limit
+
+export function scheduleNightSync(log) {
+  backfillNightTimes(log).catch(e => log?.warn({ err: e.message }, 'Night-time schedule sync failed'))
+  setInterval(() => {
+    backfillNightTimes(log).catch(e => log?.warn({ err: e.message }, 'Night-time schedule sync failed'))
+  }, NIGHT_SYNC_CHECK_MS)
+}
+
 export default async function flightRoutes(fastify) {
   fastify.get('/api/flights', async (req) => {
     const { date, tail, departure } = req.query
@@ -253,53 +315,10 @@ export default async function flightRoutes(fastify) {
   // ── Sync schedule block times from Gmail ─────────────────────────────────────
   // Sets time_out (block out) and time_in (block in) from NICE AIR Gmail schedules.
   // Does not touch any logbook values — night, takeoffs, landings are source-of-truth.
+  // Runs automatically (see scheduleNightSync below); this route lets it be
+  // triggered on demand too (e.g. for debugging).
   fastify.post('/api/flights/backfill-night', async (req, reply) => {
-    const { rows: flights } = await pool.query(`
-      SELECT f.id, f.date::text, f.time_out, f.time_in, ac.tail_number
-      FROM flights f
-      JOIN aircraft ac ON ac.id = f.aircraft_id
-    `)
-
-    let schedules = []
-    try { schedules = await fetchNiceAirSchedules() } catch (e) {
-      fastify.log.warn({ err: e.message }, 'Gmail fetch failed during schedule sync')
-    }
-
-    // Keep latest non-cancelled schedule per date+tail
-    const schedMap = new Map()
-    for (const s of schedules) {
-      if (!s.date_str || !s.tail || s.type === 'cancelled' || !s.start_unix) continue
-      const key = `${s.date_str}/${s.tail.replace(/^N/, '')}`
-      const existing = schedMap.get(key)
-      if (!existing || (s.received || '') > (existing.received || '')) schedMap.set(key, s)
-    }
-
-    const results = []
-    for (const f of flights) {
-      const dateStr   = String(f.date).slice(0, 10)
-      const tailShort = (f.tail_number || '').replace(/^N/, '')
-      const sched     = schedMap.get(`${dateStr}/${tailShort}`)
-      if (!sched) continue
-
-      // Only set if not already recorded (ForeFlight import takes precedence)
-      const timeOut = f.time_out || new Date(sched.start_unix * 1000).toISOString()
-      const timeIn  = f.time_in  || (sched.end_unix ? new Date(sched.end_unix * 1000).toISOString() : null)
-
-      await pool.query(
-        `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
-        [f.id, timeOut, timeIn]
-      )
-
-      results.push({
-        id:       f.id,
-        date:     dateStr,
-        tail:     f.tail_number,
-        time_out: timeOut?.slice(0, 16),
-        time_in:  timeIn?.slice(0, 16),
-      })
-    }
-
-    return { updated: results.length, total: flights.length, results }
+    return backfillNightTimes(fastify.log)
   })
 
   // ── Query nice_air_schedules for specific dates ───────────────────────────────

@@ -4876,7 +4876,7 @@ async function initFlightDetailMap(f) {
           });
         }
       })
-      .catch(() => {});
+      .catch(e => console.warn('[airspace]', e));
 
     // ── US airports (nationwide reference layer) ─────────────────────────────
     // Small, dim dots so they read as background context — the flight's own
@@ -4900,8 +4900,9 @@ async function initFlightDetailMap(f) {
             'circle-stroke-opacity': 0.6,
           },
         }, beforeId);
+        console.info('[us-airports] layer added, features:', fc.features.length, 'beforeId:', beforeId);
       })
-      .catch(() => {});
+      .catch(e => console.warn('[us-airports]', e));
   });
 }
 

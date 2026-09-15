@@ -2284,14 +2284,20 @@ async function renderSleepView() {
   if (trend.length) { buildSleepDurationTrend(trend); buildSleepScoreTrend(trend); buildSleepStageTrend(trend); }
 }
 
+// sleepLevels' "...GMT" strings have no trailing Z ("2026-09-12T09:36:35.0"),
+// and a date-time string with no timezone designator parses as LOCAL time
+// per spec — even though this field is genuinely UTC (verified against the
+// numeric sleepStartTimestampGMT for the same instant). Force UTC parsing.
+function parseGMT(s) { return new Date(s.endsWith('Z') ? s : s + 'Z').getTime(); }
+
 function buildSleepHypnogram(latest) {
   const levels = latest.sleepLevels || [];
   if (!levels.length) return;
   const cfg = getChartCfg();
-  const t0 = new Date(levels[0].startGMT).getTime();
-  const points = levels.map(s => ({ x: (new Date(s.startGMT).getTime() - t0) / 60000, y: s.activityLevel }));
+  const t0 = parseGMT(levels[0].startGMT);
+  const points = levels.map(s => ({ x: (parseGMT(s.startGMT) - t0) / 60000, y: s.activityLevel }));
   const lastSeg = levels[levels.length - 1];
-  points.push({ x: (new Date(lastSeg.endGMT).getTime() - t0) / 60000, y: lastSeg.activityLevel });
+  points.push({ x: (parseGMT(lastSeg.endGMT) - t0) / 60000, y: lastSeg.activityLevel });
 
   _cjsRender(document.getElementById('sleep-hypnogram'), {
     type: 'line',
@@ -2313,7 +2319,11 @@ function buildSleepHypnogram(latest) {
           ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 7,
             callback: v => new Date(t0 + v * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) } },
         y: { ...cfg.scaleY, min: -0.3, max: 3.3,
-          ticks: { ...cfg.scaleY.ticks, stepSize: 1, callback: v => SLEEP_STAGE[v]?.name || '' } },
+          // Force exactly the 4 stage ticks — Chart.js's auto-generated
+          // "nice number" ticks don't reliably land on 0/1/2/3 once min/max
+          // aren't integers, leaving some stage labels blank.
+          afterBuildTicks: axis => { axis.ticks = [0, 1, 2, 3].map(v => ({ value: v })); },
+          ticks: { ...cfg.scaleY.ticks, callback: v => SLEEP_STAGE[v]?.name || '' } },
       },
     },
   }, 150);

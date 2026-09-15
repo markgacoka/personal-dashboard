@@ -3528,21 +3528,20 @@ function buildLoadChart(activities) {
 
 function buildHRChart(activities) {
   const cfg = getChartCfg();
-  // Anchor the rolling window to the most recent activity rather than the
-  // wall-clock date, so the last 7 days of training always show data
-  // instead of going blank on days nothing was logged yet.
-  const latest = activities.reduce((max, a) => Math.max(max, new Date(a.startTimeLocal||0).getTime()), 0);
-  const cutoff = (latest || Date.now()) - 7*86400000;
+  // A rolling cutoff (now, or even the latest activity's date) can legitimately
+  // land on just one qualifying day when activities are logged with gaps —
+  // e.g. one session today, next-most-recent eight days ago falls just
+  // outside the window — leaving a single isolated dot with no visible trend.
+  // Show the most recent 7 distinct days that actually have HR data instead.
   const dayMap = {};
   for (const a of activities) {
-    const ts = new Date(a.startTimeLocal).getTime();
-    if (ts < cutoff || !a.averageHR) continue;
-    const day = new Date(ts).toISOString().slice(0,10);
+    if (!a.averageHR) continue;
+    const day = new Date(a.startTimeLocal).toISOString().slice(0,10);
     if (!dayMap[day]) dayMap[day] = { avgHRs: [], maxHR: 0 };
     dayMap[day].avgHRs.push(a.averageHR);
     dayMap[day].maxHR = Math.max(dayMap[day].maxHR, a.maxHR||0);
   }
-  const sorted = Object.keys(dayMap).sort();
+  const sorted = Object.keys(dayMap).sort().slice(-7);
   const labels = sorted.map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
   const avgHRs = sorted.map(d => Math.round(dayMap[d].avgHRs.reduce((s,v)=>s+v,0)/dayMap[d].avgHRs.length));
   const maxHRs = sorted.map(d => dayMap[d].maxHR || null);
@@ -3575,15 +3574,18 @@ function buildZonesChart(activities) {
   const cfg = getChartCfg();
   document.getElementById('zones-label').textContent = '· last 7d';
   const arr = Array.isArray(activities) ? activities : (activities ? [activities] : []);
-  // Anchor to the most recent activity rather than the wall-clock date —
-  // see buildHRChart for why.
-  const latest = arr.reduce((max, a) => Math.max(max, new Date(a.startTimeLocal||0).getTime()), 0);
-  const cutoff = (latest || Date.now()) - 7*86400000;
+  // Most recent 7 distinct days with zone data, not a rolling cutoff —
+  // see buildHRChart for why (gaps can leave a cutoff window nearly empty).
+  const daysWithData = [...new Set(
+    arr.filter(a => [1,2,3,4,5].some(i => (a['hrTimeInZone_'+i]||0) > 0))
+       .map(a => new Date(a.startTimeLocal||0).toISOString().slice(0,10))
+  )].sort().slice(-7);
+  const daySet = new Set(daysWithData);
   const zoneMins = [0, 0, 0, 0, 0];
   let hasData = false;
   for (const a of arr) {
-    const ts = new Date(a.startTimeLocal||0).getTime();
-    if (ts < cutoff) continue;
+    const day = new Date(a.startTimeLocal||0).toISOString().slice(0,10);
+    if (!daySet.has(day)) continue;
     for (let i = 0; i < 5; i++) {
       const secs = a['hrTimeInZone_'+(i+1)] || 0;
       zoneMins[i] += Math.round(secs / 60);

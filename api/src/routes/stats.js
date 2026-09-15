@@ -109,12 +109,14 @@ export default async function statsRoutes(fastify) {
     return { period: 'month', from: from.toISOString(), by_sport: aggregate(activities), total_count: activities.length }
   })
 
-  // Auto-fallback: tries today, then yesterday, then day before
+  // Auto-fallback: walks backward from today to the most recent day that
+  // actually has wellness data. Garmin sync has occasional gap days, so a
+  // short 2-3 day window isn't enough — this can walk back up to two weeks.
   fastify.get('/api/stats/daily', async (req) => {
     if (req.query.date) {
       return fetchDailyForDate(req.query.date)
     }
-    for (let offset = 0; offset <= 2; offset++) {
+    for (let offset = 0; offset <= 13; offset++) {
       const dateStr = daysAgo(offset).toISOString().slice(0, 10)
       const result = await fetchDailyForDate(dateStr)
       if (hasData(result)) return result

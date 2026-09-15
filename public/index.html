@@ -1200,6 +1200,25 @@
     }
     .rdy-sig-label { color: var(--faint); font-weight: 400; margin-right: 2px; }
 
+    /* ── Sleep page ──────────────────────────────────────── */
+    .sleep-hero-time { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .sleep-hero-time b { color: var(--champagne); font-weight: 600; }
+    .sleep-stage-bar {
+      display: flex; height: 10px; border-radius: 5px; overflow: hidden;
+      background: var(--deep); margin-top: 14px;
+    }
+    .sleep-stage-bar > div { height: 100%; }
+    .sleep-stage-legend {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      margin-top: 8px; font-size: 11px; color: var(--muted);
+    }
+    .sleep-stage-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .sleep-stage-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+    .sleep-vitals-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 10px;
+    }
+
     /* ── Data note ───────────────────────────────────────── */
     .data-note { font-size: 12px; color: var(--faint); }
 
@@ -1609,6 +1628,10 @@
           <i class="ph-bold ph-activity"></i>
           <span class="sb-lbl">Activities</span>
         </div>
+        <div class="sb-item" data-view="sleep">
+          <i class="ph-bold ph-bed"></i>
+          <span class="sb-lbl">Sleep</span>
+        </div>
       </div></div>
 
       <div class="sb-group-hdr" id="sbh-flights">
@@ -1758,6 +1781,13 @@
       <!-- ACTIVITY DETAIL ──────────────────────────────────── -->
       <div class="view" id="view-activity-detail">
         <div id="activity-detail-content">
+          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- SLEEP ─────────────────────────────────────────────── -->
+      <div class="view" id="view-sleep">
+        <div id="sleep-content">
           <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
         </div>
       </div>
@@ -1938,7 +1968,7 @@ const TYPE_CFG = {
 };
 
 const VIEW_TITLES = {
-  overview: 'Overview', activities: 'Activities',
+  overview: 'Overview', activities: 'Activities', sleep: 'Sleep',
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
   'log-flight': 'Log Flight',
   finances: 'Finances', 'fin-accounts': 'Linked Accounts',
@@ -2093,6 +2123,273 @@ function rebuildCharts() {
   if (_chessData && document.getElementById('chess-rating-chart')) {
     buildChessRatingChart(_chessData[_chessTC]?.recent || []);
   }
+  if (window._sleepLatest && document.getElementById('sleep-hypnogram')) {
+    buildSleepHypnogram(window._sleepLatest);
+  }
+  if (window._sleepTrend?.length && document.getElementById('sleep-duration-chart')) {
+    buildSleepDurationTrend(window._sleepTrend);
+    buildSleepScoreTrend(window._sleepTrend);
+    buildSleepStageTrend(window._sleepTrend);
+  }
+}
+
+// ─── sleep page ───────────────────────────────────────────────────────────────
+const SLEEP_STAGE = {
+  0: { name: 'Deep',  color: '#9a80b8' },
+  1: { name: 'Light', color: '#5a88c0' },
+  2: { name: 'REM',   color: '#d4a520' },
+  3: { name: 'Awake', color: '#c04870' },
+};
+
+function fmtSleepHM(sec) {
+  if (!sec) return '—';
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+// dailySleepDTO's "...Local" fields are epoch ms already shifted to local
+// time then mislabeled as UTC — read them back with timeZone:'UTC' to
+// recover the correct wall-clock time (same convention used elsewhere in
+// this app for Garmin data).
+function fmtSleepClockLocal(ms) {
+  if (!ms) return '—';
+  return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+}
+// sleepLevels' "...GMT" fields are genuine UTC (verified against the exact
+// 7h PDT offset between sleepStartTimestampGMT and …Local for the same
+// instant) and need a real timezone conversion.
+function fmtSleepClockUTC(ms) {
+  return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+}
+function sleepQualClass(q) {
+  if (q === 'EXCELLENT' || q === 'GOOD') return 'go';
+  if (q === 'FAIR') return 'caut';
+  if (q === 'POOR') return 'nogo';
+  return 'muted';
+}
+// sleep.hrvData is a raw per-5-minute time series ({value, startGMT}), not
+// a pre-aggregated summary — average it ourselves (mirrors the backend).
+function sleepAvgHrv(latest) {
+  const vals = (latest?.hrvData || []).map(h => h.value).filter(v => v != null);
+  return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
+}
+
+async function renderSleepView() {
+  const el = document.getElementById('sleep-content');
+  el.innerHTML = `<div style="padding:40px;text-align:center"><div class="spinner"></div></div>`;
+
+  const [latestRes, trendRes] = await Promise.allSettled([
+    fetch('/api/sleep/latest').then(r => r.ok ? r.json() : null),
+    fetch('/api/sleep/trend?days=30').then(r => r.ok ? r.json() : null),
+  ]);
+  const latest = latestRes.status === 'fulfilled' ? latestRes.value : null;
+  const trend  = (trendRes.status === 'fulfilled' ? trendRes.value?.trend : null) || [];
+  window._sleepLatest = latest;
+  window._sleepTrend  = trend;
+
+  if (_currentView !== 'sleep') return; // stale — user navigated away during fetch
+
+  if (!latest && !trend.some(t => t.duration_sec)) {
+    el.innerHTML = `<div class="section-first"><span class="view-subhdr">Sleep</span></div>
+      <div class="chart-empty" style="height:auto;padding:60px 20px;margin-top:16px">No sleep data available yet.</div>`;
+    return;
+  }
+
+  const d = latest?.dailySleepDTO;
+  const deepSec = d?.deepSleepSeconds ?? 0, lightSec = d?.lightSleepSeconds ?? 0,
+        remSec = d?.remSleepSeconds ?? 0, awakeSec = d?.awakeSleepSeconds ?? 0;
+  const stageTotal = (deepSec + lightSec + remSec + awakeSec) || 1;
+  const pct = s => Math.round(s / stageTotal * 100);
+  const score = d?.sleepScores?.overall?.value ?? null;
+  const qual  = d?.sleepScores?.overall?.qualifierKey ?? null;
+  const dateLabel = latest?.date
+    ? new Date(latest.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    : '';
+
+  const heroCard = !latest ? '' : `
+    <div class="ov-card" style="margin-bottom:16px">
+      <div class="ov-card-hd">Last Night <span style="font-weight:400;text-transform:none;letter-spacing:0">&middot; ${esc(dateLabel)}</span></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px">
+        <div>
+          <div class="fin-nw-amt">${fmtSleepHM(d?.sleepTimeSeconds)}</div>
+          <div class="sleep-hero-time">
+            <b>${fmtSleepClockLocal(d?.sleepStartTimestampLocal)}</b> &rarr; <b>${fmtSleepClockLocal(d?.sleepEndTimestampLocal)}</b>
+          </div>
+        </div>
+        ${score != null ? `<span class="rd-pill ${sleepQualClass(qual)}"><i class="ph-bold ph-moon-stars"></i>${score} &middot; ${esc((qual||'').charAt(0)+(qual||'').slice(1).toLowerCase())}</span>` : ''}
+      </div>
+      <div class="sleep-stage-bar">
+        <div style="width:${pct(deepSec)}%;background:${SLEEP_STAGE[0].color}"></div>
+        <div style="width:${pct(lightSec)}%;background:${SLEEP_STAGE[1].color}"></div>
+        <div style="width:${pct(remSec)}%;background:${SLEEP_STAGE[2].color}"></div>
+        <div style="width:${pct(awakeSec)}%;background:${SLEEP_STAGE[3].color}"></div>
+      </div>
+      <div class="sleep-stage-legend">
+        <span><i style="background:${SLEEP_STAGE[0].color}"></i>Deep ${pct(deepSec)}% &middot; ${fmtSleepHM(deepSec)}</span>
+        <span><i style="background:${SLEEP_STAGE[1].color}"></i>Light ${pct(lightSec)}% &middot; ${fmtSleepHM(lightSec)}</span>
+        <span><i style="background:${SLEEP_STAGE[2].color}"></i>REM ${pct(remSec)}% &middot; ${fmtSleepHM(remSec)}</span>
+        <span><i style="background:${SLEEP_STAGE[3].color}"></i>Awake ${pct(awakeSec)}% &middot; ${fmtSleepHM(awakeSec)}${d?.awakeCount ? ` (${d.awakeCount}&times;)` : ''}</span>
+      </div>
+    </div>`;
+
+  const hypnogramCard = !latest?.sleepLevels?.length ? '' : `
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-label">Sleep Stages</div>
+      <div id="sleep-hypnogram"></div>
+    </div>`;
+
+  const vitals = [
+    ['Avg HR',   d?.avgHeartRate ? Math.round(d.avgHeartRate) : null, ''],
+    ['SpO₂', d?.averageSpO2Value ?? null, '%'],
+    ['Resp/min', d?.averageRespirationValue ?? null, ''],
+    ['HRV',      sleepAvgHrv(latest), ''],
+    ['Stress',   d?.avgSleepStress ?? null, ''],
+  ];
+  const vitalsCard = !latest ? '' : `
+    <div class="ov-card" style="margin-bottom:16px">
+      <div class="ov-card-hd">Overnight Vitals</div>
+      <div class="sleep-vitals-grid">
+        ${vitals.map(([lbl, val, unit]) => `
+          <div class="kpi-tile">
+            <div class="kpi-big" style="font-size:22px">${val ?? '—'}${val!=null&&unit?`<span style="font-size:12px;font-weight:400;color:var(--faint)">${unit}</span>`:''}</div>
+            <div class="kpi-lbl">${esc(lbl)}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  const trendSection = !trend.length ? '' : `
+    <div class="section-label" style="margin:24px 0 12px">${trend.length}-Day Trends</div>
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="chart-card">
+        <div class="chart-label">Duration</div>
+        <div id="sleep-duration-chart"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">Sleep Score</div>
+        <div id="sleep-score-chart"></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-label">Stage Composition</div>
+      <div id="sleep-stage-trend-chart"></div>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="section-first" style="margin-bottom:16px">
+      <span class="view-subhdr">Sleep</span>
+    </div>
+    ${heroCard}${hypnogramCard}${vitalsCard}${trendSection}
+  `;
+
+  if (latest?.sleepLevels?.length) buildSleepHypnogram(latest);
+  if (trend.length) { buildSleepDurationTrend(trend); buildSleepScoreTrend(trend); buildSleepStageTrend(trend); }
+}
+
+function buildSleepHypnogram(latest) {
+  const levels = latest.sleepLevels || [];
+  if (!levels.length) return;
+  const cfg = getChartCfg();
+  const t0 = new Date(levels[0].startGMT).getTime();
+  const points = levels.map(s => ({ x: (new Date(s.startGMT).getTime() - t0) / 60000, y: s.activityLevel }));
+  const lastSeg = levels[levels.length - 1];
+  points.push({ x: (new Date(lastSeg.endGMT).getTime() - t0) / 60000, y: lastSeg.activityLevel });
+
+  _cjsRender(document.getElementById('sleep-hypnogram'), {
+    type: 'line',
+    data: { datasets: [{
+      data: points, stepped: true, borderWidth: 2, pointRadius: 0, fill: false,
+      segment: { borderColor: ctx => SLEEP_STAGE[ctx.p0.parsed.y]?.color || cfg.tickColor },
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...cfg.tt, callbacks: {
+          title: items => new Date(t0 + items[0].parsed.x * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }),
+          label: c => SLEEP_STAGE[c.parsed.y]?.name || '',
+        }},
+      },
+      scales: {
+        x: { ...cfg.scaleX, type: 'linear',
+          ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 7,
+            callback: v => new Date(t0 + v * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) } },
+        y: { ...cfg.scaleY, min: -0.3, max: 3.3,
+          ticks: { ...cfg.scaleY.ticks, stepSize: 1, callback: v => SLEEP_STAGE[v]?.name || '' } },
+      },
+    },
+  }, 150);
+}
+
+function buildSleepDurationTrend(trend) {
+  const cfg = getChartCfg();
+  _cjsRender(document.getElementById('sleep-duration-chart'), {
+    type: 'bar',
+    data: {
+      labels: trend.map(t => fmtChartDate(t.date, { month: 'short', day: 'numeric' })),
+      datasets: [{ label: 'Duration', data: trend.map(t => t.duration_sec ? +(t.duration_sec / 3600).toFixed(2) : null),
+        backgroundColor: '#5a88c0c8', borderRadius: 3, maxBarThickness: 14 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: {
+        label: c => c.raw != null ? fmtSleepHM(c.raw * 3600) : 'No data',
+      }}},
+      scales: {
+        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 8 } },
+        y: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => v + 'h' } },
+      },
+    },
+  }, 160);
+}
+
+function buildSleepScoreTrend(trend) {
+  const cfg = getChartCfg();
+  _cjsRender(document.getElementById('sleep-score-chart'), {
+    type: 'line',
+    data: {
+      labels: trend.map(t => fmtChartDate(t.date, { month: 'short', day: 'numeric' })),
+      datasets: [{ label: 'Score', data: trend.map(t => t.score ?? null),
+        borderColor: '#d4a520', backgroundColor: '#d4a52022', fill: true,
+        borderWidth: 2, tension: 0.3, pointRadius: 2, pointBackgroundColor: '#d4a520', spanGaps: true }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { ...cfg.tt, callbacks: {
+        label: c => c.raw != null ? `Score: ${c.raw}` : 'No data',
+      }}},
+      scales: {
+        x: { ...cfg.scaleX, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 8 } },
+        y: { ...cfg.scaleY, min: 0, max: 100 },
+      },
+    },
+  }, 160);
+}
+
+function buildSleepStageTrend(trend) {
+  const cfg = getChartCfg();
+  const labels = trend.map(t => fmtChartDate(t.date, { month: 'short', day: 'numeric' }));
+  const mkDataset = (key, stage) => ({
+    label: SLEEP_STAGE[stage].name,
+    data: trend.map(t => t[key] != null ? +(t[key] / 3600).toFixed(2) : null),
+    backgroundColor: SLEEP_STAGE[stage].color + 'c8', stack: 'stage',
+  });
+  _cjsRender(document.getElementById('sleep-stage-trend-chart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      mkDataset('deep_sec', 0), mkDataset('light_sec', 1),
+      mkDataset('rem_sec', 2), mkDataset('awake_sec', 3),
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'rect' } },
+        tooltip: { ...cfg.tt, callbacks: { label: c => c.raw != null ? `${c.dataset.label}: ${fmtSleepHM(c.raw * 3600)}` : null } },
+      },
+      scales: {
+        x: { ...cfg.scaleX, stacked: true, ticks: { ...cfg.scaleX.ticks, maxTicksLimit: 8 } },
+        y: { ...cfg.scaleY, stacked: true, ticks: { ...cfg.scaleY.ticks, callback: v => v + 'h' } },
+      },
+    },
+  }, 170);
 }
 
 // ─── view / router ────────────────────────────────────────────────────────────
@@ -2150,6 +2447,10 @@ function route(view, id) {
   switch (view) {
     case 'activities':
       showView('activities', { title: 'Activities' });
+      break;
+    case 'sleep':
+      showView('sleep', { title: 'Sleep' });
+      renderSleepView();
       break;
     case 'activity':
       if (id) showActivityDetail(id);
@@ -2231,7 +2532,8 @@ function renderReadiness(activities, daily) {
 
   const sleep    = d?.sleep?.dailySleepDTO;
   const sleepSec = sleep?.sleepTimeSeconds ?? 0;
-  const sleepHrs = sleepSec ? (sleepSec/3600).toFixed(1) : null;
+  const sleepHrs = sleepSec ? (sleepSec/3600).toFixed(1) : null; // raw hours, used for the low/ok threshold below
+  const sleepHM  = sleepSec ? `${Math.floor(sleepSec/3600)}h ${Math.round((sleepSec%3600)/60)}m` : null;
   const deepSec  = sleep?.deepSleepSeconds  ?? 0;
   const lightSec = sleep?.lightSleepSeconds ?? 0;
   const remSec   = sleep?.remSleepSeconds   ?? 0;
@@ -2334,7 +2636,7 @@ function renderReadiness(activities, daily) {
 
     <div class="kpi-tiles">
       <div class="kpi-tile">
-        <div class="kpi-big">${sleepHrs||'—'}<span style="font-size:14px;font-weight:400;color:var(--faint)">h</span></div>
+        <div class="kpi-big">${sleepHM||'—'}</div>
         <div class="kpi-lbl">Sleep</div>
         <div class="kpi-sub">${phaseSub}</div>
       </div>

@@ -659,3 +659,35 @@ export async function migrateV11() {
     client.release()
   }
 }
+
+// V16: cache table for daily sleep summaries (trend charts on the Sleep page).
+// Historical days never change once recorded, so past rows are fetched from
+// Garmin once and kept forever; only recent/incomplete days get re-fetched.
+export async function migrateV16() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sleep_daily (
+        date            DATE PRIMARY KEY,
+        duration_sec    INTEGER,
+        deep_sec        INTEGER,
+        light_sec       INTEGER,
+        rem_sec         INTEGER,
+        awake_sec       INTEGER,
+        score           INTEGER,
+        score_qualifier TEXT,
+        bedtime_local   TIMESTAMPTZ,
+        waketime_local  TIMESTAMPTZ,
+        avg_hr          INTEGER,
+        avg_spo2        REAL,
+        avg_respiration REAL,
+        avg_stress      INTEGER,
+        avg_hrv         INTEGER,
+        awake_count     INTEGER,
+        cached_at       TIMESTAMPTZ DEFAULT NOW()
+      );
+    `)
+  } finally {
+    client.release()
+  }
+}

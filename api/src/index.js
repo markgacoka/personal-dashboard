@@ -8,12 +8,13 @@ import authRoutes from './routes/auth.js'
 import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
+import sleepRoutes from './routes/sleep.js'
 import flightRoutes, { scheduleNightSync } from './routes/flights.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
 import chessRoutes from './routes/chess.js'
-import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15 } from './db/migrate.js'
+import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15, migrateV16 } from './db/migrate.js'
 import financeRoutes from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
@@ -74,9 +75,11 @@ if (process.env.DATABASE_URL) {
     await migrateV13()
     await migrateV14()
     await migrateV15()
+    await migrateV16()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)
+    await fastify.register(sleepRoutes)
     if (process.env.PLAID_CLIENT_ID) {
       await fastify.register(financeRoutes)
       fastify.log.info('Finance routes enabled')

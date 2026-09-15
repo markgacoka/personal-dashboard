@@ -4859,7 +4859,10 @@ async function initFlightDetailMap(f) {
           { id:'aspc-d-fill', type:'fill',   filter:['==',['get','CLASS'],'D'], paint:{'fill-color':'#1a6ef5','fill-opacity':0.03} },
           { id:'aspc-d-line', type:'line',   filter:['==',['get','CLASS'],'D'], paint:{'line-color':'#4488ee','line-width':1.0,'line-opacity':0.6,'line-dasharray':[4,3]} },
         ];
-        const beforeId = thisMap.getLayer('route-glow') ? 'route-glow' : undefined;
+        // Stay below the airport dots (points shouldn't be washed out by an
+        // area fill) — insert before whichever of those already exists.
+        const beforeId = thisMap.getLayer('us-airports-dot') ? 'us-airports-dot'
+                        : thisMap.getLayer('route-glow')      ? 'route-glow' : undefined;
         for (const cfg of aspcLayers) {
           thisMap.addLayer({ id:cfg.id, type:cfg.type, source:'airspace',
             filter:cfg.filter, paint:cfg.paint,
@@ -4887,8 +4890,11 @@ async function initFlightDetailMap(f) {
       .then(fc => {
         if (!fc || _fdMap !== thisMap) return;
         thisMap.addSource('us-airports', { type: 'geojson', data: fc });
-        const beforeId = thisMap.getLayer('aspc-b-fill') ? 'aspc-b-fill'
-                        : thisMap.getLayer('route-glow')  ? 'route-glow' : undefined;
+        // Always anchor at route-glow (never below airspace) — points
+        // shouldn't be washed out by an area fill. If airspace loaded first
+        // its layers are already sitting at this same anchor; inserting here
+        // pushes the dots above them regardless of which fetch finished first.
+        const beforeId = thisMap.getLayer('route-glow') ? 'route-glow' : undefined;
         thisMap.addLayer({
           id: 'us-airports-dot', type: 'circle', source: 'us-airports',
           paint: {

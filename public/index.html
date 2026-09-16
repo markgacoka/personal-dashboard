@@ -1127,6 +1127,11 @@
     .ch-hero-chart-lbl { margin-top: 16px; margin-bottom: 8px; }
     .ch-hero-chart { min-height: 40px; }
 
+    /* Recent Games reuses Activities' .act-row/.act-name, but the opponent
+       name here isn't the same kind of headline as an activity title —
+       keep it at normal weight without touching Activities' own listing. */
+    #view-chess .act-name { font-weight: 400; }
+
     /* Chess secondary stats — same cell pattern as #logbook-stats, own
        container so it reads as a distinct, lighter-weight strip under the
        hero rather than another full card. */

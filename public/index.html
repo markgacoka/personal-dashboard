@@ -7005,7 +7005,7 @@ async function loadFinanceDashboard() {
     const totalAssets = nw.total || 0;
     const retirePct   = Math.min(100, totalAssets / 1500000 * 100);
     el.innerHTML = `
-      <div class="card" style="margin-bottom:10px">
+      <div style="margin-bottom:10px">
         <div class="fin-nw-hero">
           <span class="fin-nw-amt">${fd(fmtDollarsExact(nw.total))}</span>
           <button class="fin-eye-toggle" onclick="toggleFinMask()" title="Show/hide balances" style="font-size:18px;align-self:center">

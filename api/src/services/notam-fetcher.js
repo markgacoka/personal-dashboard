@@ -43,6 +43,29 @@ async function ensureBrowser() {
   }
 }
 
+// AIM's own startDate/endDate fields reflect an internal retention window
+// (commonly start+2y) rather than the NOTAM's actual validity period — the
+// authoritative dates are the B)/C) fields inside the ICAO-format text
+// itself. B)/C) use "YYMMDDHHMM", C) may instead read "PERM" (no expiry)
+// or carry an "EST" suffix (estimated, not a hard end date).
+function parseNotamFieldDate(token) {
+  const m = String(token).trim().match(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(EST)?$/)
+  if (!m) return null
+  const [, yy, mo, dd, hh, mi, est] = m
+  const year = (+yy < 80 ? 2000 : 1900) + +yy
+  return `${mo}/${dd}/${year} ${hh}${mi}${est ? 'EST' : ''}`
+}
+
+function extractFieldDates(icaoText) {
+  if (!icaoText) return {}
+  const b = icaoText.match(/\bB\)\s*(\d{10})/)
+  const c = icaoText.match(/\bC\)\s*(PERM|\d{10}(?:EST)?)/)
+  return {
+    startDate: b ? parseNotamFieldDate(b[1]) : null,
+    endDate:   c ? (c[1] === 'PERM' ? 'PERM' : parseNotamFieldDate(c[1])) : null,
+  }
+}
+
 export async function fetchNotams(icao, log) {
   const cached = _cache.get(icao)
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
@@ -82,13 +105,17 @@ export async function fetchNotams(icao, log) {
     const notams = raw
       .filter(n => (n.icaoMessage || n.traditionalMessage || '').trim())
       .slice(0, 50)
-      .map(n => ({
-        id:        n.notamNumber   || n.notamID || null,
-        type:      n.keyword       || n.sourceType || n.classification || '',
-        text:      n.icaoMessage   || n.traditionalMessage || '',
-        startDate: n.startDate     || n.effectiveStart     || null,
-        endDate:   n.endDate       || n.effectiveEnd       || null,
-      }))
+      .map(n => {
+        const text = n.icaoMessage || n.traditionalMessage || ''
+        const fieldDates = extractFieldDates(text)
+        return {
+          id:        n.notamNumber || n.notamID || null,
+          type:      n.keyword     || n.sourceType || n.classification || '',
+          text,
+          startDate: fieldDates.startDate || n.startDate || n.effectiveStart || null,
+          endDate:   fieldDates.endDate   || n.endDate   || n.effectiveEnd   || null,
+        }
+      })
 
     _cache.set(icao, { notams, fetchedAt: Date.now() })
     log?.info({ icao, count: notams.length }, 'NOTAM fetch via AIM succeeded')

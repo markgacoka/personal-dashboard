@@ -46,13 +46,20 @@ async function syncItem(accessToken, itemId) {
     const secMap = Object.fromEntries(hRes.data.securities.map(s => [s.security_id, s]))
     for (const h of hRes.data.holdings) {
       const sec = secMap[h.security_id] || {}
+      // Stock-plan holdings report quantity/institution_value for the whole
+      // granted position (vested + unvested); Plaid separately exposes
+      // vested_quantity/vested_value for just the portion actually owned.
+      // Use those when present so the dashboard doesn't count unvested
+      // shares as current net worth.
+      const quantity = h.vested_quantity ?? h.quantity
+      const value = h.vested_value ?? h.institution_value
       await pool.query(`
         INSERT INTO fin_holdings (account_id, security_id, name, ticker, type, quantity, price, value, cost_basis, synced_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
         ON CONFLICT (account_id, security_id) DO UPDATE SET
           name=$3, ticker=$4, quantity=$6, price=$7, value=$8, cost_basis=$9, synced_at=NOW()
       `, [h.account_id, h.security_id, sec.name, sec.ticker_symbol, sec.type,
-          h.quantity, h.institution_price, h.institution_value, h.cost_basis])
+          quantity, h.institution_price, value, h.cost_basis])
     }
   } catch (err) {
     // Institution may not have investments product enabled — not an error

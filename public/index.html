@@ -2501,7 +2501,7 @@ function route(view, id) {
       break;
     case 'finances':
       showView('finances', { title: 'Finances' });
-      if (!window._finLoaded) { window._finLoaded = true; loadFinanceDashboard(); }
+      loadFinanceDashboard();
       break;
     case 'fin-accounts':
       showView('fin-accounts', { title: 'Linked Accounts' });
@@ -2517,6 +2517,10 @@ function route(view, id) {
       break;
     default:
       showView('overview', { title: 'Overview' });
+      // Re-fetch net worth every time Overview is shown, not just at boot —
+      // otherwise this widget can sit stale after a sync done from the
+      // Finances page while the visitor wasn't looking at Overview.
+      loadFinanceOverview().catch(() => {});
   }
 }
 
@@ -3040,11 +3044,12 @@ function renderWeatherCard(metar, airport, notamData, icao, detail, taf) {
 
   // Format "MM/DD/YYYY HHMM[tz]" → "Mon DD, YYYY HH:MMZ"
   function fmtNotamDate(s) {
-    if (!s) return null;
+    if (!s || s === 'PERM') return null;
+    const est = /EST\s*$/i.test(s);
     const m = String(s).match(/^(\d{1,2})\/(\d{2})\/(\d{4})\s+(\d{2})(\d{2})/);
     if (!m) return String(s);
     const mo = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[+m[1]-1];
-    return `${mo} ${+m[2]}, ${m[3]} ${m[4]}:${m[5]}Z`;
+    return `${mo} ${+m[2]}, ${m[3]} ${m[4]}:${m[5]}Z${est ? ' (est.)' : ''}`;
   }
 
   const notamHtml = notamLoading
@@ -3585,7 +3590,10 @@ function buildHRChart(activities) {
       responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'line' } },
+        // pointStyle:'line' drew a swatch too thin to read as a color cue —
+        // a filled circle in each dataset's own color makes it obvious which
+        // legend label goes with which line.
+        legend: { labels: { color: cfg.legendClr, font: CJ_FONT, boxWidth: 8, boxHeight: 8, padding: 10, usePointStyle: true, pointStyle: 'circle' } },
         tooltip: { ...cfg.tt, callbacks: { label: c => c.raw !== null ? `${c.dataset.label}: ${c.raw} bpm` : null } },
       },
       scales: { x: cfg.scaleX, y: cfg.scaleY },

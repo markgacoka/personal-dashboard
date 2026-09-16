@@ -44,6 +44,8 @@ async function syncItem(accessToken, itemId) {
   try {
     const hRes = await plaidClient.investmentsHoldingsGet({ access_token: accessToken })
     const secMap = Object.fromEntries(hRes.data.securities.map(s => [s.security_id, s]))
+    console.log('RAW_HOLDINGS_DEBUG', JSON.stringify(hRes.data.holdings))
+    console.log('RAW_SECURITIES_DEBUG', JSON.stringify(hRes.data.securities))
     for (const h of hRes.data.holdings) {
       const sec = secMap[h.security_id] || {}
       // Stock-plan holdings report quantity/institution_value for the whole

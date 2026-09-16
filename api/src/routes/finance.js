@@ -44,8 +44,18 @@ async function syncItem(accessToken, itemId) {
   try {
     const hRes = await plaidClient.investmentsHoldingsGet({ access_token: accessToken })
     const secMap = Object.fromEntries(hRes.data.securities.map(s => [s.security_id, s]))
-    console.log('RAW_HOLDINGS_DEBUG', JSON.stringify(hRes.data.holdings))
-    console.log('RAW_SECURITIES_DEBUG', JSON.stringify(hRes.data.securities))
+
+    // A stock-plan account can report the SAME security as more than one
+    // holding entry — e.g. one entry for an ESPP lot and another for an RSU
+    // lot, each with its own cost_basis/quantity/vested_value. Upserting by
+    // (account_id, security_id) silently collapsed those into one row,
+    // discarding whichever lot Plaid listed first. Replace each account's
+    // holdings wholesale every sync instead, so every lot is kept.
+    const touchedAccountIds = [...new Set(hRes.data.holdings.map(h => h.account_id))]
+    if (touchedAccountIds.length) {
+      await pool.query(`DELETE FROM fin_holdings WHERE account_id = ANY($1::text[])`, [touchedAccountIds])
+    }
+
     for (const h of hRes.data.holdings) {
       const sec = secMap[h.security_id] || {}
       // Stock-plan holdings report quantity/institution_value for the whole
@@ -58,8 +68,6 @@ async function syncItem(accessToken, itemId) {
       await pool.query(`
         INSERT INTO fin_holdings (account_id, security_id, name, ticker, type, quantity, price, value, cost_basis, synced_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
-        ON CONFLICT (account_id, security_id) DO UPDATE SET
-          name=$3, ticker=$4, quantity=$6, price=$7, value=$8, cost_basis=$9, synced_at=NOW()
       `, [h.account_id, h.security_id, sec.name, sec.ticker_symbol, sec.type,
           quantity, h.institution_price, value, h.cost_basis])
     }

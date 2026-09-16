@@ -14,7 +14,7 @@ import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
 import chessRoutes from './routes/chess.js'
-import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15, migrateV16 } from './db/migrate.js'
+import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15, migrateV16, migrateV17 } from './db/migrate.js'
 import financeRoutes, { scheduleFinanceSync } from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
@@ -76,6 +76,7 @@ if (process.env.DATABASE_URL) {
     await migrateV14()
     await migrateV15()
     await migrateV16()
+    await migrateV17()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)

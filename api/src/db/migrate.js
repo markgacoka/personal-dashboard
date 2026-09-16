@@ -691,3 +691,20 @@ export async function migrateV16() {
     client.release()
   }
 }
+
+// V17: fin_holdings had UNIQUE(account_id, security_id), so a stock-plan
+// account with more than one lot of the same security (e.g. an ESPP lot and
+// an RSU lot of the same ticker) silently collapsed to whichever lot Plaid
+// listed last — the other lot's value was discarded outright. Holdings are
+// now fully replaced per account on every sync instead of upserted by this
+// key, so the constraint is no longer needed and actively wrong.
+export async function migrateV17() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      ALTER TABLE fin_holdings DROP CONSTRAINT IF EXISTS fin_holdings_account_id_security_id_key;
+    `)
+  } finally {
+    client.release()
+  }
+}

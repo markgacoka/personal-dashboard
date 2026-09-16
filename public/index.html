@@ -746,6 +746,18 @@
     .dp-u { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
     .dp-s { font-size: 10px; color: var(--faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
     .dp-div { width: 1px; background: var(--rule); flex-shrink: 0; }
+    @media (max-width: 640px) {
+      /* Six tiles in one unwrapping flex row squeezed each cell down to the
+         point where its own text overlapped the divider next to it. Wrap
+         into a grid instead — dividers only make sense in a single row. */
+      #logbook-stats { flex-wrap: wrap; }
+      .dp { flex: 1 1 33%; min-width: 100px; padding: 14px 12px; }
+      .dp:first-child, .dp:last-child { padding-left: 12px; padding-right: 12px; }
+      .dp-div { display: none; }
+    }
+    @media (max-width: 420px) {
+      .dp { flex-basis: 50%; }
+    }
 
     .fl-filter-btn {
       padding: 4px 12px; font-size: 11px; border-radius: 20px; cursor: pointer;
@@ -978,7 +990,7 @@
     .cdoc-type.medical { color: var(--swim); }
     .cdoc-authority { font-size: 11px; color: var(--faint); }
     .cdoc-docnum {
-      font-family: 'Alumni Sans', monospace; font-size: 13px;
+      font-size: 13px;
       letter-spacing: 0.08em; color: var(--muted);
       font-variant-numeric: tabular-nums; flex-shrink: 0; align-self: center;
     }
@@ -990,8 +1002,7 @@
     @media (max-width: 580px) { .cdoc-body { grid-template-columns: 1fr; } }
 
     .cdoc-name {
-      font-family: 'Alumni Sans', sans-serif;
-      font-size: 26px; font-weight: 600; letter-spacing: 0.04em;
+      font-size: 22px; font-weight: 700;
       color: var(--champagne); line-height: 1.15; margin-bottom: 16px;
     }
     .cdoc-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
@@ -1011,16 +1022,15 @@
     .cdoc-ame { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; display: flex; flex-direction: column; gap: 2px; }
     .cdoc-ame-name { font-size: 13px; font-weight: 600; color: var(--champagne); }
     .cdoc-ame-role { font-size: 11px; color: var(--faint); margin-top: 1px; }
-    .cdoc-ame-ids { font-size: 11px; color: var(--disabled); font-family: 'Alumni Sans', monospace; letter-spacing: 0.04em; margin-top: 4px; }
+    .cdoc-ame-ids { font-size: 11px; color: var(--disabled); letter-spacing: 0.04em; margin-top: 4px; }
 
     .cdoc-right {
       display: flex; flex-direction: column; align-items: flex-end; text-align: right;
       padding-left: 20px; border-left: 1px solid var(--rule);
     }
     .cdoc-countdown {
-      font-family: 'Alumni Sans', sans-serif;
-      font-size: 44px; font-weight: 700; line-height: 1;
-      letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--champagne);
+      font-size: 36px; font-weight: 700; line-height: 1;
+      font-variant-numeric: tabular-nums; color: var(--champagne);
     }
     .cdoc-countdown.warn { color: var(--warn); }
     .cdoc-countdown.crit { color: var(--danger); }
@@ -1049,7 +1059,7 @@
       display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
     }
     .cdoc-reg-title { font-size: 12px; font-weight: 600; color: var(--body-text); }
-    .cdoc-reg-cfr { font-size: 10px; color: var(--faint); font-family: 'Alumni Sans', monospace; letter-spacing: 0.05em; flex-shrink: 0; }
+    .cdoc-reg-cfr { font-size: 10px; color: var(--faint); letter-spacing: 0.05em; flex-shrink: 0; }
     .cdoc-reg ul { font-size: 12px; color: var(--muted); line-height: 1.9; padding: 12px 16px 14px 30px; margin: 0; }
 
     /* Overview credential strip on logbook page */
@@ -1074,6 +1084,10 @@
     .ch-profile-avatar {
       width: 56px; height: 56px; border-radius: 50%;
       border: 2px solid var(--rule); object-fit: cover; flex-shrink: 0;
+    }
+    .ch-profile-name {
+      font-size: 24px; font-weight: 700;
+      color: var(--champagne); line-height: 1.15;
     }
     .ch-badge {
       display: inline-flex; align-items: center;
@@ -1774,6 +1788,15 @@
           </div>
           <div class="act-list" id="act-list">
             <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+          </div>
+          <div id="act-pagination" style="display:none;align-items:center;justify-content:space-between;padding:10px 4px;gap:12px">
+            <button class="btn-ghost btn-sm" id="act-prev" onclick="actPageStep(-1)">
+              <i class="ph-bold ph-caret-left"></i> Prev
+            </button>
+            <span id="act-page-label" style="font-size:12px;color:var(--muted)"></span>
+            <button class="btn-ghost btn-sm" id="act-next" onclick="actPageStep(1)">
+              Next <i class="ph-bold ph-caret-right"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -3683,6 +3706,15 @@ function actRowHtml(a) {
 }
 
 const PRIMARY_SPORTS = new Set(['running', 'cycling', 'swimming', 'rowing', 'strength']);
+const ACT_PER_PAGE = 20;
+let _actPage = 0;
+
+function actPageStep(dir) {
+  const total = (window._actsFiltered || []).length;
+  const pages = Math.ceil(total / ACT_PER_PAGE);
+  _actPage = Math.max(0, Math.min(pages - 1, _actPage + dir));
+  renderActivitiesPage(window._actsFiltered || []);
+}
 
 function filterActivities() {
   const all = window._actsArr || [];
@@ -3708,16 +3740,29 @@ function filterActivities() {
       : `· ${totalAll} sessions`;
   }
 
+  window._actsFiltered = filtered;
+  _actPage = 0;
+  renderActivitiesPage(filtered);
+}
+
+function renderActivitiesPage(filtered) {
   const list = document.getElementById('act-list');
+  const pg = document.getElementById('act-pagination');
   if (!filtered.length) {
     list.innerHTML = `<div class="act-empty">No activities match</div>`;
+    if (pg) pg.style.display = 'none';
     return;
   }
+
+  const total = filtered.length;
+  const pages = Math.ceil(total / ACT_PER_PAGE);
+  _actPage = Math.max(0, Math.min(pages - 1, _actPage));
+  const page = filtered.slice(_actPage * ACT_PER_PAGE, (_actPage + 1) * ACT_PER_PAGE);
 
   // Group by month
   const groups = [];
   let lastKey = null;
-  for (const a of filtered) {
+  for (const a of page) {
     const d = new Date(a.startTimeLocal);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -3732,6 +3777,18 @@ function filterActivities() {
   list.querySelectorAll('.act-row').forEach(row => {
     row.addEventListener('click', () => navigate('activity', row.dataset.id));
   });
+
+  if (pg) {
+    if (pages > 1) {
+      pg.style.display = 'flex';
+      document.getElementById('act-page-label').textContent =
+        `${_actPage * ACT_PER_PAGE + 1}–${Math.min((_actPage + 1) * ACT_PER_PAGE, total)} of ${total}`;
+      document.getElementById('act-prev').disabled = _actPage === 0;
+      document.getElementById('act-next').disabled = _actPage >= pages - 1;
+    } else {
+      pg.style.display = 'none';
+    }
+  }
 }
 
 function setActSport(sport) {
@@ -7517,14 +7574,14 @@ function renderChessView() {
           <svg viewBox="0 0 256 256" fill="currentColor" style="width:12px;height:12px;flex-shrink:0" aria-hidden="true"><circle cx="128" cy="76" r="36"/><polygon points="104,112 152,112 176,196 80,196"/><rect x="64" y="196" width="128" height="26" rx="8"/></svg>
           chess.com &middot; ${esc(d.league ?? '')} league
         </div>
-        <div class="detail-title">${esc(d.username)}</div>
+        <div class="ch-profile-name">${esc(d.username)}</div>
         <div style="font-size:12px;color:var(--faint);margin-top:4px">
           ${joined ? `Member since ${joined}` : ''}${lastOn ? ` &middot; Last online ${lastOn}` : ''}
         </div>
       </div>
     </div>
 
-    <div class="kpi-tiles" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
+    <div class="kpi-tiles" style="margin-bottom:24px">
       <div class="kpi-tile">
         <div class="kpi-big">${d.rapid.current ?? '—'}</div>
         <div class="kpi-lbl">Rapid</div>

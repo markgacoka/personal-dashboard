@@ -59,6 +59,28 @@ async function syncItem(accessToken, itemId) {
   }
 }
 
+// Balances (and today's snapshot) only ever updated on link or a manual sync
+// request — refresh every linked item once a day too, so the snapshot history
+// fills in even when nobody opens the Finance page. syncItem's own upsert
+// (ON CONFLICT (account_id, date) DO UPDATE) already collapses same-day runs
+// into one row, so a later manual sync that day just updates it in place.
+export function scheduleFinanceSync(log) {
+  const DAY_MS = 24 * 60 * 60 * 1000 // well under the setInterval 32-bit limit
+
+  async function run() {
+    try {
+      const { rows } = await pool.query('SELECT item_id, access_token FROM plaid_items')
+      await Promise.allSettled(rows.map(r => syncItem(r.access_token, r.item_id)))
+      log?.info({ synced: rows.length }, 'Daily finance sync complete')
+    } catch (err) {
+      log?.warn({ err }, 'Daily finance sync failed')
+    }
+  }
+
+  run()
+  setInterval(run, DAY_MS)
+}
+
 // ─── routes ───────────────────────────────────────────────────────────────────
 
 export default async function financeRoutes(fastify) {

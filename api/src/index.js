@@ -15,7 +15,7 @@ import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
 import chessRoutes from './routes/chess.js'
 import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15, migrateV16 } from './db/migrate.js'
-import financeRoutes from './routes/finance.js'
+import financeRoutes, { scheduleFinanceSync } from './routes/finance.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 import { scheduleUsAirportsRefresh } from './services/usAirports.js'
@@ -83,6 +83,8 @@ if (process.env.DATABASE_URL) {
     if (process.env.PLAID_CLIENT_ID) {
       await fastify.register(financeRoutes)
       fastify.log.info('Finance routes enabled')
+      // Snapshot every linked account's balance once a day, not just on sync
+      scheduleFinanceSync(fastify.log)
     }
     // Download FAA airspace on first boot + refresh every 28-day AIRAC cycle
     scheduleFaaAirspaceRefresh(fastify.log)

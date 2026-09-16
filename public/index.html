@@ -1201,6 +1201,10 @@
     @media (max-width: 480px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
     .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 12px 14px; }
     .kpi-big { font-size: 28px; font-weight: 700; line-height: 1.0; font-variant-numeric: tabular-nums; color: var(--champagne); }
+    /* Chess page's own rating tiles reuse .kpi-tile, but the ratings also
+       show as a hero number on Overview (.ch-ov-num, 32px) — size these to
+       match that instead of the smaller Readiness-tile default. */
+    #view-chess .kpi-big { font-size: 32px; }
     .kpi-lbl { font-size: 11px; color: var(--muted); margin-top: 5px; letter-spacing: 0.06em; text-transform: uppercase; }
     .kpi-sub { font-size: 11px; color: var(--faint); margin-top: 3px; line-height: 1.4; }
 

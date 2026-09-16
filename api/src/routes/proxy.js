@@ -581,6 +581,10 @@ export default async function proxyRoutes(fastify) {
   // Falls back to FAA API if FAA_NOTAM_CLIENT_ID / FAA_NOTAM_CLIENT_SECRET are set.
   fastify.get('/api/external/notam/:icao', async (req, reply) => {
     const icao = req.params.icao.toUpperCase()
+    // NOTAM validity windows can be corrected/superseded; this route already
+    // has its own 1h server-side cache, so tell browsers not to layer a
+    // second (unmanaged, indefinitely stale) cache on top of it.
+    reply.header('Cache-Control', 'no-store')
 
     // Fast path: FAA NOTAM API when credentials are available
     const clientId     = process.env.FAA_NOTAM_CLIENT_ID

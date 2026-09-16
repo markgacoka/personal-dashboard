@@ -1112,6 +1112,45 @@
     .act-chip[data-tc="rapid"] { --chip-color: var(--patina-text); }
     .act-chip[data-tc="blitz"] { --chip-color: var(--gold); }
 
+    /* Chess hero — current rating for the active tab, with its trend chart
+       as backdrop. The Rapid/Blitz toggle lives here now so it visibly
+       drives what the hero shows, instead of sitting above a tile row it
+       had no effect on. */
+    .ch-hero { background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 18px 20px 14px; margin-bottom: 16px; }
+    .ch-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .ch-hero-month { font-size: 11px; color: var(--faint); }
+    .ch-hero-main { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+    .ch-hero-rating { font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--champagne); letter-spacing: -0.02em; }
+    @media (max-width: 480px) { .ch-hero-rating { font-size: 40px; } }
+    .ch-hero-delta { font-size: 15px; font-weight: 600; }
+    .ch-hero-delta-lbl { font-size: 12px; color: var(--faint); font-weight: 400; margin-left: 4px; }
+    .ch-hero-chart-lbl { margin-top: 16px; margin-bottom: 8px; }
+    .ch-hero-chart { min-height: 40px; }
+
+    /* Chess secondary stats — same cell pattern as #logbook-stats, own
+       container so it reads as a distinct, lighter-weight strip under the
+       hero rather than another full card. */
+    .ch-stat-strip { display: flex; align-items: stretch; background: var(--raised); border: 1px solid var(--rule); border-radius: var(--r-sm); margin-bottom: 16px; }
+    @media (max-width: 640px) {
+      .ch-stat-strip { flex-wrap: wrap; }
+      .ch-stat-strip .dp { flex: 1 1 50%; min-width: 100px; padding: 14px 12px; }
+      .ch-stat-strip .dp-div { display: none; }
+    }
+
+    /* Chess monthly comparison — replaces two duplicate hero-metric cards
+       with one compact, scannable table. */
+    .ch-month-table { border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; background: var(--raised); margin-bottom: 16px; }
+    .ch-month-row { display: grid; grid-template-columns: 1.3fr 1.6fr 1.3fr 0.7fr; gap: 8px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--rule); font-size: 13px; color: var(--body-text); font-variant-numeric: tabular-nums; }
+    .ch-month-row:last-child { border-bottom: none; }
+    .ch-month-hdr { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); background: var(--graphite); padding-top: 8px; padding-bottom: 8px; font-variant-numeric: normal; }
+    .ch-month-name { font-weight: 600; color: var(--champagne); }
+    .ch-month-sub { font-weight: 400; color: var(--faint); font-size: 11px; margin-left: 5px; }
+    @media (max-width: 620px) {
+      .ch-month-row { grid-template-columns: 1fr 1fr; row-gap: 5px; }
+      .ch-month-hdr { display: none; }
+      .ch-month-row > :nth-child(3), .ch-month-row > :nth-child(4) { font-size: 12px; color: var(--faint); }
+    }
+
     /* Chess overview widget */
     .ch-ov { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
     .ch-ov-left { padding-right: 16px; border-right: 1px solid var(--rule); }
@@ -1201,10 +1240,6 @@
     @media (max-width: 480px) { .kpi-tiles { grid-template-columns: repeat(2,1fr); } }
     .kpi-tile { background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-md); padding: 12px 14px; }
     .kpi-big { font-size: 28px; font-weight: 700; line-height: 1.0; font-variant-numeric: tabular-nums; color: var(--champagne); }
-    /* Chess page's own rating tiles reuse .kpi-tile, but the ratings also
-       show as a hero number on Overview (.ch-ov-num, 32px) — size these to
-       match that instead of the smaller Readiness-tile default. */
-    #view-chess .kpi-big { font-size: 32px; }
     .kpi-lbl { font-size: 11px; color: var(--muted); margin-top: 5px; letter-spacing: 0.06em; text-transform: uppercase; }
     .kpi-sub { font-size: 11px; color: var(--faint); margin-top: 3px; line-height: 1.4; }
 
@@ -7423,7 +7458,6 @@ function renderChessOverview(d) {
 
 function setChessTC(tc) {
   _chessTC = tc
-  document.querySelectorAll('.act-chip[data-tc]').forEach(c => c.classList.toggle('active', c.dataset.tc === tc))
   if (_chessData) buildChessTCContent(_chessData, tc)
 }
 
@@ -7475,7 +7509,7 @@ function buildChessRatingChart(recent) {
         y: { ...cfg.scaleY, ticks: { ...cfg.scaleY.ticks, callback: v => v } },
       }
     }
-  }, 160)
+  }, 200)
 }
 
 function buildChessTCContent(d, tc) {
@@ -7499,6 +7533,11 @@ function buildChessTCContent(d, tc) {
   function winPct(m) { return m.count > 0 ? Math.round((m.win / m.count) * 100) : 0 }
 
   const tm = tc_d.thisMonth, lm = tc_d.lastMonth
+  const tcLabel = tc === 'rapid' ? 'Rapid' : 'Blitz'
+
+  const heroDelta = (tm.ratingEnd != null && tm.ratingStart != null) ? tm.ratingEnd - tm.ratingStart : null
+  const heroDeltaStr = heroDelta === null ? '—' : heroDelta >= 0 ? `↑ ${heroDelta}` : `↓ ${Math.abs(heroDelta)}`
+  const heroDeltaCol = heroDelta === null ? 'var(--faint)' : heroDelta >= 0 ? 'var(--patina-text)' : 'oklch(58% 0.20 15)'
 
   const recentHtml = !(tc_d.recent?.length)
     ? '<div class="act-summary" style="color:var(--faint);font-size:12px">No games this month</div>'
@@ -7522,29 +7561,66 @@ function buildChessTCContent(d, tc) {
       }).join('')
 
   container.innerHTML = `
-    <div class="section-label" style="margin-bottom:12px">Monthly Performance</div>
-    <div class="grid-2" style="margin-bottom:16px">
-      <div class="ov-card">
-        <div class="ov-card-hd">${monthName(0)} &middot; ${tm.count} games</div>
-        <div class="te-score" style="color:var(--champagne);margin-bottom:4px">
-          ${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} &thinsp;${deltaHtml(tm)}
+    <div class="ch-hero">
+      <div class="ch-hero-top">
+        <div style="display:flex;gap:6px">
+          <button class="act-chip ${tc === 'rapid' ? 'active' : ''}" data-tc="rapid" onclick="setChessTC('rapid')">Rapid</button>
+          <button class="act-chip ${tc === 'blitz' ? 'active' : ''}" data-tc="blitz" onclick="setChessTC('blitz')">Blitz</button>
         </div>
-        <div class="ch-wld"><span class="ch-w">W ${tm.win}</span><span class="ch-l">L ${tm.loss}</span><span class="ch-d">D ${tm.draw}</span></div>
-        <div class="ch-winpct">${winPct(tm)}% win rate</div>
+        <div class="ch-hero-month">${monthName(0)} &middot; ${tm.count} games</div>
       </div>
-      <div class="ov-card">
-        <div class="ov-card-hd">${monthName(1)} &middot; ${lm.count} games</div>
-        <div class="te-score" style="color:var(--champagne);margin-bottom:4px">
-          ${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} &thinsp;${deltaHtml(lm)}
+      <div class="ch-hero-main">
+        <div class="ch-hero-rating">${tc_d.current ?? '—'}</div>
+        <div>
+          <span class="ch-hero-delta" style="color:${heroDeltaCol}">${heroDeltaStr}</span>
+          <span class="ch-hero-delta-lbl">this month</span>
         </div>
-        <div class="ch-wld"><span class="ch-w">W ${lm.win}</span><span class="ch-l">L ${lm.loss}</span><span class="ch-d">D ${lm.draw}</span></div>
-        <div class="ch-winpct">${winPct(lm)}% win rate</div>
+      </div>
+      <div class="chart-label ch-hero-chart-lbl">Rating trend <span class="chart-sublabel">${tc_d.recent?.length ?? 0} recent games</span></div>
+      <div id="chess-rating-chart" class="ch-hero-chart"></div>
+    </div>
+
+    <div class="ch-stat-strip">
+      <div class="dp">
+        <span class="dp-n">${tc_d.best ?? '—'}</span>
+        <span class="dp-u">${tcLabel} Best</span>
+      </div>
+      <div class="dp-div"></div>
+      <div class="dp">
+        <span class="dp-n">${d.tactics.highest ?? '—'}</span>
+        <span class="dp-u">Tactics Best</span>
+      </div>
+      <div class="dp-div"></div>
+      <div class="dp">
+        <span class="dp-n">${winPct(tm)}%</span>
+        <span class="dp-u">Win Rate</span>
+        <span class="dp-s">${monthName(0)}</span>
+      </div>
+      <div class="dp-div"></div>
+      <div class="dp">
+        <span class="dp-n">${tm.win}-${tm.loss}-${tm.draw}</span>
+        <span class="dp-u">Record</span>
+        <span class="dp-s">W-L-D</span>
       </div>
     </div>
 
-    <div class="chart-card" style="margin-bottom:16px">
-      <div class="chart-label">Rating Trend <span class="chart-sublabel">${tc_d.recent?.length ?? 0} recent games</span></div>
-      <div id="chess-rating-chart"></div>
+    <div class="section-label" style="margin-bottom:10px">Monthly Comparison</div>
+    <div class="ch-month-table">
+      <div class="ch-month-row ch-month-hdr">
+        <div>Month</div><div>Rating</div><div>Record</div><div>Win %</div>
+      </div>
+      <div class="ch-month-row">
+        <div class="ch-month-name">${monthName(0)}<span class="ch-month-sub">${tm.count} games</span></div>
+        <div>${tm.ratingStart ?? '—'} → ${tm.ratingEnd ?? '—'} ${deltaHtml(tm)}</div>
+        <div><span class="ch-w">W ${tm.win}</span> <span class="ch-l">L ${tm.loss}</span> <span class="ch-d">D ${tm.draw}</span></div>
+        <div>${winPct(tm)}%</div>
+      </div>
+      <div class="ch-month-row">
+        <div class="ch-month-name">${monthName(1)}<span class="ch-month-sub">${lm.count} games</span></div>
+        <div>${lm.ratingStart ?? '—'} → ${lm.ratingEnd ?? '—'} ${deltaHtml(lm)}</div>
+        <div><span class="ch-w">W ${lm.win}</span> <span class="ch-l">L ${lm.loss}</span> <span class="ch-d">D ${lm.draw}</span></div>
+        <div>${winPct(lm)}%</div>
+      </div>
     </div>
 
     <div class="section-label" style="margin-bottom:10px">Recent Games</div>
@@ -7591,34 +7667,6 @@ function renderChessView() {
           ${joined ? `Member since ${joined}` : ''}${lastOn ? ` &middot; Last online ${lastOn}` : ''}
         </div>
       </div>
-    </div>
-
-    <div class="kpi-tiles" style="margin-bottom:24px">
-      <div class="kpi-tile">
-        <div class="kpi-big">${d.rapid.current ?? '—'}</div>
-        <div class="kpi-lbl">Rapid</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-big">${d.rapid.best ?? '—'}</div>
-        <div class="kpi-lbl">Rapid Best</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-big">${d.blitz.current ?? '—'}</div>
-        <div class="kpi-lbl">Blitz</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-big">${d.blitz.best ?? '—'}</div>
-        <div class="kpi-lbl">Blitz Best</div>
-      </div>
-      <div class="kpi-tile">
-        <div class="kpi-big">${d.tactics.highest ?? '—'}</div>
-        <div class="kpi-lbl">Tactics</div>
-      </div>
-    </div>
-
-    <div style="display:flex;gap:6px;margin-bottom:20px">
-      <button class="act-chip ${_chessTC === 'rapid' ? 'active' : ''}" data-tc="rapid" onclick="setChessTC('rapid')">Rapid</button>
-      <button class="act-chip ${_chessTC === 'blitz' ? 'active' : ''}" data-tc="blitz" onclick="setChessTC('blitz')">Blitz</button>
     </div>
 
     <div id="chess-tc-content"></div>

@@ -260,3 +260,59 @@ export async function getComparison(flightId, log) {
 
   return result
 }
+
+// Apply a flight's already-recorded choice to production: update the
+// logged via-airports if the chosen session's airport set actually differs
+// (an unchanged set never touches the existing array, so an already-correct
+// via order is never regressed by a differently-sorted cache), and replace
+// track_log_points with the chosen source's track. Does nothing (returns
+// {skipped: reason}) if there's no choice or no usable cached track.
+export async function applyChoice(flightId) {
+  const { rows: choiceRows } = await pool.query(
+    'SELECT chosen_source FROM flight_track_choice WHERE flight_id=$1', [flightId]
+  )
+  if (!choiceRows.length) return { skipped: 'no choice recorded' }
+  const source = choiceRows[0].chosen_source
+  if (source === 'neither') return { skipped: 'chosen as neither' }
+
+  const { rows: fRows } = await pool.query(
+    'SELECT departure_icao, arrival_icao, via FROM flights WHERE id=$1', [flightId]
+  )
+  if (!fRows.length) return { error: 'Flight not found' }
+  const f = fRows[0]
+
+  const { rows: cacheRows } = await pool.query(
+    'SELECT session_json, track_json FROM flight_track_compare_cache WHERE flight_id=$1 AND source=$2',
+    [flightId, source]
+  )
+  if (!cacheRows.length) return { skipped: `no cached comparison for ${source}` }
+  const { session_json, track_json } = cacheRows[0]
+  const track = track_json || []
+  if (!track.length) return { skipped: `${source} has no track points for this flight` }
+
+  let viaChanged = false
+  const sessionAirports = session_json?.airports || []
+  const computedVia = sessionAirports.filter(a => a !== f.departure_icao && a !== f.arrival_icao)
+  const curSet = new Set(f.via || [])
+  const newSet = new Set(computedVia)
+  const sameSet = curSet.size === newSet.size && [...curSet].every(a => newSet.has(a))
+  if (!sameSet) {
+    await pool.query('UPDATE flights SET via=$1 WHERE id=$2', [computedVia, flightId])
+    viaChanged = true
+  }
+
+  await pool.query('DELETE FROM track_log_points WHERE flight_id=$1', [flightId])
+  const airborne = track.filter(p => p.lat != null && p.lon != null)
+  if (airborne.length) {
+    const rows = airborne.map(p =>
+      `(${flightId}, '${p.ts}', ${p.lat}, ${p.lon}, ${p.altitude_ft ?? 'NULL'}, ` +
+      `${p.groundspeed_kts ?? 'NULL'}, ${p.heading ?? 'NULL'}, NULL)`
+    )
+    await pool.query(
+      `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+       VALUES ${rows.join(',')}`
+    )
+  }
+
+  return { applied: true, source, via_changed: viaChanged, via: viaChanged ? computedVia : f.via, track_points: airborne.length }
+}

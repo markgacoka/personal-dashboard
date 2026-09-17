@@ -1156,48 +1156,6 @@
       .ch-month-row > :nth-child(3), .ch-month-row > :nth-child(4) { font-size: 12px; color: var(--faint); }
     }
 
-    /* ── Track Compare (temporary tool) ─────────────────────── */
-    .tc-banner {
-      display: flex; align-items: center; gap: 10px;
-      background: var(--warning-bg); border: 1px solid var(--warning-border);
-      color: var(--warning); border-radius: var(--r-sm); padding: 10px 14px;
-      font-size: 12px; margin-bottom: 16px;
-    }
-    .tc-progress { font-size: 12px; color: var(--faint); margin-bottom: 16px; }
-    .tc-card {
-      border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--raised);
-      margin-bottom: 16px; overflow: hidden;
-    }
-    .tc-card-hd {
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-      padding: 14px 16px; border-bottom: 1px solid var(--rule); background: var(--graphite);
-    }
-    .tc-route { font-size: 15px; font-weight: 600; color: var(--champagne); }
-    .tc-meta { font-size: 12px; color: var(--faint); margin-top: 3px; }
-    .tc-status { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
-    .tc-status.chosen-aeroapi { background: var(--info-bg); color: var(--info); }
-    .tc-status.chosen-fr24 { background: var(--success-bg); color: var(--success); }
-    .tc-status.chosen-neither { background: var(--graphite-2); color: var(--muted); }
-    .tc-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); }
-    @media (max-width: 760px) { .tc-maps { grid-template-columns: 1fr; } }
-    .tc-map-col { background: var(--raised); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
-    .tc-map-hd { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--body-text); }
-    .tc-map-hd .dim { font-size: 10px; color: var(--faint); font-weight: 400; }
-    .tc-map { height: 220px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--rule); background: var(--deep); }
-    .tc-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; font-size: 11px; }
-    .tc-stat-k { color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
-    .tc-stat-v { color: var(--body-text); font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
-    .tc-empty { font-size: 12px; color: var(--faint); padding: 8px 0; }
-    .tc-btn-row { display: flex; gap: 6px; margin-top: 2px; }
-    .tc-btn {
-      flex: 1; font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: var(--r-sm);
-      border: 1px solid var(--rule-strong); background: transparent; color: var(--muted); cursor: pointer;
-      font-family: inherit; transition: all 0.15s;
-    }
-    .tc-btn:hover { border-color: var(--champagne); color: var(--champagne); }
-    .tc-btn.active.aeroapi { background: var(--info-bg); border-color: var(--info); color: var(--info); }
-    .tc-btn.active.fr24 { background: var(--success-bg); border-color: var(--success); color: var(--success); }
-
     /* Chess overview widget */
     .ch-ov { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
     .ch-ov-left { padding-right: 16px; border-right: 1px solid var(--rule); }
@@ -1774,17 +1732,6 @@
           <span class="sb-lbl">Progress</span>
         </div>
       </div></div>
-
-      <div class="sb-group-hdr" id="sbh-dev">
-        <span>Dev (temp)</span>
-        <i class="ph-bold ph-caret-down sb-caret"></i>
-      </div>
-      <div class="sb-group-items" id="sbi-dev"><div class="sb-group-items-inner">
-        <div class="sb-item" data-view="track-compare">
-          <i class="ph-bold ph-map-trifold"></i>
-          <span class="sb-lbl">Track Compare</span>
-        </div>
-      </div></div>
     </div>
   </nav>
 
@@ -1999,13 +1946,6 @@
         </div>
       </div>
 
-      <!-- TRACK COMPARE (temporary) ───────────────────────────── -->
-      <div class="view" id="view-track-compare">
-        <div class="section-first" id="tc-content">
-          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
-        </div>
-      </div>
-
     </div><!-- /view-scroller -->
   </div><!-- /main-wrap -->
 
@@ -2188,6 +2128,25 @@ function normSport(t) {
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+// Flight/daily-stats "date" fields are plain YYYY-MM-DD calendar dates with
+// no time-of-day — they're already the local (airport) date as logged, not
+// a UTC instant that needs converting. Parsing them with `new Date(str)`
+// and formatting with the browser's default timezone reinterprets that
+// UTC-midnight instant in local time, which can roll it back a day for any
+// viewer west of UTC (this is the Aug 18 vs Aug 19 bug: the API returns
+// "2026-08-19T00:00:00.000Z", and formatting that without pinning a
+// timezone shows Aug 18 in Pacific). Anchor to UTC noon and format in UTC
+// so the calendar day never shifts, regardless of the viewer's timezone.
+function fmtCalDate(dateStr, opts) {
+  const ymd = String(dateStr).slice(0, 10);
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
+}
+function calDateKey(dateStr) {
+  const ymd = String(dateStr).slice(0, 10);
+  const [y, m] = ymd.split('-').map(Number);
+  return `${y}-${m - 1}`;
+}
 function typeColor(t) { return (TYPE_CFG[t]||{}).color || '#6b7280'; }
 function typeLabel(t) { return (TYPE_CFG[t]||{}).label || (t||'Other'); }
 function routeLabel(f) {
@@ -2329,7 +2288,7 @@ async function renderSleepView() {
   const score = d?.sleepScores?.overall?.value ?? null;
   const qual  = d?.sleepScores?.overall?.qualifierKey ?? null;
   const dateLabel = latest?.date
-    ? new Date(latest.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    ? fmtCalDate(latest.date, { weekday: 'long', month: 'short', day: 'numeric' })
     : '';
 
   const heroCard = !latest ? '' : `
@@ -2619,10 +2578,6 @@ function route(view, id) {
       showView('chess', { title: 'Chess Progress' });
       renderChessView();
       break;
-    case 'track-compare':
-      showView('track-compare', { title: 'Track Compare (temp)' });
-      renderTrackCompareView();
-      break;
     default:
       showView('overview', { title: 'Overview' });
       // Re-fetch net worth every time Overview is shown, not just at boot —
@@ -2668,7 +2623,7 @@ function renderReadiness(activities, daily) {
   if (d?.date) {
     const el = document.getElementById('data-date');
     const isToday = d.date === new Date().toISOString().slice(0,10);
-    el.textContent = isToday ? '' : '· as of '+new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    el.textContent = isToday ? '' : '· as of '+fmtCalDate(d.date, {month:'short',day:'numeric'});
   }
 
   const rhr    = d?.heart_rate?.restingHeartRate;
@@ -3678,7 +3633,7 @@ function buildHRChart(activities) {
     dayMap[day].maxHR = Math.max(dayMap[day].maxHR, a.maxHR||0);
   }
   const sorted = Object.keys(dayMap).sort().slice(-7);
-  const labels = sorted.map(d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const labels = sorted.map(d => fmtCalDate(d, {month:'short',day:'numeric'}));
   const avgHRs = sorted.map(d => Math.round(dayMap[d].avgHRs.reduce((s,v)=>s+v,0)/dayMap[d].avgHRs.length));
   const maxHRs = sorted.map(d => dayMap[d].maxHR || null);
   _cjsRender(document.getElementById('chart-hr'), {
@@ -4311,9 +4266,8 @@ function renderFlights(flights) {
   const groups = [];
   let lastKey = null;
   for (const f of page) {
-    const d = new Date(f.date);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const key = calDateKey(f.date);
+    const label = fmtCalDate(f.date, { month: 'long', year: 'numeric' });
     if (key !== lastKey) { groups.push({ label, rows: [] }); lastKey = key; }
     groups[groups.length - 1].rows.push(f);
   }
@@ -4336,7 +4290,7 @@ function renderFlights(flights) {
             <span class="badge" style="color:${color};border-color:${color}">${esc(typeLabel(f.training_type))}</span>
             ${soloTag}${trackTag}
           </div>
-          <div class="fl-meta">${new Date(f.date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})} · <span style="color:var(--faint)">${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</span></div>
+          <div class="fl-meta">${fmtCalDate(f.date, {year:'numeric',month:'short',day:'numeric'})} · <span style="color:var(--faint)">${esc(f.aircraft?.tail_number||'')} ${esc(f.aircraft?.make||'')} ${esc(f.aircraft?.model||'')}</span></div>
         </div>
         <div class="fl-kpis">
           <div class="fl-kpi">
@@ -4440,9 +4394,7 @@ async function showFlightDetail(id) {
       No aircraft on record
     </div>`;
 
-  const dateStr = String(f.date).slice(0, 10);
-  const longDate = new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',
-    {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  const longDate = fmtCalDate(f.date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   document.getElementById('flight-detail-content').innerHTML = `
 
@@ -6340,7 +6292,7 @@ function renderModalStep2(flights, detected = []) {
   document.getElementById('modal-ft').style.display = 'none';
   if (_m.previewMap) { try{_m.previewMap.remove();}catch(_){} _m.previewMap=null; }
 
-  const dateLabel = new Date(_m.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const dateLabel = fmtCalDate(_m.date, {weekday:'long',month:'long',day:'numeric'});
   const tail = _m.aircraft?.tail_number || '';
 
   // Logbook entries (already in DB)
@@ -7265,7 +7217,7 @@ async function fetchHoldingsYTD(holdings) {
 function buildNetWorthChart(history) {
   if (!history || history.length < 2) return;
   const cfg = getChartCfg();
-  const labels = history.map(h => new Date(h.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const labels = history.map(h => fmtCalDate(h.date, {month:'short',day:'numeric'}));
   const data   = history.map(h => parseFloat(h.total));
   _cjsRender(document.getElementById('fin-nw-chart'), {
     type: 'line',
@@ -7742,299 +7694,6 @@ function renderChessView() {
   `
 
   buildChessTCContent(d, _chessTC)
-}
-
-// ─── track compare (temporary tool) ────────────────────────────────────────────
-let _tcMaps = {};    // flightId -> { aeroapi: maplibregl.Map, fr24: maplibregl.Map } — only for on-screen cards
-let _tcTracks = {};  // flightId -> { aeroapi: [...points], fr24: [...points] } — fetched once, kept forever
-let _tcVisible = new Set(); // flightIds (as strings) currently near the viewport
-let _tcRunId = 0; // bumped on each render so a stale queue from a prior visit stops itself
-let _tcCardObserver = null;
-
-// MapLibre (WebGL) maps can't all exist at once — browsers cap simultaneous
-// WebGL contexts well below 57*2. Mount a card's maps only while it's near
-// the viewport, and tear them down (freeing the context) once it scrolls
-// away; the underlying track data stays cached so re-entering is instant.
-function tcWatchCards(cardsEl) {
-  if (_tcCardObserver) _tcCardObserver.disconnect();
-  _tcCardObserver = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      const flightId = entry.target.dataset.flightId;
-      if (entry.isIntersecting) {
-        _tcVisible.add(flightId);
-        const tracks = _tcTracks[flightId];
-        if (tracks) {
-          for (const src of ['aeroapi', 'fr24']) {
-            if (tracks[src] && !_tcMaps[flightId]?.[src]) initTcMap(`tc-map-${src}-${flightId}`, tracks[src]);
-          }
-        }
-      } else {
-        _tcVisible.delete(flightId);
-        const maps = _tcMaps[flightId];
-        if (maps) {
-          for (const src of ['aeroapi', 'fr24']) {
-            if (maps[src]) { try { maps[src].remove(); } catch (_) {} }
-          }
-          delete _tcMaps[flightId];
-          for (const src of ['aeroapi', 'fr24']) {
-            if (_tcTracks[flightId]?.[src]) {
-              const el = document.getElementById(`tc-map-${src}-${flightId}`);
-              if (el) el.innerHTML = `<div class="tc-empty" style="padding:16px;color:var(--faint)">Scroll into view to render map</div>`;
-            }
-          }
-        }
-      }
-    }
-  }, { rootMargin: '200px 0px' });
-  cardsEl.querySelectorAll('.tc-card').forEach(card => _tcCardObserver.observe(card));
-}
-
-async function renderTrackCompareView() {
-  const el = document.getElementById('tc-content');
-  if (!el) return;
-  const runId = ++_tcRunId;
-
-  const [allFlights, choices] = await Promise.all([
-    fetch('/api/track-compare/flights').then(r => r.ok ? r.json() : []).catch(() => []),
-    fetch('/api/track-compare/choices').then(r => r.ok ? r.json() : []).catch(() => []),
-  ]);
-  if (runId !== _tcRunId) return; // view was left before this resolved
-  window._tcChoices = Object.fromEntries(choices.map(c => [c.flight_id, c.chosen_source]));
-  // Only flights with no recorded choice are still pending here — a flight
-  // gets a choice either because it was picked and applied to production,
-  // or (recorded as 'neither') because it was resolved directly without
-  // using either API. Either way it's done and drops off this list.
-  const flights = allFlights.filter(f => !(f.id in window._tcChoices));
-  window._tcFlights = flights;
-
-  el.innerHTML = `
-    <div class="tc-banner">
-      <i class="ph-bold ph-flask" style="font-size:16px;flex-shrink:0"></i>
-      <span>Temporary tool. Compares FlightAware AeroAPI and FlightRadar24's independently-tracked route for each logged flight against this logbook. Picking a side here only records your choice — nothing is written to the flight log or its track data until you ask for that separately. Only flights still awaiting a decision show below; decided flights drop off once applied. Loading a few at a time — first load per flight calls both APIs live, repeat visits are instant.</span>
-    </div>
-    <div class="tc-progress" id="tc-progress-lbl">${flights.length} flight${flights.length === 1 ? '' : 's'} awaiting a decision &middot; <span id="tc-load-lbl">loading…</span></div>
-    <div id="tc-cards"></div>
-  `;
-
-  // Leaving the view rebuilds the card list from scratch — release any maps
-  // from the previous visit so their WebGL contexts don't linger.
-  for (const flightId of Object.keys(_tcMaps)) {
-    for (const src of ['aeroapi', 'fr24']) {
-      if (_tcMaps[flightId][src]) { try { _tcMaps[flightId][src].remove(); } catch (_) {} }
-    }
-  }
-  _tcMaps = {};
-  _tcVisible = new Set();
-
-  const cardsEl = document.getElementById('tc-cards');
-  cardsEl.innerHTML = flights.map(f => tcCardSkeleton(f)).join('');
-  tcWatchCards(cardsEl);
-
-  // Sequential queue, a small concurrency cap — avoids firing 50+ simultaneous
-  // live AeroAPI/FR24 calls at once (rate limits, and the browser's own
-  // per-origin connection cap would just queue them anyway).
-  const CONCURRENCY = 3;
-  let idx = 0, loaded = 0;
-  const loadLbl = document.getElementById('tc-load-lbl');
-  async function worker() {
-    while (idx < flights.length) {
-      if (runId !== _tcRunId) return;
-      const f = flights[idx++];
-      await loadTcComparison(f.id);
-      loaded++;
-      if (runId !== _tcRunId) return;
-      if (loadLbl) loadLbl.textContent = loaded < flights.length ? `loading ${loaded}/${flights.length}…` : 'all loaded';
-    }
-  }
-  Promise.all(Array.from({ length: CONCURRENCY }, worker));
-}
-
-function tcRouteLabel(f) {
-  const via = (f.via || []).filter(Boolean);
-  return [f.departure_icao, ...via, f.arrival_icao].filter(Boolean).join(' → ') || '—';
-}
-
-function tcCardSkeleton(f) {
-  const dateStr = new Date(f.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const choice = window._tcChoices?.[f.id];
-  return `<div class="tc-card" data-flight-id="${f.id}">
-    <div class="tc-card-hd">
-      <div>
-        <div class="tc-route">${esc(tcRouteLabel(f))}</div>
-        <div class="tc-meta">${esc(dateStr)} &middot; ${esc(f.tail_number || 'no aircraft')} &middot; ${parseFloat(f.total_duration || 0).toFixed(1)}h logged</div>
-      </div>
-      <div class="tc-status" id="tc-status-${f.id}">${tcStatusHtml(choice)}</div>
-    </div>
-    <div class="tc-maps">
-      <div class="tc-map-col">
-        <div class="tc-map-hd"><span>FlightAware AeroAPI</span><span class="dim" id="tc-diff-aeroapi-${f.id}"></span></div>
-        <div class="tc-map" id="tc-map-aeroapi-${f.id}"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:11px">Loading…</div></div>
-        <div class="tc-stat-grid" id="tc-stats-aeroapi-${f.id}"></div>
-        <div class="tc-btn-row">
-          <button class="tc-btn aeroapi ${choice === 'aeroapi' ? 'active aeroapi' : ''}" id="tc-btn-aeroapi-${f.id}" onclick="chooseTcTrack(${f.id},'aeroapi')">Use this route</button>
-        </div>
-      </div>
-      <div class="tc-map-col">
-        <div class="tc-map-hd"><span>FlightRadar24</span><span class="dim" id="tc-diff-fr24-${f.id}"></span></div>
-        <div class="tc-map" id="tc-map-fr24-${f.id}"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:11px">Loading…</div></div>
-        <div class="tc-stat-grid" id="tc-stats-fr24-${f.id}"></div>
-        <div class="tc-btn-row">
-          <button class="tc-btn fr24 ${choice === 'fr24' ? 'active fr24' : ''}" id="tc-btn-fr24-${f.id}" onclick="chooseTcTrack(${f.id},'fr24')">Use this route</button>
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function tcStatusHtml(choice) {
-  if (choice === 'aeroapi') return '<span class="tc-status chosen-aeroapi">Using AeroAPI</span>';
-  if (choice === 'fr24')    return '<span class="tc-status chosen-fr24">Using FR24</span>';
-  if (choice === 'neither') return '<span class="tc-status chosen-neither">Neither</span>';
-  return '';
-}
-
-function tcFmtTime(iso) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
-}
-
-async function loadTcComparison(flightId) {
-  let data;
-  try {
-    data = await fetch('/api/track-compare/' + flightId).then(r => r.ok ? r.json() : null);
-  } catch (_) { data = null; }
-  if (!data || data.error) {
-    ['aeroapi', 'fr24'].forEach(src => {
-      const mapEl = document.getElementById(`tc-map-${src}-${flightId}`);
-      if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px">Couldn't load comparison data</div>`;
-    });
-    return;
-  }
-
-  for (const src of ['aeroapi', 'fr24']) {
-    const d = data[src] || {};
-    const mapEl = document.getElementById(`tc-map-${src}-${flightId}`);
-    const statsEl = document.getElementById(`tc-stats-${src}-${flightId}`);
-    const diffEl = document.getElementById(`tc-diff-${src}-${flightId}`);
-    const track = d.track || [];
-    const s = d.summary || {};
-    const sess = d.session;
-
-    if (diffEl && d.meta?.diff_hours != null) {
-      diffEl.textContent = `${d.meta.diff_hours}h from anchor`;
-    }
-
-    if (!track.length) {
-      if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px">No matching session found in ${src === 'aeroapi' ? 'AeroAPI' : 'FlightRadar24'}'s data</div>`;
-      if (statsEl) statsEl.innerHTML = '';
-      continue;
-    }
-
-    _tcTracks[flightId] = _tcTracks[flightId] || {};
-    _tcTracks[flightId][src] = track;
-    if (_tcVisible.has(String(flightId))) initTcMap(`tc-map-${src}-${flightId}`, track);
-    else if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px;color:var(--faint)">Scroll into view to render map</div>`;
-
-    const rows = [
-      ['Airports', (sess?.airports || []).join(', ') || '—'],
-      ['Legs', sess?.leg_count ?? '—'],
-      ['Takeoff', tcFmtTime(sess?.start) || '—'],
-      ['Landing', tcFmtTime(sess?.end) || '—'],
-      ['Peak alt', s.peak_altitude_ft ? s.peak_altitude_ft.toLocaleString() + ' ft' : '—'],
-      ['Max gspeed', s.max_groundspeed_kts ? s.max_groundspeed_kts + ' kt' : '—'],
-      ['Avg gspeed', s.avg_groundspeed_kts ? s.avg_groundspeed_kts + ' kt' : '—'],
-      ['Track dist', s.track_distance_nm ? s.track_distance_nm + ' nm' : '—'],
-      ['GPS points', s.point_count ?? '—'],
-    ];
-    if (statsEl) {
-      statsEl.innerHTML = rows.map(([k, v]) => `<div><div class="tc-stat-k">${esc(k)}</div><div class="tc-stat-v">${esc(String(v))}</div></div>`).join('');
-    }
-  }
-}
-
-function initTcMap(containerId, track) {
-  const container = document.getElementById(containerId);
-  if (!container || !window.maplibregl) return;
-  container.innerHTML = '';
-
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const mapStyle = isLight
-    ? 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
-    : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
-  const coords = track.map(p => [p.lon, p.lat]);
-  const lons = coords.map(c => c[0]), lats = coords.map(c => c[1]);
-  const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
-
-  const map = new maplibregl.Map({
-    container: containerId,
-    style: mapStyle,
-    bounds,
-    fitBoundsOptions: { padding: 24 },
-    attributionControl: false,
-    interactive: true,
-  });
-  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-
-  map.on('load', () => {
-    const routeColor = isLight ? '#1a6b5c' : '#d4a520';
-    map.addSource('tc-route', {
-      type: 'geojson',
-      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
-    });
-    map.addLayer({
-      id: 'tc-route-line', type: 'line', source: 'tc-route',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': routeColor, 'line-width': 2.5, 'line-opacity': 0.9 },
-    });
-    new maplibregl.Marker({ color: routeColor }).setLngLat(coords[0]).addTo(map);
-    new maplibregl.Marker({ color: '#c0392b' }).setLngLat(coords[coords.length - 1]).addTo(map);
-  });
-
-  const key = containerId.match(/^tc-map-(aeroapi|fr24)-(\d+)$/);
-  if (key) {
-    const [, src, flightId] = key;
-    _tcMaps[flightId] = _tcMaps[flightId] || {};
-    _tcMaps[flightId][src] = map;
-  }
-}
-
-async function chooseTcTrack(flightId, source) {
-  const btn = document.getElementById(`tc-btn-${source}-${flightId}`);
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  try {
-    await fetch(`/api/track-compare/${flightId}/choice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source }),
-    });
-    window._tcChoices[flightId] = source;
-    const statusEl = document.getElementById(`tc-status-${flightId}`);
-    if (statusEl) statusEl.innerHTML = tcStatusHtml(source);
-    // This list only shows flights still awaiting a decision — once one is
-    // made, its card leaves the list (matching what a fresh load would show).
-    const card = document.querySelector(`.tc-card[data-flight-id="${flightId}"]`);
-    if (card) {
-      card.style.transition = 'opacity 0.4s ease';
-      card.style.opacity = '0';
-      setTimeout(() => {
-        for (const src of ['aeroapi', 'fr24']) {
-          if (_tcMaps[flightId]?.[src]) { try { _tcMaps[flightId][src].remove(); } catch (_) {} }
-        }
-        delete _tcMaps[flightId];
-        _tcVisible.delete(String(flightId));
-        card.remove();
-        window._tcFlights = (window._tcFlights || []).filter(f => f.id !== flightId);
-        const progressEl = document.getElementById('tc-progress-lbl');
-        const n = window._tcFlights.length;
-        if (progressEl && progressEl.firstChild) {
-          progressEl.firstChild.textContent = `${n} flight${n === 1 ? '' : 's'} awaiting a decision · `;
-        }
-      }, 400);
-    }
-  } catch (_) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Use this route'; }
-  }
 }
 
 // ─── bootstrap ────────────────────────────────────────────────────────────────

@@ -10,7 +10,6 @@ import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
 import sleepRoutes from './routes/sleep.js'
 import flightRoutes, { scheduleNightSync } from './routes/flights.js'
-import trackCompareRoutes from './routes/trackCompare.js'
 import importRoutes from './routes/import.js'
 import proxyRoutes from './routes/proxy.js'
 import metarRoutes from './routes/metar.js'
@@ -81,7 +80,6 @@ if (process.env.DATABASE_URL) {
     await migrateV18()
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
-    await fastify.register(trackCompareRoutes)
     await fastify.register(importRoutes)
     await fastify.register(sleepRoutes)
     if (process.env.PLAID_CLIENT_ID) {

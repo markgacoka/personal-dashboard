@@ -3,7 +3,7 @@ import { lookupAircraft, importAcftref, isAcftrefEmpty } from '../services/faa-r
 import { pool } from '../db/client.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
 import { fetchNiceAirSchedules, syncNiceAirToDB } from '../services/gmail.js'
-import { getOskyToken, normalizeOpenSkyPath, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
+import { getOskyToken, normalizeOpenSkyPath, normalizeFr24Positions, saveTrackPoints, autoFetchOpenSkyTrack } from '../services/flightTrack.js'
 
 // ── OurAirports CSV parser ────────────────────────────────────────────────────
 function parseCsvLine(line) {
@@ -121,6 +121,35 @@ function boundFaTrack(positions, timeOut, timeIn) {
     if (faOnGround(p)) break
   }
   return extended
+}
+
+// ── FlightRadar24 API ──────────────────────────────────────────────────────────
+// Env var: FR24_API_TOKEN. Used as the initialization source for backfilling a
+// missing track on an existing flight (the UI's "Find Route" auto-loader).
+const FR24_BASE = 'https://fr24api.flightradar24.com/api'
+
+function fr24Fmt(d) {
+  return d.toISOString().replace(/\.\d{3}Z$/, '')
+}
+
+async function fr24Fetch(path, params = {}) {
+  const key = process.env.FR24_API_TOKEN
+  if (!key) throw new Error('FR24_API_TOKEN not configured')
+  const url = new URL(FR24_BASE + path)
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) url.searchParams.set(k, String(v))
+  }
+  const r = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${key}`, 'Accept-Version': 'v1', Accept: 'application/json' },
+    signal: AbortSignal.timeout(20000),
+  })
+  if (r.status === 429) {
+    const wait = parseInt(r.headers.get('Retry-After') || '5', 10) * 1000
+    await new Promise(res => setTimeout(res, wait))
+    return fr24Fetch(path, params)
+  }
+  if (!r.ok) return null
+  return r.json()
 }
 
 // ── FA backfill core ──────────────────────────────────────────────────────────
@@ -700,6 +729,130 @@ export default async function proxyRoutes(fastify) {
       return reply.status(result.error === 'Flight not found' ? 404 : 200).send(result)
     }
     return result
+  })
+
+  // ── FlightRadar24: auto-fetch track for a single flight ──────────────────────
+  // POST /api/external/auto-fetch-fr24-track/:flight_id
+  // The initialization source of choice for backfilling a missing track on an
+  // existing flight — used by the UI's "Find Route" auto-loader. New flights
+  // logged via the UI still get their track from OpenSky (see auto-fetch-track
+  // above and flights.js's POST /api/flights); this is only for filling in a
+  // track after the fact, matching FlightAware's structure below but scoring
+  // FR24 flight-summary candidates and fetching each match's full track.
+  fastify.post('/api/external/auto-fetch-fr24-track/:flight_id', async (req, reply) => {
+    const flightId = parseInt(req.params.flight_id)
+    if (!process.env.FR24_API_TOKEN) {
+      return reply.status(503).send({ error: 'FR24_API_TOKEN not configured' })
+    }
+
+    const { rows } = await pool.query(`
+      SELECT f.id, f.date::text, f.departure_icao, f.arrival_icao,
+             f.time_out, f.time_in, f.total_duration,
+             ac.tail_number
+      FROM flights f
+      JOIN aircraft ac ON ac.id = f.aircraft_id
+      WHERE f.id = $1
+    `, [flightId])
+    if (!rows.length) return reply.status(404).send({ error: 'Flight not found' })
+    const fl      = rows[0]
+    const tail    = fl.tail_number
+    const dateStr = String(fl.date).slice(0, 10)
+
+    let timeOut = fl.time_out
+    let timeIn  = fl.time_in
+    if (!timeOut || !timeIn) {
+      try {
+        const tailShort = tail.replace(/^N/, '')
+        const { rows: dbScheds } = await pool.query(`
+          SELECT start_unix, end_unix FROM nice_air_schedules
+          WHERE date_str = $1 AND type != 'cancelled'
+            AND (tail = $2 OR tail = $3)
+          ORDER BY start_unix ASC LIMIT 1
+        `, [dateStr, tail, tailShort])
+        if (dbScheds.length) {
+          if (dbScheds[0].start_unix) timeOut = timeOut || new Date(dbScheds[0].start_unix * 1000).toISOString()
+          if (dbScheds[0].end_unix)   timeIn  = timeIn  || new Date(dbScheds[0].end_unix   * 1000).toISOString()
+        }
+      } catch (_) {}
+    }
+    if (!timeOut) {
+      try {
+        const { rows: dateScheds } = await pool.query(`
+          SELECT start_unix, end_unix FROM nice_air_schedules
+          WHERE date_str = $1 AND type != 'cancelled' AND start_unix IS NOT NULL
+          ORDER BY start_unix ASC
+        `, [dateStr])
+        const chosen = dateScheds[0]
+        if (chosen?.start_unix) timeOut = new Date(chosen.start_unix * 1000).toISOString()
+        if (chosen?.end_unix)   timeIn  = new Date(chosen.end_unix * 1000).toISOString()
+      } catch (_) {}
+    }
+    const anchor = timeOut ? new Date(timeOut) : new Date(dateStr + 'T19:00:00Z')
+
+    try {
+      const winStart = fr24Fmt(new Date(anchor.getTime() - 24 * 3_600_000))
+      const winEnd   = fr24Fmt(new Date(anchor.getTime() + 24 * 3_600_000))
+      const data = await fr24Fetch('/flight-summary/full', {
+        registrations:        tail,
+        flight_datetime_from: winStart,
+        flight_datetime_to:   winEnd,
+        limit:                20,
+      })
+      const candidates = Array.isArray(data?.data) ? data.data : []
+      if (!candidates.length) {
+        return { success: false, points_saved: 0, message: 'No FR24 flights found in window' }
+      }
+
+      const norm   = ic => (ic || '').toUpperCase().replace(/^K/, '')
+      const logDep = norm(fl.departure_icao)
+      const logArr = norm(fl.arrival_icao)
+      const logMin = fl.total_duration ? parseFloat(fl.total_duration) * 60 : null
+      const scored = candidates.map(ff => {
+        let score = 0
+        const dep = ff.orig_icao || ''
+        const arr = ff.dest_icao_actual || ff.dest_icao || ''
+        if (logDep && norm(dep) === logDep) score += 4
+        if (logArr && norm(arr) === logArr) score += 4
+        const deptTs = new Date(ff.datetime_takeoff || ff.first_seen || 0)
+        if (timeOut && !isNaN(deptTs)) {
+          const diffMin = Math.abs(new Date(timeOut) - deptTs) / 60000
+          score += diffMin < 20 ? 5 : diffMin < 45 ? 3 : diffMin < 90 ? 1 : 0
+        }
+        if (logMin && ff.duration_min) {
+          const ratio = Math.min(logMin, ff.duration_min) / Math.max(logMin, ff.duration_min)
+          score += ratio > 0.85 ? 3 : ratio > 0.65 ? 1 : 0
+        }
+        return { ff, score }
+      }).sort((a, b) => b.score - a.score)
+
+      // Fetch and merge all candidates — a schedule slip can span more than one fr24_id
+      const allPositions = []
+      const okFr24Ids = []
+      for (const { ff } of scored) {
+        if (!ff.fr24_id) continue
+        await new Promise(r => setTimeout(r, 300))
+        try {
+          const t   = await fr24Fetch('/flight-tracks', { flight_id: ff.fr24_id })
+          const pts = normalizeFr24Positions(t?.[0]?.tracks).filter(p => p.lat != null && p.lon != null)
+          if (pts.length) { allPositions.push(...pts); okFr24Ids.push(ff.fr24_id) }
+        } catch (_) {}
+      }
+      const seen = new Map()
+      for (const p of allPositions) { if (p.ts && !seen.has(p.ts)) seen.set(p.ts, p) }
+      const merged  = [...seen.values()].sort((a, b) => new Date(a.ts) - new Date(b.ts))
+      const bounded = boundFaTrack(merged, timeOut, timeIn)
+
+      if (!bounded.length) {
+        return { success: false, points_saved: 0, message: 'No track positions from FR24' }
+      }
+
+      const saved = await saveTrackPoints(pool, flightId, bounded)
+      fastify.log.info({ flightId, tail, saved, fr24_ids: okFr24Ids }, 'FR24 track saved')
+      return { success: true, points_saved: saved, fr24_ids: okFr24Ids, score: scored[0].score }
+    } catch (e) {
+      fastify.log.warn({ flightId, tail, err: e.message }, 'FR24 track fetch failed')
+      return reply.status(502).send({ error: e.message })
+    }
   })
 
   // ── FlightAware: auto-fetch track for a single flight ────────────────────────

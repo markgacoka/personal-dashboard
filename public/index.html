@@ -7745,8 +7745,49 @@ function renderChessView() {
 }
 
 // ─── track compare (temporary tool) ────────────────────────────────────────────
-let _tcMaps = {}; // flightId -> { aeroapi: maplibregl.Map, fr24: maplibregl.Map }
+let _tcMaps = {};    // flightId -> { aeroapi: maplibregl.Map, fr24: maplibregl.Map } — only for on-screen cards
+let _tcTracks = {};  // flightId -> { aeroapi: [...points], fr24: [...points] } — fetched once, kept forever
+let _tcVisible = new Set(); // flightIds (as strings) currently near the viewport
 let _tcRunId = 0; // bumped on each render so a stale queue from a prior visit stops itself
+let _tcCardObserver = null;
+
+// MapLibre (WebGL) maps can't all exist at once — browsers cap simultaneous
+// WebGL contexts well below 57*2. Mount a card's maps only while it's near
+// the viewport, and tear them down (freeing the context) once it scrolls
+// away; the underlying track data stays cached so re-entering is instant.
+function tcWatchCards(cardsEl) {
+  if (_tcCardObserver) _tcCardObserver.disconnect();
+  _tcCardObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const flightId = entry.target.dataset.flightId;
+      if (entry.isIntersecting) {
+        _tcVisible.add(flightId);
+        const tracks = _tcTracks[flightId];
+        if (tracks) {
+          for (const src of ['aeroapi', 'fr24']) {
+            if (tracks[src] && !_tcMaps[flightId]?.[src]) initTcMap(`tc-map-${src}-${flightId}`, tracks[src]);
+          }
+        }
+      } else {
+        _tcVisible.delete(flightId);
+        const maps = _tcMaps[flightId];
+        if (maps) {
+          for (const src of ['aeroapi', 'fr24']) {
+            if (maps[src]) { try { maps[src].remove(); } catch (_) {} }
+          }
+          delete _tcMaps[flightId];
+          for (const src of ['aeroapi', 'fr24']) {
+            if (_tcTracks[flightId]?.[src]) {
+              const el = document.getElementById(`tc-map-${src}-${flightId}`);
+              if (el) el.innerHTML = `<div class="tc-empty" style="padding:16px;color:var(--faint)">Scroll into view to render map</div>`;
+            }
+          }
+        }
+      }
+    }
+  }, { rootMargin: '200px 0px' });
+  cardsEl.querySelectorAll('.tc-card').forEach(card => _tcCardObserver.observe(card));
+}
 
 async function renderTrackCompareView() {
   const el = document.getElementById('tc-content');
@@ -7772,8 +7813,19 @@ async function renderTrackCompareView() {
     <div id="tc-cards"></div>
   `;
 
+  // Leaving the view rebuilds the card list from scratch — release any maps
+  // from the previous visit so their WebGL contexts don't linger.
+  for (const flightId of Object.keys(_tcMaps)) {
+    for (const src of ['aeroapi', 'fr24']) {
+      if (_tcMaps[flightId][src]) { try { _tcMaps[flightId][src].remove(); } catch (_) {} }
+    }
+  }
+  _tcMaps = {};
+  _tcVisible = new Set();
+
   const cardsEl = document.getElementById('tc-cards');
   cardsEl.innerHTML = flights.map(f => tcCardSkeleton(f)).join('');
+  tcWatchCards(cardsEl);
 
   // Sequential queue, a small concurrency cap — avoids firing 50+ simultaneous
   // live AeroAPI/FR24 calls at once (rate limits, and the browser's own
@@ -7875,7 +7927,10 @@ async function loadTcComparison(flightId) {
       continue;
     }
 
-    initTcMap(`tc-map-${src}-${flightId}`, track);
+    _tcTracks[flightId] = _tcTracks[flightId] || {};
+    _tcTracks[flightId][src] = track;
+    if (_tcVisible.has(String(flightId))) initTcMap(`tc-map-${src}-${flightId}`, track);
+    else if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px;color:var(--faint)">Scroll into view to render map</div>`;
 
     const rows = [
       ['Airports', (sess?.airports || []).join(', ') || '—'],

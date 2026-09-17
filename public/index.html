@@ -1156,6 +1156,48 @@
       .ch-month-row > :nth-child(3), .ch-month-row > :nth-child(4) { font-size: 12px; color: var(--faint); }
     }
 
+    /* ── Track Compare (temporary tool) ─────────────────────── */
+    .tc-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--warning-bg); border: 1px solid var(--warning-border);
+      color: var(--warning); border-radius: var(--r-sm); padding: 10px 14px;
+      font-size: 12px; margin-bottom: 16px;
+    }
+    .tc-progress { font-size: 12px; color: var(--faint); margin-bottom: 16px; }
+    .tc-card {
+      border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--raised);
+      margin-bottom: 16px; overflow: hidden;
+    }
+    .tc-card-hd {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; border-bottom: 1px solid var(--rule); background: var(--graphite);
+    }
+    .tc-route { font-size: 15px; font-weight: 600; color: var(--champagne); }
+    .tc-meta { font-size: 12px; color: var(--faint); margin-top: 3px; }
+    .tc-status { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    .tc-status.chosen-aeroapi { background: var(--info-bg); color: var(--info); }
+    .tc-status.chosen-fr24 { background: var(--success-bg); color: var(--success); }
+    .tc-status.chosen-neither { background: var(--graphite-2); color: var(--muted); }
+    .tc-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); }
+    @media (max-width: 760px) { .tc-maps { grid-template-columns: 1fr; } }
+    .tc-map-col { background: var(--raised); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .tc-map-hd { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--body-text); }
+    .tc-map-hd .dim { font-size: 10px; color: var(--faint); font-weight: 400; }
+    .tc-map { height: 220px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--rule); background: var(--deep); }
+    .tc-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; font-size: 11px; }
+    .tc-stat-k { color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
+    .tc-stat-v { color: var(--body-text); font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+    .tc-empty { font-size: 12px; color: var(--faint); padding: 8px 0; }
+    .tc-btn-row { display: flex; gap: 6px; margin-top: 2px; }
+    .tc-btn {
+      flex: 1; font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: var(--r-sm);
+      border: 1px solid var(--rule-strong); background: transparent; color: var(--muted); cursor: pointer;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .tc-btn:hover { border-color: var(--champagne); color: var(--champagne); }
+    .tc-btn.active.aeroapi { background: var(--info-bg); border-color: var(--info); color: var(--info); }
+    .tc-btn.active.fr24 { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+
     /* Chess overview widget */
     .ch-ov { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
     .ch-ov-left { padding-right: 16px; border-right: 1px solid var(--rule); }
@@ -1732,6 +1774,17 @@
           <span class="sb-lbl">Progress</span>
         </div>
       </div></div>
+
+      <div class="sb-group-hdr" id="sbh-dev">
+        <span>Dev (temp)</span>
+        <i class="ph-bold ph-caret-down sb-caret"></i>
+      </div>
+      <div class="sb-group-items" id="sbi-dev"><div class="sb-group-items-inner">
+        <div class="sb-item" data-view="track-compare">
+          <i class="ph-bold ph-map-trifold"></i>
+          <span class="sb-lbl">Track Compare</span>
+        </div>
+      </div></div>
     </div>
   </nav>
 
@@ -1942,6 +1995,13 @@
       <!-- CHESS ─────────────────────────────────────────────── -->
       <div class="view" id="view-chess">
         <div class="section-first" id="chess-content">
+          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- TRACK COMPARE (temporary) ───────────────────────────── -->
+      <div class="view" id="view-track-compare">
+        <div class="section-first" id="tc-content">
           <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
         </div>
       </div>
@@ -2559,6 +2619,10 @@ function route(view, id) {
       showView('chess', { title: 'Chess Progress' });
       renderChessView();
       break;
+    case 'track-compare':
+      showView('track-compare', { title: 'Track Compare (temp)' });
+      renderTrackCompareView();
+      break;
     default:
       showView('overview', { title: 'Overview' });
       // Re-fetch net worth every time Overview is shown, not just at boot —
@@ -2575,7 +2639,7 @@ document.querySelectorAll('.sb-item').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
-['fitness','flights','finances','chess'].forEach(grp => {
+['fitness','flights','finances','chess','dev'].forEach(grp => {
   const hdr   = document.getElementById('sbh-' + grp);
   const items = document.getElementById('sbi-' + grp);
   if (!hdr||!items) return;
@@ -7678,6 +7742,227 @@ function renderChessView() {
   `
 
   buildChessTCContent(d, _chessTC)
+}
+
+// ─── track compare (temporary tool) ────────────────────────────────────────────
+let _tcObserver = null;
+let _tcMaps = {}; // flightId -> { aeroapi: maplibregl.Map, fr24: maplibregl.Map }
+
+async function renderTrackCompareView() {
+  const el = document.getElementById('tc-content');
+  if (!el) return;
+
+  const [flights, choices] = await Promise.all([
+    fetch('/api/track-compare/flights').then(r => r.ok ? r.json() : []).catch(() => []),
+    fetch('/api/track-compare/choices').then(r => r.ok ? r.json() : []).catch(() => []),
+  ]);
+  window._tcFlights = flights;
+  window._tcChoices = Object.fromEntries(choices.map(c => [c.flight_id, c.chosen_source]));
+
+  const decided = Object.keys(window._tcChoices).length;
+
+  el.innerHTML = `
+    <div class="tc-banner">
+      <i class="ph-bold ph-flask" style="font-size:16px;flex-shrink:0"></i>
+      <span>Temporary tool. Compares FlightAware AeroAPI and FlightRadar24's independently-tracked route for each logged flight against this logbook. Picking a side here only records your choice — nothing is written to the flight log or its track data until you ask for that separately.</span>
+    </div>
+    <div class="tc-progress" id="tc-progress-lbl">${decided} of ${flights.length} flights decided</div>
+    <div id="tc-cards"></div>
+  `;
+
+  const cardsEl = document.getElementById('tc-cards');
+  cardsEl.innerHTML = flights.map(f => tcCardSkeleton(f)).join('');
+
+  if (_tcObserver) _tcObserver.disconnect();
+  _tcObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const card = entry.target;
+      if (card.dataset.loaded) continue;
+      card.dataset.loaded = '1';
+      loadTcComparison(parseInt(card.dataset.flightId, 10));
+      _tcObserver.unobserve(card);
+    }
+  }, { rootMargin: '400px 0px' });
+
+  cardsEl.querySelectorAll('.tc-card').forEach(card => _tcObserver.observe(card));
+}
+
+function tcRouteLabel(f) {
+  const via = (f.via || []).filter(Boolean);
+  return [f.departure_icao, ...via, f.arrival_icao].filter(Boolean).join(' → ') || '—';
+}
+
+function tcCardSkeleton(f) {
+  const dateStr = new Date(f.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const choice = window._tcChoices?.[f.id];
+  return `<div class="tc-card" data-flight-id="${f.id}">
+    <div class="tc-card-hd">
+      <div>
+        <div class="tc-route">${esc(tcRouteLabel(f))}</div>
+        <div class="tc-meta">${esc(dateStr)} &middot; ${esc(f.tail_number || 'no aircraft')} &middot; ${parseFloat(f.total_duration || 0).toFixed(1)}h logged</div>
+      </div>
+      <div class="tc-status" id="tc-status-${f.id}">${tcStatusHtml(choice)}</div>
+    </div>
+    <div class="tc-maps">
+      <div class="tc-map-col">
+        <div class="tc-map-hd"><span>FlightAware AeroAPI</span><span class="dim" id="tc-diff-aeroapi-${f.id}"></span></div>
+        <div class="tc-map" id="tc-map-aeroapi-${f.id}"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:11px">Loading…</div></div>
+        <div class="tc-stat-grid" id="tc-stats-aeroapi-${f.id}"></div>
+        <div class="tc-btn-row">
+          <button class="tc-btn aeroapi ${choice === 'aeroapi' ? 'active aeroapi' : ''}" id="tc-btn-aeroapi-${f.id}" onclick="chooseTcTrack(${f.id},'aeroapi')">Use this route</button>
+        </div>
+      </div>
+      <div class="tc-map-col">
+        <div class="tc-map-hd"><span>FlightRadar24</span><span class="dim" id="tc-diff-fr24-${f.id}"></span></div>
+        <div class="tc-map" id="tc-map-fr24-${f.id}"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);font-size:11px">Loading…</div></div>
+        <div class="tc-stat-grid" id="tc-stats-fr24-${f.id}"></div>
+        <div class="tc-btn-row">
+          <button class="tc-btn fr24 ${choice === 'fr24' ? 'active fr24' : ''}" id="tc-btn-fr24-${f.id}" onclick="chooseTcTrack(${f.id},'fr24')">Use this route</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function tcStatusHtml(choice) {
+  if (choice === 'aeroapi') return '<span class="tc-status chosen-aeroapi">Using AeroAPI</span>';
+  if (choice === 'fr24')    return '<span class="tc-status chosen-fr24">Using FR24</span>';
+  if (choice === 'neither') return '<span class="tc-status chosen-neither">Neither</span>';
+  return '';
+}
+
+function tcFmtTime(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Los_Angeles' });
+}
+
+async function loadTcComparison(flightId) {
+  let data;
+  try {
+    data = await fetch('/api/track-compare/' + flightId).then(r => r.ok ? r.json() : null);
+  } catch (_) { data = null; }
+  if (!data || data.error) {
+    ['aeroapi', 'fr24'].forEach(src => {
+      const mapEl = document.getElementById(`tc-map-${src}-${flightId}`);
+      if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px">Couldn't load comparison data</div>`;
+    });
+    return;
+  }
+
+  for (const src of ['aeroapi', 'fr24']) {
+    const d = data[src] || {};
+    const mapEl = document.getElementById(`tc-map-${src}-${flightId}`);
+    const statsEl = document.getElementById(`tc-stats-${src}-${flightId}`);
+    const diffEl = document.getElementById(`tc-diff-${src}-${flightId}`);
+    const track = d.track || [];
+    const s = d.summary || {};
+    const sess = d.session;
+
+    if (diffEl && d.meta?.diff_hours != null) {
+      diffEl.textContent = `${d.meta.diff_hours}h from anchor`;
+    }
+
+    if (!track.length) {
+      if (mapEl) mapEl.innerHTML = `<div class="tc-empty" style="padding:16px">No matching session found in ${src === 'aeroapi' ? 'AeroAPI' : 'FlightRadar24'}'s data</div>`;
+      if (statsEl) statsEl.innerHTML = '';
+      continue;
+    }
+
+    initTcMap(`tc-map-${src}-${flightId}`, track);
+
+    const rows = [
+      ['Airports', (sess?.airports || []).join(', ') || '—'],
+      ['Legs', sess?.leg_count ?? '—'],
+      ['Takeoff', tcFmtTime(sess?.start) || '—'],
+      ['Landing', tcFmtTime(sess?.end) || '—'],
+      ['Peak alt', s.peak_altitude_ft ? s.peak_altitude_ft.toLocaleString() + ' ft' : '—'],
+      ['Max gspeed', s.max_groundspeed_kts ? s.max_groundspeed_kts + ' kt' : '—'],
+      ['Avg gspeed', s.avg_groundspeed_kts ? s.avg_groundspeed_kts + ' kt' : '—'],
+      ['Track dist', s.track_distance_nm ? s.track_distance_nm + ' nm' : '—'],
+      ['GPS points', s.point_count ?? '—'],
+    ];
+    if (statsEl) {
+      statsEl.innerHTML = rows.map(([k, v]) => `<div><div class="tc-stat-k">${esc(k)}</div><div class="tc-stat-v">${esc(String(v))}</div></div>`).join('');
+    }
+  }
+}
+
+function initTcMap(containerId, track) {
+  const container = document.getElementById(containerId);
+  if (!container || !window.maplibregl) return;
+  container.innerHTML = '';
+
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const mapStyle = isLight
+    ? 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+  const coords = track.map(p => [p.lon, p.lat]);
+  const lons = coords.map(c => c[0]), lats = coords.map(c => c[1]);
+  const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
+
+  const map = new maplibregl.Map({
+    container: containerId,
+    style: mapStyle,
+    bounds,
+    fitBoundsOptions: { padding: 24 },
+    attributionControl: false,
+    interactive: true,
+  });
+  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  map.on('load', () => {
+    const routeColor = isLight ? '#1a6b5c' : '#d4a520';
+    map.addSource('tc-route', {
+      type: 'geojson',
+      data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } },
+    });
+    map.addLayer({
+      id: 'tc-route-line', type: 'line', source: 'tc-route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': routeColor, 'line-width': 2.5, 'line-opacity': 0.9 },
+    });
+    new maplibregl.Marker({ color: routeColor }).setLngLat(coords[0]).addTo(map);
+    new maplibregl.Marker({ color: '#c0392b' }).setLngLat(coords[coords.length - 1]).addTo(map);
+  });
+
+  const key = containerId.match(/^tc-map-(aeroapi|fr24)-(\d+)$/);
+  if (key) {
+    const [, src, flightId] = key;
+    _tcMaps[flightId] = _tcMaps[flightId] || {};
+    _tcMaps[flightId][src] = map;
+  }
+}
+
+async function chooseTcTrack(flightId, source) {
+  const btn = document.getElementById(`tc-btn-${source}-${flightId}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await fetch(`/api/track-compare/${flightId}/choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source }),
+    });
+    window._tcChoices[flightId] = source;
+    ['aeroapi', 'fr24'].forEach(src => {
+      const b = document.getElementById(`tc-btn-${src}-${flightId}`);
+      if (!b) return;
+      b.classList.toggle('active', src === source);
+      b.classList.toggle(src, true);
+      b.disabled = false;
+      b.textContent = 'Use this route';
+    });
+    const statusEl = document.getElementById(`tc-status-${flightId}`);
+    if (statusEl) statusEl.innerHTML = tcStatusHtml(source);
+    const progressEl = document.getElementById('tc-progress-lbl');
+    if (progressEl) {
+      const decided = Object.keys(window._tcChoices).length;
+      progressEl.textContent = `${decided} of ${(window._tcFlights || []).length} flights decided`;
+    }
+  } catch (_) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Use this route'; }
+  }
 }
 
 // ─── bootstrap ────────────────────────────────────────────────────────────────

@@ -708,3 +708,34 @@ export async function migrateV17() {
     client.release()
   }
 }
+
+// V18: temporary FlightAware-vs-FlightRadar24 track comparison tool.
+// flight_track_compare_cache holds the fetched track + session metadata per
+// (flight, source) so repeat page views don't re-spend API calls. flight_
+// track_choice records which source the user picked as more accurate for a
+// flight — a record of intent only; nothing here is read by the production
+// flights/track_log_points tables until the user asks for that separately.
+export async function migrateV18() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS flight_track_compare_cache (
+        id            SERIAL PRIMARY KEY,
+        flight_id     INTEGER NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
+        source        TEXT NOT NULL CHECK (source IN ('aeroapi','fr24')),
+        session_json  JSONB,
+        track_json    JSONB,
+        fetched_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(flight_id, source)
+      );
+
+      CREATE TABLE IF NOT EXISTS flight_track_choice (
+        flight_id     INTEGER PRIMARY KEY REFERENCES flights(id) ON DELETE CASCADE,
+        chosen_source TEXT NOT NULL CHECK (chosen_source IN ('aeroapi','fr24','neither')),
+        chosen_at     TIMESTAMPTZ DEFAULT NOW()
+      );
+    `)
+  } finally {
+    client.release()
+  }
+}

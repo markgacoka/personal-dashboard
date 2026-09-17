@@ -7794,22 +7794,25 @@ async function renderTrackCompareView() {
   if (!el) return;
   const runId = ++_tcRunId;
 
-  const [flights, choices] = await Promise.all([
+  const [allFlights, choices] = await Promise.all([
     fetch('/api/track-compare/flights').then(r => r.ok ? r.json() : []).catch(() => []),
     fetch('/api/track-compare/choices').then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
   if (runId !== _tcRunId) return; // view was left before this resolved
-  window._tcFlights = flights;
   window._tcChoices = Object.fromEntries(choices.map(c => [c.flight_id, c.chosen_source]));
-
-  const decided = Object.keys(window._tcChoices).length;
+  // Only flights with no recorded choice are still pending here — a flight
+  // gets a choice either because it was picked and applied to production,
+  // or (recorded as 'neither') because it was resolved directly without
+  // using either API. Either way it's done and drops off this list.
+  const flights = allFlights.filter(f => !(f.id in window._tcChoices));
+  window._tcFlights = flights;
 
   el.innerHTML = `
     <div class="tc-banner">
       <i class="ph-bold ph-flask" style="font-size:16px;flex-shrink:0"></i>
-      <span>Temporary tool. Compares FlightAware AeroAPI and FlightRadar24's independently-tracked route for each logged flight against this logbook. Picking a side here only records your choice — nothing is written to the flight log or its track data until you ask for that separately. Loading flights a few at a time below — first load per flight calls both APIs live, repeat visits are instant.</span>
+      <span>Temporary tool. Compares FlightAware AeroAPI and FlightRadar24's independently-tracked route for each logged flight against this logbook. Picking a side here only records your choice — nothing is written to the flight log or its track data until you ask for that separately. Only flights still awaiting a decision show below; decided flights drop off once applied. Loading a few at a time — first load per flight calls both APIs live, repeat visits are instant.</span>
     </div>
-    <div class="tc-progress" id="tc-progress-lbl">${decided} of ${flights.length} flights decided &middot; <span id="tc-load-lbl">loading…</span></div>
+    <div class="tc-progress" id="tc-progress-lbl">${flights.length} flight${flights.length === 1 ? '' : 's'} awaiting a decision &middot; <span id="tc-load-lbl">loading…</span></div>
     <div id="tc-cards"></div>
   `;
 
@@ -8006,20 +8009,28 @@ async function chooseTcTrack(flightId, source) {
       body: JSON.stringify({ source }),
     });
     window._tcChoices[flightId] = source;
-    ['aeroapi', 'fr24'].forEach(src => {
-      const b = document.getElementById(`tc-btn-${src}-${flightId}`);
-      if (!b) return;
-      b.classList.toggle('active', src === source);
-      b.classList.toggle(src, true);
-      b.disabled = false;
-      b.textContent = 'Use this route';
-    });
     const statusEl = document.getElementById(`tc-status-${flightId}`);
     if (statusEl) statusEl.innerHTML = tcStatusHtml(source);
-    const progressEl = document.getElementById('tc-progress-lbl');
-    if (progressEl) {
-      const decided = Object.keys(window._tcChoices).length;
-      progressEl.textContent = `${decided} of ${(window._tcFlights || []).length} flights decided`;
+    // This list only shows flights still awaiting a decision — once one is
+    // made, its card leaves the list (matching what a fresh load would show).
+    const card = document.querySelector(`.tc-card[data-flight-id="${flightId}"]`);
+    if (card) {
+      card.style.transition = 'opacity 0.4s ease';
+      card.style.opacity = '0';
+      setTimeout(() => {
+        for (const src of ['aeroapi', 'fr24']) {
+          if (_tcMaps[flightId]?.[src]) { try { _tcMaps[flightId][src].remove(); } catch (_) {} }
+        }
+        delete _tcMaps[flightId];
+        _tcVisible.delete(String(flightId));
+        card.remove();
+        window._tcFlights = (window._tcFlights || []).filter(f => f.id !== flightId);
+        const progressEl = document.getElementById('tc-progress-lbl');
+        const n = window._tcFlights.length;
+        if (progressEl && progressEl.firstChild) {
+          progressEl.firstChild.textContent = `${n} flight${n === 1 ? '' : 's'} awaiting a decision · `;
+        }
+      }, 400);
     }
   } catch (_) {
     if (btn) { btn.disabled = false; btn.textContent = 'Use this route'; }

@@ -11,182 +11,29 @@
  *
  * Run: npm test
  * Run without smoke: SKIP_SMOKE=1 npm test
+ * Smoke-test another deployment: SMOKE_BASE=http://localhost:3000 npm test
  */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-// ─── Helpers shared with stats.js (inlined to avoid side-effectful imports) ────
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
+import { aggregate, filterFrom } from '../routes/stats.js';
+import { parsePacificToUnix, decodeQP, parseScheduleBody } from '../services/gmail.js';
+import { parseCsvLine, filterAirportCsv } from '../lib/csv.js';
+import { pickSchedule, scheduleWindow } from '../services/schedules.js';
+import { boundTrack, mergePositions, isOnGround, scoreFaCandidate, scoreFr24Candidate, normalizeFaPositions } from '../services/trackProviders.js';
+import { normalizeFr24Positions } from '../services/flightTrack.js';
 
-function weekStart() {
-  const d = new Date();
-  d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function aggregate(activities) {
-  const by_sport = {};
-  for (const act of activities) {
-    const type = (act.activityType && act.activityType.typeKey) || 'other';
-    if (!by_sport[type]) {
-      by_sport[type] = { count: 0, distance_m: 0, moving_time_s: 0, elevation_gain_m: 0, calories: 0 };
-    }
-    by_sport[type].count++;
-    by_sport[type].distance_m    += act.distance        || 0;
-    by_sport[type].moving_time_s += act.movingDuration  || act.duration || 0;
-    by_sport[type].elevation_gain_m += act.elevationGain || 0;
-    by_sport[type].calories      += act.calories        || 0;
-  }
-  return by_sport;
-}
-
-function filterFrom(activities, since) {
-  return activities.filter(a => new Date(a.startTimeLocal) >= since);
-}
-
-const M_TO_MI = 0.000621371;
-function fmtDist(m) {
-  if (!m) return '—';
-  const mi = m * M_TO_MI;
-  return mi >= 0.05 ? mi.toFixed(2) + ' mi' : Math.round(m) + ' m';
-}
-
-function fmtTime(s) {
-  if (!s) return '—';
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
-  return `${sec}s`;
-}
-
-function fmtPace(mps) {
-  if (!mps || mps <= 0) return '—';
-  const spm = 1609.344 / mps;
-  return `${Math.floor(spm/60)}:${String(Math.round(spm%60)).padStart(2,'0')}/mi`;
-}
-
-function normSport(t) {
-  if (!t) return 'other';
-  const l = t.toLowerCase();
-  if (l.includes('run') || l.includes('treadmill')) return 'running';
-  if (l.includes('cycl') || l.includes('bike') || l.includes('ride')) return 'cycling';
-  if (l.includes('swim')) return 'swimming';
-  if (l.includes('row')) return 'rowing';
-  return 'other';
-}
-
-function fmtHrs(h) {
-  if (!h || h <= 0) return '—';
-  return parseFloat(h).toFixed(1) + 'h';
-}
-
-function routeLabel(f) {
-  const stops = [f.departure?.icao || f.departure_icao];
-  if (f.via && f.via.length) stops.push(...f.via);
-  stops.push(f.arrival?.icao || f.arrival_icao);
-  return stops.join(' → ');
-}
-
-// ─── Gmail parsing helpers (inlined from api/src/services/gmail.js) ────────────
-// These are pure functions — inlining avoids side effects from IMAP imports.
-
-function parsePacificToUnix(str) {
-  if (!str) return null;
-  const m = str.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!m) return null;
-  const [, mo, day, yr, hr12, min, ampm] = m;
-  let hour = parseInt(hr12, 10);
-  if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-  if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
-  const dateUTC8 = new Date(Date.UTC(+yr, +mo - 1, +day, hour + 8, +min));
-  const isDST = (() => {
-    const y = +yr;
-    const dstStart = new Date(Date.UTC(y, 2, 8 + (7 - new Date(Date.UTC(y, 2, 8)).getUTCDay()) % 7, 10));
-    const dstEnd   = new Date(Date.UTC(y, 10, 1 + (7 - new Date(Date.UTC(y, 10, 1)).getUTCDay()) % 7, 9));
-    return dateUTC8 >= dstStart && dateUTC8 < dstEnd;
-  })();
-  const offsetH = isDST ? 7 : 8;
-  return Math.floor(new Date(Date.UTC(+yr, +mo - 1, +day, hour + offsetH, +min)).getTime() / 1000);
-}
-
-function decodeQP(str) {
-  return str.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
-
-function parseScheduleBody(raw) {
-  const text = decodeQP(raw.toString());
-  const lines = text.split(/\r?\n/);
-  const last = {};
-  for (const line of lines) {
-    for (const field of ['Pilot', 'CFI', 'Resource', 'Start', 'End']) {
-      const m = line.match(new RegExp(`^${field}:\\s*(.+)`, 'i'));
-      if (m) last[field.toLowerCase()] = m[1].replace(/=\s*$/, '').trim();
-    }
-  }
-  return last;
-}
-
-// ─── Frontend helpers (inlined from index.html) ───────────────────────────────
-
-// Fixed fDate — accepts full ISO timestamps from the API ("2026-08-26T00:00:00.000Z")
-function fDate(d) {
-  return new Date(String(d).slice(0, 10) + 'T12:00:00').getTime();
-}
-
-// 90-day currency check — mirrors the exact frontend logic in renderFlightCurrency()
-// Uses `now - fDate(f.date) < 90*86400000` (fDate = noon local) to avoid timezone drift
-// from setDate arithmetic.
-function isCurrentDayVFR(flights, asOf = new Date()) {
-  const now = asOf.getTime();
-  const d90 = 90 * 86400000;
-  const recent = flights.filter(f => now - fDate(f.date) < d90);
-  const tos  = recent.reduce((s, f) => s + (f.takeoffs || 0), 0);
-  const lnds = recent.reduce((s, f) => s + (f.landings || 0), 0);
-  return tos >= 3 && lnds >= 3;
-}
-
-// Route-picker: best OpenSky candidate within 45 min of scheduled departure
-function pickBestCandidate(candidates, schedStartUnix) {
-  const within = candidates.filter(c =>
-    Math.abs((c.first_seen_unix - schedStartUnix) / 60) <= 45
-  );
-  if (!within.length) return null;
-  return within.reduce((best, c) =>
-    Math.abs(c.first_seen_unix - schedStartUnix) < Math.abs(best.first_seen_unix - schedStartUnix)
-      ? c : best
-  );
-}
-
-// CSV utilities (inlined from api/src/routes/proxy.js)
-function parseCsvLine(line) {
-  const fields = [];
-  let cur = '', inQ = false;
-  for (const ch of line) {
-    if (ch === '"') { inQ = !inQ; }
-    else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
-    else cur += ch;
-  }
-  fields.push(cur);
-  return fields;
-}
-
-function filterAirportCsv(text, icao) {
-  const lines = text.split('\n');
-  if (!lines.length) return [];
-  const headers = parseCsvLine(lines[0]);
-  const identIdx = headers.indexOf('airport_ident');
-  if (identIdx < 0) return [];
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line || !line.includes(icao)) continue;
-    const vals = parseCsvLine(line);
-    if (vals[identIdx] !== icao) continue;
-    rows.push(Object.fromEntries(headers.map((h, j) => [h, vals[j] ?? ''])));
-  }
-  return rows;
-}
+// Frontend helpers, loaded from the file the browser runs (no copies).
+const frontend = (() => {
+  const ctx = vm.createContext({});
+  vm.runInContext(readFileSync(new URL('../../../public/js/helpers.js', import.meta.url), 'utf8') +
+    '\n;globalThis.__exports = { fmtDist, fmtTime, fmtPace, normSport, fmtHrs, routeLabel, computeCurrency };', ctx);
+  return ctx.__exports;
+})();
+const { fmtDist, fmtTime, fmtPace, normSport, fmtHrs, routeLabel, computeCurrency } = frontend;
 
 // ─── Unit tests: activity aggregation ────────────────────────────────────────
 
@@ -261,8 +108,13 @@ describe('normSport — sport classification', () => {
     assert.equal(normSport('rowing'),         'rowing');
     assert.equal(normSport('indoor_rowing'),  'rowing');
   });
+  test('newer categories', () => {
+    assert.equal(normSport('yoga'),          'yoga');
+    assert.equal(normSport('strength_training'), 'strength');
+    assert.equal(normSport('hiking'),        'hiking');
+  });
   test('fallback to other', () => {
-    assert.equal(normSport('yoga'),      'other');
+    assert.equal(normSport('bogus_activity'), 'other');
     assert.equal(normSport(''),          'other');
     assert.equal(normSport(null),        'other');
   });
@@ -496,122 +348,83 @@ describe('parseScheduleBody — schedule email field extraction', () => {
   });
 });
 
-// ─── Unit tests: frontend currency calculation ────────────────────────────────
+// ─── Unit tests: FAA currency (public/js/helpers.js computeCurrency) ─────────
 
-describe('fDate — fixed date parser (accepts ISO timestamps)', () => {
-  test('full ISO timestamp resolves to correct date', () => {
-    // API returns "2026-08-26T00:00:00.000Z" — old code made this invalid
-    const ts = fDate('2026-08-26T00:00:00.000Z');
-    const d  = new Date(ts);
-    assert.equal(d.getFullYear(), 2026);
-    assert.equal(d.getMonth(),    7);    // 0-indexed August
-    assert.equal(d.getDate(),     26);
+describe('computeCurrency — §61.57 / §61.56', () => {
+  const asOf = new Date('2026-09-08T12:00:00').getTime();
+  const flight = (date, extra = {}) => ({ date, approaches: [], ...extra });
+
+  test('recent day T/O and full-stop landings → day VFR current', () => {
+    const c = computeCurrency([flight('2026-08-26T00:00:00.000Z', { day_takeoffs: 4, day_landings_full_stop: 4 })], asOf);
+    assert.equal(c.day.current, true);
+    assert.equal(c.day.to, 4);
+    assert.equal(c.day.lnd, 4);
   });
 
-  test('date-only string still resolves correctly', () => {
-    const ts = fDate('2026-08-26');
-    const d  = new Date(ts);
-    assert.equal(d.getFullYear(), 2026);
-    assert.equal(d.getMonth(),    7);
-    assert.equal(d.getDate(),     26);
+  test('ISO timestamps and date-only strings are the same calendar day', () => {
+    const a = computeCurrency([flight('2026-08-26T00:00:00.000Z', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
+    const b = computeCurrency([flight('2026-08-26', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
+    assert.deepEqual(a.day, b.day);
   });
 
-  test('different dates produce different timestamps', () => {
-    assert.notEqual(fDate('2026-08-26'), fDate('2026-08-19'));
-    assert.ok(fDate('2026-08-26') > fDate('2026-08-19'));
-  });
-});
-
-describe('isCurrentDayVFR — 90-day currency', () => {
-  // Simulated flights with 4 T/O + 4 landings on Aug 26, 2026
-  const recentFlight = { date: '2026-08-26T00:00:00.000Z', takeoffs: 4, landings: 4 };
-  const oldFlight    = { date: '2026-05-01T00:00:00.000Z', takeoffs: 4, landings: 4 };
-  const asOf = new Date('2026-09-08');
-
-  test('recent landings → current', () => {
-    assert.ok(isCurrentDayVFR([recentFlight], asOf));
+  test('falls back to the generic takeoffs/landings columns', () => {
+    const c = computeCurrency([flight('2026-08-26', { takeoffs: 3, landings: 3 })], asOf);
+    assert.equal(c.day.current, true);
   });
 
-  test('only old landings → lapsed', () => {
-    assert.ok(!isCurrentDayVFR([oldFlight], asOf));
+  test('landings older than 90 days do not count', () => {
+    const c = computeCurrency([flight('2026-06-07', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
+    assert.equal(c.day.current, false);
   });
 
-  test('old + recent combined → current', () => {
-    assert.ok(isCurrentDayVFR([oldFlight, recentFlight], asOf));
+  test('89 days ago still counts', () => {
+    const d = new Date(asOf); d.setDate(d.getDate() - 89);
+    const c = computeCurrency([flight(d.toISOString(), { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
+    assert.equal(c.day.current, true);
   });
 
-  test('empty logbook → not current', () => {
-    assert.ok(!isCurrentDayVFR([], asOf));
+  test('two of each is not enough', () => {
+    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 2, day_landings_full_stop: 2 })], asOf);
+    assert.equal(c.day.current, false);
   });
 
-  test('92+ days ago does not count', () => {
-    // Jun 7 is more than 92 days before Sep 8 regardless of local timezone
-    const f = { date: '2026-06-07T00:00:00.000Z', takeoffs: 3, landings: 3 };
-    assert.ok(!isCurrentDayVFR([f], asOf));
+  test('days until lapse counts from the operation that completes 3 + 3', () => {
+    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
+    // Aug 26 + 90 days = Nov 24; from Sep 8 that's 77 days.
+    assert.equal(c.day.daysLeft, 77);
   });
 
-  test('89 days ago counts', () => {
-    const recent89 = new Date(asOf);
-    recent89.setDate(recent89.getDate() - 89);
-    const f = { date: recent89.toISOString(), takeoffs: 3, landings: 3 };
-    assert.ok(isCurrentDayVFR([f], asOf));
+  test('night currency uses night columns only', () => {
+    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 5, day_landings_full_stop: 5, night_takeoffs: 3, night_landings_full_stop: 3 })], asOf);
+    assert.equal(c.night.current, true);
+    assert.equal(c.night.to, 3);
   });
 
-  test('need ≥3 T/O and ≥3 landings — 2 of each is not enough', () => {
-    const f = { date: '2026-08-26T00:00:00.000Z', takeoffs: 2, landings: 2 };
-    assert.ok(!isCurrentDayVFR([f], asOf));
-  });
-});
-
-// ─── Unit tests: route-picker candidate matching ──────────────────────────────
-
-describe('pickBestCandidate — Gmail schedule × OpenSky candidate matching', () => {
-  const schedStart = 1754427600; // 2026-08-06 16:00 PDT
-
-  const candidates = [
-    { icao24: 'a12345', first_seen_unix: schedStart - 30 * 60 }, // 30 min early — within window
-    { icao24: 'b67890', first_seen_unix: schedStart + 5  * 60 }, // 5 min late — best match
-    { icao24: 'c11111', first_seen_unix: schedStart + 60 * 60 }, // 60 min late — outside window
-  ];
-
-  test('picks closest candidate within 45-min window', () => {
-    const best = pickBestCandidate(candidates, schedStart);
-    assert.equal(best.icao24, 'b67890'); // 5 min is closer than 30 min
+  test('6 approaches in 6 months → instrument current; older ones are grace', () => {
+    const six = Array.from({ length: 6 }, () => ({ approach_type: 'RNAV' }));
+    assert.equal(computeCurrency([flight('2026-08-01', { approaches: six })], asOf).ifr.current, true);
+    const old = computeCurrency([flight('2026-01-15', { approaches: six })], asOf).ifr;
+    assert.equal(old.current, false);
+    assert.equal(old.grace, true);
   });
 
-  test('excludes candidates outside 45-min window', () => {
-    const best = pickBestCandidate(candidates, schedStart);
-    assert.notEqual(best?.icao24, 'c11111');
-  });
-
-  test('returns null when no candidate within 45 min', () => {
-    const far = [{ icao24: 'x', first_seen_unix: schedStart + 46 * 60 }];
-    assert.equal(pickBestCandidate(far, schedStart), null);
-  });
-
-  test('returns null for empty candidates', () => {
-    assert.equal(pickBestCandidate([], schedStart), null);
-  });
-
-  test('single candidate within window is returned', () => {
-    const solo = [{ icao24: 'solo', first_seen_unix: schedStart + 10 * 60 }];
-    assert.equal(pickBestCandidate(solo, schedStart).icao24, 'solo');
-  });
-
-  test('exactly 45 min away is included (boundary)', () => {
-    const exact = [{ icao24: 'exact', first_seen_unix: schedStart + 45 * 60 }];
-    assert.equal(pickBestCandidate(exact, schedStart).icao24, 'exact');
-  });
-
-  test('46 min away is excluded (boundary)', () => {
-    const over = [{ icao24: 'over', first_seen_unix: schedStart + 46 * 60 }];
-    assert.equal(pickBestCandidate(over, schedStart), null);
+  test('flight review within 24 months', () => {
+    const c = computeCurrency([flight('2025-09-10', { flight_review: true })], asOf);
+    assert.equal(c.bfr.current, true);
+    assert.ok(c.bfr.daysLeft > 0);
+    assert.equal(computeCurrency([flight('2024-01-01', { flight_review: true })], asOf).bfr.current, false);
+    assert.equal(computeCurrency([], asOf).bfr.daysLeft, null);
   });
 });
 
 // ─── Unit tests: CSV parsing utilities ──────────────────────────────────────
 
 describe('parseCsvLine — OurAirports CSV parser', () => {
+  test('trim option strips whitespace around fields (ForeFlight import)', () => {
+    assert.deepEqual(parseCsvLine(' a , "b, c" ,d ', { trim: true }), ['a', 'b, c', 'd']);
+    assert.deepEqual(parseCsvLine(' a ,b'), [' a ', 'b']);
+  });
+
   test('basic comma-separated fields', () => {
     assert.deepEqual(parseCsvLine('KRHV,Reid-Hillview,US'), ['KRHV', 'Reid-Hillview', 'US']);
   });
@@ -695,15 +508,131 @@ describe('saveTrackPoints — source provenance validation', () => {
       const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
       const saved = await saveTrackPoints(stubPool, 1, [], source);
       assert.equal(saved, 0, 'no airborne points → nothing saved, but no error either');
-      assert.equal(calls.length, 1, 'only the DELETE should run when there are no points to insert');
+      assert.equal(calls.length, 1, 'replacing a track is one statement');
+      assert.equal(calls[0].params.at(-1), source);
     }
+  });
+
+  test('replaces the track atomically with airborne points only, values as parameters', async () => {
+    const { saveTrackPoints } = await import('../services/flightTrack.js');
+    const calls = [];
+    const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
+    const pts = [
+      { ts: "2026-08-26T18:00:00Z'); DROP TABLE flights; --", lat: 37.3, lon: -121.8, altitude_ft: 1500, on_ground: false },
+      { ts: '2026-08-26T18:01:00Z', lat: 37.4, lon: -121.9, altitude_ft: 0, on_ground: true },
+      { ts: '2026-08-26T18:02:00Z', lat: null, lon: -121.9 },
+    ];
+    const saved = await saveTrackPoints(stubPool, 7, pts, 'fr24');
+    assert.equal(saved, 1);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].sql, /DELETE FROM track_log_points/);
+    assert.match(calls[0].sql, /INSERT INTO track_log_points/);
+    assert.ok(!calls[0].sql.includes('DROP TABLE'), 'point values never reach the SQL text');
+    assert.deepEqual(calls[0].params[1], [pts[0].ts]);
+  });
+});
+
+// ─── Unit tests: schedule matching (services/schedules.js) ───────────────────
+
+describe('pickSchedule / scheduleWindow — booking ↔ logbook entry', () => {
+  const unix = s => Math.floor(Date.parse(s) / 1000);
+  const dual = { tail: 'N227AN', start_unix: unix('2026-08-26T16:00:00Z'), end_unix: unix('2026-08-26T18:00:00Z') };
+  const solo = { tail: '739HE', start_unix: unix('2026-08-26T20:00:00Z'), end_unix: unix('2026-08-26T21:30:00Z') };
+
+  test('an exact tail match wins, with or without the N prefix', () => {
+    assert.equal(pickSchedule({ tail_number: 'N739HE' }, [dual, solo]).schedule, solo);
+    assert.equal(pickSchedule({ tail_number: 'N739HE' }, [dual, solo]).byTail, true);
+  });
+
+  test('otherwise the booking closest to the logged duration', () => {
+    const m = pickSchedule({ tail_number: 'N213AN', total_duration: 1.5 }, [dual, solo]);
+    assert.equal(m.schedule, solo);
+    assert.equal(m.byTail, false);
+  });
+
+  test('otherwise the earliest booking when the duration is unknown', () => {
+    assert.equal(pickSchedule({ tail_number: 'N213AN' }, [dual, solo]).schedule, dual);
+  });
+
+  test('no bookings → null', () => {
+    assert.equal(pickSchedule({ tail_number: 'N213AN' }, []), null);
+  });
+
+  test('logged times are kept; missing ones come from the tail-matched booking', () => {
+    const w = scheduleWindow({ tail_number: 'N739HE', time_out: '2026-08-26T20:05:00Z', time_in: null }, [solo]);
+    assert.equal(w.timeOut, '2026-08-26T20:05:00Z');
+    assert.equal(w.timeIn, '2026-08-26T21:30:00.000Z');
+  });
+
+  test('another tail\'s booking only fills a flight with no time_out', () => {
+    const withOut = scheduleWindow({ tail_number: 'N213AN', time_out: '2026-08-26T19:00:00Z' }, [dual]);
+    assert.equal(withOut.timeIn, null);
+    const bare = scheduleWindow({ tail_number: 'N213AN' }, [dual]);
+    assert.equal(bare.timeOut, '2026-08-26T16:00:00.000Z');
+    assert.equal(bare.timeIn, '2026-08-26T18:00:00.000Z');
+  });
+});
+
+// ─── Unit tests: provider track shaping (services/trackProviders.js) ────────
+
+describe('track shaping — merge, ground detection, block-time bounds', () => {
+  const p = (min, extra = {}) => ({ ts: new Date(Date.UTC(2026, 7, 26, 18, min)).toISOString(), lat: 37, lon: -121, altitude_ft: 2000, groundspeed_kts: 90, ...extra });
+
+  test('mergePositions dedupes by timestamp and sorts', () => {
+    const merged = mergePositions([p(5), p(1), p(5, { lat: 1 }), p(3)]);
+    assert.deepEqual(merged.map(x => x.ts), [p(1).ts, p(3).ts, p(5).ts]);
+    assert.equal(merged[2].lat, 37, 'first occurrence wins');
+  });
+
+  test('isOnGround uses the flag, then altitude + speed thresholds', () => {
+    assert.equal(isOnGround({ on_ground: true }), true);
+    assert.equal(isOnGround({ altitude_ft: 400, groundspeed_kts: 40 }), true);
+    assert.equal(isOnGround({ altitude_ft: 400, groundspeed_kts: 80 }), false);
+    assert.equal(isOnGround({ groundspeed_kts: 20 }), true);
+    assert.equal(isOnGround({ altitude_ft: 200 }), true);
+    assert.equal(isOnGround({}), false);
+  });
+
+  test('boundTrack drops points before time_out and cuts at time_in when landed', () => {
+    const track = [p(0), p(10), p(20, { altitude_ft: 0, groundspeed_kts: 5 }), p(30)];
+    const out = boundTrack(track, p(5).ts, p(20).ts);
+    assert.deepEqual(out.map(x => x.ts), [p(10).ts, p(20).ts]);
+  });
+
+  test('boundTrack runs past time_in until the aircraft lands', () => {
+    const track = [p(0), p(10), p(20), p(25), p(30, { on_ground: true }), p(40)];
+    const out = boundTrack(track, p(0).ts, p(15).ts);
+    assert.deepEqual(out.map(x => x.ts), [p(0).ts, p(10).ts, p(20).ts, p(25).ts, p(30).ts]);
+  });
+
+  test('boundTrack keeps everything if the window would empty it', () => {
+    const track = [p(0), p(10)];
+    assert.equal(boundTrack(track, p(50).ts, null).length, 2);
+  });
+
+  test('candidate scoring prefers matching airports and duration', () => {
+    const flight = { departure_icao: 'KRHV', arrival_icao: 'KRHV', total_duration: 1.5 };
+    const good = { origin: { code: 'RHV' }, destination: { code: 'KRHV' }, actual_off: '2026-08-26T18:00:00Z', actual_on: '2026-08-26T19:30:00Z' };
+    const bad = { origin: { code: 'KSQL' }, destination: { code: 'KPAO' }, actual_off: '2026-08-26T18:00:00Z', actual_on: '2026-08-26T18:10:00Z' };
+    assert.equal(scoreFaCandidate(flight, good), 13);
+    assert.equal(scoreFaCandidate(flight, bad), 0);
+    const fr = { orig_icao: 'KRHV', dest_icao_actual: 'KRHV', datetime_takeoff: '2026-08-26T18:10:00Z', duration_min: 90 };
+    assert.equal(scoreFr24Candidate(flight, fr, '2026-08-26T18:00:00Z'), 16);
+  });
+
+  test('provider positions normalize to the track schema', () => {
+    const [fa] = normalizeFaPositions([{ timestamp: 't', latitude: 1, longitude: 2, altitude: 25, groundspeed: 90, heading: 10 }]);
+    assert.deepEqual(fa, { ts: 't', lat: 1, lon: 2, altitude_ft: 2500, groundspeed_kts: 90, track_deg: 10, on_ground: false });
+    const [fr] = normalizeFr24Positions([{ timestamp: '2026-08-26T18:00:00Z', lat: 1, lon: 2, alt: 150, gspeed: 60, vspeed: 0, track: 5 }]);
+    assert.equal(fr.on_ground, true);
+    assert.equal(fr.altitude_ft, 150);
   });
 });
 
 // ─── Smoke tests — live API ──────────────────────────────────────────────────
 
 const SKIP_SMOKE = process.env.SKIP_SMOKE === '1';
-const BASE = 'https://gacoka.com';
+const BASE = process.env.SMOKE_BASE || 'https://gacoka.com';
 
 async function get(path) {
   const r = await fetch(BASE + path, { signal: AbortSignal.timeout(15000) });
@@ -940,11 +869,11 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
 
 // ─── DB integration tests — new flight write path ────────────────────────────
 // Exercises the actual registered Fastify routes (not reimplemented SQL)
-// against the live database: POST /api/flights → OpenSky auto-fetch →
-// aircraft/airport join checks → DELETE cleanup. Only runs where
-// DATABASE_URL is set — that's only true inside the api container, so this
-// is skipped on a normal dev machine and only exercised there, e.g.:
-//   docker exec <api-container> npm test
+// against a database: POST /api/flights → OpenSky auto-fetch → aircraft/
+// airport join checks → DELETE cleanup. Runs only when DATABASE_URL is set,
+// and never under NODE_ENV=production (the api container): these tests write
+// to the database, so point them at a restored copy, e.g.
+//   DATABASE_URL=postgres://…/dashboard_copy SKIP_SMOKE=1 npm test
 //
 // Uses aircraft N213AN (id 36, mode_s_hex a1c4b4) at KRHV on 2026-08-26 with
 // time_out anchored to exactly 17:41:41Z — the OpenSky query key already
@@ -953,9 +882,11 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
 // fabricated flight. Every write this test makes is deleted in the final
 // test, which cascades track_log_points via the FK's ON DELETE CASCADE.
 
-const RUN_DB = !!process.env.DATABASE_URL;
+const DB_SKIP = !process.env.DATABASE_URL ? 'DATABASE_URL not set'
+  : process.env.NODE_ENV === 'production' ? 'refusing to write to a production database'
+  : false;
 
-describe('New flight entry — full write path (DB integration)', { skip: RUN_DB ? false : 'DATABASE_URL not set' }, () => {
+describe('New flight entry — full write path (DB integration)', { skip: DB_SKIP }, () => {
   let app, pool, createdFlightId;
 
   test('setup: build app + verify fixture aircraft/airport exist', async () => {
@@ -1037,6 +968,29 @@ describe('New flight entry — full write path (DB integration)', { skip: RUN_DB
       assert.equal(typeof p.lat, 'number');
       assert.equal(typeof p.lon, 'number');
       assert.ok(p.ts);
+    }
+  });
+
+  test('track upload for a missing flight leaves no connection inside a transaction', async () => {
+    // Regression: the 404 path returned without ROLLBACK, so the pooled client
+    // went back open mid-transaction and later writes on it were never committed.
+    for (let i = 0; i < 3; i++) {
+      const res = await app.inject({ method: 'POST', url: '/api/flights/999999/track', headers: { 'content-type': 'text/csv' },
+        payload: 'Timestamp,Latitude,Longitude,Altitude\n2026-01-01T00:00:00Z,37,-121,1000\n' });
+      assert.equal(res.statusCode, 404);
+    }
+    // Check from a separate connection: a pooled query could land on the very
+    // connection that leaked and wouldn't see itself as idle.
+    const { default: pg } = await import('pg');
+    const probe = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await probe.connect();
+    try {
+      const { rows } = await probe.query(
+        `SELECT count(*)::int AS n FROM pg_stat_activity
+         WHERE datname = current_database() AND state LIKE 'idle in transaction%'`);
+      assert.equal(rows[0].n, 0);
+    } finally {
+      await probe.end();
     }
   });
 

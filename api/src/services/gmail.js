@@ -52,7 +52,7 @@ async function checkInbox(client) {
 }
 
 // Parse "M/D/YYYY h:mm AM/PM" in US Pacific Time → UTC Unix timestamp
-function parsePacificToUnix(str) {
+export function parsePacificToUnix(str) {
   if (!str) return null
   const m = str.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
   if (!m) return null
@@ -73,13 +73,13 @@ function parsePacificToUnix(str) {
 }
 
 // Decode quoted-printable encoding used in MIME email bodies
-function decodeQP(str) {
+export function decodeQP(str) {
   return str.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
 }
 
 // Extract the last occurrence of each field from the decoded email text.
 // "Changed" emails contain two blocks (from/to) — we want the final (to) block.
-function parseScheduleBody(raw) {
+export function parseScheduleBody(raw) {
   const text = decodeQP(raw.toString())
   const lines = text.split(/\r?\n/)
   const last = {}

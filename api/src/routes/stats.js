@@ -14,7 +14,7 @@ function monthStart() {
   return d
 }
 
-function aggregate(activities) {
+export function aggregate(activities) {
   const by_sport = {}
   for (const act of activities) {
     const type = act.activityType?.typeKey ?? 'other'
@@ -30,7 +30,7 @@ function aggregate(activities) {
   return by_sport
 }
 
-function filterFrom(activities, since) {
+export function filterFrom(activities, since) {
   return activities.filter((a) => new Date(a.startTimeLocal) >= since)
 }
 

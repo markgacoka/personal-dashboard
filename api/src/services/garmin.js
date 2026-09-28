@@ -78,9 +78,6 @@ export async function completeMFA(code) {
   if (!_mfaState) throw new Error('No pending MFA session — call /auth/garmin/init first')
   const { gc, html, cookies } = _mfaState
 
-  console.log('MFA_HTML_LENGTH:', html.length)
-  console.log('MFA_HTML_FULL:', html)
-
   // Try both attribute orderings; /s flag lets . cross newlines in multi-line tags
   const csrfMatch =
     html.match(/name="_csrf"\s+value="([^"]+)"/) ||
@@ -105,9 +102,6 @@ export async function completeMFA(code) {
     : `https://sso.garmin.com${rawAction}`
 
   const cookieHeader = buildCookieHeader(cookies)
-  console.log('MFA_ACTION_URL:', actionUrl)
-  console.log('MFA_CSRF:', csrf)
-  console.log('MFA_COOKIE_HEADER:', cookieHeader)
 
   const form = new FormData()
   form.append('_csrf', csrf)
@@ -123,8 +117,6 @@ export async function completeMFA(code) {
       ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     },
   })
-
-  console.log('MFA_RESULT_SNIPPET:', String(mfaResult).substring(0, 2000))
 
   const ticketMatch = String(mfaResult).match(/ticket=([^"&\s]+)/)
   if (!ticketMatch) {
@@ -167,7 +159,7 @@ export async function autoMFA() {
 
   console.log('Garmin MFA required — polling Gmail for code...')
   const code = await fetchGarminCode()
-  console.log('Garmin MFA code found:', code)
+  console.log('Garmin MFA code found')
   await completeMFA(code)
   return { ok: true, mfa: true }
 }

@@ -11,6 +11,7 @@
 
 import { createInflateRaw } from 'zlib'
 import { pool } from '../db/client.js'
+import { fetchWithTimeout } from '../lib/http.js'
 
 const FAA_ZIP_URL = 'https://registry.faa.gov/database/ReleasableAircraft.zip'
 const UA = 'Mozilla/5.0 (compatible; personal-dashboard/1.0)'
@@ -67,25 +68,21 @@ export const TYPE_PERFORMANCE = {
   R44:  { mtow_lbs:2500, cruise_ktas:113, service_ceiling_ft:14000, range_nm:300,  vne_kts:130, vno_kts:110, vx_kts:null,vy_kts:null,vs0_kts:null,vs1_kts:null,va_kts:null,fuel_gal:29,  fuel_burn_gph:11.0, engine_hp:245 },
 }
 
-function xfetch(url, opts = {}) {
-  const { ms = 10000, ...rest } = opts
-  const ctrl = new AbortController()
-  const tid = setTimeout(() => ctrl.abort(), ms)
-  return fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA }, ...rest })
-    .finally(() => clearTimeout(tid))
-}
+// The FAA registry serves a reduced page to non-browser user agents.
+const xfetch = (url, { ms = 10000, headers = {} } = {}) =>
+  fetchWithTimeout(url, { ms, headers: { 'User-Agent': UA, ...headers } })
 
 // ─── Range-request ZIP extractor ─────────────────────────────────────────────
 
 async function fetchBytes(url, start, end) {
-  const r = await xfetch(url, { ms: 30000, headers: { 'User-Agent': UA, Range: `bytes=${start}-${end}` } })
+  const r = await xfetch(url, { ms: 30000, headers: { Range: `bytes=${start}-${end}` } })
   if (r.status !== 206 && r.status !== 200) throw new Error(`Range fetch failed: ${r.status}`)
   return Buffer.from(await r.arrayBuffer())
 }
 
 async function extractFileFromZip(url, filename) {
   // 1. Fetch last 22 bytes → EOCD → locate central directory
-  const headR = await xfetch(url, { ms: 15000, headers: { 'User-Agent': UA, Range: 'bytes=-22' } })
+  const headR = await xfetch(url, { ms: 15000, headers: { Range: 'bytes=-22' } })
   const totalSize = parseInt(headR.headers.get('content-range')?.split('/')[1] || '0')
   const eocd = Buffer.from(await headR.arrayBuffer())
   if (eocd.readUInt32LE(0) !== 0x06054b50) throw new Error('Invalid EOCD signature')

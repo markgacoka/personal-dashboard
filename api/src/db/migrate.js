@@ -797,3 +797,44 @@ export async function migrateV19() {
     client.release()
   }
 }
+
+// Migrations in order. Each runs once and is recorded in schema_migrations.
+// Before the ledger existed every migration re-ran on every boot, which kept
+// re-applying one-off data fixes (V10 blanked instructor_comments on every
+// restart).
+const MIGRATIONS = [
+  ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
+  ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
+  ['009', migrateV9],  ['010', migrateV10], ['011', migrateV11], ['012', migrateV12],
+  ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
+  ['017', migrateV17], ['018', migrateV18], ['019', migrateV19],
+]
+
+// Every migration in MIGRATIONS up to this one had already run (repeatedly) on
+// any database that existed before the ledger was introduced.
+const LAST_PRE_LEDGER = '019'
+
+export async function runMigrations(log) {
+  const { rows: [{ ledger, existing }] } = await pool.query(`
+    SELECT to_regclass('schema_migrations') IS NOT NULL AS ledger,
+           to_regclass('flights') IS NOT NULL AS existing`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ DEFAULT NOW()
+  )`)
+  if (!ledger && existing) {
+    // A pre-ledger database: record the migrations it already ran instead of
+    // re-running them, so their one-off data changes aren't applied again.
+    const done = MIGRATIONS.map(([name]) => name).filter(name => name <= LAST_PRE_LEDGER)
+    await pool.query('INSERT INTO schema_migrations (name) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING', [done])
+    log?.info({ recorded: done.length }, 'Migration ledger created for an existing database')
+  }
+  const { rows } = await pool.query('SELECT name FROM schema_migrations')
+  const applied = new Set(rows.map(r => r.name))
+  for (const [name, run] of MIGRATIONS) {
+    if (applied.has(name)) continue
+    await run()
+    await pool.query('INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING', [name])
+    log?.info({ migration: name }, 'Migration applied')
+  }
+}

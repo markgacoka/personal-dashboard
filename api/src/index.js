@@ -9,16 +9,19 @@ import athleteRoutes from './routes/athlete.js'
 import activitiesRoutes from './routes/activities.js'
 import statsRoutes from './routes/stats.js'
 import sleepRoutes from './routes/sleep.js'
-import flightRoutes, { scheduleNightSync } from './routes/flights.js'
+import flightRoutes from './routes/flights.js'
 import importRoutes from './routes/import.js'
-import proxyRoutes from './routes/proxy.js'
-import metarRoutes from './routes/metar.js'
+import aircraftRoutes from './routes/aircraft.js'
+import aviationRoutes from './routes/aviation.js'
+import trackRoutes from './routes/tracks.js'
+import niceAirRoutes from './routes/niceAir.js'
 import chessRoutes from './routes/chess.js'
-import { migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9, migrateV10, migrateV11, migrateV12, migrateV13, migrateV14, migrateV15, migrateV16, migrateV17, migrateV18, migrateV19 } from './db/migrate.js'
 import financeRoutes, { scheduleFinanceSync } from './routes/finance.js'
+import { runMigrations } from './db/migrate.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 import { scheduleUsAirportsRefresh } from './services/usAirports.js'
+import { scheduleNightSync } from './services/schedules.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -26,59 +29,26 @@ const publicDir = process.env.PUBLIC_DIR || resolve(__dirname, '../../public')
 
 const fastify = Fastify({ logger: true })
 
-await fastify.register(cors, {
-  origin: process.env.CORS_ORIGIN || 'https://gacoka.com',
-})
-
-// Serve static frontend files
-await fastify.register(fastifyStatic, {
-  root: publicDir,
-  prefix: '/',
-})
-
-await fastify.register(proxyRoutes)
-await fastify.register(metarRoutes)
-await fastify.register(chessRoutes)
+await fastify.register(cors, { origin: process.env.CORS_ORIGIN || 'https://gacoka.com' })
+await fastify.register(fastifyStatic, { root: publicDir, prefix: '/' })
 
 fastify.get('/health', async () => ({ ok: true }))
-
-fastify.get('/api/health', async () => ({
-  ok: true,
-  uptime: process.uptime(),
-  timestamp: new Date().toISOString(),
-}))
+fastify.get('/api/health', async () => ({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() }))
 
 fastify.setErrorHandler((err, req, reply) => {
   fastify.log.error(err)
   reply.status(err.statusCode || 500).send({ error: err.message })
 })
 
-await fastify.register(authRoutes)
-await fastify.register(athleteRoutes)
-await fastify.register(activitiesRoutes)
-await fastify.register(statsRoutes)
+// Routes that work without the database (they degrade to external APIs only).
+for (const routes of [aircraftRoutes, aviationRoutes, trackRoutes, niceAirRoutes, chessRoutes,
+                      authRoutes, athleteRoutes, activitiesRoutes, statsRoutes]) {
+  await fastify.register(routes)
+}
 
 if (process.env.DATABASE_URL) {
   try {
-    await migrate()
-    await migrateV2()
-    await migrateV3()
-    await migrateV4()
-    await migrateV5()
-    await migrateV6()
-    await migrateV7()
-    await migrateV8()
-    await migrateV9()
-    await migrateV10()
-    await migrateV11()
-    await migrateV12()
-    await migrateV13()
-    await migrateV14()
-    await migrateV15()
-    await migrateV16()
-    await migrateV17()
-    await migrateV18()
-    await migrateV19()
+    await runMigrations(fastify.log)
     fastify.log.info('DB migration complete')
     await fastify.register(flightRoutes)
     await fastify.register(importRoutes)
@@ -86,23 +56,18 @@ if (process.env.DATABASE_URL) {
     if (process.env.PLAID_CLIENT_ID) {
       await fastify.register(financeRoutes)
       fastify.log.info('Finance routes enabled')
-      // Snapshot every linked account's balance once a day, not just on sync
-      scheduleFinanceSync(fastify.log)
+      scheduleFinanceSync(fastify.log) // daily balance snapshot
     }
-    // Download FAA airspace on first boot + refresh every 28-day AIRAC cycle
-    scheduleFaaAirspaceRefresh(fastify.log)
-    // Download nationwide US airports on first boot + refresh every 28 days
-    scheduleUsAirportsRefresh(fastify.log)
-    // Sync flight block times from Gmail schedules on first boot + every 6h
-    scheduleNightSync(fastify.log)
+    scheduleFaaAirspaceRefresh(fastify.log) // first boot, then every 28-day AIRAC cycle
+    scheduleUsAirportsRefresh(fastify.log)  // first boot, then every 28 days
+    scheduleNightSync(fastify.log)          // block times from Gmail: first boot, then every 6 h
 
-    // Seed ACFTREF (8K rows) on first boot — runs in background, non-blocking
+    // Seed the FAA ACFTREF table (~8K rows) on first boot, in the background.
     isAcftrefEmpty().then(empty => {
-      if (empty) {
-        importAcftref(msg => fastify.log.info(msg))
-          .then(n => fastify.log.info({ rows: n }, 'FAA ACFTREF import done'))
-          .catch(err => fastify.log.warn({ err }, 'FAA ACFTREF import failed'))
-      }
+      if (!empty) return
+      importAcftref(msg => fastify.log.info(msg))
+        .then(n => fastify.log.info({ rows: n }, 'FAA ACFTREF import done'))
+        .catch(err => fastify.log.warn({ err }, 'FAA ACFTREF import failed'))
     }).catch(() => {})
   } catch (err) {
     fastify.log.warn({ err }, 'DB unavailable — flight routes disabled')
@@ -110,11 +75,8 @@ if (process.env.DATABASE_URL) {
 }
 
 // SPA fallback — serve index.html for any unmatched route
-fastify.setNotFoundHandler((req, reply) => {
-  reply.sendFile('index.html')
-})
+fastify.setNotFoundHandler((req, reply) => reply.sendFile('index.html'))
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const host = process.env.HOST || '127.0.0.1'
 await fastify.listen({ port, host })
-

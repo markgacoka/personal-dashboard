@@ -19,23 +19,10 @@
  */
 
 import { pool } from '../db/client.js'
-
-// ─── CSV parser ────────────────────────────────────────────────────────────────
-function parseCSVLine(line) {
-  const parts = []
-  let cur = ''
-  let inQuotes = false
-  for (const ch of line) {
-    if (ch === '"') { inQuotes = !inQuotes }
-    else if (ch === ',' && !inQuotes) { parts.push(cur.trim()); cur = '' }
-    else { cur += ch }
-  }
-  parts.push(cur.trim())
-  return parts
-}
+import { parseCsvLine } from '../lib/csv.js'
 
 function parseCSV(text) {
-  return text.split('\n').map(l => parseCSVLine(l.replace(/\r$/, '')))
+  return text.split('\n').map(l => parseCsvLine(l.replace(/\r$/, ''), { trim: true }))
 }
 
 function fl(v) { return v ? parseFloat(v) || 0 : 0 }
@@ -267,9 +254,13 @@ export default async function importRoutes(fastify) {
     try {
       await client.query('BEGIN')
 
-      // Verify flight exists
       const { rows: fl } = await client.query('SELECT id FROM flights WHERE id=$1', [flight_id])
-      if (!fl.length) return reply.status(404).send({ error: 'Flight not found' })
+      if (!fl.length) {
+        // Close the transaction before the client goes back to the pool, or
+        // every later query on that connection runs inside it, uncommitted.
+        await client.query('ROLLBACK')
+        return reply.status(404).send({ error: 'Flight not found' })
+      }
 
       // Clear existing track
       await client.query('DELETE FROM track_log_points WHERE flight_id=$1', [flight_id])

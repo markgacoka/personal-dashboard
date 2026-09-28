@@ -1,45 +1,13 @@
-// Generic flight track service — normalizes ADS-B data into a common schema
-// Compatible with OpenSky Network (ongoing default) and FlightRadar24 (legacy).
+// Flight GPS tracks: normalization of provider data into the track_log_points
+// schema, and persistence tagged with the provider the route came from.
 //
-// Normalized track point schema (matches track_log_points table):
-//   { ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm }
+// Normalized point: { ts, lat, lon, altitude_ft, groundspeed_kts, track_deg,
+//                     vertical_speed_fpm, on_ground }
+import { fetchOpenSkyTrack, normalizeIcao24 } from './opensky.js'
 
-const OSKY_TOKEN_URL = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token'
-let _oskyToken = null
+const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv']
 
-export async function getOskyToken() {
-  const id  = process.env.OPENSKY_CLIENT_ID
-  const sec = process.env.OPENSKY_CLIENT_SECRET
-  if (!id || !sec) return null
-  if (_oskyToken && _oskyToken.expiresAt > Date.now() + 30_000) return _oskyToken.value
-  const r = await fetch(OSKY_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: sec }),
-    signal: AbortSignal.timeout(10000),
-  })
-  if (!r.ok) return null
-  const d = await r.json()
-  _oskyToken = { value: d.access_token, expiresAt: Date.now() + (d.expires_in ?? 3600) * 1000 }
-  return _oskyToken.value
-}
-
-// Normalize OpenSky path array [[time, lat, lon, alt_m, track_deg, on_ground], ...]
-export function normalizeOpenSkyPath(path) {
-  return (path || []).map(([t, lat, lon, alt, trk, grnd]) => ({
-    ts:               new Date(t * 1000).toISOString(),
-    lat,
-    lon,
-    altitude_ft:      alt != null ? Math.round(alt * 3.28084) : null,
-    groundspeed_kts:  null,
-    track_deg:        trk ?? null,
-    vertical_speed_fpm: null,
-    on_ground:        !!grnd,
-  }))
-}
-
-// Normalize FR24 v1 API position array (from /api/historic/flight-positions/full)
-// timestamp is ISO string, alt in feet, gspeed in knots, vspeed in fpm
+// FR24 v1 /flight-tracks positions: ISO timestamp, alt ft, gspeed kt, vspeed fpm.
 export function normalizeFr24Positions(positions) {
   return (positions || []).map(p => ({
     ts:               typeof p.timestamp === 'string' ? p.timestamp
@@ -54,36 +22,34 @@ export function normalizeFr24Positions(positions) {
   }))
 }
 
-const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv']
-
-// Save normalized track points to track_log_points, replacing any existing track.
-// `source` records which provider the route data came from — required so the
-// database always knows the origin of a flight's GPS track.
-export async function saveTrackPoints(pool, flightId, points, source) {
+// Replace a flight's track with the airborne points, tagged with `source`.
+// One statement (DELETE in a CTE + INSERT), so readers never see a half-written
+// track. `db` is anything with pg's query(): the pool or a transaction client.
+export async function saveTrackPoints(db, flightId, points, source) {
   if (!TRACK_SOURCES.includes(source)) {
     throw new Error(`saveTrackPoints: invalid source '${source}' (must be one of ${TRACK_SOURCES.join(', ')})`)
   }
   const airborne = points.filter(p => p.lat != null && p.lon != null && !p.on_ground)
-  await pool.query('DELETE FROM track_log_points WHERE flight_id=$1', [flightId])
-  if (!airborne.length) return 0
-  const rows = airborne.map(p =>
-    `(${flightId}, '${p.ts}', ${p.lat}, ${p.lon}, ${p.altitude_ft ?? 'NULL'}, ` +
-    `${p.groundspeed_kts ?? 'NULL'}, ${p.track_deg ?? 'NULL'}, ${p.vertical_speed_fpm ?? 'NULL'}, '${source}')`
-  )
-  await pool.query(
-    `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source)
-     VALUES ${rows.join(',')}`,
-    []
+  const col = k => airborne.map(p => p[k] ?? null)
+  await db.query(
+    `WITH cleared AS (DELETE FROM track_log_points WHERE flight_id = $1)
+     INSERT INTO track_log_points
+       (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source)
+     SELECT $1, t.ts, t.lat, t.lon, t.alt, t.gs, t.trk, t.vs, $9
+     FROM unnest($2::timestamptz[], $3::float8[], $4::float8[], $5::float8[], $6::float8[], $7::float8[], $8::float8[])
+       AS t(ts, lat, lon, alt, gs, trk, vs)`,
+    [flightId, col('ts'), col('lat'), col('lon'), col('altitude_ft'),
+     col('groundspeed_kts'), col('track_deg'), col('vertical_speed_fpm'), source]
   )
   return airborne.length
 }
 
-// Fetch OpenSky track for a flight by flight_id (reads mode_s_hex + time_out from DB)
-// Returns { success, points_saved, total_points } or { error }
+// Fetch and save the OpenSky track for a logged flight, using its aircraft's
+// Mode S hex and block-out time. Returns { success, points_saved, total_points }
+// or { error }.
 export async function autoFetchOpenSkyTrack(pool, flightId) {
   const { rows } = await pool.query(`
-    SELECT f.id, f.date::text, f.time_out,
-           ac.mode_s_hex, ac.tail_number
+    SELECT f.id, f.date::text, f.time_out, ac.mode_s_hex
     FROM flights f
     JOIN aircraft ac ON ac.id = f.aircraft_id
     WHERE f.id = $1
@@ -91,51 +57,17 @@ export async function autoFetchOpenSkyTrack(pool, flightId) {
 
   if (!rows.length) return { error: 'Flight not found' }
   const f = rows[0]
-
   if (!f.mode_s_hex) return { error: 'No Mode S hex code for aircraft' }
 
-  const hex = f.mode_s_hex.toLowerCase().replace(/[^0-9a-f]/g, '')
-
-  // Anchor timestamp: use block-out time if known, else noon Pacific on the flight date
+  // Anchor: block-out time if known, else 18:00Z (late morning Pacific) on the flight date.
   const queryTs = f.time_out
     ? Math.floor(new Date(f.time_out).getTime() / 1000)
     : Math.floor(new Date(String(f.date).slice(0, 10) + 'T18:00:00Z').getTime() / 1000)
 
-  // Check cache first — OpenSky tracks are immutable once a flight completes
-  const { rows: cached } = await pool.query(
-    'SELECT path_json FROM opensky_tracks_cache WHERE icao24=$1 AND first_seen_unix=$2',
-    [hex, queryTs]
-  )
+  const result = await fetchOpenSkyTrack(normalizeIcao24(f.mode_s_hex), queryTs)
+  if (result.status) return { error: `OpenSky returned ${result.status}` }
+  if (!result.path?.length) return { error: 'No track data from OpenSky', points_saved: 0 }
 
-  let path
-  if (cached.length) {
-    path = cached[0].path_json
-  } else {
-    let token = null
-    try { token = await getOskyToken() } catch (_) {}
-    const headers = { 'User-Agent': 'personal-dashboard/1.0' }
-    if (token) headers.Authorization = `Bearer ${token}`
-
-    const r = await fetch(
-      `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(hex)}&time=${queryTs}`,
-      { headers, signal: AbortSignal.timeout(12000) }
-    )
-    if (!r.ok) return { error: `OpenSky returned ${r.status}` }
-
-    const d = await r.json()
-    path = normalizeOpenSkyPath(d.path)
-
-    if (path.length) {
-      await pool.query(
-        `INSERT INTO opensky_tracks_cache (icao24, first_seen_unix, callsign, path_json)
-         VALUES ($1, $2, $3, $4) ON CONFLICT (icao24, first_seen_unix) DO NOTHING`,
-        [hex, queryTs, d.callsign?.trim() || null, JSON.stringify(path)]
-      )
-    }
-  }
-
-  if (!path?.length) return { error: 'No track data from OpenSky', points_saved: 0 }
-
-  const saved = await saveTrackPoints(pool, flightId, path, 'opensky')
-  return { success: true, points_saved: saved, total_points: path.length }
+  const saved = await saveTrackPoints(pool, flightId, result.path, 'opensky')
+  return { success: true, points_saved: saved, total_points: result.path.length }
 }

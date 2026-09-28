@@ -1,6 +1,7 @@
 import { pool } from '../db/client.js'
-import { fetchNiceAirSchedules, syncNiceAirToDB } from '../services/gmail.js'
+import { syncNiceAirToDB } from '../services/gmail.js'
 import { autoFetchOpenSkyTrack } from '../services/flightTrack.js'
+import { backfillNightTimes, syncSchedulesToTimes } from '../services/schedules.js'
 
 const FLIGHT_SELECT = `
   SELECT
@@ -47,200 +48,95 @@ const FLIGHT_SELECT = `
   LEFT JOIN instructors i ON i.id = f.instructor_id
 `
 
-// Sets time_out (block out) and time_in (block in) from NICE AIR Gmail
-// schedules. Does not touch any logbook values — night, takeoffs, landings
-// are source-of-truth. Safe to re-run: only fills fields that aren't
-// already set (ForeFlight import takes precedence).
-export async function backfillNightTimes(log) {
-  const { rows: flights } = await pool.query(`
-    SELECT f.id, f.date::text, f.time_out, f.time_in, ac.tail_number
-    FROM flights f
-    JOIN aircraft ac ON ac.id = f.aircraft_id
-  `)
+// Columns written by POST/PUT /api/flights, in parameter order, with the value
+// used when the request omits the field (undefined, not null, falls back).
+const FLIGHT_COLUMNS = [
+  ['date'], ['aircraft_id'], ['departure_icao'], ['arrival_icao'], ['via', []], ['training_type'], ['total_duration'],
+  ['dual_given', 0], ['dual_received', 0], ['pic', 0], ['sic', 0], ['solo', 0],
+  ['cross_country', 0], ['night', 0], ['actual_instrument', 0], ['instrument', 0],
+  ['takeoffs', 0], ['landings', 0], ['day_takeoffs', 0], ['day_landings_full_stop', 0],
+  ['night_takeoffs', 0], ['night_landings', 0], ['night_landings_full_stop', 0],
+  ['holds', 0], ['distance_nm', null], ['hobbs_start', null], ['hobbs_end', null], ['tach_start', null], ['tach_end', null],
+  ['time_out', null], ['time_in', null], ['instructor_id'], ['remarks'],
+]
+const COLUMN_NAMES = FLIGHT_COLUMNS.map(([c]) => c)
 
-  let schedules = []
-  try { schedules = await fetchNiceAirSchedules() } catch (e) {
-    log?.warn({ err: e.message }, 'Gmail fetch failed during schedule sync')
-  }
-
-  // Keep latest non-cancelled schedule per date+tail
-  const schedMap = new Map()
-  for (const s of schedules) {
-    if (!s.date_str || !s.tail || s.type === 'cancelled' || !s.start_unix) continue
-    const key = `${s.date_str}/${s.tail.replace(/^N/, '')}`
-    const existing = schedMap.get(key)
-    if (!existing || (s.received || '') > (existing.received || '')) schedMap.set(key, s)
-  }
-
-  const results = []
-  for (const f of flights) {
-    const dateStr   = String(f.date).slice(0, 10)
-    const tailShort = (f.tail_number || '').replace(/^N/, '')
-    const sched     = schedMap.get(`${dateStr}/${tailShort}`)
-    if (!sched) continue
-
-    // Only set if not already recorded (ForeFlight import takes precedence)
-    const timeOut = f.time_out || new Date(sched.start_unix * 1000).toISOString()
-    const timeIn  = f.time_in  || (sched.end_unix ? new Date(sched.end_unix * 1000).toISOString() : null)
-
-    await pool.query(
-      `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
-      [f.id, timeOut, timeIn]
-    )
-
-    results.push({
-      id:       f.id,
-      date:     dateStr,
-      tail:     f.tail_number,
-      time_out: timeOut?.slice(0, 16),
-      time_in:  timeIn?.slice(0, 16),
-    })
-  }
-
-  return { updated: results.length, total: flights.length, results }
+function flightValues(body) {
+  return FLIGHT_COLUMNS.map(([col, fallback]) => {
+    if (col === 'instructor_id') return body.instructor_id || null
+    return body[col] === undefined ? fallback : body[col]
+  })
 }
 
-const NIGHT_SYNC_CHECK_MS = 6 * 60 * 60 * 1000 // 6h — safely within setInterval's 32-bit delay limit
+async function insertApproaches(flightId, approaches = []) {
+  for (const ap of approaches) {
+    if (!ap.approach_type || !ap.airport_icao) continue
+    await pool.query(
+      `INSERT INTO approaches (flight_id,approach_type,airport_icao,runway,circle_to_land) VALUES ($1,$2,$3,$4,$5)`,
+      [flightId, ap.approach_type, ap.airport_icao.toUpperCase(), ap.runway || null, ap.circle_to_land || false]
+    )
+  }
+}
 
-export function scheduleNightSync(log) {
-  backfillNightTimes(log).catch(e => log?.warn({ err: e.message }, 'Night-time schedule sync failed'))
-  setInterval(() => {
-    backfillNightTimes(log).catch(e => log?.warn({ err: e.message }, 'Night-time schedule sync failed'))
-  }, NIGHT_SYNC_CHECK_MS)
+// Add via_airports: the airports table row for each ICAO in flight.via.
+async function withViaAirports(flights) {
+  const icaos = [...new Set(flights.flatMap(f => f.via || []))]
+  const byIcao = {}
+  if (icaos.length) {
+    const { rows } = await pool.query('SELECT * FROM airports WHERE icao = ANY($1)', [icaos])
+    for (const a of rows) byIcao[a.icao] = a
+  }
+  return flights.map(f => ({ ...f, via_airports: (f.via || []).map(ic => byIcao[ic] || { icao: ic }) }))
 }
 
 export default async function flightRoutes(fastify) {
   fastify.get('/api/flights', async (req) => {
     const { date, tail, departure } = req.query
     const clauses = [], params = []
-    if (date)      { clauses.push(`f.date = $${params.length+1}::date`);             params.push(date) }
-    if (tail)      { clauses.push(`ac.tail_number = $${params.length+1}`);           params.push(tail.toUpperCase()) }
-    if (departure) { clauses.push(`f.departure_icao = $${params.length+1}`);         params.push(departure.toUpperCase()) }
+    if (date)      { params.push(date);                     clauses.push(`f.date = $${params.length}::date`) }
+    if (tail)      { params.push(tail.toUpperCase());       clauses.push(`ac.tail_number = $${params.length}`) }
+    if (departure) { params.push(departure.toUpperCase());  clauses.push(`f.departure_icao = $${params.length}`) }
     const where = clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''
     const { rows } = await pool.query(FLIGHT_SELECT + where + ' ORDER BY f.date DESC', params)
-    // Attach via airport objects from the airports table
-    const allIcaos = [...new Set(rows.flatMap(r => r.via || []))]
-    const airportMap = {}
-    if (allIcaos.length) {
-      const { rows: apts } = await pool.query(
-        'SELECT * FROM airports WHERE icao = ANY($1)',
-        [allIcaos]
-      )
-      for (const a of apts) airportMap[a.icao] = a
-    }
-    return rows.map(r => ({ ...r, via_airports: (r.via || []).map(ic => airportMap[ic] || { icao: ic }) }))
+    return withViaAirports(rows)
   })
 
   fastify.get('/api/flights/:id', async (req, reply) => {
     const { rows } = await pool.query(FLIGHT_SELECT + ' WHERE f.id = $1', [req.params.id])
     if (!rows.length) return reply.status(404).send({ error: 'Not found' })
-    const flight = rows[0]
-    const allIcaos = flight.via || []
-    const airportMap = {}
-    if (allIcaos.length) {
-      const { rows: apts } = await pool.query('SELECT * FROM airports WHERE icao = ANY($1)', [allIcaos])
-      for (const a of apts) airportMap[a.icao] = a
-    }
-    return { ...flight, via_airports: allIcaos.map(ic => airportMap[ic] || { icao: ic }) }
+    return (await withViaAirports(rows))[0]
   })
 
   fastify.post('/api/flights', async (req, reply) => {
-    const {
-      date, aircraft_id, departure_icao, arrival_icao,
-      via = [], training_type, total_duration,
-      dual_given = 0, dual_received = 0, pic = 0, sic = 0, solo = 0,
-      cross_country = 0, night = 0, actual_instrument = 0, instrument = 0,
-      takeoffs = 0, landings = 0, day_takeoffs = 0, day_landings_full_stop = 0,
-      night_takeoffs = 0, night_landings = 0, night_landings_full_stop = 0,
-      holds = 0, distance_nm = null,
-      hobbs_start = null, hobbs_end = null, tach_start = null, tach_end = null,
-      time_out = null, time_in = null,
-      instructor_id, remarks,
-      approaches = [],
-    } = req.body
+    const placeholders = COLUMN_NAMES.map((_, i) => `$${i + 1}`).join(',')
     const { rows } = await pool.query(
-      `INSERT INTO flights
-       (date,aircraft_id,departure_icao,arrival_icao,via,training_type,total_duration,
-        dual_given,dual_received,pic,sic,solo,cross_country,night,actual_instrument,instrument,
-        takeoffs,landings,day_takeoffs,day_landings_full_stop,
-        night_takeoffs,night_landings,night_landings_full_stop,
-        holds,distance_nm,hobbs_start,hobbs_end,tach_start,tach_end,
-        time_out,time_in,instructor_id,remarks,foreflight_source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,'manual')
-       RETURNING id`,
-      [date, aircraft_id, departure_icao, arrival_icao, via, training_type, total_duration,
-       dual_given, dual_received, pic, sic, solo, cross_country, night, actual_instrument, instrument,
-       takeoffs, landings, day_takeoffs, day_landings_full_stop,
-       night_takeoffs, night_landings, night_landings_full_stop,
-       holds, distance_nm, hobbs_start, hobbs_end, tach_start, tach_end,
-       time_out, time_in, instructor_id || null, remarks]
+      `INSERT INTO flights (${COLUMN_NAMES.join(',')},foreflight_source)
+       VALUES (${placeholders},'manual') RETURNING id`,
+      flightValues(req.body)
     )
     const flightId = rows[0].id
 
-    // Sync latest NICE AIR Gmail schedules to DB so new entries have accurate time windows
+    // Background: refresh NICE AIR bookings so the new entry gets block times,
+    // and fetch its OpenSky track (a no-op without a Mode S hex or data).
     syncNiceAirToDB(pool).catch(() => {})
-    // Fire-and-forget OpenSky track fetch — fails silently if no Mode S hex or data unavailable
     autoFetchOpenSkyTrack(pool, flightId).catch(() => {})
 
-    for (const ap of approaches) {
-      if (!ap.approach_type || !ap.airport_icao) continue
-      await pool.query(
-        `INSERT INTO approaches (flight_id,approach_type,airport_icao,runway,circle_to_land) VALUES ($1,$2,$3,$4,$5)`,
-        [flightId, ap.approach_type, ap.airport_icao.toUpperCase(), ap.runway || null, ap.circle_to_land || false]
-      )
-    }
+    await insertApproaches(flightId, req.body.approaches)
     return reply.status(201).send({ id: flightId })
   })
 
   fastify.put('/api/flights/:id', async (req, reply) => {
     const id = parseInt(req.params.id)
-    const {
-      date, aircraft_id, departure_icao, arrival_icao,
-      via = [], training_type, total_duration,
-      dual_given = 0, dual_received = 0, pic = 0, sic = 0, solo = 0,
-      cross_country = 0, night = 0, actual_instrument = 0, instrument = 0,
-      takeoffs = 0, landings = 0, day_takeoffs = 0, day_landings_full_stop = 0,
-      night_takeoffs = 0, night_landings = 0, night_landings_full_stop = 0,
-      holds = 0, distance_nm = null,
-      hobbs_start = null, hobbs_end = null, tach_start = null, tach_end = null,
-      time_out = null, time_in = null,
-      instructor_id, remarks,
-      approaches = [],
-    } = req.body
-    const { rowCount } = await pool.query(
-      `UPDATE flights SET
-         date=$2, aircraft_id=$3, departure_icao=$4, arrival_icao=$5, via=$6,
-         training_type=$7, total_duration=$8,
-         dual_given=$9, dual_received=$10, pic=$11, sic=$12, solo=$13,
-         cross_country=$14, night=$15, actual_instrument=$16, instrument=$17,
-         takeoffs=$18, landings=$19, day_takeoffs=$20, day_landings_full_stop=$21,
-         night_takeoffs=$22, night_landings=$23, night_landings_full_stop=$24,
-         holds=$25, distance_nm=$26, hobbs_start=$27, hobbs_end=$28,
-         tach_start=$29, tach_end=$30, time_out=$31, time_in=$32,
-         instructor_id=$33, remarks=$34
-       WHERE id=$1`,
-      [id, date, aircraft_id, departure_icao, arrival_icao, via, training_type, total_duration,
-       dual_given, dual_received, pic, sic, solo, cross_country, night, actual_instrument, instrument,
-       takeoffs, landings, day_takeoffs, day_landings_full_stop,
-       night_takeoffs, night_landings, night_landings_full_stop,
-       holds, distance_nm, hobbs_start, hobbs_end, tach_start, tach_end,
-       time_out, time_in, instructor_id || null, remarks]
-    )
+    const assignments = COLUMN_NAMES.map((c, i) => `${c}=$${i + 2}`).join(', ')
+    const { rowCount } = await pool.query(`UPDATE flights SET ${assignments} WHERE id=$1`, [id, ...flightValues(req.body)])
     if (!rowCount) return reply.status(404).send({ error: 'Not found' })
     await pool.query('DELETE FROM approaches WHERE flight_id=$1', [id])
-    for (const ap of approaches) {
-      if (!ap.approach_type || !ap.airport_icao) continue
-      await pool.query(
-        `INSERT INTO approaches (flight_id,approach_type,airport_icao,runway,circle_to_land) VALUES ($1,$2,$3,$4,$5)`,
-        [id, ap.approach_type, ap.airport_icao.toUpperCase(), ap.runway || null, ap.circle_to_land || false]
-      )
-    }
+    await insertApproaches(id, req.body.approaches)
     return { id }
   })
 
   fastify.delete('/api/flights/:id', async (req, reply) => {
-    const id = parseInt(req.params.id)
-    const { rowCount } = await pool.query('DELETE FROM flights WHERE id=$1', [id])
+    const { rowCount } = await pool.query('DELETE FROM flights WHERE id=$1', [parseInt(req.params.id)])
     if (!rowCount) return reply.status(404).send({ error: 'Not found' })
     return reply.status(204).send()
   })
@@ -313,14 +209,9 @@ export default async function flightRoutes(fastify) {
     return { ...rows[0], airports_visited: visited[0].airports_visited }
   })
 
-  // ── Sync schedule block times from Gmail ─────────────────────────────────────
-  // Sets time_out (block out) and time_in (block in) from NICE AIR Gmail schedules.
-  // Does not touch any logbook values — night, takeoffs, landings are source-of-truth.
-  // Runs automatically (see scheduleNightSync below); this route lets it be
-  // triggered on demand too (e.g. for debugging).
-  fastify.post('/api/flights/backfill-night', async (req, reply) => {
-    return backfillNightTimes(fastify.log)
-  })
+  // ── Block times from NICE AIR bookings ─────────────────────────────────────
+  // From the Gmail inbox; also runs every 6 hours (scheduleNightSync).
+  fastify.post('/api/flights/backfill-night', async () => backfillNightTimes(fastify.log))
 
   // ── Query nice_air_schedules for specific dates ───────────────────────────────
   fastify.get('/api/flights/schedules-by-date', async (req, reply) => {
@@ -336,76 +227,8 @@ export default async function flightRoutes(fastify) {
     return rows
   })
 
-  // ── Sync NICE AIR schedule times → flights.time_out / time_in ────────────────
-  // For each flight (without time_out by default, or all with ?overwrite=true),
-  // find the best matching non-cancelled schedule from nice_air_schedules:
-  //   1. Exact tail match on same date
-  //   2. Any schedule on same date (date-only fallback) — handles solo in N739HE
-  //      while dual slot was booked as N227AN; duration used as tiebreaker.
-  // Does NOT touch logbook values (night, takeoffs, landings, etc.).
-  fastify.post('/api/flights/sync-schedules-to-times', async (req, reply) => {
-    const overwrite = req.query.overwrite === 'true'
-
-    const { rows: flights } = await pool.query(`
-      SELECT f.id, f.date::text, f.time_out, f.time_in, f.total_duration, ac.tail_number
-      FROM flights f
-      JOIN aircraft ac ON ac.id = f.aircraft_id
-      ${overwrite ? '' : 'WHERE f.time_out IS NULL'}
-    `)
-
-    const { rows: scheds } = await pool.query(`
-      SELECT date_str, tail, start_unix, end_unix
-      FROM nice_air_schedules
-      WHERE type != 'cancelled' AND start_unix IS NOT NULL
-    `)
-
-    const results = []
-    for (const f of flights) {
-      const dateStr   = String(f.date).slice(0, 10)
-      const tail      = f.tail_number
-      const tailShort = tail.replace(/^N/, '')
-      const dateScheds = scheds.filter(s => s.date_str === dateStr)
-      if (!dateScheds.length) continue
-
-      // 1. Prefer exact tail match
-      let chosen = dateScheds.find(s =>
-        s.tail === tail || s.tail?.replace(/^N/, '') === tailShort
-      ) || null
-
-      // 2. Date-only fallback: pick best duration match among remaining
-      if (!chosen) {
-        if (dateScheds.length === 1) {
-          chosen = dateScheds[0]
-        } else {
-          const logSec = f.total_duration ? parseFloat(f.total_duration) * 3600 : null
-          chosen = logSec
-            ? dateScheds.reduce((a, b) =>
-                Math.abs((a.end_unix - a.start_unix || 0) - logSec) <=
-                Math.abs((b.end_unix - b.start_unix || 0) - logSec) ? a : b
-              )
-            : dateScheds[0]
-        }
-      }
-
-      if (!chosen) continue
-
-      const timeOut = new Date(chosen.start_unix * 1000).toISOString()
-      const timeIn  = chosen.end_unix ? new Date(chosen.end_unix * 1000).toISOString() : null
-
-      await pool.query(
-        `UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1`,
-        [f.id, timeOut, timeIn]
-      )
-      results.push({
-        id:            f.id,
-        date:          dateStr,
-        tail,
-        schedule_tail: chosen.tail,
-        time_out:      timeOut.slice(0, 16),
-        time_in:       timeIn?.slice(0, 16) ?? null,
-      })
-    }
-
-    return { updated: results.length, total: flights.length, results }
-  })
+  // From the nice_air_schedules table: flights without a time_out, or every
+  // flight with ?overwrite=true.
+  fastify.post('/api/flights/sync-schedules-to-times', async (req) =>
+    syncSchedulesToTimes({ overwrite: req.query.overwrite === 'true' }))
 }

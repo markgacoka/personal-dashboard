@@ -122,3 +122,10 @@ this server yet" and the rest of the dashboard is unaffected.
   VPS, and Traefik must route
   `http://mail.gacoka.com/.well-known/acme-challenge/*` to Stalwart. Look for
   `acme` in the Stalwart logs.
+
+  Traefik and Stalwart each get their own certificate for `mail.gacoka.com`.
+  Traefik's covers `https://mail.gacoka.com`, which redirects to the webmail;
+  Stalwart's covers IMAP (993) and SMTP (465). Traefik uses the TLS-ALPN
+  challenge on port 443 (`traefik/traefik.yml`), because an HTTP challenge
+  would make Traefik answer every `/.well-known/acme-challenge/` request on
+  port 80 itself, and Stalwart's challenge would never reach Stalwart.

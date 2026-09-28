@@ -28,8 +28,9 @@ certificatesResolvers:
     acme:
       email: markgacoka@gmail.com
       storage: /acme.json
-      httpChallenge:
-        entryPoint: web
+      # TLS-ALPN on :443, so the plain-HTTP challenge path on :80 stays free
+      # for the mail server's own certificate (mail.gacoka.com, see docs/mail.md).
+      tlsChallenge: {}
 
 providers:
   docker:

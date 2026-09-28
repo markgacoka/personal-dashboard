@@ -54,6 +54,14 @@ services:
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=letsencrypt"
       - "traefik.http.services.app.loadbalancer.server.port=3000"
+      # https://mail.gacoka.com opens the webmail in the dashboard.
+      - "traefik.http.routers.mail-web.rule=Host(`mail.gacoka.com`)"
+      - "traefik.http.routers.mail-web.entrypoints=websecure"
+      - "traefik.http.routers.mail-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.mail-web.middlewares=to-webmail"
+      - "traefik.http.routers.mail-web.service=app"
+      - "traefik.http.middlewares.to-webmail.redirectregex.regex=^https://mail\\.gacoka\\.com/.*"
+      - "traefik.http.middlewares.to-webmail.redirectregex.replacement=https://gacoka.com/#mail"
     depends_on:
       traefik:
         condition: service_started

@@ -68,4 +68,4 @@ Persistent files on VPS (outside releases, never in git):
 
 ## Commit Convention
 
-`feat:`, `fix:`, `chore:`, `docs:` — see cicd-framework for full convention.
+`feat:`, `fix:`, `chore:`, `docs:` prefixes are the documented convention; recent history uses plain imperative subjects.

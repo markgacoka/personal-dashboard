@@ -878,7 +878,7 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
     assert.ok([200, 502].includes(status), `unexpected status ${status}`);
     if (status === 200) {
       assert.ok(Array.isArray(body.schedules), 'schedules should be an array');
-      assert.ok(['gmail', 'cache'].includes(body.source), 'source should be gmail or cache');
+      assert.ok(['db', 'gmail', 'cache'].includes(body.source), 'source should be db, gmail, or cache');
       if (body.schedules.length > 0) {
         const s = body.schedules[0];
         assert.ok(s.tail,        'schedule should have tail number');

@@ -54,17 +54,24 @@ export function normalizeFr24Positions(positions) {
   }))
 }
 
-// Save normalized track points to track_log_points, replacing any existing track
-export async function saveTrackPoints(pool, flightId, points) {
+const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv']
+
+// Save normalized track points to track_log_points, replacing any existing track.
+// `source` records which provider the route data came from — required so the
+// database always knows the origin of a flight's GPS track.
+export async function saveTrackPoints(pool, flightId, points, source) {
+  if (!TRACK_SOURCES.includes(source)) {
+    throw new Error(`saveTrackPoints: invalid source '${source}' (must be one of ${TRACK_SOURCES.join(', ')})`)
+  }
   const airborne = points.filter(p => p.lat != null && p.lon != null && !p.on_ground)
   await pool.query('DELETE FROM track_log_points WHERE flight_id=$1', [flightId])
   if (!airborne.length) return 0
   const rows = airborne.map(p =>
     `(${flightId}, '${p.ts}', ${p.lat}, ${p.lon}, ${p.altitude_ft ?? 'NULL'}, ` +
-    `${p.groundspeed_kts ?? 'NULL'}, ${p.track_deg ?? 'NULL'}, ${p.vertical_speed_fpm ?? 'NULL'})`
+    `${p.groundspeed_kts ?? 'NULL'}, ${p.track_deg ?? 'NULL'}, ${p.vertical_speed_fpm ?? 'NULL'}, '${source}')`
   )
   await pool.query(
-    `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
+    `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source)
      VALUES ${rows.join(',')}`,
     []
   )
@@ -129,6 +136,6 @@ export async function autoFetchOpenSkyTrack(pool, flightId) {
 
   if (!path?.length) return { error: 'No track data from OpenSky', points_saved: 0 }
 
-  const saved = await saveTrackPoints(pool, flightId, path)
+  const saved = await saveTrackPoints(pool, flightId, path, 'opensky')
   return { success: true, points_saved: saved, total_points: path.length }
 }

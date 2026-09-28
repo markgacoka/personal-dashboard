@@ -1,10 +1,13 @@
 /**
  * Test suite for the personal-dashboard API.
  *
- * Three layers:
+ * Four layers:
  *   1. Unit tests — pure helper functions (no I/O, no mocking needed)
  *   2. Frontend logic tests — functions mirrored from index.html
  *   3. Smoke tests — HTTP calls to the live deployed API
+ *   4. DB integration tests — real writes against the live database via the
+ *      actual Fastify routes, always cleaned up. Only runs where DATABASE_URL
+ *      is set (i.e. inside the api container), so it's skipped by default.
  *
  * Run: npm test
  * Run without smoke: SKIP_SMOKE=1 npm test
@@ -661,6 +664,42 @@ describe('filterAirportCsv — runway CSV filter', () => {
   });
 });
 
+// ─── Unit tests: track source provenance ────────────────────────────────────
+// saveTrackPoints validates its `source` argument before touching the
+// database, so this exercises the real function (not a reimplementation)
+// with no DB required — an invalid source must never reach a live query.
+
+describe('saveTrackPoints — source provenance validation', () => {
+  test('rejects a missing source before any query runs', async () => {
+    const { saveTrackPoints } = await import('../services/flightTrack.js');
+    const poolThatMustNotBeCalled = { query: () => { throw new Error('should not query'); } };
+    await assert.rejects(
+      () => saveTrackPoints(poolThatMustNotBeCalled, 1, [], undefined),
+      /invalid source/
+    );
+  });
+
+  test('rejects an unknown source string', async () => {
+    const { saveTrackPoints } = await import('../services/flightTrack.js');
+    const poolThatMustNotBeCalled = { query: () => { throw new Error('should not query'); } };
+    await assert.rejects(
+      () => saveTrackPoints(poolThatMustNotBeCalled, 1, [], 'flightradar'),
+      /invalid source/
+    );
+  });
+
+  test('accepts each of the four known sources', async () => {
+    const { saveTrackPoints } = await import('../services/flightTrack.js');
+    for (const source of ['opensky', 'fr24', 'aeroapi', 'foreflight_csv']) {
+      const calls = [];
+      const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
+      const saved = await saveTrackPoints(stubPool, 1, [], source);
+      assert.equal(saved, 0, 'no airborne points → nothing saved, but no error either');
+      assert.equal(calls.length, 1, 'only the DELETE should run when there are no points to insert');
+    }
+  });
+});
+
 // ─── Smoke tests — live API ──────────────────────────────────────────────────
 
 const SKIP_SMOKE = process.env.SKIP_SMOKE === '1';
@@ -885,5 +924,117 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
     const { status, body } = await post('/api/gmail/nice-air/refresh', {});
     assert.equal(status, 200);
     assert.equal(body.ok, true);
+  });
+});
+
+// ─── DB integration tests — new flight write path ────────────────────────────
+// Exercises the actual registered Fastify routes (not reimplemented SQL)
+// against the live database: POST /api/flights → OpenSky auto-fetch →
+// aircraft/airport join checks → DELETE cleanup. Only runs where
+// DATABASE_URL is set — that's only true inside the api container, so this
+// is skipped on a normal dev machine and only exercised there, e.g.:
+//   docker exec <api-container> npm test
+//
+// Uses aircraft N213AN (id 36, mode_s_hex a1c4b4) at KRHV on 2026-08-26 with
+// time_out anchored to exactly 17:41:41Z — the OpenSky query key already
+// cached in opensky_tracks_cache from production use, so the track fetch is
+// a cache hit (deterministic, no live network dependency) rather than a
+// fabricated flight. Every write this test makes is deleted in the final
+// test, which cascades track_log_points via the FK's ON DELETE CASCADE.
+
+const RUN_DB = !!process.env.DATABASE_URL;
+
+describe('New flight entry — full write path (DB integration)', { skip: RUN_DB ? false : 'DATABASE_URL not set' }, () => {
+  let app, pool, createdFlightId;
+
+  test('setup: build app + verify fixture aircraft/airport exist', async () => {
+    const { default: Fastify } = await import('fastify');
+    const { default: flightRoutes } = await import('../routes/flights.js');
+    ({ pool } = await import('../db/client.js'));
+
+    app = Fastify({ logger: false });
+    await app.register(flightRoutes);
+    await app.ready();
+
+    const { rows } = await pool.query(`SELECT id, mode_s_hex FROM aircraft WHERE tail_number='N213AN'`);
+    assert.ok(rows.length, 'fixture aircraft N213AN must exist in production');
+    assert.equal(rows[0].id, 36, 'test is hardcoded to aircraft id 36 — update both if this ever changes');
+    assert.equal(rows[0].mode_s_hex, 'a1c4b4', 'fixture aircraft mode_s_hex must match the cached OpenSky track');
+
+    const { rows: apt } = await pool.query(`SELECT icao FROM airports WHERE icao='KRHV'`);
+    assert.ok(apt.length, 'fixture airport KRHV must exist in production');
+  });
+
+  test('POST /api/flights creates a flight with the submitted fields', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/flights',
+      payload: {
+        date: '2026-08-26',
+        aircraft_id: 36,
+        departure_icao: 'KRHV',
+        arrival_icao: 'KRHV',
+        training_type: 'dual',
+        total_duration: 1.0,
+        dual_received: 1.0,
+        takeoffs: 1, landings: 1, day_takeoffs: 1, day_landings_full_stop: 1,
+        time_out: '2026-08-26T17:41:41.000Z',
+        remarks: 'AUTOMATED TEST — write-path validation, deleted immediately after assertions run',
+      },
+    });
+    assert.equal(res.statusCode, 201);
+    createdFlightId = res.json().id;
+    assert.ok(Number.isInteger(createdFlightId));
+  });
+
+  test('GET /api/flights/:id → aircraft + airport info fully populated', async () => {
+    const res = await app.inject({ method: 'GET', url: `/api/flights/${createdFlightId}` });
+    assert.equal(res.statusCode, 200);
+    const f = res.json();
+    assert.equal(f.aircraft.tail_number, 'N213AN');
+    assert.equal(f.aircraft.mode_s_hex, 'a1c4b4');
+    assert.ok(f.aircraft.make, 'aircraft.make should be populated from the aircraft table join');
+    assert.equal(f.departure.icao, 'KRHV');
+    assert.equal(typeof f.departure.lat, 'number', 'departure airport lat should be populated');
+    assert.equal(f.arrival.icao, 'KRHV');
+    assert.equal(typeof f.arrival.lat, 'number', 'arrival airport lat should be populated');
+  });
+
+  test('OpenSky auto-fetch populates track_log_points tagged source=opensky', async () => {
+    // The route fires this fire-and-forget, so poll briefly for it to land —
+    // it's a cache hit, so in practice this resolves in well under a second.
+    let flight;
+    for (let i = 0; i < 20; i++) {
+      const res = await app.inject({ method: 'GET', url: `/api/flights/${createdFlightId}` });
+      flight = res.json();
+      if (flight.has_track) break;
+      await new Promise(r => setTimeout(r, 250));
+    }
+    assert.equal(flight.has_track, true, 'OpenSky auto-fetch should have populated a track from cached data');
+    assert.equal(flight.track_source, 'opensky', 'a new UI-logged flight must be tagged with its real source');
+
+    const trackRes = await app.inject({ method: 'GET', url: `/api/flights/${createdFlightId}/track` });
+    assert.equal(trackRes.statusCode, 200);
+    const points = trackRes.json();
+    assert.ok(points.length > 0, 'should have track points');
+    for (const p of points) {
+      assert.equal(p.source, 'opensky');
+      assert.equal(typeof p.lat, 'number');
+      assert.equal(typeof p.lon, 'number');
+      assert.ok(p.ts);
+    }
+  });
+
+  test('cleanup: DELETE /api/flights/:id removes the flight and cascades its track', async () => {
+    const res = await app.inject({ method: 'DELETE', url: `/api/flights/${createdFlightId}` });
+    assert.equal(res.statusCode, 204);
+
+    const { rows: tp } = await pool.query('SELECT count(*) FROM track_log_points WHERE flight_id=$1', [createdFlightId]);
+    assert.equal(Number(tp[0].count), 0, 'track points should cascade-delete with the flight');
+    const { rows: fl } = await pool.query('SELECT count(*) FROM flights WHERE id=$1', [createdFlightId]);
+    assert.equal(Number(fl[0].count), 0, 'flight row should be gone');
+
+    await app.close();
+    await pool.end();
   });
 });

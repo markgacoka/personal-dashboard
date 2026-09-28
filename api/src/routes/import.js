@@ -287,8 +287,8 @@ export default async function importRoutes(fastify) {
         const vs  = vsIdx  >= 0 ? parseInt(r[vsIdx])  || null : null
 
         await client.query(
-          `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          `INSERT INTO track_log_points (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'foreflight_csv')`,
           [flight_id, ts, lat, lon, alt, spd, trk, vs]
         )
         inserted++
@@ -307,7 +307,7 @@ export default async function importRoutes(fastify) {
   // ─── Track log retrieval ─────────────────────────────────────────────────────
   fastify.get('/api/flights/:id/track', async (req, reply) => {
     const { rows } = await pool.query(
-      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm
+      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source
        FROM track_log_points WHERE flight_id=$1 ORDER BY ts`,
       [req.params.id]
     )

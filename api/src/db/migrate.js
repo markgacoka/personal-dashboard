@@ -739,3 +739,61 @@ export async function migrateV18() {
     client.release()
   }
 }
+
+// V19: record the original provider for each flight's GPS route data.
+// track_log_points previously had no source column — four different write
+// paths (OpenSky auto-fetch on new flights, FR24/FlightAware on-demand
+// backfill, and a raw ForeFlight CSV import) all wrote into the same
+// columns with no provenance, so the only way to tell where a track came
+// from was to diff its point count against flight_track_compare_cache.
+// Add `source` and backfill the 57 existing tracks that way — for the
+// same flight, FR24's and AeroAPI's cached point counts never collide, so
+// the match is exact. Leaves any flight that matches neither cached
+// source (e.g. a manual ForeFlight import) as NULL rather than guessing.
+//
+// Also corrects flight_track_choice for flight 44, whose chosen_source
+// ('neither', recorded when its FR24/AeroAPI comparison was rejected)
+// disagreed with what's actually live in track_log_points for it — an
+// AeroAPI track applied afterward via a since-removed backfill path.
+export async function migrateV19() {
+  const client = await pool.connect()
+  try {
+    await client.query(`
+      ALTER TABLE track_log_points ADD COLUMN IF NOT EXISTS source TEXT
+        CHECK (source IN ('opensky','fr24','aeroapi','foreflight_csv'));
+      CREATE INDEX IF NOT EXISTS idx_track_log_points_source ON track_log_points(source);
+    `)
+
+    // Idempotent: only ever touches rows that don't have a source yet.
+    await client.query(`
+      WITH counts AS (
+        SELECT flight_id, COUNT(*) AS n
+        FROM track_log_points
+        WHERE source IS NULL
+        GROUP BY flight_id
+      ),
+      matched AS (
+        SELECT c.flight_id, cc.source
+        FROM counts c
+        JOIN flight_track_compare_cache cc
+          ON cc.flight_id = c.flight_id
+         AND jsonb_array_length(cc.track_json) = c.n
+      )
+      UPDATE track_log_points t
+      SET source = m.source
+      FROM matched m
+      WHERE t.flight_id = m.flight_id AND t.source IS NULL
+    `)
+
+    await client.query(`
+      UPDATE flight_track_choice c
+      SET chosen_source = t.source
+      FROM (
+        SELECT DISTINCT flight_id, source FROM track_log_points WHERE source IN ('fr24','aeroapi')
+      ) t
+      WHERE c.flight_id = t.flight_id AND c.chosen_source != t.source
+    `)
+  } finally {
+    client.release()
+  }
+}

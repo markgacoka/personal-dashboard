@@ -267,7 +267,7 @@ async function runFaBackfill(toProcess, job, log) {
         continue
       }
 
-      const saved = await saveTrackPoints(pool, f.id, bounded)
+      const saved = await saveTrackPoints(pool, f.id, bounded, 'aeroapi')
       emit({ id: f.id, date: dateStr, tail, status: 'ok', points: saved, fa_flight_ids: okFaIds, score: scored[0].score })
       if (job) job.counts.ok++
     } catch (e) {
@@ -715,7 +715,7 @@ export default async function proxyRoutes(fastify) {
       return reply.status(200).send({ error: 'No GPS track points available for this flight. OpenSky may not have retained this track.' })
     }
 
-    const saved = await saveTrackPoints(pool, flight_id, path)
+    const saved = await saveTrackPoints(pool, flight_id, path, 'opensky')
     return { success: true, points_saved: saved, total_points: path.length }
   })
 
@@ -846,7 +846,7 @@ export default async function proxyRoutes(fastify) {
         return { success: false, points_saved: 0, message: 'No track positions from FR24' }
       }
 
-      const saved = await saveTrackPoints(pool, flightId, bounded)
+      const saved = await saveTrackPoints(pool, flightId, bounded, 'fr24')
       fastify.log.info({ flightId, tail, saved, fr24_ids: okFr24Ids }, 'FR24 track saved')
       return { success: true, points_saved: saved, fr24_ids: okFr24Ids, score: scored[0].score }
     } catch (e) {
@@ -962,7 +962,7 @@ export default async function proxyRoutes(fastify) {
         return { success: false, points_saved: 0, message: 'No track positions from FlightAware' }
       }
 
-      const saved = await saveTrackPoints(pool, flightId, bounded)
+      const saved = await saveTrackPoints(pool, flightId, bounded, 'aeroapi')
       fastify.log.info({ flightId, tail, saved, fa_flight_ids: okFaIds }, 'FlightAware track saved')
       return { success: true, points_saved: saved, fa_flight_ids: okFaIds, score: scored[0].score }
     } catch (e) {

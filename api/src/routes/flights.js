@@ -15,6 +15,7 @@ const FLIGHT_SELECT = `
     f.remarks, f.instructor_comments,
     f.instructor_id,
     EXISTS(SELECT 1 FROM track_log_points tlp WHERE tlp.flight_id = f.id) AS has_track,
+    (SELECT source FROM track_log_points WHERE flight_id = f.id LIMIT 1) AS track_source,
     row_to_json(dep) AS departure,
     row_to_json(arr) AS arrival,
     json_build_object(

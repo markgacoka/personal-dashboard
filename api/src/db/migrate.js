@@ -839,6 +839,67 @@ export async function migrateV22() {
   await runMigrations()
 }
 
+// V23: mail. The messages themselves live in the Stalwart mail server; these
+// tables hold the dashboard's own mail features: label names and colours
+// (labels are JMAP keywords on the messages), filter rules (compiled to the
+// server's Sieve script), templates, autocomplete contacts, per-sender
+// preferences, follow-up reminders, and settings.
+export async function migrateV23() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mail_labels (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL UNIQUE,
+      color      TEXT NOT NULL DEFAULT 'patina',
+      keyword    TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mail_filters (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL,
+      enabled    BOOLEAN NOT NULL DEFAULT true,
+      match      TEXT NOT NULL DEFAULT 'all' CHECK (match IN ('all', 'any')),
+      conditions JSONB NOT NULL,
+      actions    JSONB NOT NULL,
+      position   INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mail_templates (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL,
+      subject    TEXT NOT NULL DEFAULT '',
+      html       TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mail_contacts (
+      email        TEXT PRIMARY KEY,
+      name         TEXT,
+      sent_count   INTEGER NOT NULL DEFAULT 0,
+      last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS mail_sender_prefs (
+      email       TEXT PRIMARY KEY,
+      load_images BOOLEAN NOT NULL DEFAULT false,
+      importance  TEXT CHECK (importance IN ('important', 'other'))
+    );
+    CREATE TABLE IF NOT EXISTS mail_followups (
+      id         SERIAL PRIMARY KEY,
+      email_id   TEXT NOT NULL,
+      thread_id  TEXT NOT NULL,
+      subject    TEXT NOT NULL DEFAULT '',
+      recipients TEXT NOT NULL DEFAULT '',
+      sent_at    TIMESTAMPTZ NOT NULL,
+      due_at     TIMESTAMPTZ NOT NULL,
+      state      TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'replied', 'dismissed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS mail_followups_pending ON mail_followups (due_at) WHERE state = 'pending';
+    CREATE TABLE IF NOT EXISTS mail_settings (
+      key   TEXT PRIMARY KEY,
+      value JSONB NOT NULL
+    );
+  `)
+}
+
 // Migrations in order. Each runs once and is recorded in schema_migrations.
 // Before the ledger existed every migration re-ran on every boot, which kept
 // re-applying one-off data fixes (V10 blanked instructor_comments on every
@@ -849,7 +910,7 @@ const MIGRATIONS = [
   ['009', migrateV9],  ['010', migrateV10], ['011', migrateV11], ['012', migrateV12],
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
-  ['021', migrateV21], ['022', migrateV22],
+  ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

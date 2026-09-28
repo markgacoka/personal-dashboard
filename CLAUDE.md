@@ -40,6 +40,15 @@ Requires `BETTER_AUTH_SECRET` (32+ characters) in `/var/www/app/.env`; the API
 refuses to start in production without it. `BETTER_AUTH_URL` defaults to
 https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
 
+## Mail
+
+`#mail` is a mail client for hello@gacoka.com backed by a self-hosted
+Stalwart server (compose service `stalwart`; JMAP at http://stalwart:8080 on
+the docker network) with outgoing mail relayed through Brevo. Setup, env
+vars, DNS and maintenance: `docs/mail.md`. Server setup and repair:
+
+    docker exec current-api-1 node src/cli/mail.mjs bootstrap|configure|dns|set-password
+
 ## Tests
 
 `cd api && npm test` runs unit tests, signed-out security checks against
@@ -59,6 +68,7 @@ Persistent files on VPS (outside releases, never in git):
 - `/var/www/app/.env` — BETTER_AUTH_SECRET, GARMIN_USERNAME, GARMIN_PASSWORD, etc.
 - `/var/www/app/acme.json` — Traefik Let's Encrypt store (chmod 600)
 - `/var/www/app/garmin-session.json` — Garmin OAuth session cache
+- `/var/www/app/mail/` — Stalwart config and mail store (owned by UID 2000; back this up)
 
 ## Branch Rules
 

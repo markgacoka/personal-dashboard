@@ -91,6 +91,22 @@
           <span class="sb-lbl">Progress</span>
         </div>
       </div></div>
+
+      <div class="sb-group-hdr" id="sbh-mail">
+        <span>Mail</span>
+        <i class="ph-bold ph-caret-down sb-caret"></i>
+      </div>
+      <div class="sb-group-items" id="sbi-mail"><div class="sb-group-items-inner">
+        <div class="sb-item" data-view="mail">
+          <i class="ph-bold ph-tray"></i>
+          <span class="sb-lbl">Inbox</span>
+          <span class="sb-count" id="sb-mail-count" hidden></span>
+        </div>
+        <div class="sb-item" data-view="mail-settings">
+          <i class="ph-bold ph-gear-six"></i>
+          <span class="sb-lbl">Settings</span>
+        </div>
+      </div></div>
     </div>
   </nav>
 
@@ -314,6 +330,34 @@
         </div>
       </div>
 
+      <!-- MAIL ──────────────────────────────────────────────── -->
+      <div class="view" id="view-mail">
+        <div class="mail-layout">
+          <nav class="mail-rail" id="mail-rail" aria-label="Mail folders"></nav>
+          <section class="mail-main">
+            <div class="mail-toolbar">
+              <label class="mail-search">
+                <i class="ph-bold ph-magnifying-glass" aria-hidden="true"></i>
+                <input id="mail-search" type="search" placeholder="Search mail" title="Search words, or use from: to: subject: has:attachment is:unread is:starred label: in: before: after:" autocomplete="off" aria-label="Search mail">
+              </label>
+              <button class="btn-ghost btn-sm" id="mail-refresh" title="Check for new mail"><i class="ph-bold ph-arrow-clockwise"></i><span class="mail-hide-sm">Refresh</span></button>
+            </div>
+            <div class="mail-subbar" id="mail-subbar"></div>
+            <div id="mail-list" class="mail-list" aria-live="polite"></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- MAIL THREAD ───────────────────────────────────────── -->
+      <div class="view" id="view-mail-thread">
+        <div id="mail-thread" class="mail-thread"></div>
+      </div>
+
+      <!-- MAIL SETTINGS ─────────────────────────────────────── -->
+      <div class="view" id="view-mail-settings">
+        <div id="mail-settings" class="mail-settings"></div>
+      </div>
+
     </div><!-- /view-scroller -->
   </div><!-- /main-wrap -->
 
@@ -357,6 +401,9 @@
 <script src="/js/finance.js"></script>
 <script src="/js/chess.js"></script>
 <script src="/js/account.js"></script>
+<script src="/js/mail.js"></script>
+<script src="/js/mail-compose.js"></script>
+<script src="/js/mail-settings.js"></script>
 <script src="/js/main.js"></script>
 </body>
 </html>

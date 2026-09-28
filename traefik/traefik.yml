@@ -17,6 +17,9 @@ entryPoints:
           to: websecure
           scheme: https
           permanent: true
+          # Lowest priority, so a specific plain-HTTP route (the mail server's
+          # ACME challenge path) wins; everything else still redirects to HTTPS.
+          priority: 1
   websecure:
     address: ":443"
 

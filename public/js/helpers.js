@@ -65,7 +65,62 @@ const VIEW_TITLES = {
   'log-flight': 'Log Flight',
   finances: 'Finances', 'fin-accounts': 'Linked Accounts',
   chess: 'Chess Progress', account: 'Account',
+  mail: 'Mail', 'mail-thread': '', 'mail-settings': 'Mail Settings',
 };
+
+// ─── mail formatters ──────────────────────────────────────────────────────────
+// List date: time today, "Sep 28" this year, "Sep 28, 2025" before that.
+function fmtMailDate(iso, now = new Date()) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('en-US', opts);
+}
+
+// Full timestamp for a message header: "Mon, Sep 28, 3:42 PM".
+function fmtMailDateLong(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined, hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtBytes(n) {
+  if (!n) return '0 B';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// "Ana Lee <ana@x.com>" / {name,email} → display text.
+function fmtMailAddr(a) {
+  if (!a) return '';
+  return a.name && a.name !== a.email ? a.name : a.email;
+}
+
+// One address token typed into a recipient field → {name, email} or null.
+function parseMailToken(text) {
+  const t = String(text || '').trim().replace(/[,;]+$/, '');
+  const m = t.match(/^(.*?)<([^>]+)>$/);
+  const email = (m ? m[2] : t).trim();
+  if (!/^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/.test(email)) return null;
+  const name = m ? m[1].trim().replace(/^"(.*)"$/, '$1').trim() : '';
+  return { name: name || null, email };
+}
+
+// Send-later presets relative to now, in the viewer's local time.
+function mailSchedulePresets(now = new Date()) {
+  const at = (days, hour) => { const d = new Date(now); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0); return d; };
+  const monday = (() => { const d = at(((8 - now.getDay()) % 7) || 7, 8); return d; })();
+  const presets = [];
+  if (now.getHours() < 17) presets.push({ label: 'This evening', at: at(0, 18) });
+  presets.push({ label: 'Tomorrow morning', at: at(1, 8) });
+  presets.push({ label: 'Tomorrow afternoon', at: at(1, 13) });
+  presets.push({ label: 'Monday morning', at: monday });
+  return presets;
+}
 
 // ─── formatters ───────────────────────────────────────────────────────────────
 function fmtMi(m)   { return (m * M_TO_MI).toFixed(2) + ' mi'; }

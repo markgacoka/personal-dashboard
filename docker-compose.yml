@@ -60,6 +60,35 @@ services:
       postgres:
         condition: service_healthy
 
+  # Mail server for @gacoka.com (docs/mail.md). The dashboard reaches it over
+  # this network at http://stalwart:8080 (JMAP); port 8080 is never published.
+  # Public: 25 (incoming mail), 465 (sending from mail apps), 993 (IMAP).
+  # Outgoing mail relays through Brevo; Stalwart reads the relay key from
+  # BREVO_SMTP_KEY. STALWART_RECOVERY_ADMIN is only used during first setup.
+  stalwart:
+    image: stalwartlabs/stalwart:v0.16
+    restart: unless-stopped
+    ports:
+      - "25:25"
+      - "465:465"
+      - "993:993"
+    environment:
+      BREVO_SMTP_KEY: ${BREVO_SMTP_KEY:-}
+      STALWART_RECOVERY_ADMIN: admin:${MAIL_ADMIN_PASSWORD:-}
+    volumes:
+      - /var/www/app/mail/etc:/etc/stalwart
+      - /var/www/app/mail/data:/var/lib/stalwart
+    networks:
+      - web
+    labels:
+      # Let's Encrypt HTTP-01 for mail.gacoka.com: only the challenge path is
+      # routed to Stalwart (plain HTTP, port 80). Its admin UI stays private.
+      - "traefik.enable=true"
+      - "traefik.http.routers.mail-acme.rule=Host(`mail.gacoka.com`) && PathPrefix(`/.well-known/acme-challenge/`)"
+      - "traefik.http.routers.mail-acme.entrypoints=web"
+      - "traefik.http.routers.mail-acme.service=mail-acme"
+      - "traefik.http.services.mail-acme.loadbalancer.server.port=8080"
+
   # Run on demand to (re-)authenticate with Garmin via headless Chromium.
   # Chromium's real TLS fingerprint bypasses Cloudflare's bot detection on Garmin's SSO.
   # Tokens are saved to the shared garmin-session volume and reused by the api service.

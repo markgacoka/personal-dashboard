@@ -48,5 +48,6 @@ window._flightsReady = loadFlights().catch(() => {
 loadWeatherWidget();
 loadFinanceOverview().catch(() => {});
 loadChessData().catch(() => {});
+loadMailBadge();
 
 route();

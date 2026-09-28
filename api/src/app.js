@@ -16,6 +16,7 @@ import trackRoutes from './routes/tracks.js'
 import niceAirRoutes from './routes/niceAir.js'
 import chessRoutes from './routes/chess.js'
 import financeRoutes, { scheduleFinanceSync } from './routes/finance.js'
+import mailRoutes from './routes/mail.js'
 import { runMigrations } from './db/migrate.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
@@ -58,6 +59,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
       await fastify.register(flightRoutes)
       await fastify.register(importRoutes)
       await fastify.register(sleepRoutes)
+      await fastify.register(mailRoutes) // answers "not configured" until MAIL_* is set
       if (process.env.PLAID_CLIENT_ID) {
         await fastify.register(financeRoutes)
         fastify.log.info('Finance routes enabled')

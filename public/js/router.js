@@ -9,7 +9,7 @@ function showView(viewId, opts = {}) {
   const el = document.getElementById('view-' + viewId);
   if (el) el.classList.add('active');
 
-  const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook', 'fin-accounts': 'fin-accounts' }[viewId] || viewId;
+  const sidebarKey = { 'activity-detail': 'activities', 'flight-detail': 'logbook', 'fin-accounts': 'fin-accounts', 'mail-thread': 'mail' }[viewId] || viewId;
   // log-flight is its own sidebar item — keep active highlight on it
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll(`.sb-item[data-view="${sidebarKey}"]`).forEach(n => n.classList.add('active'));
@@ -94,6 +94,18 @@ function route(view, id) {
       showView('account', { title: 'Account' });
       renderAccountView();
       break;
+    case 'mail':
+      showView('mail', { title: 'Mail' });
+      showMailFolder(id);
+      break;
+    case 'mail-thread':
+      if (id) showMailThread(id);
+      else navigate('mail');
+      break;
+    case 'mail-settings':
+      showView('mail-settings', { title: 'Mail Settings' });
+      renderMailSettings();
+      break;
     default:
       showView('overview', { title: 'Overview' });
       // Re-fetch net worth every time Overview is shown, not just at boot —
@@ -112,7 +124,7 @@ document.querySelectorAll('.sb-item').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });
 
-['fitness','flights','finances','chess','dev'].forEach(grp => {
+['fitness','flights','finances','chess','mail','dev'].forEach(grp => {
   const hdr   = document.getElementById('sbh-' + grp);
   const items = document.getElementById('sbi-' + grp);
   if (!hdr||!items) return;

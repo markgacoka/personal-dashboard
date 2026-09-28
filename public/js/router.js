@@ -90,6 +90,10 @@ function route(view, id) {
       showView('chess', { title: 'Chess Progress' });
       renderChessView();
       break;
+    case 'account':
+      showView('account', { title: 'Account' });
+      renderAccountView();
+      break;
     default:
       showView('overview', { title: 'Overview' });
       // Re-fetch net worth every time Overview is shown, not just at boot —
@@ -102,6 +106,8 @@ function route(view, id) {
 window.addEventListener('popstate', () => route());
 
 // ─── sidebar wiring ───────────────────────────────────────────────────────────
+document.getElementById('account-btn').addEventListener('click', () => navigate('account'));
+
 document.querySelectorAll('.sb-item').forEach(item => {
   item.addEventListener('click', () => navigate(item.dataset.view));
 });

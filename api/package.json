@@ -8,10 +8,12 @@
     "test": "node --test src/test/wx.test.js src/test/routes.test.js"
   },
   "dependencies": {
-    "@fastify/cors": "^9.0.1",
-    "@fastify/static": "^7.0.4",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/static": "^10.1.5",
+    "better-auth": "^1.7.6",
     "dotenv": "^16.4.5",
-    "fastify": "^4.28.1",
+    "fastify": "^5.12.5",
+    "fastify-plugin": "^6.0.0",
     "garmin-connect": "^1.6.2",
     "imapflow": "^1.7.6",
     "pg": "^8.23.0",
@@ -19,5 +21,8 @@
     "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

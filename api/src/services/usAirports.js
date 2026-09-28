@@ -3,6 +3,7 @@
 import { createFeatureLayer } from './featureLayer.js'
 
 const layer = createFeatureLayer({
+  name: 'us-airports',
   label: 'US airports',
   baseUrl: 'https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/US_Airport/FeatureServer/0',
   fields: 'IDENT,ICAO_ID,NAME,SERVCITY,STATE',
@@ -12,8 +13,8 @@ const layer = createFeatureLayer({
   pageSize: 1000,
   extraParams: '&geometryPrecision=4',
   timeoutMs: 30_000,
-  fileName: 'us-airports.json',
+  legacyFile: 'us-airports.json',
 })
 
-export const getUsAirports = layer.get
+export const sendUsAirports = layer.send
 export const scheduleUsAirportsRefresh = layer.scheduleRefresh

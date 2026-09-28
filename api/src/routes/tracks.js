@@ -257,6 +257,7 @@ export default async function trackRoutes(fastify) {
     }
 
     const job = newJob()
+    reply.hijack() // the response is written to the raw socket below
     reply.raw.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'X-Accel-Buffering': 'no' })
     let sent = 0
     const flush = () => { while (sent < job.log.length) reply.raw.write(JSON.stringify(job.log[sent++]) + '\n') }

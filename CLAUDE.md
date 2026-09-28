@@ -22,11 +22,30 @@ tracks, finances (Plaid), and chess (chess.com).
 - `traefik/` — Traefik v3 static config (HTTPS + Docker routing)
 - VPS at 89.116.157.98, deployed via GitHub Actions on push to `main`
 
+## Authentication
+
+Every page, file, and API route requires a signed-in session except `/login`,
+its assets, `/health`, `/api/health`, and Better Auth's own `/api/auth/*`
+(see `api/src/routes/authGate.js`; `api/src/auth.js` holds the config). One
+owner account, email + password with optional TOTP two-factor (turned on
+from the Account view). Public sign-up is disabled; the account is managed
+on the server:
+
+    docker exec -it current-api-1 node src/cli/account.mjs create        # first time
+    docker exec -it current-api-1 node src/cli/account.mjs set-password  # reset
+    docker exec -it current-api-1 node src/cli/account.mjs disable-2fa   # lost authenticator
+    docker exec -it current-api-1 node src/cli/account.mjs sign-out-all
+
+Requires `BETTER_AUTH_SECRET` (32+ characters) in `/var/www/app/.env`; the API
+refuses to start in production without it. `BETTER_AUTH_URL` defaults to
+https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
+
 ## Tests
 
-`cd api && npm test` runs unit tests, smoke tests against gacoka.com
-(`SKIP_SMOKE=1` to skip, `SMOKE_BASE=<url>` for another deployment), and DB
-integration tests when `DATABASE_URL` is set. Never point the DB integration
+`cd api && npm test` runs unit tests, signed-out security checks against
+gacoka.com (`SKIP_SMOKE=1` to skip, `SMOKE_BASE=<url>` for another deployment),
+signed-in smoke tests when `SMOKE_COOKIE` holds a session token, and DB
+integration tests (including every-route auth coverage) when `DATABASE_URL` is set. Never point the DB integration
 tests at the production database: they write (and then delete) a test flight.
 
 ## Deploy Path
@@ -37,7 +56,7 @@ then `docker compose up -d --build` rebuilds and restarts the api container.
 Traefik container stays running across deploys (only restarts if its config changes).
 
 Persistent files on VPS (outside releases, never in git):
-- `/var/www/app/.env` — GARMIN_USERNAME, GARMIN_PASSWORD, etc.
+- `/var/www/app/.env` — BETTER_AUTH_SECRET, GARMIN_USERNAME, GARMIN_PASSWORD, etc.
 - `/var/www/app/acme.json` — Traefik Let's Encrypt store (chmod 600)
 - `/var/www/app/garmin-session.json` — Garmin OAuth session cache
 

@@ -814,6 +814,31 @@ export async function migrateV20() {
   `)
 }
 
+// V21: map layers (FAA airspace, US airports) move from files in DATA_DIR
+// into the database, stored gzip-compressed. featureLayer.js imports the old
+// files on first load.
+export async function migrateV21() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS map_layers (
+      name          TEXT PRIMARY KEY,
+      geojson_gzip  BYTEA NOT NULL,
+      feature_count INTEGER NOT NULL,
+      fetched_at    TIMESTAMPTZ NOT NULL
+    )
+  `)
+}
+
+// V22: Better Auth tables (user, session, account, verification, twoFactor),
+// generated from the auth config so they always match the installed version.
+// A later auth config change that needs schema changes gets its own migration
+// calling the same function (getMigrations only adds what's missing).
+export async function migrateV22() {
+  const { getMigrations } = await import('better-auth/db/migration')
+  const { auth } = await import('../auth.js')
+  const { runMigrations } = await getMigrations(auth.options)
+  await runMigrations()
+}
+
 // Migrations in order. Each runs once and is recorded in schema_migrations.
 // Before the ledger existed every migration re-ran on every boot, which kept
 // re-applying one-off data fixes (V10 blanked instructor_comments on every
@@ -824,6 +849,7 @@ const MIGRATIONS = [
   ['009', migrateV9],  ['010', migrateV10], ['011', migrateV11], ['012', migrateV12],
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
+  ['021', migrateV21], ['022', migrateV22],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

@@ -64,7 +64,7 @@ const VIEW_TITLES = {
   logbook: 'Logbook', 'activity-detail': '', 'flight-detail': '',
   'log-flight': 'Log Flight',
   finances: 'Finances', 'fin-accounts': 'Linked Accounts',
-  chess: 'Chess Progress',
+  chess: 'Chess Progress', account: 'Account',
 };
 
 // ─── formatters ───────────────────────────────────────────────────────────────

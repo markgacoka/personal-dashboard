@@ -8,10 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@100;300;400;600&family=Albert+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin></script>
-  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/bold/style.css" integrity="sha384-nblAP2mo2pVPyMQZDw9Xy9Cwgs9lowushAYep4w5+Q9kF4Ibf3n0B/gCMVdR+Vqy" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <link rel="stylesheet" href="/css/app.css">
 </head>
@@ -106,6 +106,9 @@
       <div class="nav-date" id="nav-date"></div>
       <button class="icon-btn" id="theme-btn" title="Toggle theme">
         <i class="ph-bold ph-sun" id="theme-icon"></i>
+      </button>
+      <button class="icon-btn" id="account-btn" title="Account" aria-label="Account">
+        <i class="ph-bold ph-user-circle"></i>
       </button>
     </div>
 
@@ -257,6 +260,12 @@
       </div>
 
       <!-- PILOT CREDENTIALS ──────────────────────────────────── -->
+      <div class="view" id="view-account">
+        <div class="section-first" id="account-content">
+          <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
+        </div>
+      </div>
+
       <div class="view" id="view-certificates">
         <div class="section-first" id="credentials-content">
           <div style="padding:40px;text-align:center"><div class="spinner"></div></div>
@@ -347,6 +356,7 @@
 <script src="/js/flight-form.js"></script>
 <script src="/js/finance.js"></script>
 <script src="/js/chess.js"></script>
+<script src="/js/account.js"></script>
 <script src="/js/main.js"></script>
 </body>
 </html>

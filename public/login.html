@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Sign in · Gacoka</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@600;700&family=Albert+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/js/login.js" defer></script>
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <h1 class="auth-title">Gacoka</h1>
+
+    <form id="password-step" class="auth-form" novalidate>
+      <p class="auth-sub">Sign in to your dashboard.</p>
+      <label class="form-field">
+        <span class="form-label">Email</span>
+        <input class="form-input" id="email" type="email" name="email" autocomplete="username" spellcheck="false" required autofocus>
+      </label>
+      <label class="form-field">
+        <span class="form-label">Password</span>
+        <input class="form-input" id="password" type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn-primary auth-submit" type="submit">Sign in</button>
+    </form>
+
+    <form id="code-step" class="auth-form" hidden novalidate>
+      <p class="auth-sub">Enter the 6-digit code from your authenticator app.</p>
+      <label class="form-field">
+        <span class="form-label" id="code-label">Authentication code</span>
+        <input class="form-input auth-code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" required>
+      </label>
+      <label class="auth-check">
+        <input type="checkbox" id="trust-device"> Trust this device for 30 days
+      </label>
+      <button class="btn-primary auth-submit" type="submit">Verify</button>
+      <button class="btn-link auth-alt" type="button" id="use-backup">Use a backup code instead</button>
+    </form>
+
+    <div class="form-error" id="auth-error" role="alert" aria-live="polite"></div>
+  </main>
+</body>
+</html>

@@ -665,22 +665,80 @@ describe('track shaping — merge, ground detection, block-time bounds', () => {
 const SKIP_SMOKE = process.env.SKIP_SMOKE === '1';
 const BASE = process.env.SMOKE_BASE || 'https://gacoka.com';
 
+// Signed-in smoke tests need a session: set SMOKE_COOKIE to the value of the
+// better-auth.session_token cookie from a signed-in browser.
+const SMOKE_COOKIE = process.env.SMOKE_COOKIE;
+const authHeaders = SMOKE_COOKIE ? { Cookie: `better-auth.session_token=${SMOKE_COOKIE}` } : {};
+const ORIGIN = new URL(BASE).origin;
+
 async function get(path) {
-  const r = await fetch(BASE + path, { signal: AbortSignal.timeout(15000) });
+  const r = await fetch(BASE + path, { headers: authHeaders, signal: AbortSignal.timeout(15000) });
   return { status: r.status, body: await r.json().catch(() => null) };
 }
 
 async function post(path, data) {
   const r = await fetch(BASE + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: ORIGIN, ...authHeaders },
     body: JSON.stringify(data),
     signal: AbortSignal.timeout(15000),
   });
   return { status: r.status, body: await r.json().catch(() => null) };
 }
 
-describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, () => {
+describe('Live security checks (signed out)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, () => {
+  const raw = (path, init = {}) => fetch(BASE + path, { redirect: 'manual', signal: AbortSignal.timeout(15000), ...init });
+
+  test('health checks stay public', async () => {
+    assert.equal((await raw('/health')).status, 200);
+    assert.equal((await raw('/api/health')).status, 200);
+  });
+
+  test('sign-in page is public; the dashboard redirects to it', async () => {
+    assert.equal((await raw('/login')).status, 200);
+    for (const path of ['/', '/index.html', '/js/core.js', '/some/deep/link']) {
+      const r = await raw(path);
+      assert.equal(r.status, 302, path);
+      assert.match(r.headers.get('location'), /\/login\?next=/, path);
+    }
+  });
+
+  test('every API area refuses requests without a session', async () => {
+    for (const path of ['/api/flights', '/api/flights/99', '/api/flights/99/track', '/api/aircraft', '/api/stats/logbook',
+                        '/api/athlete', '/api/activities', '/api/sleep/latest', '/api/finance/accounts', '/api/finance/net-worth',
+                        '/api/chess/stats', '/api/gmail/nice-air', '/api/external/faa-airspace', '/api/external/metar/KRHV',
+                        '/api/external/fa-backfill-status', '/auth/garmin/auto', '/auth/garmin/init']) {
+      assert.equal((await raw(path)).status, 401, path);
+    }
+    for (const path of ['/api/flights', '/api/aircraft', '/api/external/fa-backfill', '/api/finance/sync', '/auth/garmin/mfa']) {
+      const r = await raw(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN }, body: '{}' });
+      assert.equal(r.status, 401, 'POST ' + path);
+    }
+  });
+
+  test('non-canonical paths cannot slip past the gate', async () => {
+    for (const path of ['/%2e%2e/api/flights', '/css/app.css/../../api/flights', '/API/flights', '/api//flights']) {
+      assert.notEqual((await raw(path)).status, 200, path);
+    }
+  });
+
+  test('public sign-up is disabled', async () => {
+    const r = await raw('/api/auth/sign-up/email', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
+      body: JSON.stringify({ email: 'x@example.invalid', password: 'not-a-real-password-1', name: 'x' }) });
+    assert.notEqual(r.status, 200);
+  });
+
+  test('security headers are set', async () => {
+    const h = (await raw('/login')).headers;
+    assert.match(h.get('content-security-policy') || '', /default-src 'self'/);
+    assert.match(h.get('content-security-policy') || '', /frame-ancestors 'none'/);
+    assert.equal(h.get('x-content-type-options'), 'nosniff');
+    assert.ok(h.get('strict-transport-security'), 'HSTS');
+    assert.equal(h.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  });
+});
+
+describe('Live API smoke tests (signed in)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : !SMOKE_COOKIE ? 'SMOKE_COOKIE not set' : false }, () => {
 
   test('GET /api/athlete → 200 with fullName', async () => {
     const { status, body } = await get('/api/athlete');
@@ -916,6 +974,99 @@ describe('Live API smoke tests', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1' : false }, 
 const DB_SKIP = !process.env.DATABASE_URL ? 'DATABASE_URL not set'
   : process.env.NODE_ENV === 'production' ? 'refusing to write to a production database'
   : false;
+
+// ─── DB integration: authentication covers every route ───────────────────────
+// Builds the full app in-process, enumerates every registered route, and
+// checks each one refuses a signed-out request; then walks sign-in, CSRF
+// refusal, and sign-out with a temporary account that is deleted afterwards.
+
+describe('Authentication — every route requires a session (DB integration)', { skip: DB_SKIP }, () => {
+  let app, auth, pool, testUserId;
+  const routes = [];
+  const EMAIL = 'auth-test@example.invalid', PASSWORD = 'auth-test-password-123';
+  const ORIGIN_URL = 'http://localhost:3000';
+  // Paths that are public on purpose.
+  const PUBLIC = new Set(['/health', '/api/health', '/login']);
+
+  test('setup: build the full app and a temporary account', async () => {
+    process.env.BETTER_AUTH_URL ||= ORIGIN_URL;
+    process.env.BETTER_AUTH_SECRET ||= 'test-secret-that-is-long-enough-0123456789';
+    process.env.PLAID_CLIENT_ID ||= 'test'; // registers the finance routes too
+    const { buildApp } = await import('../app.js');
+    ({ auth } = await import('../auth.js'));
+    ({ pool } = await import('../db/client.js'));
+    app = await buildApp({ logger: false, background: false, onRoute: r => {
+      for (const m of [].concat(r.method)) if (m !== 'HEAD') routes.push({ method: m, url: r.url });
+    } });
+    await app.ready();
+    const ctx = await auth.$context;
+    const existing = await ctx.internalAdapter.findUserByEmail(EMAIL);
+    if (existing?.user) await pool.query('DELETE FROM "user" WHERE id = $1', [existing.user.id]);
+    const user = await ctx.internalAdapter.createUser({ email: EMAIL, name: 'Auth test', emailVerified: true });
+    testUserId = user.id;
+    await ctx.internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: await ctx.password.hash(PASSWORD) });
+    assert.ok(routes.length >= 69, `expected every app route, found ${routes.length}`);
+  });
+
+  test('every non-public route refuses a signed-out request', async () => {
+    const leaks = [];
+    for (const { method, url } of routes) {
+      if (PUBLIC.has(url) || url.startsWith('/api/auth/')) continue;
+      const path = url.replace(/:[a-zA-Z_]+/g, '1').replace(/\*$/, 'js/core.js');
+      const res = await app.inject({ method, url: path, headers: { origin: ORIGIN_URL, 'content-type': 'application/json' }, payload: method === 'GET' ? undefined : '{}' });
+      const page = method === 'GET' && !path.startsWith('/api/') && !path.startsWith('/auth/');
+      const ok = page ? res.statusCode === 302 && res.headers.location.startsWith('/login?next=') : res.statusCode === 401;
+      if (!ok) leaks.push(`${method} ${url} → ${res.statusCode}`);
+    }
+    assert.deepEqual(leaks, []);
+  });
+
+  test('sign-in gives a session that opens the API; bad credentials do not', async () => {
+    const bad = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: { origin: ORIGIN_URL }, payload: { email: EMAIL, password: 'wrong-password-123' } });
+    assert.equal(bad.statusCode, 401);
+    const res = await app.inject({ method: 'POST', url: '/api/auth/sign-in/email', headers: { origin: ORIGIN_URL }, payload: { email: EMAIL, password: PASSWORD } });
+    assert.equal(res.statusCode, 200);
+    const cookie = res.cookies.find(c => c.name.endsWith('session_token'));
+    assert.ok(cookie?.httpOnly, 'session cookie is HttpOnly');
+    assert.equal(cookie.sameSite, 'Lax');
+    const headers = { cookie: `${cookie.name}=${cookie.value}` };
+    assert.equal((await app.inject({ method: 'GET', url: '/api/flights', headers })).statusCode, 200);
+    assert.equal((await app.inject({ method: 'GET', url: '/', headers })).statusCode, 200);
+
+    // Writes need our own Origin (CSRF defence), even with a valid session.
+    const noOrigin = await app.inject({ method: 'POST', url: '/api/instructors', headers, payload: { name: 'x' } });
+    assert.equal(noOrigin.statusCode, 403);
+    const evil = await app.inject({ method: 'POST', url: '/api/instructors', headers: { ...headers, origin: 'https://evil.example' }, payload: { name: 'x' } });
+    assert.equal(evil.statusCode, 403);
+
+    const out = await app.inject({ method: 'POST', url: '/api/auth/sign-out', headers: { ...headers, origin: ORIGIN_URL } });
+    assert.equal(out.statusCode, 200);
+    assert.equal((await app.inject({ method: 'GET', url: '/api/flights', headers })).statusCode, 401, 'signed-out session is dead');
+  });
+
+  test('public sign-up is disabled', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/auth/sign-up/email', headers: { origin: ORIGIN_URL }, payload: { email: 'new@example.invalid', password: 'another-password-123', name: 'x' } });
+    assert.notEqual(res.statusCode, 200);
+  });
+
+  test('cleanup: delete the temporary account', async () => {
+    await pool.query('DELETE FROM "user" WHERE id = $1', [testUserId]);
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM "user" WHERE email = $1', [EMAIL]);
+    assert.equal(rows[0].n, 0);
+    await app.close();
+  });
+});
+
+describe('safeNext — post-sign-in redirect target', () => {
+  test('keeps same-site paths, rejects other hosts', async () => {
+    const { safeNext } = await import('../routes/authGate.js');
+    assert.equal(safeNext('/#flight/99'), '/#flight/99');
+    assert.equal(safeNext('/js/core.js?x=1'), '/js/core.js?x=1');
+    for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)', undefined]) {
+      assert.equal(safeNext(bad), '/', String(bad));
+    }
+  });
+});
 
 describe('New flight entry — full write path (DB integration)', { skip: DB_SKIP }, () => {
   let app, pool, createdFlightId;

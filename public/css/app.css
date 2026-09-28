@@ -1638,3 +1638,27 @@ html, body {
 .fin-strip-amt  { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--champagne); }
 .fin-strip-lbl  { font-size: 11px; color: var(--faint); margin-top: 4px; text-transform: uppercase; letter-spacing: .06em; }
 .view-subhdr { font-size: 13px; color: var(--muted); }
+
+/* ── Sign-in page ───────────────────────────────────────── */
+.auth-page {
+  min-height: 100dvh; display: grid; place-items: center;
+  padding: 24px 16px; background: var(--ground);
+}
+.auth-card {
+  width: 100%; max-width: 360px;
+  background: var(--raised); border: 1px solid var(--rule);
+  border-radius: var(--r-lg); padding: 32px 28px;
+}
+.auth-title {
+  font-family: 'Alumni Sans', sans-serif; font-weight: 700; font-size: 36px;
+  letter-spacing: 0.02em; color: var(--champagne); margin: 0 0 4px;
+}
+.auth-sub { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+.auth-form { display: grid; gap: 14px; }
+.auth-form[hidden] { display: none; }
+.auth-form .form-field { display: grid; gap: 6px; }
+.auth-form .form-input { font-size: 16px; padding: 10px 12px; } /* 16px: no iOS zoom on focus */
+.auth-code { letter-spacing: 0.2em; font-variant-numeric: tabular-nums; }
+.auth-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.auth-submit { justify-content: center; width: 100%; padding: 11px 20px; margin-top: 4px; }
+.auth-alt { justify-self: center; font-size: 12px; }

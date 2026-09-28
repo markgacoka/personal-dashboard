@@ -1,5 +1,20 @@
 'use strict';
 
+// ─── session ──────────────────────────────────────────────────────────────────
+// A 401 from the app's API means the session expired or was signed out on
+// another device: go to sign-in, and come back to this view afterwards.
+// Sign-in's own endpoints (/api/auth) report failures with 401 as well, so
+// they're left to their callers.
+const _fetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const res = await _fetch(input, init);
+  const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+  if (res.status === 401 && url.origin === location.origin && url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/')) {
+    location.assign('/login?next=' + encodeURIComponent(location.pathname + location.hash));
+  }
+  return res;
+};
+
 // ─── lazy init flags ──────────────────────────────────────────────────────────
 let _fdMap = null;
 let _actMap = null;

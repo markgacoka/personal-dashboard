@@ -5,8 +5,8 @@ import { fetchWithTimeout } from '../lib/http.js'
 import { filterAirportCsv } from '../lib/csv.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
 import { fetchMesonetMetars, closestTo } from '../services/mesonet.js'
-import { getFaaAirspace } from '../services/faaAirspace.js'
-import { getUsAirports } from '../services/usAirports.js'
+import { sendFaaAirspace } from '../services/faaAirspace.js'
+import { sendUsAirports } from '../services/usAirports.js'
 
 // Past observations never change, so a found METAR is stored in metar_history
 // and served from there afterwards (Mesonet rate-limits repeated lookups).
@@ -242,30 +242,17 @@ export default async function aviationRoutes(fastify) {
     }
   })
 
-  // ── FAA Class Airspace B/C/D (AIRAC 28-day cycle, pre-downloaded by scheduler) ──
-  // Data from: https://adds-faa.opendata.arcgis.com/datasets/c6a62360338e408cb1512366ad61559e_0
-  // The faaAirspace service downloads + caches on first boot and every 28 days.
-  fastify.get('/api/external/faa-airspace', async (req, reply) => {
-    try {
-      const fc = await getFaaAirspace(fastify.log)
-      // Send with long cache header — client can cache for 1 day; data refreshes server-side
-      reply.header('Cache-Control', 'public, max-age=86400')
-      return fc
-    } catch (e) {
-      fastify.log.warn({ err: e.message }, 'FAA airspace serve error')
-      return reply.code(503).send({ error: 'Airspace data unavailable', detail: e.message })
-    }
-  })
-
-  // ── US public-use airports (nationwide, 28-day cycle, pre-downloaded) ──────
-  fastify.get('/api/external/us-airports', async (req, reply) => {
-    try {
-      const fc = await getUsAirports(fastify.log)
-      reply.header('Cache-Control', 'public, max-age=86400')
-      return fc
-    } catch (e) {
-      fastify.log.warn({ err: e.message }, 'US airports serve error')
-      return reply.code(503).send({ error: 'Airport data unavailable', detail: e.message })
-    }
-  })
+  // ── Map layers: FAA Class B/C/D airspace and US public-use airports ─────────
+  // Stored gzip-compressed in map_layers, refreshed every 28-day AIRAC cycle.
+  for (const [path, send, what] of [['/api/external/faa-airspace', sendFaaAirspace, 'Airspace'],
+                                    ['/api/external/us-airports', sendUsAirports, 'Airport']]) {
+    fastify.get(path, async (req, reply) => {
+      try {
+        return await send(req, reply, fastify.log)
+      } catch (e) {
+        fastify.log.warn({ err: e.message, path }, 'Map layer serve error')
+        return reply.code(503).send({ error: `${what} data unavailable`, detail: e.message })
+      }
+    })
+  }
 }

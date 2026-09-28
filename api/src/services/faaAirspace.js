@@ -6,6 +6,7 @@
 import { createFeatureLayer } from './featureLayer.js'
 
 const layer = createFeatureLayer({
+  name: 'faa-airspace',
   label: 'FAA class airspace',
   baseUrl: 'https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services/Class_Airspace/FeatureServer/0',
   fields: 'NAME,LOWER_VAL,UPPER_VAL,TYPE_CODE,LOCAL_TYPE,CLASS',
@@ -16,8 +17,8 @@ const layer = createFeatureLayer({
   pageSize: 250,
   extraParams: '&outSR=4326&geometryPrecision=5',
   timeoutMs: 45_000,
-  fileName: 'faa-airspace.json',
+  legacyFile: 'faa-airspace.json',
 })
 
-export const getFaaAirspace = layer.get
+export const sendFaaAirspace = layer.send
 export const scheduleFaaAirspaceRefresh = layer.scheduleRefresh

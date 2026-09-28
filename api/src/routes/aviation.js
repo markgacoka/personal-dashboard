@@ -4,75 +4,51 @@ import { queryRowsOrNull } from '../db/client.js'
 import { fetchWithTimeout } from '../lib/http.js'
 import { filterAirportCsv } from '../lib/csv.js'
 import { fetchNotams } from '../services/notam-fetcher.js'
+import { fetchMesonetMetars, closestTo } from '../services/mesonet.js'
 import { getFaaAirspace } from '../services/faaAirspace.js'
 import { getUsAirports } from '../services/usAirports.js'
+
+// Past observations never change, so a found METAR is stored in metar_history
+// and served from there afterwards (Mesonet rate-limits repeated lookups).
+// Recent times aren't stored: late reports can still arrive. Without a
+// database this falls through to the live lookup.
+async function historicalMetar(kind, station, at, lookup) {
+  const settled = Date.now() - at > 6 * 3_600_000
+  if (settled) {
+    const hit = await queryRowsOrNull('SELECT result FROM metar_history WHERE kind=$1 AND station=$2 AND at=$3', [kind, station, at])
+    if (hit?.length) return hit[0].result
+  }
+  const result = await lookup()
+  if (result && settled) {
+    await queryRowsOrNull(
+      'INSERT INTO metar_history (kind, station, at, result) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',
+      [kind, station, at, JSON.stringify(result)])
+  }
+  return result
+}
 
 export default async function aviationRoutes(fastify) {
   // ── METAR nearest a given time, from ISU Mesonet ─────────────────────────────
   // GET /api/metar?station=KRHV&time=2026-04-06T20:00:00Z
   fastify.get('/api/metar', async (req, reply) => {
-    const { station, time } = req.query
-    if (!station || !time) return reply.status(400).send({ error: 'station and time required' })
+    const { station: stationParam, time } = req.query
+    if (!stationParam || !time) return reply.status(400).send({ error: 'station and time required' })
 
     const t = new Date(time)
     if (isNaN(t.getTime())) return reply.status(400).send({ error: 'invalid time' })
 
-    const t0 = new Date(t.getTime() - 90 * 60 * 1000)
-    const t1 = new Date(t.getTime() + 90 * 60 * 1000)
-
-    const params = new URLSearchParams({
-      station:  station.toUpperCase().replace(/^K/, ''),
-      data:     'metar',
-      year1:    t0.getUTCFullYear(),
-      month1:   t0.getUTCMonth() + 1,
-      day1:     t0.getUTCDate(),
-      hour1:    t0.getUTCHours(),
-      minute1:  0,
-      year2:    t1.getUTCFullYear(),
-      month2:   t1.getUTCMonth() + 1,
-      day2:     t1.getUTCDate(),
-      hour2:    t1.getUTCHours(),
-      minute2:  59,
-      tz:       'UTC',
-      format:   'onlycomma',
-      latlon:   'no',
-      elev:     'no',
-      missing:  'empty',
-      trace:    'empty',
-      direct:   'no',
-    })
-
     try {
-      const res  = await fetch(`https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?${params}`)
-      const text = await res.text()
-
-      // ISU Mesonet returns: station,valid,metar  (valid is UTC "YYYY-MM-DD HH:MM")
-      const allLines = text.trim().split('\n')
-        .filter(l => l && !l.startsWith('#') && !l.startsWith('station'))
-
-      let best = null
-      let bestDiff = Infinity
-
-      for (const line of allLines) {
-        const idx = line.indexOf(',')
-        const idx2 = line.indexOf(',', idx + 1)
-        if (idx < 0 || idx2 < 0) continue
-        const validStr = line.slice(idx + 1, idx2).trim()
-        const metarStr = line.slice(idx2 + 1).trim()
-        if (!metarStr || !validStr) continue
-        const validT = new Date(validStr.replace(' ', 'T') + ':00Z')
-        if (isNaN(validT.getTime())) continue
-        const diff = Math.abs(validT.getTime() - t.getTime())
-        if (diff < bestDiff) {
-          bestDiff = diff
-          best = { station: station.toUpperCase(), valid: validStr.replace(' ', 'T') + ':00Z', metar: metarStr }
-        }
-      }
-
-      return best || { station: station.toUpperCase(), time, metar: null }
+      const station = stationParam.toUpperCase().replace(/^K/, '')
+      const best = await historicalMetar('nearest90', station, t, async () => {
+        const o = closestTo(await fetchMesonetMetars(station, new Date(t - 90 * 60_000), new Date(+t + 90 * 60_000)), t)
+        return o && { valid: o.valid.toISOString().replace('.000Z', 'Z'), metar: o.metar }
+      })
+      return best
+        ? { station: stationParam.toUpperCase(), ...best }
+        : { station: stationParam.toUpperCase(), time, metar: null }
     } catch (err) {
       fastify.log.warn({ err }, 'METAR fetch failed')
-      return { station: station.toUpperCase(), time, metar: null }
+      return { station: stationParam.toUpperCase(), time, metar: null }
     }
   })
 
@@ -143,7 +119,7 @@ export default async function aviationRoutes(fastify) {
   fastify.get('/api/external/airport/:icao', async (req, reply) => {
     const icao = req.params.icao.toUpperCase()
     try {
-      const r = await fetchWithTimeout(`https://aviationweather.gov/api/data/airport?ids=${icao}`)
+      const r = await fetchWithTimeout(`https://aviationweather.gov/api/data/airport?ids=${icao}&format=json`)
       if (!r.ok) return reply.status(404).send({ error: 'Airport not found' })
       const d = await r.json()
       const apt = Array.isArray(d) ? d[0] : d
@@ -173,18 +149,13 @@ export default async function aviationRoutes(fastify) {
           )[0] || null
           return { source: 'awc', metar: best, icao }
         }
-        // Historical via Iowa State Mesonet (archives ASOS METARs)
+        // Older than 48 h: Iowa State Mesonet's ASOS archive, nearest observation within ±1 h.
         const station = icao.startsWith('K') && icao.length === 4 ? icao.slice(1) : icao
-        const d1 = new Date(ft.getTime() - 3600000)
-        const d2 = new Date(ft.getTime() + 3600000)
-        const seg = d => `year1=${d.getUTCFullYear()}&month1=${d.getUTCMonth() + 1}&day1=${d.getUTCDate()}&hour1=${d.getUTCHours()}&min1=0`
-        const url = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=${station}&data=metar&${seg(d1)}&year2=${d2.getUTCFullYear()}&month2=${d2.getUTCMonth() + 1}&day2=${d2.getUTCDate()}&hour2=${d2.getUTCHours()}&min2=59&tz=UTC&format=json&latlon=no&elev=no&missing=empty&trace=T&direct=no&report_type=3`
-        const r = await fetchWithTimeout(url, { ms: 10000 })
-        if (!r.ok) throw new Error('Mesonet unavailable')
-        const d = await r.json()
-        const obs2 = (d?.data || []).filter(x => x.metar)
-        const best2 = obs2.length ? obs2[obs2.length - 1] : null
-        return { source: 'mesonet', metar: best2 ? { rawOb: best2.metar, obsTime: best2.valid } : null, icao }
+        const metar = await historicalMetar('nearest60', station, ft, async () => {
+          const o = closestTo(await fetchMesonetMetars(station, new Date(ft - 3_600_000), new Date(+ft + 3_600_000)), ft)
+          return o && { rawOb: o.metar, obsTime: o.valid.toISOString() }
+        })
+        return { source: 'mesonet', metar, icao }
       }
       // Current METAR — 4h window so we catch airports that close at night (tagged LAST)
       const r = await fetchWithTimeout(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=4`)

@@ -25,6 +25,7 @@ import { parseCsvLine, filterAirportCsv } from '../lib/csv.js';
 import { pickSchedule, scheduleWindow } from '../services/schedules.js';
 import { boundTrack, mergePositions, isOnGround, scoreFaCandidate, scoreFr24Candidate, normalizeFaPositions } from '../services/trackProviders.js';
 import { normalizeFr24Positions } from '../services/flightTrack.js';
+import { parseMesonetCsv, closestTo } from '../services/mesonet.js';
 
 // Frontend helpers, loaded from the file the browser runs (no copies).
 const frontend = (() => {
@@ -570,6 +571,36 @@ describe('pickSchedule / scheduleWindow — booking ↔ logbook entry', () => {
     const bare = scheduleWindow({ tail_number: 'N213AN' }, [dual]);
     assert.equal(bare.timeOut, '2026-08-26T16:00:00.000Z');
     assert.equal(bare.timeIn, '2026-08-26T18:00:00.000Z');
+  });
+});
+
+// ─── Unit tests: historical METAR (services/mesonet.js) ─────────────────────
+
+describe('Mesonet archive reply — parsing and nearest observation', () => {
+  // Verbatim shape of the live reply: CSV after '#DEBUG' lines, even when JSON
+  // is requested (parsing it as JSON was the historical-METAR 502).
+  const reply = [
+    '#DEBUG: Format Typ    -> json',
+    '#DEBUG: Entries Found -> -1',
+    'station,valid,metar',
+    'RHV,2026-08-26 16:47,KRHV 261647Z 00000KT 10SM SKC 21/14 A3002',
+    'RHV,2026-08-26 17:47,KRHV 261747Z 00000KT 10SM SKC 22/14 A3003',
+    'RHV,2026-08-26 18:10,',
+    '',
+  ].join('\n');
+
+  test('skips comments, header, and empty METARs', () => {
+    const obs = parseMesonetCsv(reply);
+    assert.equal(obs.length, 2);
+    assert.equal(obs[0].valid.toISOString(), '2026-08-26T16:47:00.000Z');
+    assert.equal(obs[1].metar, 'KRHV 261747Z 00000KT 10SM SKC 22/14 A3003');
+  });
+
+  test('closestTo picks the observation nearest the flight time', () => {
+    const obs = parseMesonetCsv(reply);
+    assert.equal(closestTo(obs, new Date('2026-08-26T17:41:41Z')).metar.slice(5, 12), '261747Z');
+    assert.equal(closestTo(obs, new Date('2026-08-26T16:00:00Z')).metar.slice(5, 12), '261647Z');
+    assert.equal(closestTo([], new Date()), null);
   });
 });
 

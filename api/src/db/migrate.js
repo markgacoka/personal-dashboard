@@ -798,6 +798,22 @@ export async function migrateV19() {
   }
 }
 
+// V20: historical METARs from the Mesonet archive, keyed by lookup kind
+// (nearest within ±60 or ±90 min), station, and requested time. Past
+// observations never change; storing them avoids Mesonet's rate limit.
+export async function migrateV20() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS metar_history (
+      kind       TEXT NOT NULL,
+      station    TEXT NOT NULL,
+      at         TIMESTAMPTZ NOT NULL,
+      result     JSONB NOT NULL,
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (kind, station, at)
+    )
+  `)
+}
+
 // Migrations in order. Each runs once and is recorded in schema_migrations.
 // Before the ledger existed every migration re-ran on every boot, which kept
 // re-applying one-off data fixes (V10 blanked instructor_comments on every
@@ -807,7 +823,7 @@ const MIGRATIONS = [
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
   ['009', migrateV9],  ['010', migrateV10], ['011', migrateV11], ['012', migrateV12],
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
-  ['017', migrateV17], ['018', migrateV18], ['019', migrateV19],
+  ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

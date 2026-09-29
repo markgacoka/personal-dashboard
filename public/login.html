@@ -20,13 +20,9 @@
 
     <form id="password-step" class="auth-form" novalidate>
       <p class="auth-sub">Sign in to your dashboard.</p>
-      <div class="auth-passkey" id="passkey-block" hidden>
-        <button class="btn-primary auth-submit" type="button" id="passkey-signin"><i class="ph-bold ph-fingerprint" aria-hidden="true"></i>Sign in with Touch ID</button>
-        <div class="auth-or"><span>or use your password</span></div>
-      </div>
       <label class="form-field">
         <span class="form-label">Email</span>
-        <input class="form-input" id="email" type="email" name="email" autocomplete="username webauthn" spellcheck="false" required autofocus>
+        <input class="form-input" id="email" type="email" name="email" autocomplete="username" spellcheck="false" required autofocus>
       </label>
       <label class="form-field">
         <span class="form-label">Password</span>
@@ -35,17 +31,23 @@
       <button class="btn-primary auth-submit" type="submit" id="password-submit">Sign in</button>
     </form>
 
+    <div id="method-step" class="auth-form" hidden>
+      <p class="auth-sub">Confirm it's you.</p>
+      <div class="auth-methods" id="auth-methods"></div>
+    </div>
+
     <form id="code-step" class="auth-form" hidden novalidate>
-      <p class="auth-sub">Enter the 6-digit code from your authenticator app.</p>
+      <p class="auth-sub" id="code-hint">Enter the 6-digit code.</p>
       <label class="form-field">
-        <span class="form-label" id="code-label">Authentication code</span>
+        <span class="form-label" id="code-label">Code</span>
         <input class="form-input auth-code" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" required>
       </label>
       <label class="auth-check">
         <input type="checkbox" id="trust-device"> Trust this device for 30 days
       </label>
       <button class="btn-primary auth-submit" type="submit">Verify</button>
-      <button class="btn-link auth-alt" type="button" id="use-backup">Use a backup code instead</button>
+      <button class="btn-link auth-alt" type="button" id="resend-code" hidden>Send a new code</button>
+      <button class="btn-link auth-alt" type="button" id="other-method">Use another way</button>
     </form>
 
     <div class="form-error" id="auth-error" role="alert" aria-live="polite"></div>

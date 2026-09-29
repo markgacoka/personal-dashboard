@@ -27,8 +27,12 @@ tracks, finances (Plaid), and chess (chess.com).
 Every page, file, and API route requires a signed-in session except `/login`,
 its assets, `/health`, `/api/health`, and Better Auth's own `/api/auth/*`
 (see `api/src/routes/authGate.js`; `api/src/auth.js` holds the config). One
-owner account, email + password with optional TOTP two-factor (turned on
-from the Account view). Public sign-up is disabled; the account is managed
+owner account. The password is always required; with two-factor on (Account
+view), sign-in then asks for a second step: Touch ID (a passkey added from the
+Account view; `api/src/lib/passkeySecondFactor.js`), a code emailed to the
+account address (sent through the mail server), the authenticator app, or a
+backup code. Passkeys never replace the password: the passkey plugin's own
+sign-in endpoints are disabled. Public sign-up is disabled; the account is managed
 on the server:
 
     docker exec -it current-api-1 node src/cli/account.mjs create        # first time

@@ -54,6 +54,33 @@ export function mailConfig(env = process.env) {
   }
 }
 
+// A system message (e.g. a sign-in code) from the mailbox: sent at once (no
+// undo window), and not kept in Sent once the server has it.
+export async function sendSystemEmail({ to, subject, text, html }) {
+  const cfg = mailConfig()
+  if (!cfg) throw new JmapError('notConfigured', 'Mail is not configured on this server', 503)
+  const jmap = createJmapClient({ baseUrl: cfg.baseUrl, username: cfg.user, password: cfg.password })
+  const r = await jmap.call([
+    ['Mailbox/get', { ids: null, properties: ['role'] }, 'm'],
+    ['Identity/get', { ids: null }, 'i'],
+  ])
+  const drafts = r.m.list.find(m => m.role === 'drafts')?.id
+  const identity = r.i.list.find(i => i.email.toLowerCase() === cfg.user)
+  if (!drafts || !identity) throw new JmapError('notProvisioned', 'mailbox is not set up', 503)
+  const e = await jmap.call([['Email/set', { create: { e: {
+    mailboxIds: { [drafts]: true }, keywords: { $seen: true, $draft: true },
+    from: [{ name: 'gacoka.com', email: cfg.user }], to: [{ email: to }], subject,
+    textBody: [{ partId: 't', type: 'text/plain' }], htmlBody: [{ partId: 'h', type: 'text/html' }],
+    bodyValues: { t: { value: text }, h: { value: html } },
+  } } }, 'e']])
+  if (e.e.notCreated) throw setError('Could not create the message', e.e.notCreated.e)
+  const s = await jmap.call([['EmailSubmission/set', {
+    create: { s: { identityId: identity.id, emailId: e.e.created.e.id } },
+    onSuccessDestroyEmail: ['#s'],
+  }, 's']])
+  if (s.s.notCreated) throw setError('The mail server refused the message', s.s.notCreated.s)
+}
+
 const lower = s => String(s || '').toLowerCase()
 const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n))
 const bad = msg => new JmapError('invalidRequest', msg, 400)

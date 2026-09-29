@@ -1673,12 +1673,24 @@ html, body {
 .acct-pk-rename .form-input { max-width: 220px; }
 .acct-pk-msg { font-size: 13px; margin-top: 10px; }
 .acct-pk-msg:empty { display: none; }
-.auth-passkey { display: grid; gap: 16px; }
-.auth-passkey[hidden] { display: none; }
-.auth-passkey .auth-submit { margin-top: 0; gap: 8px; }
-.auth-submit i { font-size: 18px; }
-.auth-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--faint); }
-.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+.auth-methods { display: grid; gap: 8px; }
+.auth-method {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;
+  padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--r-sm); background: none;
+  font-family: inherit; color: var(--body-text); transition: border-color var(--duration-quick), background var(--duration-quick);
+}
+.auth-method:hover { border-color: var(--muted); background: var(--graphite); }
+.auth-method:disabled { opacity: 0.6; cursor: default; }
+.auth-method > i:first-child { font-size: 22px; color: var(--info); width: 24px; text-align: center; }
+.auth-method.primary { border-color: var(--gold); }
+.auth-method.primary > i:first-child { color: var(--gold); }
+[data-theme="light"] .auth-method.primary > i:first-child { color: oklch(50% 0.11 78); }
+.auth-method.waiting { opacity: 0.6; }
+.auth-method-text { flex: 1; display: grid; gap: 1px; }
+.auth-method-label { font-size: 14px; font-weight: 600; color: var(--champagne); }
+.auth-method-sub { font-size: 12px; color: var(--muted); }
+.auth-method-go { color: var(--faint); font-size: 14px; }
+
 
 /* ── Mail ─────────────────────────────────────────────── */
 .sb-count {

@@ -67,8 +67,8 @@ async function renderAccountView() {
           <span class="cur-badge ${on ? 'cur-badge-success' : 'cur-badge-neutral'}">${on ? 'On' : 'Off'}</span>
         </div>
         <p style="font-size:13px;color:var(--muted);margin:0 0 12px">
-          ${on ? 'Sign-in asks for a code from your authenticator app.'
-               : 'Add a second step to sign-in: a 6-digit code from an authenticator app.'}
+          ${on ? 'After your password, sign-in asks you to confirm it’s you: Touch ID (if you’ve added a passkey below), a code emailed to ' + esc(u.email) + ', your authenticator app, or a backup code.'
+               : 'Add a second step after your password: Touch ID, a code emailed to ' + esc(u.email) + ', or an authenticator app.'}
         </p>
         <div id="acct-2fa">
           <label class="form-field" style="max-width:280px">
@@ -130,7 +130,7 @@ async function renderPasskeys(message) {
     <div class="ov-card-hd">Passkeys
       <span class="cur-badge ${list.length ? 'cur-badge-success' : 'cur-badge-neutral'}">${list.length ? 'On' : 'Off'}</span>
     </div>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">Sign in with your laptop's fingerprint (Touch ID) instead of your password. No authenticator code needed: the passkey already proves both the device and that it's you.</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">After your password, confirm sign-in with this laptop's fingerprint (Touch ID) instead of typing a code. Used only when two-factor authentication is on.</p>
     ${list.length ? `<div class="acct-pk-list">${list.map(pk => `
       <div class="acct-pk" data-id="${esc(pk.id)}">
         <i class="ph-bold ph-fingerprint acct-pk-icon" aria-hidden="true"></i>
@@ -216,19 +216,22 @@ async function showTotpEnrollment(totpURI, backupCodes) {
   const secret = new URL(totpURI).searchParams.get('secret') || '';
   const box = document.getElementById('acct-2fa');
   box.innerHTML = `
+    <p style="font-size:13px;color:var(--success);margin:0 0 10px">Two-factor is on. Sign-in will offer Touch ID (once you add a passkey) or an emailed code.</p>
     <ol style="font-size:13px;color:var(--body-text);padding-left:18px;margin:0 0 12px;display:grid;gap:10px">
-      <li>Scan this code with an authenticator app (1Password, Google Authenticator, Authy…).
+      <li>Save your backup codes.<div style="margin-top:8px">${backupCodesHTML(backupCodes)}</div></li>
+      <li>Optional: scan this with an authenticator app (1Password, Google Authenticator, Authy…) to use it as another way in.
         <div id="acct-qr" style="margin-top:10px;background:#fff;display:block;width:max-content;padding:10px;border-radius:var(--r-sm)"></div>
         <div style="font-size:12px;color:var(--muted);margin-top:6px">Or enter this key: <code style="user-select:all;letter-spacing:.05em">${esc(secret)}</code></div>
       </li>
-      <li>Save your backup codes.<div style="margin-top:8px">${backupCodesHTML(backupCodes)}</div></li>
-      <li>Enter the 6-digit code the app shows to finish.
+      <li>If you scanned it, check a code from the app works.
         <div style="display:flex;gap:8px;margin-top:8px;max-width:280px">
           <input class="form-input" id="acct-totp" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
-          <button class="btn-primary btn-sm" id="acct-totp-verify">Verify</button>
+          <button class="btn-ghost btn-sm" id="acct-totp-verify">Check</button>
         </div>
       </li>
-    </ol>`;
+    </ol>
+    <button class="btn-primary btn-sm" id="acct-2fa-done">Done</button>`;
+  document.getElementById('acct-2fa-done').addEventListener('click', () => renderAccountView());
 
   loadQrLib().then(() => {
     const qr = window.qrcode(0, 'M');
@@ -243,8 +246,8 @@ async function showTotpEnrollment(totpURI, backupCodes) {
     e.currentTarget.disabled = true;
     try {
       await authPost('/two-factor/verify-totp', { code });
-      await renderAccountView();
-      accountMsg('Two-factor authentication is on.', true);
+      accountMsg('That code works. Your authenticator app is set up.', true);
+      e.currentTarget.disabled = false;
     } catch (err) { accountMsg(err.message); e.currentTarget.disabled = false; }
   });
 }

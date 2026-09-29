@@ -3,8 +3,9 @@
 // ─── passkeys (WebAuthn) ──────────────────────────────────────────────────────
 // Shared by the sign-in page and the Account view. Converts between the JSON
 // the server sends/expects (base64url binary fields) and the browser's
-// WebAuthn API, and runs the two ceremonies against Better Auth's passkey
-// endpoints. Loaded before sign-in, so it is on the gate's public allowlist.
+// WebAuthn API. Passkeys are only ever a second step after the password
+// (Better Auth's passkey endpoints for adding them, lib/passkeySecondFactor.js
+// for using them). Loaded before sign-in, so it is on the gate's allowlist.
 
 function b64urlToBuf(s) {
   const b64 = String(s).replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(s).length / 4) * 4, '=');
@@ -67,10 +68,6 @@ async function passkeySupported() {
   } catch (_) { return false; }
 }
 
-async function passkeyAutofillSupported() {
-  try { return !!(await PublicKeyCredential.isConditionalMediationAvailable?.()); } catch (_) { return false; }
-}
-
 // Human-readable reason a ceremony stopped; null when the person just cancelled.
 function passkeyErrorMessage(err) {
   if (!err) return 'Something went wrong. Try again.';
@@ -92,19 +89,19 @@ async function passkeyFetch(path, init) {
   return data;
 }
 
-// Sign in. `conditional` offers the passkey in the email field's autofill
-// instead of opening a dialog; `signal` cancels a pending request.
-async function passkeySignIn({ conditional = false, signal } = {}) {
-  const options = await passkeyFetch('/generate-authenticate-options', { method: 'GET' });
-  const cred = await navigator.credentials.get({
-    publicKey: webauthnRequestOptions(options),
-    ...(conditional ? { mediation: 'conditional' } : {}),
-    ...(signal ? { signal } : {}),
-  });
-  return passkeyFetch('/verify-authentication', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+// Second sign-in step: after the password, confirm with a passkey (Touch ID).
+async function passkeySecondFactor() {
+  const r = await fetch('/api/auth/second-factor/passkey-options', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  const options = await r.json().catch(() => ({}))
+  if (!r.ok) throw Object.assign(new Error(options.message || `Request failed (${r.status})`), { status: r.status })
+  const cred = await navigator.credentials.get({ publicKey: webauthnRequestOptions(options) })
+  const v = await fetch('/api/auth/second-factor/passkey-verify', {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ response: webauthnCredentialJSON(cred) }),
-  });
+  })
+  const data = await v.json().catch(() => ({}))
+  if (!v.ok) throw Object.assign(new Error(v.status === 429 ? 'Too many attempts. Wait a minute and try again.' : (data.message || 'Touch ID didn’t work. Try again.')), { status: v.status })
+  return data
 }
 
 // Add a passkey on this computer for the signed-in account.

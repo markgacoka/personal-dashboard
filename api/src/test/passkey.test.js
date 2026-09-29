@@ -54,28 +54,43 @@ describe('passkey server policy', async () => {
   process.env.BETTER_AUTH_URL ||= 'https://gacoka.com'
   process.env.BETTER_AUTH_SECRET ||= 'test-secret-0123456789abcdef0123456789abcdef'
   const { auth } = await import('../auth.js')
-  const plugin = auth.options.plugins.find(p => p.id === 'passkey')
-  const opts = plugin?.options || {}
+  const { maskEmail } = await import('../lib/passkeySecondFactor.js')
+  const plugin = id => auth.options.plugins.find(p => p.id === id)
+  const opts = plugin('passkey')?.options || {}
 
-  test('the passkey plugin is enabled next to two-factor', () => {
-    assert.ok(plugin)
-    assert.ok(auth.options.plugins.some(p => p.id === 'two-factor'))
+  test('passkeys are a second step only: password-less passkey sign-in is switched off', () => {
+    assert.ok(auth.options.disabledPaths.includes('/passkey/verify-authentication'))
+    assert.ok(auth.options.disabledPaths.includes('/passkey/generate-authenticate-options'))
+    assert.ok(plugin('passkey-second-factor'))
+    assert.equal(opts.authentication, undefined)
   })
-  test('only built-in authenticators, discoverable, with user verification', () => {
-    assert.deepEqual({ ...opts.authenticatorSelection }, { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' })
+  test('two-factor offers emailed codes and can be on without an authenticator app', () => {
+    const tf = plugin('two-factor').options
+    assert.equal(typeof tf.otpOptions.sendOTP, 'function')
+    assert.equal(tf.otpOptions.storeOTP, 'hashed')
+    assert.equal(tf.skipVerificationOnEnable, true)
   })
-  test('relying party and origin are pinned to the site, not taken from the request', () => {
+  test('only built-in authenticators, with user verification', () => {
+    assert.equal(opts.authenticatorSelection.authenticatorAttachment, 'platform')
+    assert.equal(opts.authenticatorSelection.userVerification, 'required')
+  })
+  test('relying party and origin are pinned to the site', () => {
     assert.equal(opts.rpID, new URL(process.env.BETTER_AUTH_URL).hostname)
     assert.equal(opts.origin, new URL(process.env.BETTER_AUTH_URL).origin)
   })
-  test('sign-in and registration are refused unless the device verified the user', () => {
-    const auth = opts.authentication.afterVerification, reg = opts.registration.afterVerification
-    assert.throws(() => auth({ verification: { authenticationInfo: { userVerified: false } } }), /confirm it is you/)
+  test('adding a passkey is refused unless the device verified the user', () => {
+    const reg = opts.registration.afterVerification
     assert.throws(() => reg({ verification: { registrationInfo: { userVerified: false } } }), /confirm it is you/)
-    assert.doesNotThrow(() => auth({ verification: { authenticationInfo: { userVerified: true } } }))
     assert.doesNotThrow(() => reg({ verification: { registrationInfo: { userVerified: true } } }))
   })
-  test('passkey sign-in attempts are rate limited', () => {
-    assert.ok(auth.options.rateLimit.customRules['/passkey/verify-authentication'].max <= 10)
+  test('second-step endpoints and emailed codes are rate limited', () => {
+    const rules = auth.options.rateLimit.customRules
+    assert.ok(rules['/second-factor/*'].max <= 15)
+    assert.ok(rules['/two-factor/send-otp'].max <= 3)
+  })
+  test('the email address is masked on the sign-in page', () => {
+    assert.equal(maskEmail('markgacoka@gmail.com'), 'm••••••@gmail.com')
+    assert.equal(maskEmail('ab@x.test'), 'a••@x.test')
+    assert.equal(maskEmail('nope'), '')
   })
 })

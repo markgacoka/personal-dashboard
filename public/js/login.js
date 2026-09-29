@@ -1,8 +1,9 @@
 'use strict';
 
-// Sign-in page: a passkey (Touch ID) when this computer has one, or email +
-// password followed by an authenticator (or backup) code when two-factor is
-// on. Talks to Better Auth's endpoints under /api/auth.
+// Sign-in page. The password is always required. With two-factor on, a second
+// step follows: Touch ID (a passkey on this computer), a code emailed to the
+// account address, or the authenticator app / a backup code if set up.
+// Talks to Better Auth's endpoints under /api/auth.
 
 // Same theme as the dashboard, applied before first paint.
 document.documentElement.setAttribute('data-theme', (() => {
@@ -12,7 +13,8 @@ document.documentElement.setAttribute('data-theme', (() => {
 document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
   const errorBox = $('auth-error');
-  let backupMode = false;
+  let mode = null;    // 'email' | 'totp' | 'backup' while the code form is shown
+  let methods = null; // what this account can use as a second step
 
   // Only same-site paths: never redirect to another host after sign-in.
   const next = (() => {
@@ -30,14 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify(body),
+      body: JSON.stringify(body || {}),
     });
     const data = await r.json().catch(() => ({}));
     return { ok: r.ok, status: r.status, data };
   }
 
-  function busy(form, on) {
-    form.querySelectorAll('button, input').forEach(el => { el.disabled = on; });
+  function busy(el, on) {
+    el.querySelectorAll('button, input').forEach(x => { x.disabled = on; });
   }
 
   function failureMessage(res) {
@@ -45,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return res.data.message || 'Sign-in failed. Try again.';
   }
 
+  function show(step) {
+    ['password-step', 'method-step', 'code-step'].forEach(id => { $(id).hidden = id !== step; });
+  }
+
+  // ── Step 1: password ──────────────────────────────────────────────────────
   $('password-step').addEventListener('submit', async e => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -56,52 +63,85 @@ document.addEventListener('DOMContentLoaded', () => {
     busy(form, false);
     if (!res) return showError('Could not reach the server. Check your connection.');
     if (!res.ok) { $('password').value = ''; return showError(res.status === 401 ? 'Wrong email or password.' : failureMessage(res)); }
-    if (res.data.twoFactorRedirect) {
-      form.hidden = true;
-      $('code-step').hidden = false;
-      $('code').focus();
-      return;
-    }
+    if (res.data.twoFactorRedirect) return showMethods();
     location.replace(next);
   });
 
-  // ── Passkey (Touch ID): signs in directly, no authenticator code ──────────
-  let autofill = null; // pending autofill request, cancelled before a manual one
+  // ── Step 2: choose how to confirm ─────────────────────────────────────────
+  async function showMethods() {
+    const res = await post('/second-factor/methods').catch(() => null);
+    methods = res?.ok ? res.data : { email: '', totp: true, backupCodes: true, passkey: false };
+    const canTouchId = methods.passkey && await passkeySupported();
+    const options = [
+      canTouchId && { id: 'passkey', icon: 'ph-fingerprint', label: 'Touch ID', sub: 'This computer’s fingerprint sensor', primary: true },
+      methods.email && { id: 'email', icon: 'ph-envelope-simple', label: 'Email me a code', sub: `Sent to ${methods.email}`, primary: !canTouchId },
+      methods.totp && { id: 'totp', icon: 'ph-device-mobile', label: 'Authenticator app', sub: 'A 6-digit code from the app' },
+      methods.backupCodes && { id: 'backup', icon: 'ph-key', label: 'Backup code', sub: 'One of the codes you saved' },
+    ].filter(Boolean);
+    $('auth-methods').innerHTML = options.map(o => `
+      <button type="button" class="auth-method${o.primary ? ' primary' : ''}" data-method="${o.id}">
+        <i class="ph-bold ${o.icon}" aria-hidden="true"></i>
+        <span class="auth-method-text"><span class="auth-method-label">${o.label}</span><span class="auth-method-sub">${o.sub}</span></span>
+        <i class="ph-bold ph-caret-right auth-method-go" aria-hidden="true"></i>
+      </button>`).join('');
+    $('auth-methods').querySelectorAll('[data-method]').forEach(b => b.addEventListener('click', () => chooseMethod(b.dataset.method, b)));
+    showError('');
+    show('method-step');
+    $('auth-methods').querySelector('button')?.focus();
+  }
 
-  async function passkeyFlow(conditional) {
-    if (!conditional) { autofill?.abort(); autofill = null; }
-    const controller = new AbortController();
-    if (conditional) autofill = controller;
-    const button = $('passkey-signin');
-    if (!conditional) { showError(''); button.disabled = true; }
+  async function chooseMethod(id, button) {
+    showError('');
+    if (id === 'passkey') return touchId(button);
+    if (id === 'email') {
+      busy($('method-step'), true);
+      const res = await post('/two-factor/send-otp').catch(() => null);
+      busy($('method-step'), false);
+      if (!res?.ok) return showError(res ? failureMessage(res) : 'Could not reach the server.');
+    }
+    openCode(id);
+  }
+
+  async function touchId(button) {
+    busy($('method-step'), true);
+    button.classList.add('waiting');
     try {
-      await passkeySignIn({ conditional, signal: controller.signal });
+      await passkeySecondFactor();
       location.replace(next);
     } catch (err) {
-      if (controller.signal.aborted) return;
-      const message = err.code === 'PASSKEY_NOT_FOUND' ? 'That passkey isn’t registered here. Sign in with your password, then add it under Account.' : passkeyErrorMessage(err);
+      const message = err.status ? err.message : passkeyErrorMessage(err);
       if (message) showError(message);
+      if (err.status === 401 && /expired|password/i.test(err.message)) setTimeout(() => location.reload(), 1500);
     } finally {
-      if (!conditional) button.disabled = false;
-      if (autofill === controller) autofill = null;
+      busy($('method-step'), false);
+      button.classList.remove('waiting');
     }
   }
 
-  (async () => {
-    if (!(await passkeySupported())) return;
-    $('passkey-block').hidden = false;
-    $('password-submit').classList.replace('btn-primary', 'btn-ghost');
-    $('passkey-signin').addEventListener('click', () => passkeyFlow(false));
-    if (await passkeyAutofillSupported()) passkeyFlow(true);
-  })();
-
-  $('use-backup').addEventListener('click', () => {
-    backupMode = !backupMode;
-    $('code-label').textContent = backupMode ? 'Backup code' : 'Authentication code';
-    $('code').setAttribute('inputmode', backupMode ? 'text' : 'numeric');
-    $('use-backup').textContent = backupMode ? 'Use your authenticator app instead' : 'Use a backup code instead';
+  // ── Step 3: a code (email, authenticator app, backup) ─────────────────────
+  function openCode(which) {
+    mode = which;
+    const hints = {
+      email: `We emailed a 6-digit code to ${methods.email}. It expires in 5 minutes.`,
+      totp: 'Enter the 6-digit code from your authenticator app.',
+      backup: 'Enter one of your backup codes. Each works once.',
+    };
+    $('code-hint').textContent = hints[which];
+    $('code-label').textContent = which === 'backup' ? 'Backup code' : 'Code';
+    $('code').setAttribute('inputmode', which === 'backup' ? 'text' : 'numeric');
     $('code').value = '';
+    $('resend-code').hidden = which !== 'email';
+    show('code-step');
     $('code').focus();
+  }
+
+  $('other-method').addEventListener('click', () => { showError(''); show('method-step'); });
+
+  $('resend-code').addEventListener('click', async e => {
+    e.currentTarget.disabled = true;
+    const res = await post('/two-factor/send-otp').catch(() => null);
+    e.currentTarget.disabled = false;
+    showError(res?.ok ? '' : (res ? failureMessage(res) : 'Could not reach the server.'));
   });
 
   $('code-step').addEventListener('submit', async e => {
@@ -111,11 +151,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!code) return showError('Enter the code.');
     showError('');
     busy(form, true);
-    const res = await post(backupMode ? '/two-factor/verify-backup-code' : '/two-factor/verify-totp',
-      { code, trustDevice: $('trust-device').checked }).catch(() => null);
+    const path = { email: '/two-factor/verify-otp', totp: '/two-factor/verify-totp', backup: '/two-factor/verify-backup-code' }[mode];
+    const res = await post(path, { code, trustDevice: $('trust-device').checked }).catch(() => null);
     busy(form, false);
     if (!res) return showError('Could not reach the server. Check your connection.');
-    if (!res.ok) { $('code').value = ''; return showError(res.status === 401 ? 'That code didn’t work. Try the current one.' : failureMessage(res)); }
+    if (!res.ok) { $('code').value = ''; return showError(res.status === 401 ? 'That code didn’t work. Check it and try again.' : failureMessage(res)); }
     location.replace(next);
   });
 });

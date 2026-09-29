@@ -104,7 +104,7 @@ function route(view, id) {
       break;
     case 'mail-settings':
       showView('mail-settings', { title: 'Mail Settings' });
-      renderMailSettings();
+      renderMailSettings(id);
       break;
     default:
       showView('overview', { title: 'Overview' });

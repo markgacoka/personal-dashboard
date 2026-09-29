@@ -497,7 +497,7 @@ function mailLabelMenu(anchor, threadIds, current = []) {
       return { label: l.name, color: MAIL_LABEL_COLORS[l.color], hint: has ? 'Remove' : '', run: () => mailThreadAction(threadIds, has ? 'unlabel' : 'label', { labelId: l.id }).then(() => mailThreadShown() && showMailThread(MAIL.thread.threadId, { keepScroll: true })) };
     }),
     ...(labels.length ? [{ sep: true }] : []),
-    { label: 'New label…', icon: 'ph-plus', run: () => navigate('mail-settings') },
+    { label: 'New label…', icon: 'ph-plus', run: () => navigate('mail-settings', 'labels') },
   ]);
 }
 

@@ -304,7 +304,7 @@ async function templateMenu(anchor) {
       markComposerDirty();
     } })),
     ...(list.length ? [{ sep: true }] : []),
-    { label: 'Manage templates…', icon: 'ph-gear-six', run: () => navigate('mail-settings') },
+    { label: 'Manage templates…', icon: 'ph-gear-six', run: () => navigate('mail-settings', 'templates') },
   ]);
 }
 

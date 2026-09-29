@@ -5,9 +5,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test src/test/wx.test.js src/test/routes.test.js src/test/mail.test.js"
+    "test": "node --test src/test/wx.test.js src/test/routes.test.js src/test/mail.test.js src/test/passkey.test.js"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.6",
     "@fastify/helmet": "^13.1.1",
     "@fastify/static": "^10.1.5",
     "better-auth": "^1.7.6",

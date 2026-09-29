@@ -54,6 +54,11 @@ services:
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=letsencrypt"
       - "traefik.http.services.app.loadbalancer.server.port=3000"
+      # www → gacoka.com: sign-in (password and passkeys) is bound to the bare domain.
+      - "traefik.http.routers.app.middlewares=www-to-apex"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.regex=^https://www\\.gacoka\\.com/(.*)"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.replacement=https://gacoka.com/$${1}"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.permanent=true"
       # https://mail.gacoka.com opens the webmail in the dashboard.
       - "traefik.http.routers.mail-web.rule=Host(`mail.gacoka.com`)"
       - "traefik.http.routers.mail-web.entrypoints=websecure"

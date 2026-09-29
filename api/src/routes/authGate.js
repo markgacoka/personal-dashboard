@@ -8,7 +8,7 @@ import { auth } from '../auth.js'
 
 // Exact paths only (no prefixes, no normalization): an encoded or
 // non-canonical path can never match, so it falls through to the session check.
-const PUBLIC_PATHS = new Set(['/login', '/css/app.css', '/js/login.js', '/favicon.svg', '/health', '/api/health'])
+const PUBLIC_PATHS = new Set(['/login', '/css/app.css', '/js/login.js', '/js/webauthn.js', '/favicon.svg', '/health', '/api/health'])
 const AUTH_PREFIX = '/api/auth/'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 

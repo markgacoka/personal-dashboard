@@ -1662,6 +1662,23 @@ html, body {
 .auth-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .auth-submit { justify-content: center; width: 100%; padding: 11px 20px; margin-top: 4px; }
 .auth-alt { justify-self: center; font-size: 12px; }
+.acct-pk-list { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: var(--r-sm); margin-bottom: 12px; }
+.acct-pk { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
+.acct-pk:first-child { border-top: none; }
+.acct-pk-icon { font-size: 20px; color: var(--patina-text); }
+.acct-pk-main { flex: 1; min-width: 160px; }
+.acct-pk-name { font-size: 14px; font-weight: 600; color: var(--champagne); }
+.acct-pk-meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.acct-pk-rename { display: flex; gap: 8px; align-items: center; }
+.acct-pk-rename .form-input { max-width: 220px; }
+.acct-pk-msg { font-size: 13px; margin-top: 10px; }
+.acct-pk-msg:empty { display: none; }
+.auth-passkey { display: grid; gap: 16px; }
+.auth-passkey[hidden] { display: none; }
+.auth-passkey .auth-submit { margin-top: 0; gap: 8px; }
+.auth-submit i { font-size: 18px; }
+.auth-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--faint); }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
 
 /* ── Mail ─────────────────────────────────────────────── */
 .sb-count {

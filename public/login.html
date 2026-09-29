@@ -9,7 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Alumni+Sans:wght@600;700&family=Albert+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/bold/style.css" integrity="sha384-nblAP2mo2pVPyMQZDw9Xy9Cwgs9lowushAYep4w5+Q9kF4Ibf3n0B/gCMVdR+Vqy" crossorigin="anonymous">
   <link rel="stylesheet" href="/css/app.css">
+  <script src="/js/webauthn.js" defer></script>
   <script src="/js/login.js" defer></script>
 </head>
 <body class="auth-page">
@@ -18,15 +20,19 @@
 
     <form id="password-step" class="auth-form" novalidate>
       <p class="auth-sub">Sign in to your dashboard.</p>
+      <div class="auth-passkey" id="passkey-block" hidden>
+        <button class="btn-primary auth-submit" type="button" id="passkey-signin"><i class="ph-bold ph-fingerprint" aria-hidden="true"></i>Sign in with Touch ID</button>
+        <div class="auth-or"><span>or use your password</span></div>
+      </div>
       <label class="form-field">
         <span class="form-label">Email</span>
-        <input class="form-input" id="email" type="email" name="email" autocomplete="username" spellcheck="false" required autofocus>
+        <input class="form-input" id="email" type="email" name="email" autocomplete="username webauthn" spellcheck="false" required autofocus>
       </label>
       <label class="form-field">
         <span class="form-label">Password</span>
         <input class="form-input" id="password" type="password" name="password" autocomplete="current-password" required>
       </label>
-      <button class="btn-primary auth-submit" type="submit">Sign in</button>
+      <button class="btn-primary auth-submit" type="submit" id="password-submit">Sign in</button>
     </form>
 
     <form id="code-step" class="auth-form" hidden novalidate>

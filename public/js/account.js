@@ -60,6 +60,8 @@ async function renderAccountView() {
         </div>
       </div>
 
+      <div class="ov-card" id="acct-passkeys"></div>
+
       <div class="ov-card">
         <div class="ov-card-hd">Two-factor authentication
           <span class="cur-badge ${on ? 'cur-badge-success' : 'cur-badge-neutral'}">${on ? 'On' : 'Off'}</span>
@@ -84,6 +86,7 @@ async function renderAccountView() {
       <div class="form-error" id="acct-msg" role="alert"></div>
     </div>`;
 
+  renderPasskeys();
   document.getElementById('acct-signout').addEventListener('click', signOut);
   document.getElementById('acct-signout-others').addEventListener('click', async () => {
     try { await authPost('/revoke-other-sessions'); accountMsg('Every other device was signed out.', true); }
@@ -110,6 +113,96 @@ async function renderAccountView() {
     const { backupCodes } = await authPost('/two-factor/generate-backup-codes', { password: password() });
     document.getElementById('acct-2fa').innerHTML = backupCodesHTML(backupCodes, 'Your old backup codes no longer work.');
   });
+}
+
+// ─── passkeys ─────────────────────────────────────────────────────────────────
+// Touch ID sign-in. Adding one needs a recent sign-in (Better Auth's "fresh
+// session", under a day old); signing in with it skips the authenticator code.
+async function renderPasskeys(message) {
+  const box = document.getElementById('acct-passkeys');
+  if (!box) return;
+  const [supported, list] = await Promise.all([
+    passkeySupported(),
+    fetch('/api/auth/passkey/list-user-passkeys', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : []).catch(() => []),
+  ]);
+  const fmt = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  box.innerHTML = `
+    <div class="ov-card-hd">Passkeys
+      <span class="cur-badge ${list.length ? 'cur-badge-success' : 'cur-badge-neutral'}">${list.length ? 'On' : 'Off'}</span>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">Sign in with your laptop's fingerprint (Touch ID) instead of your password. No authenticator code needed: the passkey already proves both the device and that it's you.</p>
+    ${list.length ? `<div class="acct-pk-list">${list.map(pk => `
+      <div class="acct-pk" data-id="${esc(pk.id)}">
+        <i class="ph-bold ph-fingerprint acct-pk-icon" aria-hidden="true"></i>
+        <div class="acct-pk-main">
+          <div class="acct-pk-name">${esc(pk.name || 'Passkey')}</div>
+          <div class="acct-pk-meta">Added ${esc(fmt(pk.createdAt))}${pk.backedUp ? ' · synced across your devices' : ' · this computer only'}</div>
+        </div>
+        <button class="btn-ghost btn-sm" data-pk-rename>Rename</button>
+        <button class="btn-ghost btn-sm" data-pk-remove>Remove</button>
+      </div>`).join('')}</div>` : ''}
+    ${supported
+      ? `<button class="btn-primary btn-sm" id="acct-pk-add"><i class="ph-bold ph-fingerprint"></i> Add a passkey on this computer</button>`
+      : `<p style="font-size:13px;color:var(--faint);margin:0">This browser or computer can't create passkeys. Use Safari or Chrome on a Mac with Touch ID.</p>`}
+    <div class="acct-pk-msg" id="acct-pk-msg" role="status"></div>`;
+
+  const say = (text, ok = false) => {
+    const el = document.getElementById('acct-pk-msg');
+    el.textContent = text || '';
+    el.style.color = ok ? 'var(--success)' : 'var(--warn)';
+  };
+  if (message) say(message, true);
+
+  document.getElementById('acct-pk-add')?.addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    btn.disabled = true; say('');
+    try {
+      await passkeyRegister(passkeyDefaultName());
+      await renderPasskeys('Passkey added. Next time, choose "Sign in with Touch ID".');
+    } catch (err) {
+      btn.disabled = false;
+      if (err.status === 403 || /fresh/i.test(err.message)) return say('For security, adding a passkey needs a recent sign-in. Sign out, sign back in with your password, then add it.');
+      const text = passkeyErrorMessage(err);
+      if (text) say(text);
+    }
+  });
+
+  box.querySelectorAll('[data-pk-remove]').forEach(b => b.addEventListener('click', () => {
+    const row = b.closest('.acct-pk');
+    const wrap = document.createElement('span');
+    wrap.className = 'row-confirm';
+    wrap.innerHTML = `<span class="row-confirm-label">Remove this passkey?</span><button class="btn-ghost btn-sm">Remove</button><button class="btn-link">Cancel</button>`;
+    b.replaceWith(wrap);
+    const [yes, no] = wrap.querySelectorAll('button');
+    no.addEventListener('click', () => renderPasskeys());
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      const r = await fetch('/api/auth/passkey/delete-passkey', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.dataset.id }) }).catch(() => null);
+      if (!r?.ok) { yes.disabled = false; return say('Could not remove the passkey. Try again.'); }
+      renderPasskeys('Passkey removed. Also delete it from System Settings → Passwords on the Mac.');
+    });
+  }));
+
+  box.querySelectorAll('[data-pk-rename]').forEach(b => b.addEventListener('click', () => {
+    const row = b.closest('.acct-pk');
+    const nameEl = row.querySelector('.acct-pk-name');
+    const form = document.createElement('form');
+    form.className = 'acct-pk-rename';
+    form.innerHTML = `<input class="form-input" maxlength="60" aria-label="Passkey name"><button class="btn-primary btn-sm" type="submit">Save</button><button class="btn-link" type="button">Cancel</button>`;
+    form.querySelector('input').value = nameEl.textContent;
+    nameEl.replaceWith(form);
+    row.querySelectorAll('[data-pk-rename],[data-pk-remove]').forEach(x => { x.hidden = true; });
+    form.querySelector('input').focus();
+    form.querySelector('[type=button]').addEventListener('click', () => renderPasskeys());
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const name = form.querySelector('input').value.trim();
+      if (!name) return form.querySelector('input').focus();
+      const r = await fetch('/api/auth/passkey/update-passkey', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.dataset.id, name }) }).catch(() => null);
+      if (!r?.ok) return say('Could not rename the passkey.');
+      renderPasskeys();
+    });
+  }));
 }
 
 function backupCodesHTML(codes, note) {

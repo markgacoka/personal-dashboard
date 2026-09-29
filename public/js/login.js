@@ -1,7 +1,8 @@
 'use strict';
 
-// Sign-in page: email + password, then an authenticator (or backup) code when
-// two-factor is on. Talks to Better Auth's endpoints under /api/auth.
+// Sign-in page: a passkey (Touch ID) when this computer has one, or email +
+// password followed by an authenticator (or backup) code when two-factor is
+// on. Talks to Better Auth's endpoints under /api/auth.
 
 // Same theme as the dashboard, applied before first paint.
 document.documentElement.setAttribute('data-theme', (() => {
@@ -63,6 +64,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     location.replace(next);
   });
+
+  // ── Passkey (Touch ID): signs in directly, no authenticator code ──────────
+  let autofill = null; // pending autofill request, cancelled before a manual one
+
+  async function passkeyFlow(conditional) {
+    if (!conditional) { autofill?.abort(); autofill = null; }
+    const controller = new AbortController();
+    if (conditional) autofill = controller;
+    const button = $('passkey-signin');
+    if (!conditional) { showError(''); button.disabled = true; }
+    try {
+      await passkeySignIn({ conditional, signal: controller.signal });
+      location.replace(next);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      const message = err.code === 'PASSKEY_NOT_FOUND' ? 'That passkey isn’t registered here. Sign in with your password, then add it under Account.' : passkeyErrorMessage(err);
+      if (message) showError(message);
+    } finally {
+      if (!conditional) button.disabled = false;
+      if (autofill === controller) autofill = null;
+    }
+  }
+
+  (async () => {
+    if (!(await passkeySupported())) return;
+    $('passkey-block').hidden = false;
+    $('password-submit').classList.replace('btn-primary', 'btn-ghost');
+    $('passkey-signin').addEventListener('click', () => passkeyFlow(false));
+    if (await passkeyAutofillSupported()) passkeyFlow(true);
+  })();
 
   $('use-backup').addEventListener('click', () => {
     backupMode = !backupMode;

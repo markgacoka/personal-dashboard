@@ -916,6 +916,10 @@ export async function migrateV24() {
   `)
 }
 
+// V25: the passkey plugin's table. Same generator as V22, which only adds
+// what the auth config needs and is missing.
+export const migrateV25 = migrateV22
+
 // Migrations in order. Each runs once and is recorded in schema_migrations.
 // Before the ledger existed every migration re-ran on every boot, which kept
 // re-applying one-off data fixes (V10 blanked instructor_comments on every
@@ -927,7 +931,7 @@ const MIGRATIONS = [
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
-  ['024', migrateV24],
+  ['024', migrateV24], ['025', migrateV25],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

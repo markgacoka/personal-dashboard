@@ -9,7 +9,7 @@
 // passkeys (user verification required), and finish the sign-in exactly as
 // the built-in verifiers do: consume the pending row, create the session,
 // clear the cookie.
-import { createAuthEndpoint, APIError } from 'better-auth/api'
+import { createAuthEndpoint, APIError, getSessionFromCtx } from 'better-auth/api'
 import { setSessionCookie, expireCookie } from 'better-auth/cookies'
 import { generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server'
 
@@ -52,6 +52,17 @@ export function passkeySecondFactor({ rpID, origin }) {
           ctx.context.adapter.findOne({ model: 'twoFactor', where: [{ field: 'userId', value: user.id }] }),
         ])
         return ctx.json({ passkey: passkeys.length > 0, email: maskEmail(user.email), totp: !!totp?.secret, backupCodes: !!totp?.backupCodes })
+      }),
+
+      // The signed-in account's second steps, for the Account page.
+      secondFactorStatus: createAuthEndpoint('/second-factor/status', { method: 'GET' }, async ctx => {
+        const session = await getSessionFromCtx(ctx)
+        if (!session) throw fail('Sign in first.')
+        const [passkeys, totp] = await Promise.all([
+          userPasskeys(ctx, session.user.id),
+          ctx.context.adapter.findOne({ model: 'twoFactor', where: [{ field: 'userId', value: session.user.id }] }),
+        ])
+        return ctx.json({ enabled: !!session.user.twoFactorEnabled, passkeys: passkeys.length, email: session.user.email, totp: !!totp?.secret, backupCodes: !!totp?.backupCodes })
       }),
 
       secondFactorPasskeyOptions: createAuthEndpoint('/second-factor/passkey-options', { method: 'POST' }, async ctx => {

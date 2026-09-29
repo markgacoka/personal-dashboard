@@ -41,52 +41,89 @@ function loadQrLib() {
   });
 }
 
+// "Chrome on macOS" from a user-agent string, for the session card.
+function describeDevice(ua) {
+  ua = String(ua || '');
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'A browser';
+  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${browser} on ${os}` : browser;
+}
+
 async function renderAccountView() {
   const el = document.getElementById('account-content');
-  const session = await fetch('/api/auth/get-session', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  const [session, status] = await Promise.all([
+    fetch('/api/auth/get-session', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch('/api/auth/second-factor/status', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
   if (!session?.user) { location.replace('/login?next=' + encodeURIComponent('/#account')); return; }
   const u = session.user;
   const on = !!u.twoFactorEnabled;
+  const st = status || { passkeys: 0, totp: false, backupCodes: false };
+  const initials = (u.name || u.email).split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const since = session.session?.createdAt ? new Date(session.session.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+  // The current sign-in, step by step.
+  const second = [st.passkeys ? 'Touch ID' : null, 'emailed code', st.totp ? 'authenticator app' : null, st.backupCodes ? 'backup code' : null].filter(Boolean);
+  const flow = on
+    ? `<span class="acct-step"><b>1</b>Password</span><i class="ph-bold ph-arrow-right acct-arrow"></i><span class="acct-step"><b>2</b>${esc(second.join(' · '))}</span><span class="acct-flow-note">Any one of these completes sign-in.</span>`
+    : `<span class="acct-step"><b>1</b>Password</span><span class="acct-flow-note warn"><i class="ph-bold ph-warning"></i>Your password alone signs you in. Turn on two-factor to require a second step.</span>`;
 
   el.innerHTML = `
-    <div style="display:grid;gap:16px;max-width:560px">
-      <div class="ov-card">
-        <div class="ov-card-hd">Signed in</div>
-        <div style="font-size:14px;font-weight:600;color:var(--champagne)">${esc(u.name || u.email)}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(u.email)}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn-ghost btn-sm" id="acct-signout"><i class="ph-bold ph-sign-out"></i> Sign out</button>
+    <div class="acct">
+      <section class="ms-card acct-profile">
+        <span class="acct-avatar" aria-hidden="true">${esc(initials)}</span>
+        <div class="acct-who">
+          <div class="acct-name">${esc(u.name || u.email)}</div>
+          <div class="acct-email">${esc(u.email)}</div>
+          <div class="acct-device"><i class="ph-bold ph-desktop"></i>This device: ${esc(describeDevice(session.session?.userAgent))}${since ? ` · signed in ${esc(since)}` : ''}</div>
+        </div>
+        <div class="acct-signout">
+          <button class="btn-danger" id="acct-signout"><i class="ph-bold ph-sign-out"></i> Sign out</button>
           <button class="btn-ghost btn-sm" id="acct-signout-others">Sign out other devices</button>
         </div>
-      </div>
+      </section>
 
-      <div class="ov-card" id="acct-passkeys"></div>
+      <section class="ms-card acct-flow">
+        <h2 class="ms-card-title">How you sign in</h2>
+        <div class="acct-flow-steps">${flow}</div>
+      </section>
 
-      <div class="ov-card">
-        <div class="ov-card-hd">Two-factor authentication
-          <span class="cur-badge ${on ? 'cur-badge-success' : 'cur-badge-neutral'}">${on ? 'On' : 'Off'}</span>
-        </div>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 12px">
-          ${on ? 'After your password, sign-in asks you to confirm it’s you: Touch ID (if you’ve added a passkey below), a code emailed to ' + esc(u.email) + ', your authenticator app, or a backup code.'
-               : 'Add a second step after your password: Touch ID, a code emailed to ' + esc(u.email) + ', or an authenticator app.'}
-        </p>
-        <div id="acct-2fa">
-          <label class="form-field" style="max-width:280px">
-            <span class="form-label">Confirm your password</span>
-            <input class="form-input" id="acct-pw" type="password" autocomplete="current-password">
-          </label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-            ${on
-              ? `<button class="btn-ghost btn-sm" id="acct-2fa-codes">New backup codes</button>
-                 <button class="btn-ghost btn-sm" id="acct-2fa-off">Turn off</button>`
-              : `<button class="btn-primary btn-sm" id="acct-2fa-on">Turn on</button>`}
+      <div class="acct-grid">
+        <section class="ms-card">
+          <header class="ms-card-hd"><div><h2 class="ms-card-title">Two-factor authentication</h2>
+            <p class="ms-card-desc">${on ? 'After your password, sign-in asks for one more step.' : 'Require a second step after your password.'}</p></div>
+            <span class="cur-badge ${on ? 'cur-badge-success' : 'cur-badge-warning'}">${on ? 'On' : 'Off'}</span>
+          </header>
+          <div class="ms-rows acct-methods">
+            ${[
+              ['ph-fingerprint', 'Touch ID', st.passkeys ? `${st.passkeys} passkey${st.passkeys === 1 ? '' : 's'} on this account` : 'Add a passkey to use it', !!st.passkeys],
+              ['ph-envelope-simple', 'Emailed code', `Sent to ${esc(u.email)}`, true],
+              ['ph-device-mobile', 'Authenticator app', st.totp ? 'Set up' : on ? 'Not set up' : 'Offered when you turn two-factor on', st.totp],
+              ['ph-key', 'Backup codes', st.backupCodes ? 'Saved (each works once)' : 'Created when you turn two-factor on', st.backupCodes],
+            ].map(([icon, label, meta, ready]) => `<div class="ms-row">
+              <i class="ph-bold ${icon} acct-method-icon" aria-hidden="true"></i>
+              <div class="ms-row-main"><div class="ms-row-title">${label}</div><div class="ms-row-meta">${meta}</div></div>
+              <span class="cur-badge ${ready && on ? 'cur-badge-success' : 'cur-badge-neutral'}">${ready ? (on ? 'Ready' : 'Unused') : 'Not set'}</span>
+            </div>`).join('')}
           </div>
-        </div>
+          <div id="acct-2fa" class="acct-2fa">
+            <label class="form-field acct-pw"><span class="form-label">Confirm your password to change this</span>
+              <input class="form-input" id="acct-pw" type="password" autocomplete="current-password"></label>
+            <div class="ms-actions">
+              ${on
+                ? `<button class="btn-ghost btn-sm" id="acct-2fa-codes">New backup codes</button>
+                   <button class="btn-ghost btn-sm mail-danger" id="acct-2fa-off">Turn off two-factor</button>`
+                : `<button class="btn-primary btn-sm" id="acct-2fa-on">Turn on two-factor</button>`}
+            </div>
+          </div>
+        </section>
+
+        <section class="ms-card" id="acct-passkeys"></section>
       </div>
       <div class="form-error" id="acct-msg" role="alert"></div>
     </div>`;
 
-  renderPasskeys();
+  renderPasskeys(null, on);
   document.getElementById('acct-signout').addEventListener('click', signOut);
   document.getElementById('acct-signout-others').addEventListener('click', async () => {
     try { await authPost('/revoke-other-sessions'); accountMsg('Every other device was signed out.', true); }
@@ -118,7 +155,7 @@ async function renderAccountView() {
 // ─── passkeys ─────────────────────────────────────────────────────────────────
 // Touch ID sign-in. Adding one needs a recent sign-in (Better Auth's "fresh
 // session", under a day old); signing in with it skips the authenticator code.
-async function renderPasskeys(message) {
+async function renderPasskeys(message, twoFactorOn = document.querySelector('#acct-2fa-off') !== null) {
   const box = document.getElementById('acct-passkeys');
   if (!box) return;
   const [supported, list] = await Promise.all([
@@ -126,11 +163,12 @@ async function renderPasskeys(message) {
     fetch('/api/auth/passkey/list-user-passkeys', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : []).catch(() => []),
   ]);
   const fmt = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const badge = !list.length ? ['cur-badge-neutral', 'None'] : twoFactorOn ? ['cur-badge-success', 'In use'] : ['cur-badge-warning', 'Not in use'];
   box.innerHTML = `
-    <div class="ov-card-hd">Passkeys
-      <span class="cur-badge ${list.length ? 'cur-badge-success' : 'cur-badge-neutral'}">${list.length ? 'On' : 'Off'}</span>
-    </div>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">After your password, confirm sign-in with this laptop's fingerprint (Touch ID) instead of typing a code. Used only when two-factor authentication is on.</p>
+    <header class="ms-card-hd"><div><h2 class="ms-card-title">Touch ID passkeys</h2>
+      <p class="ms-card-desc">Confirm sign-in with this laptop's fingerprint after your password, instead of typing a code.${list.length && !twoFactorOn ? ' <b>Not used while two-factor is off.</b>' : ''}</p></div>
+      <span class="cur-badge ${badge[0]}">${badge[1]}</span>
+    </header>
     ${list.length ? `<div class="acct-pk-list">${list.map(pk => `
       <div class="acct-pk" data-id="${esc(pk.id)}">
         <i class="ph-bold ph-fingerprint acct-pk-icon" aria-hidden="true"></i>
@@ -158,7 +196,8 @@ async function renderPasskeys(message) {
     btn.disabled = true; say('');
     try {
       await passkeyRegister(passkeyDefaultName());
-      await renderPasskeys('Passkey added. Next time, choose "Sign in with Touch ID".');
+      await renderAccountView();
+      accountMsg(document.querySelector('#acct-2fa-off') ? 'Passkey added. After your password, choose Touch ID.' : 'Passkey added. Turn on two-factor to use it at sign-in.', true);
     } catch (err) {
       btn.disabled = false;
       if (err.status === 403 || /fresh/i.test(err.message)) return say('For security, adding a passkey needs a recent sign-in. Sign out, sign back in with your password, then add it.');
@@ -179,7 +218,8 @@ async function renderPasskeys(message) {
       yes.disabled = true;
       const r = await fetch('/api/auth/passkey/delete-passkey', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.dataset.id }) }).catch(() => null);
       if (!r?.ok) { yes.disabled = false; return say('Could not remove the passkey. Try again.'); }
-      renderPasskeys('Passkey removed. Also delete it from System Settings → Passwords on the Mac.');
+      await renderAccountView();
+      accountMsg('Passkey removed. Also delete it from System Settings → Passwords on the Mac.', true);
     });
   }));
 

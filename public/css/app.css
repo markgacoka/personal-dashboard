@@ -2221,3 +2221,47 @@ html, body {
   .mst-filter .ms-row-actions { width: 100%; justify-content: flex-end; }
 }
 @media (prefers-reduced-motion: reduce) { .mst-switch-track, .mst-switch-track::after, .mst-tab { transition: none !important; } }
+
+/* ── Account ─────────────────────────────────────────── */
+.acct { display: grid; gap: 20px; }
+.acct-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .acct-grid { grid-template-columns: minmax(0, 1fr); } }
+.acct-profile { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.acct-avatar {
+  width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 20px; font-weight: 700; letter-spacing: 0.02em;
+  background: oklch(84% 0.19 80.46 / 0.14); color: var(--gold-rich); border: 1px solid var(--rule-strong);
+}
+[data-theme="light"] .acct-avatar { color: oklch(50% 0.11 78); }
+.acct-who { flex: 1; min-width: 220px; }
+.acct-name { font-size: 22px; font-weight: 600; color: var(--champagne); line-height: 1.2; }
+.acct-email { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.acct-device { font-size: 13px; color: var(--faint); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+.acct-signout { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-danger {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); border-radius: var(--r-sm);
+  font-family: 'Albert Sans', sans-serif; font-size: 14px; font-weight: 600; padding: 10px 20px; cursor: pointer;
+  transition: background var(--duration-quick), border-color var(--duration-quick);
+}
+.btn-danger:hover { background: color-mix(in oklch, var(--danger) 22%, transparent); border-color: var(--danger); }
+.btn-danger i { font-size: 16px; }
+.acct-flow { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding-top: 14px; padding-bottom: 14px; }
+.acct-flow .ms-card-title { flex-shrink: 0; }
+.acct-flow-steps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
+.acct-step { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--champagne); padding: 6px 12px 6px 6px; border: 1px solid var(--rule); border-radius: 20px; }
+.acct-step b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--graphite-2); color: var(--muted); }
+.acct-arrow { color: var(--faint); }
+.acct-flow-note { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.acct-flow-note.warn { color: var(--warning); }
+.acct-method-icon { font-size: 20px; color: var(--info); width: 24px; text-align: center; flex-shrink: 0; }
+.acct-2fa { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule); display: grid; gap: 12px; }
+.acct-pw { max-width: 320px; }
+#acct-passkeys .acct-pk-list { margin-top: 4px; }
+.btn-danger { white-space: nowrap; }
+@media (max-width: 700px) {
+  .acct-signout { width: 100%; flex-direction: column; align-items: stretch; }
+  .acct-signout .btn-danger, .acct-signout .btn-ghost { justify-content: center; }
+  .acct-flow { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .acct-avatar { width: 44px; height: 44px; font-size: 16px; }
+}

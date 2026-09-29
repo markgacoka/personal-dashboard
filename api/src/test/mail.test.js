@@ -242,3 +242,42 @@ describe('mail frontend helpers', () => {
     assert.ok(!fe.mailSchedulePresets(new Date(2026, 8, 28, 18, 0)).some(p => p.label === 'This evening'))
   })
 })
+
+import { matchRelayEmail, replaceMessageId, parseRelayTime } from '../lib/mailRelay.js'
+
+describe('mail relay — Message-ID reconciliation', () => {
+  const sendAt = Date.parse('2026-09-29T01:19:21Z')
+  const sent = { from: 'hello@gacoka.com', subject: 'Hello from my new address', rcpts: ['markgacoka@gmail.com'], sendAt }
+  const rec = (over = {}) => ({
+    id: 'r1', from: 'hello@gacoka.com', to: ['Mark <markgacoka@gmail.com>'], cc: null, bcc: null,
+    subject: 'Hello from my new address', created_at: '2026-09-29 01:19:22.581000+00',
+    message_id: '<0100-abc@email.amazonses.com>', ...over,
+  })
+  test('relay timestamps parse as UTC', () => {
+    assert.equal(parseRelayTime('2026-09-29 01:19:22.581000+00'), Date.parse('2026-09-29T01:19:22.581Z'))
+    assert.equal(parseRelayTime('garbage'), null)
+  })
+  test('matches on sender, subject, recipients and time', () => {
+    assert.equal(matchRelayEmail(sent, [rec()])?.id, 'r1')
+  })
+  test('rejects a different subject, sender, recipient, or a time far away', () => {
+    assert.equal(matchRelayEmail(sent, [rec({ subject: 'Other' })]), null)
+    assert.equal(matchRelayEmail(sent, [rec({ from: 'flights@gacoka.com' })]), null)
+    assert.equal(matchRelayEmail(sent, [rec({ to: ['someone@else.test'] })]), null)
+    assert.equal(matchRelayEmail(sent, [rec({ created_at: '2026-09-29 03:00:00.000000+00' })]), null)
+  })
+  test('picks the closest unused record when the same message is sent twice', () => {
+    const a = rec({ id: 'a', created_at: '2026-09-29 01:19:22.000000+00' })
+    const b = rec({ id: 'b', created_at: '2026-09-29 01:25:00.000000+00' })
+    assert.equal(matchRelayEmail(sent, [b, a])?.id, 'a')
+    assert.equal(matchRelayEmail(sent, [b, a], new Set(['a']))?.id, 'b')
+  })
+  test('rewrites the Message-ID header only in the header block, folded or not', () => {
+    const raw = 'From: a@b\r\nMessage-ID:\r\n <old@mail.gacoka.com>\r\nSubject: x\r\n\r\nbody Message-ID: <keep@x>\r\n'
+    const out = replaceMessageId(raw, '<new@ses>').toString('latin1')
+    assert.equal(out, 'From: a@b\r\nMessage-ID: <new@ses>\r\nSubject: x\r\n\r\nbody Message-ID: <keep@x>\r\n')
+  })
+  test('adds a Message-ID header when missing', () => {
+    assert.match(replaceMessageId('Subject: x\n\nbody', 'new@ses').toString(), /^Message-ID: <new@ses>\nSubject: x\n\nbody$/)
+  })
+})

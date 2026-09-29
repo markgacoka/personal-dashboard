@@ -14,6 +14,7 @@ import { createJmapClient, setError, JmapError } from './jmap.js'
 import { createMailAdmin, dkimRecordsFromZone } from './mailAdmin.js'
 import { parseSearch, toJmapFilter } from '../lib/mailSearch.js'
 import { compileSieve, OTHER_KEYWORD } from '../lib/sieve.js'
+import { matchRelayEmail, replaceMessageId } from '../lib/mailRelay.js'
 import { buildViewerDocument, hasRemoteContent, inlineCidImages, htmlToText, sanitizeComposeHtml, stripRemoteImages } from '../lib/mailHtml.js'
 import {
   parseAddressList, formatAddress, prefixSubject, replyRecipients, receivedAt,
@@ -47,6 +48,9 @@ export function mailConfig(env = process.env) {
     publicIp: env.MAIL_PUBLIC_IP || '89.116.157.98',
     hostname: env.MAIL_HOSTNAME || 'mail.gacoka.com',
     relayDkimSelector: env.MAIL_RELAY_DKIM_SELECTOR ?? 'resend',
+    // The relay's API, for the Message-IDs it assigns (see lib/mailRelay.js).
+    relayApi: env.MAIL_RELAY_API_URL ?? (/resend\.com$/i.test(env.MAIL_RELAY_HOST || '') ? 'https://api.resend.com' : null),
+    relayKey: env.MAIL_RELAY_SECRET || null,
   }
 }
 
@@ -656,7 +660,7 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
     const obj = {
       mailboxIds: { [byRole.drafts]: true },
       keywords: { $draft: true, $seen: true },
-      from: [{ name: identity?.name || null, email: m.from }],
+      from: [{ name: identity?.name && lower(identity.name) !== m.from ? identity.name : null, email: m.from }],
       to: m.to, cc: m.cc.length ? m.cc : null, bcc: m.bcc.length ? m.bcc : null,
       subject: m.subject,
       inReplyTo: m.inReplyTo, references: m.references,
@@ -1000,6 +1004,75 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
     await db.query(`UPDATE mail_followups SET state = 'dismissed' WHERE id = $1`, [id])
   }
 
+  // ── Relay Message-IDs ──────────────────────────────────────────────────────
+  // The relay replaces each message's Message-ID, so replies would reference
+  // an ID we never stored and start a new conversation. After a message goes
+  // out, find the ID the relay used and write it into the Sent copy.
+  async function relayEmails() {
+    const res = await fetch(`${cfg.relayApi}/emails?limit=100`, {
+      headers: { Authorization: `Bearer ${cfg.relayKey}` }, signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) throw new Error(`relay API HTTP ${res.status}`)
+    return (await res.json()).data || []
+  }
+
+  async function rewriteMessageId(e, messageId) {
+    const raw = Buffer.from(await (await jmap.download(e.blobId, 'message.eml', 'message/rfc822')).arrayBuffer())
+    const blob = await jmap.upload(replaceMessageId(raw, messageId), 'message/rfc822')
+    const r = await jmap.call([['Email/import', { emails: { m: { blobId: blob.blobId, mailboxIds: e.mailboxIds, keywords: e.keywords, receivedAt: e.receivedAt } } }, 'i']])
+    if (r.i.notCreated) throw setError('Could not store the relayed copy', r.i.notCreated.m)
+    await jmap.call([['Email/set', { destroy: [e.id] }, 'd']])
+    return r.i.created.m.id
+  }
+
+  async function syncRelayMessageIds() {
+    if (!cfg.relayApi || !cfg.relayKey) return { synced: 0 }
+    const since = new Date(now().getTime() - 2 * 86400_000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+    const q = await jmap.call([
+      ['EmailSubmission/query', { filter: { undoStatus: 'final', after: since }, limit: 200 }, 'q'],
+      ['EmailSubmission/get', { '#ids': { resultOf: 'q', name: 'EmailSubmission/query', path: '/ids' } }, 'g'],
+    ])
+    const subs = q.g.list
+    if (!subs.length) return { synced: 0 }
+    const { rows } = await db.query('SELECT submission_id, relay_id FROM mail_relay_sync WHERE submission_id = ANY($1) OR relay_id IS NOT NULL', [subs.map(s => s.id)])
+    const seen = new Set(rows.map(r => r.submission_id))
+    const used = new Set(rows.map(r => r.relay_id).filter(Boolean))
+    const mark = (s, state, extra = {}) => db.query(
+      `INSERT INTO mail_relay_sync (submission_id, email_id, state, relay_id, message_id) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (submission_id) DO NOTHING`, [s.id, extra.emailId || s.emailId, state, extra.relayId || null, extra.messageId || null])
+
+    const pending = []
+    for (const s of subs.filter(s => !seen.has(s.id))) {
+      const rcpts = (s.envelope?.rcptTo || []).map(r => lower(r.email))
+      if (rcpts.every(a => a.endsWith('@' + domain))) await mark(s, 'local') // never left the server
+      else pending.push({ s, rcpts })
+    }
+    if (!pending.length) return { synced: 0 }
+    const got = await jmap.call([['Email/get', { ids: pending.map(p => p.s.emailId), properties: ['id', 'blobId', 'subject', 'mailboxIds', 'keywords', 'receivedAt', 'messageId'] }, 'e']])
+    const relay = await relayEmails()
+    let synced = 0
+    for (const { s, rcpts } of pending) {
+      const e = got.e.list.find(x => x.id === s.emailId)
+      const sendAt = Date.parse(s.sendAt)
+      if (!e) { await mark(s, 'unmatched'); continue } // deleted since
+      const m = matchRelayEmail({ from: lower(s.envelope?.mailFrom?.email), subject: e.subject, rcpts, sendAt }, relay, used)
+      if (!m) {
+        if (now().getTime() - sendAt > 30 * 60_000) await mark(s, 'unmatched')
+        continue
+      }
+      used.add(m.id)
+      const bare = m.message_id.replace(/^<|>$/g, '')
+      let emailId = e.id
+      if (!(e.messageId || []).includes(bare)) {
+        emailId = await rewriteMessageId(e, m.message_id)
+        await db.query('UPDATE mail_followups SET email_id = $2 WHERE email_id = $1', [e.id, emailId])
+      }
+      await mark(s, 'done', { emailId, relayId: m.id, messageId: bare })
+      synced++
+    }
+    return { synced }
+  }
+
   // ── Attachments ────────────────────────────────────────────────────────────
   const upload = (stream, type) => jmap.upload(stream, type)
   const download = (blobId, name, type) => jmap.download(blobId, name, type)
@@ -1098,6 +1171,6 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
     templates, saveTemplate, deleteTemplate,
     followups, dismissFollowup,
     getSettings, updateSettings, identities, updateIdentity, addresses, addAlias, removeAlias, setCatchAll,
-    upload, download, health,
+    upload, download, health, syncRelayMessageIds,
   }
 }

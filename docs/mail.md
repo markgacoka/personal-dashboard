@@ -43,6 +43,12 @@ Design decisions:
 - **Received HTML** renders in an iframe that can't run scripts. Remote images
   are blocked until you choose to load them, once or always for a sender.
   Quoted text in replies has remote images removed.
+- **Threading through the relay.** Resend sends through Amazon SES, which
+  replaces every outgoing Message-ID, so replies reference an ID the server
+  never stored. Once a minute the API asks Resend's API for the IDs it
+  assigned, matches each one to its sent message (sender, recipients,
+  subject, time), and swaps it into the Sent copy, so replies join their
+  conversation. `mail_relay_sync` records each processed submission.
 - **Attachments** of types that could run as a web page (HTML, SVG) always
   download instead of opening, because they would otherwise run on the
   gacoka.com origin.

@@ -8,9 +8,27 @@ import { createMailService, mailConfig, MAX_ATTACHMENTS_BYTES } from '../service
 // gacoka.com.
 const INLINE_SAFE = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'application/pdf', 'text/plain'])
 
-export default async function mailRoutes(fastify, { service } = {}) {
+export default async function mailRoutes(fastify, { service, background = false } = {}) {
   const cfg = mailConfig()
   const mail = service || (cfg && createMailService(cfg, { log: fastify.log }))
+
+  // Every minute: give Sent copies the Message-ID the relay actually used,
+  // so replies join their conversation. Skipped while a run is in progress.
+  if (mail && background) {
+    let running = false
+    const timer = setInterval(async () => {
+      if (running) return
+      running = true
+      try {
+        const { synced } = await mail.syncRelayMessageIds()
+        if (synced) fastify.log.info({ synced }, 'mail: relay Message-IDs synced')
+      } catch (err) {
+        fastify.log.warn({ err: err.message }, 'mail: relay Message-ID sync failed')
+      } finally { running = false }
+    }, 60_000)
+    timer.unref()
+    fastify.addHook('onClose', async () => clearInterval(timer))
+  }
 
   // Uploads stream straight through to the mail server.
   fastify.addContentTypeParser('application/octet-stream', (req, payload, done) => done(null, payload))

@@ -71,8 +71,8 @@ services:
   # Mail server for @gacoka.com (docs/mail.md). The dashboard reaches it over
   # this network at http://stalwart:8080 (JMAP); port 8080 is never published.
   # Public: 25 (incoming mail), 465 (sending from mail apps), 993 (IMAP).
-  # Outgoing mail relays through Brevo; Stalwart reads the relay key from
-  # BREVO_SMTP_KEY. STALWART_RECOVERY_ADMIN is only used during first setup.
+  # Outgoing mail relays through Resend; Stalwart reads the relay password
+  # from MAIL_RELAY_SECRET. STALWART_RECOVERY_ADMIN is only used during first setup.
   stalwart:
     image: stalwartlabs/stalwart:v0.16
     restart: unless-stopped
@@ -81,7 +81,7 @@ services:
       - "465:465"
       - "993:993"
     environment:
-      BREVO_SMTP_KEY: ${BREVO_SMTP_KEY:-}
+      MAIL_RELAY_SECRET: ${MAIL_RELAY_SECRET:-}
       STALWART_RECOVERY_ADMIN: admin:${MAIL_ADMIN_PASSWORD:-}
     volumes:
       - /var/www/app/mail/etc:/etc/stalwart

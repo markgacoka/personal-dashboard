@@ -44,7 +44,7 @@ https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
 
 `#mail` is a mail client for hello@gacoka.com backed by a self-hosted
 Stalwart server (compose service `stalwart`; JMAP at http://stalwart:8080 on
-the docker network) with outgoing mail relayed through Brevo. Setup, env
+the docker network) with outgoing mail relayed through Resend. Setup, env
 vars, DNS and maintenance: `docs/mail.md`. Server setup and repair:
 
     docker exec current-api-1 node src/cli/mail.mjs bootstrap|configure|dns|set-password

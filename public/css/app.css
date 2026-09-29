@@ -1671,33 +1671,48 @@ html, body {
 .sidebar.collapsed .sb-count { display: none; }
 @media (max-width: 700px) { .sidebar .sb-count { display: none; } }
 
-.mail-layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 20px; align-items: start; }
+.mail-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 20px; align-items: start; }
+.mail-reader { display: none; }
+/* Wide screens: folders | list | conversation, each scrolling on its own. */
+@media (min-width: 1280px) {
+  .mail-layout { grid-template-columns: 208px minmax(360px, 30%) minmax(0, 1fr); height: calc(100vh - 112px); align-items: stretch; }
+  .mail-rail { position: static; overflow-y: auto; min-height: 0; }
+  .mail-main { display: flex; flex-direction: column; min-height: 0; }
+  .mail-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .mail-reader { display: block; overflow-y: auto; min-height: 0; padding: 0 4px 24px 4px; }
+  .mail-reader .mail-thread { max-width: none; }
+  .mail-row-sub { flex-direction: column; gap: 1px; }
+  .mail-subject { max-width: 100%; }
+  .mail-row.open { background: var(--graphite); box-shadow: inset 2px 0 0 var(--gold); }
+  .mail-row-actions { display: none; } /* the pane has every action */
+  .mail-reader-empty { margin-top: 12vh; }
+}
 .mail-rail { position: sticky; top: 0; display: flex; flex-direction: column; gap: 4px; }
 .mail-compose-btn { justify-content: center; width: 100%; margin-bottom: 10px; }
 .mail-folders { display: flex; flex-direction: column; }
 .mail-folder {
   display: flex; align-items: center; gap: 10px; width: 100%;
-  height: 32px; padding: 0 10px; border: none; background: none; cursor: pointer;
-  font-family: inherit; font-size: 13px; color: var(--muted); text-align: left;
+  height: 34px; padding: 0 10px; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: 14px; color: var(--muted); text-align: left;
   border-radius: var(--r-sm); transition: color var(--duration-quick), background var(--duration-quick);
 }
 .mail-folder i { font-size: 14px; width: 16px; text-align: center; flex-shrink: 0; }
 .mail-folder:hover { color: var(--body-text); background: var(--raised); }
 .mail-folder.active { color: var(--gold); background: var(--raised); }
 .mail-folder-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mail-count { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--faint); }
+.mail-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--faint); }
 .mail-count.strong { color: var(--champagne); font-weight: 700; }
 .mail-rail-hd {
   display: flex; align-items: center; justify-content: space-between;
   margin: 14px 0 2px; padding: 0 4px 0 10px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
 }
 .mail-rail-add {
   background: none; border: 1px solid transparent; color: var(--faint); cursor: pointer;
   width: 22px; height: 22px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center;
 }
 .mail-rail-add:hover { color: var(--body-text); border-color: var(--rule); }
-.mail-rail-empty { font-size: 12px; color: var(--faint); padding: 4px 10px 6px; line-height: 1.45; }
+.mail-rail-empty { font-size: 13px; color: var(--faint); padding: 4px 10px 6px; line-height: 1.45; }
 .mail-inline-new { display: flex; gap: 6px; padding: 4px 0 6px; }
 .mail-inline-new .form-input { padding: 5px 8px; }
 .mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip, var(--patina)); flex-shrink: 0; margin: 0 4px; }
@@ -1713,25 +1728,26 @@ html, body {
 .mail-search i { color: var(--faint); font-size: 14px; }
 .mail-search input {
   flex: 1; min-width: 0; border: none; background: none; outline: none;
-  font-family: inherit; font-size: 13px; color: var(--body-text); padding: 8px 0;
+  font-family: inherit; font-size: 14px; color: var(--body-text); padding: 9px 0;
 }
 .mail-search input::placeholder { color: var(--faint); }
 .mail-subbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 30px; margin-bottom: 10px; }
 .mail-subbar:empty { display: none; }
 .mail-tabs { display: flex; gap: 6px; }
+.mail-tabs .fl-filter-btn { font-size: 12px; padding: 5px 13px; }
 .mail-tab-n { font-variant-numeric: tabular-nums; font-weight: 700; margin-left: 2px; }
-.mail-search-note { font-size: 12px; color: var(--muted); }
+.mail-search-note { font-size: 13px; color: var(--muted); }
 .mail-search-note b { color: var(--champagne); font-weight: 600; }
 .mail-subbar-spacer { flex: 1; }
 .mail-bulk { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.mail-bulk-n { font-size: 12px; color: var(--muted); margin-right: 4px; font-variant-numeric: tabular-nums; }
+.mail-bulk-n { font-size: 13px; color: var(--muted); margin-right: 4px; font-variant-numeric: tabular-nums; }
 .mail-danger:hover { color: var(--danger); border-color: var(--danger-border); }
 
 .mail-list { border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--raised); overflow: hidden; }
 .mail-list:has(.mail-empty) { border-style: dashed; background: none; }
 .mail-row {
   position: relative; display: flex; align-items: center; gap: 6px;
-  padding: 10px 14px 10px 8px; border-bottom: 1px solid var(--rule);
+  padding: 12px 16px 12px 8px; border-bottom: 1px solid var(--rule);
   transition: background var(--duration-quick);
 }
 .mail-row:last-child { border-bottom: none; }
@@ -1756,8 +1772,8 @@ html, body {
 }
 .mail-n { font-size: 11px; color: var(--faint); margin-left: 6px; font-variant-numeric: tabular-nums; }
 .mail-clip { font-size: 13px; color: var(--faint); }
-.mail-date { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.mail-row-sub { display: flex; gap: 6px; margin-top: 2px; font-size: 13px; min-width: 0; }
+.mail-date { font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.mail-row-sub { display: flex; gap: 6px; margin-top: 3px; font-size: 14px; min-width: 0; }
 .mail-subject { color: var(--body-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; max-width: 60%; }
 .mail-preview { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .mail-row.unread .mail-from, .mail-row.unread .mail-subject { font-weight: 600; color: var(--champagne); }
@@ -1769,8 +1785,8 @@ html, body {
 .mail-row-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 .mail-chip {
   display: inline-flex; align-items: center; gap: 3px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.03em; line-height: 1.4;
-  padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.03em; line-height: 1.4;
+  padding: 2px 9px; border-radius: 20px;
   color: color-mix(in oklch, var(--chip) 70%, var(--champagne));
   background: color-mix(in oklch, var(--chip) 16%, transparent);
   border: 1px solid color-mix(in oklch, var(--chip) 40%, transparent);
@@ -1785,8 +1801,8 @@ html, body {
 
 .mail-empty { padding: 56px 24px; text-align: center; color: var(--muted); max-width: 440px; margin: 0 auto; }
 .mail-empty > i { font-size: 28px; color: var(--faint); }
-.mail-empty-title { font-size: 14px; font-weight: 600; color: var(--champagne); margin: 10px 0 4px; }
-.mail-empty p { font-size: 13px; line-height: 1.55; margin-bottom: 14px; }
+.mail-empty-title { font-size: 16px; font-weight: 600; color: var(--champagne); margin: 10px 0 4px; }
+.mail-empty p { font-size: 14px; line-height: 1.55; margin-bottom: 14px; }
 
 /* Toast + menus */
 .mail-toast {
@@ -1794,7 +1810,7 @@ html, body {
   display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px);
   padding: 10px 10px 10px 16px; border-radius: var(--r-md);
   background: var(--graphite-2); border: 1px solid var(--rule-strong); color: var(--champagne);
-  font-size: 13px; box-shadow: 0 12px 32px oklch(0% 0 0 / 0.35);
+  font-size: 14px; box-shadow: 0 12px 32px oklch(0% 0 0 / 0.35);
   opacity: 0; pointer-events: none; transform: translate(-50%, 8px);
   transition: opacity var(--duration-quick) var(--ease-smooth-out), transform var(--duration-fast) var(--ease-smooth-out);
 }
@@ -1813,7 +1829,7 @@ html, body {
 .mail-menu-item {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 7px 10px; border: none; background: none; border-radius: var(--r-sm); cursor: pointer;
-  font-family: inherit; font-size: 13px; color: var(--body-text); text-align: left;
+  font-family: inherit; font-size: 14px; color: var(--body-text); text-align: left;
 }
 .mail-menu-item i { font-size: 14px; color: var(--muted); width: 16px; text-align: center; }
 .mail-menu-item:hover, .mail-menu-item:focus-visible, .mail-menu-item.active { background: var(--graphite); outline: none; }
@@ -1824,15 +1840,15 @@ html, body {
 .mail-menu-empty { font-size: 12px; color: var(--faint); padding: 8px 10px; }
 
 /* Thread reader */
-.mail-thread { max-width: 920px; }
+.mail-thread { max-width: 1100px; }
 .mail-thread-hd { margin-bottom: 12px; }
 .mail-thread-subject { font-size: 22px; font-weight: 600; color: var(--champagne); line-height: 1.3; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .mail-thread-labels { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .mail-thread-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
 .mail-note {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 12px; color: var(--muted); padding: 8px 12px; margin-bottom: 10px;
-  background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
+  font-size: 13px; color: var(--muted); padding: 9px 12px; margin-bottom: 10px;
+  background: none; border: 1px solid var(--rule); border-radius: var(--r-sm);
 }
 .mail-note.warn { color: var(--warning); background: var(--warning-bg); border-color: var(--warning-border); }
 .mail-note .btn-link { margin-left: 4px; }
@@ -1849,19 +1865,19 @@ html, body {
 }
 .mail-avatar.mine { background: oklch(84% 0.19 80.46 / 0.14); color: var(--gold-rich); border-color: var(--rule-strong); }
 .mail-msg-who { flex: 1; min-width: 0; }
-.mail-msg-from { font-size: 14px; font-weight: 600; color: var(--champagne); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mail-msg-addr { font-weight: 400; font-size: 12px; color: var(--muted); }
-.mail-msg-to { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.mail-msg-from { font-size: 15px; font-weight: 600; color: var(--champagne); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-msg-addr { font-weight: 400; font-size: 13px; color: var(--muted); }
+.mail-msg-to { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .mail-msg.collapsed .mail-msg-body { display: none; }
 .mail-msg-body { padding: 0 14px 14px 58px; }
 .mail-frame { display: block; width: 100%; height: 160px; border: 1px solid var(--rule); border-radius: var(--r-sm); background: #fff; }
-.mail-text { font-size: 14px; line-height: 1.6; color: var(--body-text); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 75ch; }
+.mail-text { font-size: 15px; line-height: 1.6; color: var(--body-text); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 75ch; }
 .mail-text a, .mail-unsub a { color: var(--patina-text); text-underline-offset: 2px; }
 .mail-atts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mail-att {
   display: flex; align-items: center; gap: 8px; max-width: 260px;
   padding: 6px 10px 6px 6px; border: 1px solid var(--rule); border-radius: var(--r-sm);
-  color: var(--body-text); text-decoration: none; font-size: 12px; background: var(--graphite);
+  color: var(--body-text); text-decoration: none; font-size: 13px; background: none;
   transition: border-color var(--duration-quick);
 }
 .mail-att:hover { border-color: var(--muted); }
@@ -1869,7 +1885,7 @@ html, body {
 .mail-att > i { font-size: 20px; color: var(--muted); width: 32px; text-align: center; }
 .mail-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .mail-att-size { color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.mail-unsub { margin-top: 12px; font-size: 12px; }
+.mail-unsub { margin-top: 12px; font-size: 13px; }
 .mail-reply-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 
 /* Composer */
@@ -1886,8 +1902,8 @@ html, body {
 .mail-composer.min .mc-body, .mail-composer.min .mc-ft { display: none; }
 .mail-composer.min { width: 300px; cursor: pointer; }
 .mc-hd { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--rule); background: var(--graphite); border-radius: var(--r-lg) var(--r-lg) 0 0; }
-.mc-title { font-size: 13px; font-weight: 600; color: var(--champagne); }
-.mc-status { flex: 1; font-size: 11px; color: var(--faint); text-align: right; white-space: nowrap; }
+.mc-title { font-size: 14px; font-weight: 600; color: var(--champagne); }
+.mc-status { flex: 1; font-size: 12px; color: var(--faint); text-align: right; white-space: nowrap; }
 .mc-icon {
   background: none; border: 1px solid transparent; color: var(--faint); cursor: pointer;
   width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; font-size: 14px;
@@ -1897,20 +1913,20 @@ html, body {
 .mc-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .mc-row { display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--rule); min-height: 38px; }
 .mc-row[hidden] { display: none; }
-.mc-lbl { font-size: 12px; color: var(--faint); width: 36px; flex-shrink: 0; }
+.mc-lbl { font-size: 13px; color: var(--muted); width: 40px; flex-shrink: 0; }
 .mc-from, .mc-subject, .mc-rcpt-input {
-  border: none; background: none; outline: none; font-family: inherit; font-size: 13px; color: var(--body-text);
-  padding: 8px 0; min-width: 0;
+  border: none; background: none; outline: none; font-family: inherit; font-size: 14px; color: var(--body-text);
+  padding: 9px 0; min-width: 0;
 }
 .mc-from { flex: 1; cursor: pointer; }
-.mc-from option { background: var(--raised); color: var(--body-text); }
+.mc-from option, .mc-followup option { background: var(--raised); color: var(--body-text); }
 .mc-subject { flex: 1; font-weight: 600; color: var(--champagne); }
 .mc-subject::placeholder, .mc-rcpt-input::placeholder { color: var(--faint); font-weight: 400; }
 .mc-rcpt { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 0; min-width: 0; cursor: text; }
 .mc-rcpt-input { flex: 1; min-width: 120px; padding: 4px 0; }
 .mc-token {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
-  font-size: 12px; color: var(--body-text); padding: 2px 4px 2px 9px;
+  font-size: 13px; color: var(--body-text); padding: 2px 4px 2px 10px;
   background: var(--graphite); border: 1px solid var(--rule); border-radius: 20px;
 }
 .mc-token span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1928,8 +1944,8 @@ html, body {
 .mc-tool:hover { color: var(--champagne); border-color: var(--rule); }
 .mc-tool-sep { width: 1px; height: 16px; background: var(--rule); margin: 0 4px; }
 .mc-editor {
-  flex: 1; min-height: 200px; padding: 14px 16px; outline: none;
-  font-size: 14px; line-height: 1.6; color: var(--body-text); caret-color: var(--gold); overflow-wrap: anywhere;
+  flex: 1; min-height: 220px; padding: 14px 16px; outline: none;
+  font-size: 15px; line-height: 1.6; color: var(--body-text); caret-color: var(--gold); overflow-wrap: anywhere;
 }
 .mc-editor a { color: var(--patina-text); }
 .mc-editor blockquote { margin: 6px 0 6px 4px; padding-left: 12px; border-left: 1px solid var(--rule-strong); color: var(--muted); }
@@ -1940,7 +1956,7 @@ html, body {
 .mc-atts:empty { display: none; }
 .mc-att {
   display: inline-flex; align-items: center; gap: 6px; max-width: 260px;
-  font-size: 12px; padding: 4px 4px 4px 10px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
+  font-size: 13px; padding: 4px 4px 4px 10px; background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
 }
 .mc-att.pending { color: var(--muted); }
 .mc-att.invalid { color: var(--danger); border-color: var(--danger-border); }
@@ -1948,7 +1964,7 @@ html, body {
 .mc-att-size { color: var(--faint); font-variant-numeric: tabular-nums; }
 .mc-att button { background: none; border: none; color: var(--faint); cursor: pointer; display: flex; padding: 3px; }
 .mc-spin { animation: spin 0.8s linear infinite; }
-.mc-error { margin: 0 16px 10px; font-size: 12px; color: var(--danger); padding: 8px 12px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--r-sm); }
+.mc-error { margin: 0 16px 10px; font-size: 13px; color: var(--danger); padding: 8px 12px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--r-sm); }
 .mc-error[hidden] { display: none; }
 .mc-ft { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
 .mc-send { display: flex; }
@@ -1957,7 +1973,7 @@ html, body {
 .mc-send-more { border-radius: 0 var(--r-sm) var(--r-sm) 0; padding: 9px 10px; margin-left: 1px; }
 .mc-followup {
   background: none; border: 1px solid var(--rule); border-radius: var(--r-sm); color: var(--muted);
-  font-family: inherit; font-size: 12px; padding: 6px 8px; cursor: pointer; max-width: 230px;
+  font-family: inherit; font-size: 13px; padding: 7px 8px; cursor: pointer; max-width: 250px;
 }
 .mc-followup option { background: var(--raised); color: var(--body-text); }
 .mc-spacer { flex: 1; }
@@ -1965,65 +1981,65 @@ html, body {
 .mc-link-pop .form-input { flex: 1; }
 .mc-suggest { min-width: 260px; }
 
-/* Settings */
-.mail-settings-col { display: grid; gap: 16px; max-width: 760px; }
-.ms-note { font-size: 12px; color: var(--muted); line-height: 1.55; margin: 0 0 12px; }
-.ms-list { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; margin-bottom: 14px; }
-.ms-item { border-bottom: 1px solid var(--rule); background: var(--raised); }
-.ms-item:last-child { border-bottom: none; }
-.ms-item > summary { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; list-style: none; }
-.ms-item > summary::-webkit-details-marker { display: none; }
-.ms-item-title { font-size: 14px; font-weight: 600; color: var(--champagne); overflow-wrap: anywhere; }
-.ms-item-meta { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.ms-item > summary .ms-item-meta { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
-.ms-caret { color: var(--faint); font-size: 12px; transition: transform var(--duration-fast) var(--ease-smooth-out); }
-.ms-item[open] .ms-caret { transform: rotate(180deg); }
-.ms-item-body { padding: 4px 14px 14px; display: grid; gap: 12px; }
-.ms-phone { border: 1px solid var(--rule); border-radius: var(--r-sm); margin-top: 14px; }
+/* Settings: Credentials-style cards (one raised surface, hairline rules), two columns when wide */
+.ms-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.ms-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+@media (max-width: 1180px) { .ms-grid { grid-template-columns: minmax(0, 1fr); } }
+.ms-card { background: var(--raised); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 18px 20px 20px; }
+.ms-card-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.ms-card-title { font-size: 15px; font-weight: 600; color: var(--champagne); letter-spacing: -0.005em; }
+.ms-card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 3px; max-width: 70ch; }
+.ms-card-hd .btn-ghost { flex-shrink: 0; }
+.ms-rows { display: flex; flex-direction: column; }
+.ms-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--rule); }
+.ms-rows > :first-child { border-top: none; }
+.ms-row.off .ms-row-title { color: var(--muted); }
+.ms-row-main { flex: 1; min-width: 0; }
+.ms-row-title { font-size: 14px; font-weight: 600; color: var(--champagne); overflow-wrap: anywhere; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ms-row-meta { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; line-height: 1.45; }
+.ms-row-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.ms-empty { font-size: 13px; color: var(--muted); padding: 8px 0 2px; }
+.ms-edit { display: grid; gap: 14px; padding: 14px 0 16px; border-top: 1px solid var(--rule); }
+.ms-edit-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ms-edit-inline .form-input { flex: 1; min-width: 160px; }
 .ms-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.ms-add { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
-.ms-add .form-input { max-width: 260px; }
-.ms-alias-input { display: flex; align-items: center; gap: 6px; }
-.ms-domain { font-size: 13px; color: var(--muted); }
-.ms-toggle { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 14px; cursor: pointer; }
-.ms-toggle input { accent-color: var(--patina); margin-top: 3px; width: 15px; height: 15px; flex-shrink: 0; }
-.ms-toggle b { color: var(--champagne); font-weight: 600; }
-.ms-inline-field { max-width: 280px; margin-bottom: 6px; }
-.ms-rows { display: flex; flex-direction: column; gap: 8px; }
-.ms-row { display: flex; align-items: center; gap: 8px; }
-.ms-row .form-input { flex: 1; min-width: 0; }
+.ms-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--rule); }
+.ms-alias-input { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 240px; }
+.ms-alias-input .form-input { flex: 1; }
+.ms-domain { font-size: 14px; color: var(--muted); }
+.ms-toggle { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--body-text); line-height: 1.5; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule); cursor: pointer; }
+.ms-toggle b { color: var(--champagne); font-weight: 600; display: block; }
+.ms-toggle-desc { display: block; font-size: 13px; color: var(--muted); }
+.ms-inline-select { width: auto; min-width: 150px; flex-shrink: 0; }
 .ms-color { width: 120px; flex-shrink: 0; }
-.ms-filter { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--raised); }
-.ms-filter.off { opacity: 0.7; }
-.ms-filter-text { flex: 1; min-width: 0; }
-.ms-filter-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.ms-filter-actions .row-btn:disabled { opacity: 0.35; cursor: default; }
-.ms-filter-form { display: grid; gap: 14px; margin-top: 14px; padding: 16px; border: 1px solid var(--rule-strong); border-radius: var(--r-sm); background: var(--raised); }
-.ms-filter-form-hd { font-size: 14px; font-weight: 600; color: var(--champagne); }
 .ms-match { display: inline-block; width: auto; padding: 2px 24px 2px 8px; margin: 0 4px; font-size: 11px; text-transform: none; letter-spacing: 0; }
-.ms-cond { display: grid; grid-template-columns: 150px 120px 1fr auto; gap: 8px; margin-top: 8px; }
-.ms-actions-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; margin-top: 4px; font-size: 12px; color: var(--muted); }
-.ms-actions-grid label { display: flex; flex-direction: column; gap: 4px; }
-.ms-actions-grid .ms-check { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--body-text); }
-.ms-check input { accent-color: var(--patina); }
-.ms-editor-wrap { border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--raised); }
+.ms-conds { display: grid; gap: 8px; margin: 6px 0 8px; }
+.ms-cond { display: grid; grid-template-columns: 160px 130px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.ms-actions-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; margin-top: 6px; }
+.ms-sub { font-size: 12px; color: var(--muted); }
+.ms-checks-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+.ms-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--body-text); cursor: pointer; }
+.ms-editor-wrap { border: 1px solid var(--rule); border-radius: var(--r-sm); }
 .ms-editor-wrap:focus-within { border-color: var(--patina); }
 .ms-toolbar { padding: 4px 6px; }
-.ms-editor { min-height: 90px; font-size: 13px; padding: 10px 12px; }
-.ms-budget { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
-.ms-budget b { color: var(--champagne); font-variant-numeric: tabular-nums; }
-.ms-checks { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: var(--r-sm); overflow: hidden; margin-bottom: 12px; }
-.ms-check-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--rule); background: var(--raised); }
-.ms-check-row:last-child { border-bottom: none; }
-.ms-check-row .cur-badge { width: 104px; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-.ms-check-text { min-width: 0; flex: 1; }
+.ms-editor { min-height: 96px; font-size: 14px; padding: 10px 12px; }
+.ms-budget { display: flex; gap: 36px; padding: 4px 0 14px; }
+.ms-budget-n { font-family: 'Alumni Sans', sans-serif; font-size: 28px; font-weight: 700; color: var(--champagne); font-variant-numeric: tabular-nums; line-height: 1; }
+.ms-budget-of { font-size: 13px; color: var(--muted); }
+.ms-check-row { align-items: flex-start; }
+.ms-check-row .cur-badge { flex-shrink: 0; margin-top: 2px; }
 .ms-fix {
-  display: block; margin-top: 6px; padding: 6px 10px; font-size: 12px; line-height: 1.5;
-  background: var(--deep); border: 1px solid var(--rule); border-radius: var(--r-sm);
+  display: block; margin-top: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.5;
+  background: var(--graphite); border: 1px solid var(--rule); border-radius: var(--r-sm);
   color: var(--body-text); overflow-wrap: anywhere; user-select: all; white-space: pre-wrap;
 }
-.ms-dl { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
-.ms-dl dt { color: var(--faint); }
+.ms-phone { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.ms-phone > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 14px; font-weight: 600; color: var(--champagne); }
+.ms-phone > summary::-webkit-details-marker { display: none; }
+.ms-caret { color: var(--faint); font-size: 12px; margin-left: auto; transition: transform var(--duration-fast) var(--ease-smooth-out); }
+.ms-phone[open] .ms-caret { transform: rotate(180deg); }
+.ms-dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; font-size: 14px; margin-top: 12px; }
+.ms-dl dt { color: var(--muted); }
 .ms-dl dd { color: var(--body-text); overflow-wrap: anywhere; }
 
 @media (max-width: 900px) {
@@ -2050,10 +2066,11 @@ html, body {
   .ms-cond { grid-template-columns: 1fr 1fr; }
   .ms-cond .form-input { grid-column: 1 / 2; }
   .ms-actions-grid { grid-template-columns: 1fr; }
-  .ms-filter { flex-direction: column; align-items: stretch; }
-  .ms-filter-actions { justify-content: flex-start; }
+  .ms-row { flex-wrap: wrap; }
+  .ms-inline-select { width: 100%; }
+  .ms-cond .row-btn { justify-self: end; }
+  .ms-budget { gap: 24px; }
   .ms-dl { grid-template-columns: 1fr; }
-  .ms-check-row { flex-direction: column; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mail-toast, .mail-menu, .mail-composer, .ms-caret { transition: none !important; animation: none !important; }
@@ -2068,3 +2085,20 @@ html, body {
 .mail-text a, .mail-unsub a, .mc-editor a { color: var(--info); }
 [data-theme="light"] .mail-folder.active { color: oklch(50% 0.11 78); }
 [data-theme="light"] .mail-toast-action { color: oklch(50% 0.11 78); }
+
+/* Checkboxes in mail: drawn from the palette instead of the browser's grey squares. */
+.mail-check input, .ms-toggle input, .ms-check input {
+  -webkit-appearance: none; appearance: none; margin: 0; flex-shrink: 0;
+  width: 16px; height: 16px; border: 1.5px solid var(--faint); border-radius: 4px;
+  background: transparent; display: inline-grid; place-content: center; cursor: pointer;
+  transition: background var(--duration-quick), border-color var(--duration-quick);
+}
+.mail-check input:hover, .ms-toggle input:hover, .ms-check input:hover { border-color: var(--muted); }
+.mail-check input:checked, .ms-toggle input:checked, .ms-check input:checked { background: var(--patina); border-color: var(--patina); }
+.mail-check input:checked::after, .ms-toggle input:checked::after, .ms-check input:checked::after {
+  content: ''; width: 8px; height: 4px; margin-top: -2px;
+  border-left: 2px solid var(--ink-on-accent); border-bottom: 2px solid var(--ink-on-accent); transform: rotate(-45deg);
+}
+.mail-check input:focus-visible, .ms-toggle input:focus-visible, .ms-check input:focus-visible { outline: 2px solid var(--patina); outline-offset: 2px; }
+.mail-check input:disabled, .ms-toggle input:disabled, .ms-check input:disabled { opacity: 0.5; cursor: default; }
+.ms-toggle input { margin-top: 3px; }

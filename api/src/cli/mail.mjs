@@ -11,9 +11,9 @@
 //   set-password  set the mailbox password to MAIL_PASSWORD (after changing .env)
 //
 // Reads from the environment: MAIL_JMAP_URL, MAIL_USER, MAIL_PASSWORD,
-// MAIL_ADMIN_USER, MAIL_ADMIN_PASSWORD, BREVO_SMTP_LOGIN (relay login; the
-// relay key itself is read by Stalwart from its own BREVO_SMTP_KEY variable),
-// and optionally MAIL_HOSTNAME, MAIL_RELAY_HOST, MAIL_RELAY_PORT.
+// MAIL_ADMIN_USER, MAIL_ADMIN_PASSWORD, MAIL_RELAY_HOST, MAIL_RELAY_PORT,
+// MAIL_RELAY_USER (the relay's SMTP login; its password is read by Stalwart
+// from its own MAIL_RELAY_SECRET variable), and optionally MAIL_HOSTNAME.
 // Secrets are never printed.
 
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs'
@@ -26,8 +26,8 @@ const MAILBOX = (env.MAIL_USER || '').toLowerCase()
 const [LOCAL, DOMAIN] = MAILBOX.split('@')
 const HOSTNAME = env.MAIL_HOSTNAME || `mail.${DOMAIN}`
 const HOST_LABEL = HOSTNAME.endsWith('.' + DOMAIN) ? HOSTNAME.slice(0, -DOMAIN.length - 1) : HOSTNAME
-const RELAY_HOST = env.MAIL_RELAY_HOST || 'smtp-relay.brevo.com'
-const RELAY_PORT = Number(env.MAIL_RELAY_PORT || 587)
+const RELAY_HOST = env.MAIL_RELAY_HOST || 'smtp.resend.com'
+const RELAY_PORT = Number(env.MAIL_RELAY_PORT || 465)
 const ADMIN_USER = env.MAIL_ADMIN_USER || `admin@${DOMAIN}`
 // Stalwart's setup prints a generated admin secret once; it is parked here
 // (the api container's data volume, mode 600) until `configure` replaces it.
@@ -119,13 +119,13 @@ async function configure() {
   }
   await setMailboxPassword(c)
 
-  // Outbound relay (Brevo): the key stays in Stalwart's environment.
+  // Outbound relay: the secret stays in Stalwart's environment.
   const routes = await get(c, 'MtaRoute')
-  const login = env.BREVO_SMTP_LOGIN
+  const login = env.MAIL_RELAY_USER
   const relay = {
     '@type': 'Relay', address: RELAY_HOST, port: RELAY_PORT, protocol: 'smtp', implicitTls: RELAY_PORT === 465,
     authUsername: login || null,
-    authSecret: login ? { '@type': 'EnvironmentVariable', variableName: 'BREVO_SMTP_KEY' } : { '@type': 'None' },
+    authSecret: login ? { '@type': 'EnvironmentVariable', variableName: 'MAIL_RELAY_SECRET' } : { '@type': 'None' },
     description: `Outbound relay via ${RELAY_HOST}`,
   }
   const existing = routes.find(r => r.name === RELAY_ROUTE)
@@ -138,7 +138,7 @@ async function configure() {
   await set(c, 'MtaOutboundStrategy', { update: { singleton: {
     route: { match: { 0: { if: 'is_local_domain(rcpt_domain)', then: "'local'" } }, else: `'${RELAY_ROUTE}'` },
   } } }, 'Could not route outbound mail through the relay')
-  console.log(`✓ outbound mail relays through ${RELAY_HOST}:${RELAY_PORT}${login ? '' : ' (no login: BREVO_SMTP_LOGIN unset)'}`)
+  console.log(`✓ outbound mail relays through ${RELAY_HOST}:${RELAY_PORT}${login ? '' : ' (no login: MAIL_RELAY_USER unset)'}`)
 
   // TLS for mail.<domain>: ACME HTTP-01. Traefik forwards
   // http://mail.<domain>/.well-known/acme-challenge/* to Stalwart; port 443
@@ -178,13 +178,14 @@ async function dns() {
   const rows = [
     ['A', HOST_LABEL, ip],
     ['MX', '@', `${HOSTNAME} (priority 10)`],
-    ['TXT', '@', `v=spf1 mx include:spf.brevo.com ~all`],
+    ['TXT', '@', 'v=spf1 mx ~all'],
     ...dkimRecordsFromZone(zone).map(r => ['TXT', r.name.replace('.' + DOMAIN, ''), r.value]),
-    ['TXT', '_dmarc', `v=DMARC1; p=quarantine; rua=mailto:${MAILBOX}`],
+    ['TXT', '_dmarc', 'v=DMARC1; p=quarantine'],
   ]
   console.log(`DNS records for ${DOMAIN} (replace any existing MX, SPF and DMARC records):\n`)
   for (const [type, name, value] of rows) console.log(`${type.padEnd(4)} ${name.padEnd(34)} ${value}`)
-  console.log(`\nAlso keep the TXT/CNAME records Brevo asks for when authenticating ${DOMAIN}.`)
+  console.log(`\nAlso keep the relay's own records for ${DOMAIN} (for Resend: resend._domainkey TXT and the send/rsend CNAMEs),`)
+  console.log('but not its receiving MX record: mail for this domain must only point at the server above.')
   console.log(`Reverse DNS (optional): set the PTR of ${ip} to ${HOSTNAME} in Hostinger hPanel.`)
 }
 

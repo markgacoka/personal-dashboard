@@ -198,6 +198,7 @@ async function showMailFolder(id) {
   const list = document.getElementById('mail-list');
   if (id) MAIL.folder = decodeURIComponent(id);
   MAIL.selected.clear();
+  if (_currentView === 'mail' && !location.hash.startsWith('#mail-thread/')) { MAIL.thread = null; renderMailReaderEmpty(); }
   if (!MAIL.boot) list.innerHTML = mailSkeleton();
   try { await loadMailBoot(true); }
   catch (err) { list.innerHTML = mailErrorHTML(err.message); return; }
@@ -367,7 +368,8 @@ function mailRowHTML(t) {
     t.scheduledAt ? `<span class="cur-badge cur-badge-warning" title="Scheduled"><i class="ph-bold ph-clock"></i>${esc(fmtMailDateLong(t.scheduledAt))}</span>` : '',
   ].join('');
   const archivable = MAIL.folder === 'inbox';
-  return `<div class="mail-row${t.unread ? ' unread' : ''}${sel ? ' selected' : ''}" data-tid="${esc(t.threadId)}">
+  const open = MAIL.thread?.threadId === t.threadId && mailSplit();
+  return `<div class="mail-row${t.unread ? ' unread' : ''}${sel ? ' selected' : ''}${open ? ' open' : ''}" data-tid="${esc(t.threadId)}">
     <label class="mail-check"><input type="checkbox" ${sel ? 'checked' : ''} aria-label="Select conversation"></label>
     <button class="mail-star${t.starred ? ' on' : ''}" aria-pressed="${t.starred}" aria-label="${t.starred ? 'Unstar' : 'Star'}"><i class="ph-bold ph-star"></i></button>
     <a class="mail-row-body" href="#mail-thread/${esc(encodeURIComponent(t.threadId))}">
@@ -492,7 +494,7 @@ function mailLabelMenu(anchor, threadIds, current = []) {
   mailMenu(anchor, [
     ...labels.map(l => {
       const has = current.includes(l.keyword);
-      return { label: l.name, color: MAIL_LABEL_COLORS[l.color], hint: has ? 'Remove' : '', run: () => mailThreadAction(threadIds, has ? 'unlabel' : 'label', { labelId: l.id }).then(() => _currentView === 'mail-thread' && showMailThread(MAIL.thread.threadId, { keepScroll: true })) };
+      return { label: l.name, color: MAIL_LABEL_COLORS[l.color], hint: has ? 'Remove' : '', run: () => mailThreadAction(threadIds, has ? 'unlabel' : 'label', { labelId: l.id }).then(() => mailThreadShown() && showMailThread(MAIL.thread.threadId, { keepScroll: true })) };
     }),
     ...(labels.length ? [{ sep: true }] : []),
     { label: 'New label…', icon: 'ph-plus', run: () => navigate('mail-settings') },
@@ -578,29 +580,66 @@ function mailInitials(a) {
   return ((parts[0]?.[0] || '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 }
 
+// Wide screens read conversations in a pane beside the list; narrower ones
+// open them as their own view with a Back button.
+const MAIL_SPLIT = window.matchMedia('(min-width: 1280px)');
+const mailSplit = () => MAIL_SPLIT.matches;
+const mailThreadEl = () => document.getElementById(mailSplit() ? 'mail-reader' : 'mail-thread');
+const mailThreadShown = () => !!MAIL.thread && (_currentView === 'mail-thread' || (_currentView === 'mail' && mailSplit()));
+
+// Crossing the breakpoint re-routes, so an open conversation moves between pane and page.
+MAIL_SPLIT.addEventListener('change', () => { if (_currentView === 'mail' || _currentView === 'mail-thread') route(); });
+
+function renderMailReaderEmpty() {
+  const el = document.getElementById('mail-reader');
+  if (!el) return;
+  el.innerHTML = `<div class="mail-empty mail-reader-empty"><i class="ph-bold ph-envelope-open"></i><div class="mail-empty-title">No conversation selected</div><p>Pick one from the list to read it here.</p></div>`;
+  document.querySelectorAll('.mail-row.open').forEach(r => r.classList.remove('open'));
+}
+
 async function showMailThread(threadId, { keepScroll = false } = {}) {
-  const scroller = document.getElementById('view-scroller');
+  const id = decodeURIComponent(threadId);
+  const split = mailSplit();
+  if (split) {
+    if (_currentView !== 'mail') {
+      showView('mail', { title: 'Mail' });
+      if (!MAIL.threads.length) showMailFolder(); // list loads beside the conversation
+    }
+  } else {
+    const backTo = MAIL.folder === 'inbox' ? 'mail' : 'mail/' + MAIL.folder;
+    showView('mail-thread', { back: backTo, title: '' });
+    document.getElementById('back-label').textContent = MAIL.boot ? mailFolderTitle() : 'Mail';
+  }
+  const el = mailThreadEl();
+  const scroller = split ? el : document.getElementById('view-scroller');
   const prevScroll = scroller.scrollTop;
-  const backTo = MAIL.folder === 'inbox' ? 'mail' : 'mail/' + MAIL.folder;
-  showView('mail-thread', { back: backTo, title: '' });
-  document.getElementById('back-label').textContent = MAIL.boot ? mailFolderTitle() : 'Mail';
-  const el = document.getElementById('mail-thread');
-  if (!keepScroll) el.innerHTML = '<div class="skel" style="height:28px;width:50%"></div><div class="skel" style="height:220px;margin-top:20px"></div>';
+  if (!keepScroll) el.innerHTML = '<div class="mail-thread"><div class="skel" style="height:28px;width:50%"></div><div class="skel" style="height:220px;margin-top:20px"></div></div>';
+  document.querySelectorAll('.mail-row').forEach(r => r.classList.toggle('open', r.dataset.tid === id));
   try {
     if (!MAIL.boot) await loadMailBoot();
-    const t = await mailApi('/threads/' + encodeURIComponent(decodeURIComponent(threadId)));
+    const t = await mailApi('/threads/' + encodeURIComponent(id));
     MAIL.thread = t;
     renderMailThread(t);
-    if (keepScroll) scroller.scrollTop = prevScroll;
+    scroller.scrollTop = keepScroll ? prevScroll : 0;
     refreshMailCounts();
     const listed = MAIL.threads.find(x => x.threadId === t.threadId);
-    if (listed) listed.unread = false;
+    if (listed && listed.unread) {
+      listed.unread = false;
+      document.querySelector(`.mail-row[data-tid="${CSS.escape(t.threadId)}"]`)?.classList.remove('unread');
+    }
   } catch (err) {
     el.innerHTML = mailErrorHTML(err.message);
   }
 }
 
+// Done with a conversation (archived, deleted...): back to the list, or an empty pane.
 function mailBackToList() {
+  if (mailSplit() && _currentView === 'mail') {
+    MAIL.thread = null;
+    renderMailReaderEmpty();
+    history.replaceState(null, '', '#mail/' + encodeURIComponent(MAIL.folder));
+    return;
+  }
   const [view, id] = (document.getElementById('back-btn').dataset.back || 'mail').split('/');
   navigate(view, id);
 }
@@ -613,7 +652,7 @@ function mailThreadContext(t) {
 }
 
 function renderMailThread(t) {
-  const el = document.getElementById('mail-thread');
+  const el = mailThreadEl();
   const ctx = mailThreadContext(t);
   const kws = new Set(ctx.visible.flatMap(m => m.keywords));
   const starred = kws.has('$flagged');

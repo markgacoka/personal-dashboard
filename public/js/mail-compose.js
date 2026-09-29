@@ -536,8 +536,8 @@ function afterSend(res, sendAt, s) {
     mailToast('Message sent');
   }
   refreshMailCounts();
-  if (_currentView === 'mail-thread' && MAIL.thread && s.threadId === MAIL.thread.threadId) showMailThread(MAIL.thread.threadId, { keepScroll: true });
-  else if (_currentView === 'mail') loadMailThreads();
+  if (mailThreadShown() && s.threadId === MAIL.thread.threadId) showMailThread(MAIL.thread.threadId, { keepScroll: true });
+  if (_currentView === 'mail') loadMailThreads();
 }
 
 // Unsaved composer content survives a closing tab only as a saved draft.

@@ -3,8 +3,11 @@
 The dashboard's Mail section (`#mail`) is a mail client for `hello@gacoka.com`
 and its aliases. Mail is stored by a self-hosted [Stalwart](https://stalw.art)
 server (v0.16, AGPL) running beside the API. Outgoing mail goes out through
-Brevo's free SMTP relay (300 messages a day) so it reaches Gmail and Outlook
-inboxes instead of spam. Phone and desktop mail apps can use the same mailbox
+Resend's free SMTP relay (100 messages a day, 3,000 a month) so it reaches
+Gmail and Outlook inboxes instead of spam. Resend adds no open or click
+tracking and no unsubscribe header. Brevo was tried first and dropped: its
+free plan forces a tracking pixel, rewrites every link and adds an Unsubscribe
+header, which makes personal mail look like marketing. Phone and desktop mail apps can use the same mailbox
 over IMAP and SMTP.
 
 ## How it fits together
@@ -13,7 +16,7 @@ over IMAP and SMTP.
 Internet ──25──▶ stalwart ◀── JMAP (http://stalwart:8080, docker network) ── api ◀── browser (#mail)
                     │  ▲
                     │  └── 993 IMAP / 465 SMTP ── phone and desktop mail apps
-                    └── outgoing ──587──▶ smtp-relay.brevo.com ──▶ recipient
+                    └── outgoing ──465──▶ smtp.resend.com ──▶ recipient
 ```
 
 | Piece | Where | Holds |
@@ -53,8 +56,10 @@ Design decisions:
 | `MAIL_PASSWORD` | api, CLI | Mailbox password, also used by phone mail apps (16 or more characters) |
 | `MAIL_ADMIN_USER` | api, CLI | `admin@gacoka.com` |
 | `MAIL_ADMIN_PASSWORD` | api, CLI, stalwart | Stalwart administrator password |
-| `BREVO_SMTP_LOGIN` | CLI | The login shown on Brevo's SMTP & API page |
-| `BREVO_SMTP_KEY` | stalwart | The Brevo SMTP key. Only the stalwart container reads it. |
+| `MAIL_RELAY_HOST` | CLI | `smtp.resend.com` |
+| `MAIL_RELAY_PORT` | CLI | `465` (implicit TLS) |
+| `MAIL_RELAY_USER` | CLI | `resend` |
+| `MAIL_RELAY_SECRET` | stalwart | The Resend API key. Only the stalwart container reads it. |
 
 Without the `MAIL_*` variables, the Mail section shows "Mail isn't set up on
 this server yet" and the rest of the dashboard is unaffected.
@@ -84,8 +89,10 @@ this server yet" and the rest of the dashboard is unaffected.
 
        docker exec current-api-1 node src/cli/mail.mjs dns
 
-   Replace any old MX, SPF and DMARC records, and keep Brevo's own
-   domain-authentication records.
+   Replace any old MX, SPF and DMARC records. Keep Resend's sending records
+   (`resend._domainkey` TXT, `send` and `rsend` CNAMEs), but leave Resend's
+   **receiving** turned off: its MX record would take incoming mail away
+   from Stalwart.
 
 6. Check the result in Mail Settings → Setup and delivery. Every row should
    show OK; reverse DNS is optional.
@@ -114,10 +121,10 @@ this server yet" and the rest of the dashboard is unaffected.
 - **Nothing arrives.** Check the MX record, confirm `ufw status` lists port
   25, and read `docker logs current-stalwart-1`.
 - **Sent mail lands in spam.** Check Mail Settings → Setup and delivery, where
-  SPF, DKIM and DMARC must all show OK. Then check that Brevo shows the domain
+  SPF, DKIM and DMARC must all show OK. Then check that Resend shows the domain
   as authenticated.
-- **"Daily sending limit reached."** Brevo's free plan allows 300 messages a
-  day. The limit resets at midnight UTC.
+- **"Daily sending limit reached."** Resend's free plan allows 100 messages a
+  day and 3,000 a month. The daily limit resets at midnight UTC.
 - **No certificate for mail.gacoka.com.** The `A mail` record must point at the
   VPS, and Traefik must route
   `http://mail.gacoka.com/.well-known/acme-challenge/*` to Stalwart. Look for

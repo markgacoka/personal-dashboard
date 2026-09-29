@@ -25,7 +25,9 @@ export const LABEL_COLORS = ['patina', 'gold', 'success', 'warning', 'danger', '
 export const UNDO_CHOICES = [0, 5, 10, 20, 30]
 export const MAX_ATTACHMENTS_BYTES = 15 * 1024 * 1024 // raw bytes; base64 adds a third, under the relay's 20 MB
 export const MAX_SCHEDULE_DAYS = 30
-export const DAILY_SEND_LIMIT = 300 // Brevo free plan
+// Resend's free plan: 100 messages a day, 3,000 a month.
+export const DAILY_SEND_LIMIT = 100
+export const MONTHLY_SEND_LIMIT = 3000
 const SIEVE_NAME = 'dashboard'
 const INLINE_IMAGE_MAX = 1_500_000
 const LIST_PROPS = ['id', 'threadId', 'mailboxIds', 'keywords', 'from', 'to', 'subject', 'receivedAt', 'preview', 'hasAttachment']
@@ -44,6 +46,7 @@ export function mailConfig(env = process.env) {
     adminPassword: env.MAIL_ADMIN_PASSWORD,
     publicIp: env.MAIL_PUBLIC_IP || '89.116.157.98',
     hostname: env.MAIL_HOSTNAME || 'mail.gacoka.com',
+    relayDkimSelector: env.MAIL_RELAY_DKIM_SELECTOR ?? 'resend',
   }
 }
 
@@ -683,11 +686,17 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
     await jmap.call([['Email/set', { destroy: [id] }, 'd']])
   }
 
-  async function sentToday() {
-    const start = new Date(now())
-    start.setUTCHours(0, 0, 0, 0)
+  async function sentSince(start) {
     const r = await jmap.call([['EmailSubmission/query', { filter: { after: start.toISOString().replace('.000Z', 'Z') }, calculateTotal: true, limit: 1 }, 'q']])
     return r.q.total || 0
+  }
+
+  // Counted from the server's own submissions, in UTC days and months (the relay's clock).
+  async function sendCounts() {
+    const day = new Date(now()); day.setUTCHours(0, 0, 0, 0)
+    const month = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), 1))
+    const [today, thisMonth] = await Promise.all([sentSince(day), sentSince(month)])
+    return { today, thisMonth }
   }
 
   // sendAt: ISO time for "send later"; otherwise held for the undo window.
@@ -705,7 +714,9 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
     } else {
       holdFor = settings.undoSeconds
     }
-    if (await sentToday() >= DAILY_SEND_LIMIT) throw bad(`Daily sending limit reached (${DAILY_SEND_LIMIT} per day on the relay's free plan)`)
+    const sent = await sendCounts()
+    if (sent.today >= DAILY_SEND_LIMIT) throw bad(`Daily sending limit reached: ${DAILY_SEND_LIMIT} messages a day on the relay's free plan. It resets at midnight UTC.`)
+    if (sent.thisMonth >= MONTHLY_SEND_LIMIT) throw bad(`Monthly sending limit reached: ${MONTHLY_SEND_LIMIT} messages a month on the relay's free plan.`)
     await fromAllowed(m.from)
     const identity = await ensureIdentity(m.from)
     const byRole = await roles()
@@ -1020,7 +1031,7 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
       labels: labelRows,
       settings,
       counts: { ...unread, followupsDue: fu.due.length, scheduled: sched.length },
-      limits: { attachmentsBytes: MAX_ATTACHMENTS_BYTES, scheduleDays: MAX_SCHEDULE_DAYS, dailySends: DAILY_SEND_LIMIT },
+      limits: { attachmentsBytes: MAX_ATTACHMENTS_BYTES, scheduleDays: MAX_SCHEDULE_DAYS, dailySends: DAILY_SEND_LIMIT, monthlySends: MONTHLY_SEND_LIMIT },
       undoChoices: UNDO_CHOICES,
       labelColors: LABEL_COLORS,
     }
@@ -1043,8 +1054,8 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
       mx.map(r => `${r.priority} ${r.exchange}`).join(', ') || 'missing', `MX  @  →  ${cfg.hostname} (priority 10), and remove any other MX records`)
 
     const spf = (await txt(domain)).filter(t => t.startsWith('v=spf1'))
-    add('spf', 'SPF', spf.length === 1 && /\bmx\b/.test(spf[0]) && /include:spf\.brevo\.com/.test(spf[0]),
-      spf.join(' | ') || 'missing', 'TXT  @  "v=spf1 mx include:spf.brevo.com ~all"')
+    add('spf', 'SPF', spf.length === 1 && /\bmx\b/.test(spf[0]),
+      spf.join(' | ') || 'missing', 'TXT  @  "v=spf1 mx ~all"  (exactly one SPF record)')
 
     let dkimExpected = []
     if (admin) { try { dkimExpected = dkimRecordsFromZone(await admin.zoneFile()) } catch { /* reported below */ } }
@@ -1056,17 +1067,25 @@ export function createMailService(cfg, { db = pool, log = console, now = () => n
         `TXT  ${rec.name.replace('.' + domain, '')}  "${rec.value}"`)
     }
 
+    // The relay signs with its own key for the domain; DMARC passes on that signature.
+    if (cfg.relayDkimSelector) {
+      const name = `${cfg.relayDkimSelector}._domainkey.${domain}`
+      const found = (await txt(name)).join('')
+      add('relay-dkim', `DKIM ${cfg.relayDkimSelector} (relay)`, /p=[A-Za-z0-9+/]{20,}/.test(found), found ? 'published' : 'missing',
+        `TXT  ${cfg.relayDkimSelector}._domainkey  (copy the value from the relay's domain page)`)
+    }
+
     const dmarc = (await txt(`_dmarc.${domain}`)).find(t => t.startsWith('v=DMARC1'))
     add('dmarc', 'DMARC', !!dmarc && /p=(quarantine|reject)/.test(dmarc), dmarc || 'missing',
-      `TXT  _dmarc  "v=DMARC1; p=quarantine; rua=mailto:${cfg.user}"`)
+      'TXT  _dmarc  "v=DMARC1; p=quarantine"')
 
     const ptr = await dns.reverse(cfg.publicIp).catch(() => [])
     add('ptr', 'Reverse DNS (optional)', ptr.map(lower).includes(cfg.hostname), ptr.join(', ') || 'missing',
       `Hostinger hPanel → VPS → Settings → PTR record: ${cfg.hostname}`)
 
-    let sent = null
-    try { sent = await sentToday() } catch { /* server check already failed */ }
-    return { checks, sentToday: sent, dailyLimit: DAILY_SEND_LIMIT }
+    let sent = { today: null, thisMonth: null }
+    try { sent = await sendCounts() } catch { /* server check already failed */ }
+    return { checks, sentToday: sent.today, sentThisMonth: sent.thisMonth, dailyLimit: DAILY_SEND_LIMIT, monthlyLimit: MONTHLY_SEND_LIMIT }
   }
 
   return {

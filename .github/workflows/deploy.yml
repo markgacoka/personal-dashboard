@@ -39,7 +39,10 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='api/node_modules' \
+            --exclude='web/node_modules' \
+            --exclude='web/dist' \
             public/ \
+            web/ \
             api/ \
             traefik/ \
             docker-compose.yml

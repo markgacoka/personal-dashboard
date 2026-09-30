@@ -1,4 +1,5 @@
-import { dirname, resolve } from 'path'
+import { existsSync } from 'fs'
+import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
@@ -26,6 +27,11 @@ import { scheduleNightSync } from './services/schedules.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
 const publicDir = process.env.PUBLIC_DIR || resolve(__dirname, '../../public')
+// The 2026 redesign, built from web/ (docs/redesign-2026.md). UI=classic, or a
+// missing build, serves the classic UI at / again; it is always at /classic.
+const webDir = process.env.WEB_DIR || resolve(__dirname, '../../web/dist')
+const useWeb = process.env.UI !== 'classic' && existsSync(join(webDir, 'index.html'))
+const appDir = useWeb ? webDir : publicDir
 
 // Build the app. `background: false` skips the scheduled jobs and first-boot
 // downloads, for tests that exercise the routes in-process.
@@ -36,7 +42,16 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
   // Sign-in gate first, so its session check and security headers cover every
   // route and file registered after it.
   await fastify.register(authGate)
-  await fastify.register(fastifyStatic, { root: publicDir, prefix: '/' })
+  await fastify.register(fastifyStatic, {
+    root: useWeb ? [webDir, publicDir] : publicDir,
+    prefix: '/',
+    setHeaders(reply, path) {
+      // Vite's hashed bundles never change; the page itself must always revalidate.
+      if (path.startsWith(join(webDir, 'assets'))) reply.header('Cache-Control', 'public, max-age=31536000, immutable')
+      else if (path.endsWith('.html')) reply.header('Cache-Control', 'no-cache')
+    },
+  })
+  fastify.get('/classic', (req, reply) => reply.header('Cache-Control', 'no-cache').sendFile('index.html', publicDir))
 
   fastify.get('/health', async () => ({ ok: true }))
   fastify.get('/api/health', async () => ({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() }))
@@ -84,7 +99,11 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
   }
 
   // SPA fallback — serve index.html for any unmatched route
-  fastify.setNotFoundHandler((req, reply) => reply.sendFile('index.html'))
+  fastify.setNotFoundHandler((req, reply) => {
+    // A bundle from an older deploy is gone for good; answering with the page would break the module load.
+    if (useWeb && req.url.startsWith('/assets/')) return reply.status(404).send({ error: 'Not found' })
+    return reply.header('Cache-Control', 'no-cache').sendFile('index.html', appDir)
+  })
 
   return fastify
 }

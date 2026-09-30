@@ -1,0 +1,183 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Tokens ───────────────────────────────────────────────────────────────────
+   One page plane, one card surface, hairline borders. Chart series use the
+   validated dataviz palette (light/dark steps chosen per surface). */
+:root {
+  color-scheme: light;
+  --bg: oklch(0.978 0.002 95);
+  --card: oklch(1 0 0);
+  --sunken: oklch(0.965 0.003 95);
+  --hover: oklch(0.955 0.003 95);
+  --border: oklch(0.915 0.004 95);
+  --border-strong: oklch(0.855 0.005 95);
+  --fg: oklch(0.205 0.012 265);
+  --fg-2: oklch(0.44 0.012 265);
+  --fg-3: oklch(0.575 0.01 265);
+  --accent: oklch(0.53 0.2 264);
+  --accent-hover: oklch(0.48 0.2 264);
+  --accent-fg: oklch(0.99 0 0);
+  --accent-soft: oklch(0.53 0.2 264 / 0.09);
+  --ring: oklch(0.53 0.2 264 / 0.45);
+
+  --good: oklch(0.56 0.15 150);
+  --good-soft: oklch(0.56 0.15 150 / 0.1);
+  --warn: oklch(0.62 0.15 65);
+  --warn-soft: oklch(0.75 0.16 75 / 0.14);
+  --bad: oklch(0.56 0.2 25);
+  --bad-soft: oklch(0.56 0.2 25 / 0.09);
+
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+  --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
+  --grid: #e8e7e1;
+  --axis: #898781;
+
+  --shadow-card: 0 1px 2px oklch(0.2 0.01 265 / 0.04);
+  --shadow-pop: 0 12px 32px -8px oklch(0.2 0.02 265 / 0.18), 0 2px 6px oklch(0.2 0.02 265 / 0.06);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: oklch(0.155 0.005 265);
+  --card: oklch(0.192 0.006 265);
+  --sunken: oklch(0.172 0.005 265);
+  --hover: oklch(0.235 0.007 265);
+  --border: oklch(0.262 0.007 265);
+  --border-strong: oklch(0.33 0.008 265);
+  --fg: oklch(0.965 0.003 265);
+  --fg-2: oklch(0.78 0.008 265);
+  --fg-3: oklch(0.64 0.01 265);
+  --accent: oklch(0.68 0.16 264);
+  --accent-hover: oklch(0.74 0.14 264);
+  --accent-fg: oklch(0.16 0.02 265);
+  --accent-soft: oklch(0.68 0.16 264 / 0.14);
+  --ring: oklch(0.68 0.16 264 / 0.5);
+
+  --good: oklch(0.72 0.15 150);
+  --good-soft: oklch(0.72 0.15 150 / 0.13);
+  --warn: oklch(0.8 0.14 75);
+  --warn-soft: oklch(0.8 0.14 75 / 0.13);
+  --bad: oklch(0.7 0.17 25);
+  --bad-soft: oklch(0.7 0.17 25 / 0.13);
+
+  --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+  --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
+  --grid: #2a2b2e;
+  --axis: #8a8a86;
+
+  --shadow-card: none;
+  --shadow-pop: 0 16px 40px -8px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.06);
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-sunken: var(--sunken);
+  --color-hover: var(--hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-c1: var(--c1);
+  --color-c2: var(--c2);
+  --color-c3: var(--c3);
+  --color-c4: var(--c4);
+  --color-c5: var(--c5);
+  --color-c6: var(--c6);
+  --color-c7: var(--c7);
+  --color-c8: var(--c8);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 22px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 26px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 34px;
+  --text-3xl--line-height: 40px;
+  --text-4xl: 44px;
+  --text-4xl--line-height: 48px;
+
+  --animate-in: fade-in 160ms ease-out;
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-bg text-fg font-sans text-base antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  ::selection { background: var(--accent-soft); }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; }
+}
+
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; letter-spacing: -0.005em; }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .skeleton {
+    background: linear-gradient(90deg, var(--sunken) 0%, var(--hover) 50%, var(--sunken) 100%);
+    background-size: 200% 100%;
+    animation: skeleton 1.4s ease-in-out infinite;
+    border-radius: var(--radius-md);
+  }
+  @keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .masked .money { filter: blur(7px); user-select: none; transition: filter 150ms; }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* MapLibre controls, restyled to the surface */
+.maplibregl-ctrl-group { background: var(--card) !important; border: 1px solid var(--border); box-shadow: var(--shadow-card) !important; border-radius: var(--radius-md) !important; overflow: hidden; }
+.maplibregl-ctrl-group button { width: 32px !important; height: 32px !important; }
+.maplibregl-ctrl-group button + button { border-top: 1px solid var(--border) !important; }
+.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+.maplibregl-popup-content { background: var(--card) !important; color: var(--fg); border: 1px solid var(--border); border-radius: var(--radius-lg) !important; box-shadow: var(--shadow-pop) !important; padding: 12px 14px !important; font-family: var(--font-sans); }
+.maplibregl-popup-tip { display: none; }
+.maplibregl-ctrl-attrib { font-size: 10px; background: color-mix(in oklch, var(--card) 80%, transparent) !important; }
+.maplibregl-ctrl-scale { background: color-mix(in oklch, var(--card) 80%, transparent); border-color: var(--fg-3); color: var(--fg-2); }

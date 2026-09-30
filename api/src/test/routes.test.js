@@ -696,7 +696,7 @@ describe('Live security checks (signed out)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1
 
   test('sign-in page is public; the dashboard redirects to it', async () => {
     assert.equal((await raw('/login')).status, 200);
-    for (const path of ['/', '/index.html', '/js/core.js', '/some/deep/link']) {
+    for (const path of ['/', '/index.html', '/classic', '/js/core.js', '/some/deep/link']) {
       const r = await raw(path);
       assert.equal(r.status, 302, path);
       assert.match(r.headers.get('location'), /\/login\?next=/, path);
@@ -764,14 +764,21 @@ describe('Live API smoke tests (signed in)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1'
     assert.equal(status, 200, 'daily stats should return 200 even when some data is missing');
   });
 
-  test('Frontend index.html → 200 with correct content', async () => {
+  test('Frontend index.html → 200 with the app shell', async () => {
     const r = await fetch(BASE + '/', { signal: AbortSignal.timeout(15000) });
     assert.equal(r.status, 200);
     const html = await r.text();
-    assert.ok(html.includes('Gacoka'), 'page should contain athlete name');
+    assert.ok(html.includes('Gacoka'), 'page title');
+    assert.ok(html.includes('id="root"'), 'React mount point');
+    assert.match(html, /\/assets\/index-[\w-]+\.js/, 'hashed app bundle');
+  });
+
+  test('Classic UI stays reachable at /classic', async () => {
+    const r = await fetch(BASE + '/classic', { signal: AbortSignal.timeout(15000) });
+    assert.equal(r.status, 200);
+    const html = await r.text();
     assert.ok(html.includes('chart.js'), 'should reference Chart.js');
     assert.ok(html.includes('maplibre-gl'), 'should reference MapLibre GL');
-    assert.ok(!html.includes('text/babel'), 'should NOT use Babel (which caused blank page)');
   });
 
   // ── Flight log endpoints ───────────────────────────────────────────────────

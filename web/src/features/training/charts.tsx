@@ -44,7 +44,7 @@ export function VolumeChart({ activities, days = 30, height = 200 }: { activitie
     <div>
       <div style={{ height }}>
         <ResponsiveContainer>
-          <BarChart data={rows} margin={{ top: 4, right: 0, left: -18, bottom: 0 }} barCategoryGap="22%">
+          <BarChart data={rows} margin={{ top: 4, right: 0, left: 0, bottom: 0 }} barCategoryGap="22%">
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="day" {...axisProps} tickFormatter={d => short(d)} interval="preserveStartEnd" minTickGap={28} />
             <YAxis {...axisProps} tickFormatter={v => (v ? `${v}h` : '0')} width={44} allowDecimals />
@@ -152,7 +152,7 @@ export function HeartRateChart({ activities, height = 200 }: { activities: Activ
     <div>
       <div style={{ height }}>
         <ResponsiveContainer>
-          <LineChart data={rows} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="day" {...axisProps} tickFormatter={d => short(d)} />
             <YAxis {...axisProps} width={44} domain={['dataMin - 10', 'dataMax + 5']} allowDecimals={false} />

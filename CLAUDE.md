@@ -7,11 +7,15 @@ tracks, finances (Plaid), and chess (chess.com).
 
 ## Stack
 
-- `public/` — static frontend, no build step. `index.html` is the markup;
-  `css/app.css` the styles; `js/*.js` are classic scripts loaded in order and
-  sharing one global scope (inline `onclick` handlers call their functions).
-  Load order matters: top-level code may only use what earlier files define.
-  `js/helpers.js` holds DOM-free helpers the API test suite runs directly.
+- `web/` — the dashboard: Vite + React + TypeScript, Tailwind CSS v4, Radix
+  primitives (components in `src/components/ui`), TanStack Query, React Router,
+  Recharts, MapLibre. Features live in `src/features/<area>`, shared logic in
+  `src/lib`. Built inside the Docker image; `cd web && npm run dev` (proxies
+  `/api` to `DEV_API`, default http://localhost:3000), `npm test` (Vitest).
+  Design notes: `docs/redesign-2026.md`.
+- `public/` — only the sign-in page (`login.html`, `css/app.css`,
+  `js/login.js`, `js/webauthn.js`) and `favicon.svg`; these are on the auth
+  gate's public allowlist.
 - `api/` — Node.js 20 + Fastify, containerised
   - `src/routes/` — HTTP endpoints by area (flights, tracks, aircraft, aviation, …)
   - `src/services/` — external integrations and domain logic (OpenSky, FR24 /
@@ -55,6 +59,7 @@ vars, DNS and maintenance: `docs/mail.md`. Server setup and repair:
 
 ## Tests
 
+`cd web && npm test` runs the frontend unit tests (Vitest; also part of `npm run build`).
 `cd api && npm test` runs unit tests, signed-out security checks against
 gacoka.com (`SKIP_SMOKE=1` to skip, `SMOKE_BASE=<url>` for another deployment),
 signed-in smoke tests when `SMOKE_COOKIE` holds a session token, and DB

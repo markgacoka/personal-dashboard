@@ -2,7 +2,7 @@ import { Command } from 'cmdk'
 import { Dialog as RDialog } from 'radix-ui'
 import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Eye, History, LogOut, Moon, PenLine, Plane, Plus, Search, Sun } from 'lucide-react'
+import { Eye, LogOut, Moon, PenLine, Plane, Plus, Search, Sun } from 'lucide-react'
 import { usePrefs } from '@/lib/prefs'
 import { useFlights } from '@/lib/queries'
 import { route, trainingLabel } from '@/lib/flying'
@@ -51,7 +51,6 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 <Command.Item value="compose new email message" onSelect={() => run(() => navigate('/mail?compose=1'))} className={item}><PenLine />Compose email</Command.Item>
                 <Command.Item value="toggle theme dark light" onSelect={() => run(() => setTheme(resolved === 'dark' ? 'light' : 'dark'))} className={item}>{resolved === 'dark' ? <Sun /> : <Moon />}Switch to {resolved === 'dark' ? 'light' : 'dark'} theme</Command.Item>
                 <Command.Item value="privacy balances hide show mask" onSelect={() => run(toggleMask)} className={item}><Eye />{masked ? 'Show' : 'Hide'} balances</Command.Item>
-                <Command.Item value="classic old dashboard previous design" onSelect={() => run(() => { location.href = '/classic' })} className={item}><History />Open classic dashboard</Command.Item>
                 <Command.Item value="sign out log out" onSelect={() => run(signOut)} className={item}><LogOut />Sign out</Command.Item>
               </Command.Group>
               {!!flights?.length && (

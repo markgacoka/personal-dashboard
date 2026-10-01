@@ -205,44 +205,6 @@ gacoka.com. IN MX 10 mail.gacoka.com.`
   })
 })
 
-// Frontend helpers, loaded from the file the browser runs.
-const fe = (() => {
-  const ctx = vm.createContext({})
-  vm.runInContext(readFileSync(new URL('../../../public/js/helpers.js', import.meta.url), 'utf8') +
-    '\n;globalThis.__exports = { fmtMailDate, fmtBytes, parseMailToken, mailSchedulePresets, fmtMailAddr };', ctx)
-  return ctx.__exports
-})()
-
-describe('mail frontend helpers', () => {
-  test('list dates: time today, month/day this year, with year before', () => {
-    const now = new Date(2026, 8, 28, 15, 0)
-    assert.match(fe.fmtMailDate(new Date(2026, 8, 28, 9, 5).toISOString(), now), /9:05\s?AM/)
-    assert.equal(fe.fmtMailDate(new Date(2026, 1, 3).toISOString(), now), 'Feb 3')
-    assert.equal(fe.fmtMailDate(new Date(2025, 1, 3).toISOString(), now), 'Feb 3, 2025')
-    assert.equal(fe.fmtMailDate('garbage', now), '')
-  })
-  test('sizes', () => {
-    assert.equal(fe.fmtBytes(0), '0 B')
-    assert.equal(fe.fmtBytes(2048), '2 KB')
-    assert.equal(fe.fmtBytes(3.5 * 1024 * 1024), '3.5 MB')
-  })
-  test('recipient tokens', () => {
-    assert.deepEqual({ ...fe.parseMailToken('Ana Lee <ana@x.test>,') }, { name: 'Ana Lee', email: 'ana@x.test' })
-    assert.deepEqual({ ...fe.parseMailToken('bob@y.test') }, { name: null, email: 'bob@y.test' })
-    assert.equal(fe.parseMailToken('not an email'), null)
-  })
-  test('send-later presets are in the future and Monday is a Monday', () => {
-    const now = new Date(2026, 8, 28, 10, 0) // a Monday morning
-    const presets = fe.mailSchedulePresets(now)
-    assert.ok(presets.every(p => p.at > now))
-    const monday = presets.find(p => p.label === 'Monday morning').at
-    assert.equal(monday.getDay(), 1)
-    assert.equal(monday.getDate(), 5) // next Monday, not today
-    assert.ok(presets.some(p => p.label === 'This evening'))
-    assert.ok(!fe.mailSchedulePresets(new Date(2026, 8, 28, 18, 0)).some(p => p.label === 'This evening'))
-  })
-})
-
 import { matchRelayEmail, replaceMessageId, parseRelayTime } from '../lib/mailRelay.js'
 
 describe('mail relay — Message-ID reconciliation', () => {

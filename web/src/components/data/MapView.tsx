@@ -41,13 +41,17 @@ export function MapView({ className, onLoad, center, zoom = 9, controls = true, 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
     let cleanup: void | (() => void)
     map.on('load', () => { setReady(true); cleanup = loadRef.current(map) })
-    return () => { try { cleanup?.() } catch { /* */ } map.remove() }
+    // The container often settles to its final size after the map is created (skeletons, grid reflow).
+    const ro = new ResizeObserver(() => map.resize())
+    ro.observe(ref.current)
+    return () => { ro.disconnect(); try { cleanup?.() } catch { /* */ } map.remove() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved])
 
   return (
     <div className={cn('relative overflow-hidden', className)}>
-      <div ref={ref} className="absolute inset-0" />
+      {/* MapLibre forces position:relative on this element, so it is sized with h-full rather than inset-0. */}
+      <div ref={ref} className="h-full w-full" />
       {!ready && <Skeleton className="absolute inset-0 rounded-none" />}
     </div>
   )

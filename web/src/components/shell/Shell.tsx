@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router'
-import { Eye, EyeOff, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, LogOut, History, UserRound, MoreHorizontal } from 'lucide-react'
+import { Eye, EyeOff, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, LogOut, UserRound, MoreHorizontal } from 'lucide-react'
 import { Drawer } from 'vaul'
 import { cn } from '@/lib/utils'
 import { usePrefs, type Theme } from '@/lib/prefs'
@@ -168,7 +168,6 @@ function AccountMenu() {
       <MenuContent>
         <MenuLabel>{name}</MenuLabel>
         <MenuItem onSelect={() => navigate('/account')}><UserRound />Account &amp; security</MenuItem>
-        <MenuItem onSelect={() => { location.href = '/classic' }}><History />Open classic dashboard</MenuItem>
         <MenuSeparator />
         <MenuItem danger onSelect={signOut}><LogOut />Sign out</MenuItem>
       </MenuContent>

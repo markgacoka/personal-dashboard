@@ -1,8 +1,8 @@
 # Dashboard redesign (2026)
 
-A new frontend for gacoka.com, built from scratch in `web/`. The classic UI in
-`public/` stays untouched and reachable at `/classic` until the new one is
-approved; `git tag ui-classic-2026-09-30` marks the last commit before this work.
+A new frontend for gacoka.com, built from scratch in `web/`. It replaced the
+classic UI on 2026-09-30; `git tag ui-classic-2026-09-30` marks the last commit
+of the classic UI if it is ever needed again.
 
 ## Scope
 
@@ -62,5 +62,5 @@ theme (system/light/dark), and a global privacy toggle that masks balances.
 
 ## Revert
 
-Delete `web/` wiring in `api/src/app.js` (or set `UI=classic`), and the classic UI
-serves from `/` again. Nothing in `public/` changed.
+The classic UI was removed after approval. To bring it back, check out
+`public/` from the `ui-classic-2026-09-30` tag and serve its `index.html`.

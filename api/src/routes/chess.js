@@ -14,9 +14,9 @@ async function chessGet(path) {
 
 const LOSS_RESULTS = new Set(['checkmated', 'resigned', 'timeout', 'abandoned', 'lose'])
 
-function summarizeMonth(games, timeClass) {
+function summarizeMonth(games, timeClass, month) {
   const filtered = (games || []).filter(g => g.time_class === timeClass).sort((a, b) => a.end_time - b.end_time)
-  if (!filtered.length) return { count: 0, win: 0, loss: 0, draw: 0, ratingStart: null, ratingEnd: null }
+  if (!filtered.length) return { month, count: 0, win: 0, loss: 0, draw: 0, ratingStart: null, ratingEnd: null }
   let win = 0, loss = 0, draw = 0, ratingStart = null, ratingEnd = null
   for (const g of filtered) {
     const mine = g.white.username.toLowerCase() === USERNAME ? g.white : g.black
@@ -26,7 +26,7 @@ function summarizeMonth(games, timeClass) {
     else if (LOSS_RESULTS.has(mine.result)) loss++
     else draw++
   }
-  return { count: filtered.length, win, loss, draw, ratingStart, ratingEnd }
+  return { month, count: filtered.length, win, loss, draw, ratingStart, ratingEnd }
 }
 
 function extractRecent(games, timeClass, limit = 20) {
@@ -60,11 +60,13 @@ export default async function chessRoutes(fastify) {
         chessGet(`/player/${USERNAME}/stats`),
       ])
 
-      const now = new Date()
-      const cy = now.getFullYear()
-      const cm = String(now.getMonth() + 1).padStart(2, '0')
-      const ly = now.getMonth() === 0 ? cy - 1 : cy
-      const lm = String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, '0')
+      // Months follow the owner's calendar (Pacific), not the container's UTC clock.
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit' })
+        .formatToParts(new Date()).map(x => [x.type, x.value]))
+      const cy = Number(p.year), cmN = Number(p.month)
+      const cm = String(cmN).padStart(2, '0')
+      const ly = cmN === 1 ? cy - 1 : cy
+      const lm = String(cmN === 1 ? 12 : cmN - 1).padStart(2, '0')
 
       const [thisData, lastData] = await Promise.all([
         chessGet(`/player/${USERNAME}/games/${cy}/${cm}`).catch(() => ({ games: [] })),
@@ -84,17 +86,19 @@ export default async function chessRoutes(fastify) {
           current:   stats.chess_rapid?.last?.rating ?? null,
           best:      stats.chess_rapid?.best?.rating ?? null,
           record:    stats.chess_rapid?.record ?? { win: 0, loss: 0, draw: 0 },
-          thisMonth: summarizeMonth(thisGames, 'rapid'),
-          lastMonth: summarizeMonth(lastGames, 'rapid'),
-          recent:    extractRecent(thisGames, 'rapid', 20),
+          thisMonth: summarizeMonth(thisGames, 'rapid', `${cy}-${cm}`),
+          lastMonth: summarizeMonth(lastGames, 'rapid', `${ly}-${lm}`),
+          // Across both months, so the trend isn't empty in the first days of a month.
+          recent:    extractRecent([...lastGames, ...thisGames], 'rapid', 30),
         },
         blitz: {
           current:   stats.chess_blitz?.last?.rating ?? null,
           best:      stats.chess_blitz?.best?.rating ?? null,
           record:    stats.chess_blitz?.record ?? { win: 0, loss: 0, draw: 0 },
-          thisMonth: summarizeMonth(thisGames, 'blitz'),
-          lastMonth: summarizeMonth(lastGames, 'blitz'),
-          recent:    extractRecent(thisGames, 'blitz', 20),
+          thisMonth: summarizeMonth(thisGames, 'blitz', `${cy}-${cm}`),
+          lastMonth: summarizeMonth(lastGames, 'blitz', `${ly}-${lm}`),
+          // Across both months, so the trend isn't empty in the first days of a month.
+          recent:    extractRecent([...lastGames, ...thisGames], 'blitz', 30),
         },
         tactics:    { highest: stats.tactics?.highest?.rating ?? null },
         puzzleRush: { best: stats.puzzle_rush?.best?.score ?? null },

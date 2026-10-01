@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { bytes, mailDateLong } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { parseToken, schedulePresets } from './compose-utils'
 import { mail, mailPost, useMailBoot, type Addr, type Attachment, type ComposeCtx, type MailBoot, type Template } from './api'
 
 export interface OpenOpts { mode?: 'new' | 'reply' | 'replyAll' | 'forward' | 'draft'; emailId?: string; threadId?: string; to?: Addr[] }
@@ -37,23 +38,6 @@ export function cleanHtml(html: string) {
   }
   walk(doc.body)
   return doc.body.innerHTML
-}
-
-const parseToken = (text: string): Addr | null => {
-  const t = text.trim().replace(/[,;]+$/, '')
-  const m = t.match(/^(.*?)<([^>]+)>$/)
-  const email = (m ? m[2] : t).trim()
-  if (!/^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/.test(email)) return null
-  const name = m ? m[1].trim().replace(/^"(.*)"$/, '$1').trim() : ''
-  return { name: name || null, email }
-}
-
-function schedulePresets(now = new Date()) {
-  const at = (days: number, hour: number) => { const d = new Date(now); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0); return d }
-  const out: { label: string; at: Date }[] = []
-  if (now.getHours() < 17) out.push({ label: 'This evening', at: at(0, 18) })
-  out.push({ label: 'Tomorrow morning', at: at(1, 8) }, { label: 'Tomorrow afternoon', at: at(1, 13) }, { label: 'Monday morning', at: at(((8 - now.getDay()) % 7) || 7, 8) })
-  return out
 }
 
 interface State { ctx: ComposeCtx; mode: NonNullable<OpenOpts['mode']>; threadId: string | null; body: string; key: number }

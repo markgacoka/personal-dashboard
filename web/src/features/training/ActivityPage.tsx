@@ -55,15 +55,13 @@ export default function ActivityPage() {
       </Card>
 
       {hasMap && (
-        <div className="mb-5 grid gap-5 xl:grid-cols-12">
-          <Card className="overflow-hidden xl:col-span-8">
-            {gpx.isLoading ? <Skeleton className="h-[420px] rounded-none" /> : <RouteMap points={pts} color={cfg.color} />}
-          </Card>
-          <Card className="xl:col-span-4">
-            <CardHeader icon={<Mountain />} title="Elevation" description={a.elevationGain ? `${Math.round(a.elevationGain * 3.28084).toLocaleString()} ft gained` : undefined} />
-            <CardBody>{gpx.isLoading ? <Skeleton className="h-64" /> : <ElevationChart points={pts} />}</CardBody>
-          </Card>
-        </div>
+        <Card className="mb-5 overflow-hidden">
+          {gpx.isLoading ? <Skeleton className="h-[440px] rounded-none" /> : <RouteMap points={pts} color={cfg.color} />}
+          <div className="border-t border-border px-5 pb-4 pt-3">
+            <div className="mb-2 flex items-baseline gap-2"><Mountain className="size-4 self-center text-fg-3" /><span className="text-sm font-medium">Elevation</span>{a.elevationGain ? <span className="text-sm text-fg-3">· {Math.round(a.elevationGain * 3.28084).toLocaleString()} ft gained</span> : null}</div>
+            {gpx.isLoading ? <Skeleton className="h-40" /> : <ElevationChart points={pts} />}
+          </div>
+        </Card>
       )}
 
       <div className="grid gap-5 xl:grid-cols-12">
@@ -86,7 +84,7 @@ export default function ActivityPage() {
 function RouteMap({ points, color }: { points: [number, number, number | null][]; color: string }) {
   const line = mapColor(color.startsWith('var(') ? color.slice(4, -1) : color)
   return (
-    <MapView className="h-[420px]" fullscreen center={[points[0][0], points[0][1]]} zoom={12} onLoad={map => {
+    <MapView className="h-[440px]" fullscreen center={[points[0][0], points[0][1]]} zoom={12} onLoad={map => {
       const coords = points.map(p => [p[0], p[1]] as [number, number])
       map.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } })
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.9 } })
@@ -112,9 +110,9 @@ function ElevationChart({ points }: { points: [number, number, number | null][] 
   const Tip = useMemo(() => makeTip<{ mi: number; ft: number }>({ title: r => `${r.mi} mi`, rows: r => [{ color: 'var(--c3)', label: 'Elevation', value: `${r.ft.toLocaleString()} ft` }] }), [])
   if (rows.length < 2) return <p className="py-10 text-center text-sm text-fg-3">No elevation in this track.</p>
   return (
-    <div className="h-64">
+    <div className="h-40">
       <ResponsiveContainer>
-        <AreaChart data={rows} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
+        <AreaChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid {...gridProps} />
           <XAxis dataKey="mi" type="number" domain={['dataMin', 'dataMax']} {...axisProps} tickFormatter={v => `${v} mi`} tickCount={5} />
           <YAxis {...axisProps} width={52} tickFormatter={v => `${v} ft`} domain={['dataMin - 20', 'dataMax + 20']} />

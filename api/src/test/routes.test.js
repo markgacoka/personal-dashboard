@@ -3,7 +3,7 @@
  *
  * Four layers:
  *   1. Unit tests — pure helper functions (no I/O, no mocking needed)
- *   2. Frontend logic tests — functions mirrored from index.html
+ *   2. (Frontend helpers are tested in web/ with Vitest: cd web && npm test)
  *   3. Smoke tests — HTTP calls to the live deployed API
  *   4. DB integration tests — real writes against the live database via the
  *      actual Fastify routes, always cleaned up. Only runs where DATABASE_URL
@@ -27,99 +27,7 @@ import { boundTrack, mergePositions, isOnGround, scoreFaCandidate, scoreFr24Cand
 import { normalizeFr24Positions } from '../services/flightTrack.js';
 import { parseMesonetCsv, closestTo } from '../services/mesonet.js';
 
-// Frontend helpers, loaded from the file the browser runs (no copies).
-const frontend = (() => {
-  const ctx = vm.createContext({});
-  vm.runInContext(readFileSync(new URL('../../../public/js/helpers.js', import.meta.url), 'utf8') +
-    '\n;globalThis.__exports = { fmtDist, fmtTime, fmtPace, normSport, fmtHrs, routeLabel, computeCurrency };', ctx);
-  return ctx.__exports;
-})();
-const { fmtDist, fmtTime, fmtPace, normSport, fmtHrs, routeLabel, computeCurrency } = frontend;
-
 // ─── Unit tests: activity aggregation ────────────────────────────────────────
-
-describe('fmtDist — distance formatting', () => {
-  test('null/zero returns em dash', () => {
-    assert.equal(fmtDist(0),   '—');
-    assert.equal(fmtDist(null),'—');
-  });
-  test('marathon distance in miles', () => {
-    const result = fmtDist(42195);
-    assert.match(result, /26\.\d+ mi/);
-  });
-  test('very short distance falls back to metres', () => {
-    assert.equal(fmtDist(10), '10 m');
-  });
-  test('5 km is ~3.11 mi', () => {
-    const result = fmtDist(5000);
-    assert.match(result, /3\.1\d mi/);
-  });
-});
-
-describe('fmtTime — duration formatting', () => {
-  test('null/zero returns em dash', () => {
-    assert.equal(fmtTime(0),   '—');
-    assert.equal(fmtTime(null),'—');
-  });
-  test('sub-minute seconds only', () => {
-    assert.equal(fmtTime(45), '45s');
-  });
-  test('minutes and seconds', () => {
-    assert.equal(fmtTime(90), '1m 30s');
-  });
-  test('hours and minutes', () => {
-    assert.equal(fmtTime(3660), '1h 1m');
-  });
-  test('four hours', () => {
-    assert.equal(fmtTime(14400), '4h 0m');
-  });
-});
-
-describe('fmtPace — pace formatting', () => {
-  test('null/zero returns em dash', () => {
-    assert.equal(fmtPace(0),   '—');
-    assert.equal(fmtPace(null),'—');
-  });
-  test('8 min/mi pace (3.355 m/s)', () => {
-    const result = fmtPace(3.355);
-    assert.match(result, /7:\d\d\/mi/);
-  });
-  test('6 min/mi pace (4.47 m/s)', () => {
-    const result = fmtPace(4.47);
-    assert.match(result, /6:\d\d\/mi/);
-  });
-});
-
-describe('normSport — sport classification', () => {
-  test('running variants', () => {
-    assert.equal(normSport('running'),          'running');
-    assert.equal(normSport('treadmill_running'),'running');
-    assert.equal(normSport('trail_running'),    'running');
-  });
-  test('cycling variants', () => {
-    assert.equal(normSport('cycling'),  'cycling');
-    assert.equal(normSport('bike'),     'cycling');
-    assert.equal(normSport('road_bike'),'cycling');
-  });
-  test('swimming', () => {
-    assert.equal(normSport('swimming'), 'swimming');
-    assert.equal(normSport('lap_swimming'), 'swimming');
-  });
-  test('rowing', () => {
-    assert.equal(normSport('rowing'),         'rowing');
-    assert.equal(normSport('indoor_rowing'),  'rowing');
-  });
-  test('newer categories', () => {
-    assert.equal(normSport('yoga'),          'yoga');
-    assert.equal(normSport('strength_training'), 'strength');
-    assert.equal(normSport('hiking'),        'hiking');
-  });
-  test('fallback to other', () => {
-    assert.equal(normSport('bogus_activity'), 'other');
-    assert.equal(normSport(''),          'other');
-    assert.equal(normSport(null),        'other');
-  });
-});
 
 describe('aggregate — weekly stats aggregation', () => {
   const fixtures = [
@@ -176,43 +84,6 @@ describe('filterFrom — date filtering', () => {
 });
 
 // ─── Unit tests: flight log formatting ───────────────────────────────────────
-
-describe('fmtHrs — flight hours formatting', () => {
-  test('zero/null returns em dash', () => {
-    assert.equal(fmtHrs(0),    '—');
-    assert.equal(fmtHrs(null), '—');
-  });
-  test('1.5 hours formats correctly', () => {
-    assert.equal(fmtHrs(1.5), '1.5h');
-  });
-  test('string coercion works', () => {
-    assert.equal(fmtHrs('3.2'), '3.2h');
-  });
-  test('rounds to one decimal', () => {
-    assert.equal(fmtHrs(1.05), '1.1h');
-  });
-});
-
-describe('routeLabel — flight route formatting', () => {
-  test('direct flight with no via', () => {
-    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KLVK' }, via: [] };
-    assert.equal(routeLabel(f), 'KSQL → KLVK');
-  });
-  test('flight with via stops', () => {
-    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KSQL' }, via: ['KLVK', 'KRHV'] };
-    assert.equal(routeLabel(f), 'KSQL → KLVK → KRHV → KSQL');
-  });
-  test('local pattern (same dep/arr)', () => {
-    const f = { departure: { icao: 'KSQL' }, arrival: { icao: 'KSQL' }, via: [] };
-    assert.equal(routeLabel(f), 'KSQL → KSQL');
-  });
-  test('falls back to departure_icao string', () => {
-    const f = { departure_icao: 'KPAO', arrival_icao: 'KRHV', via: [] };
-    assert.equal(routeLabel(f), 'KPAO → KRHV');
-  });
-});
-
-// ─── Unit tests: Gmail schedule parsing ──────────────────────────────────────
 
 describe('parsePacificToUnix — Pacific Time → UTC Unix', () => {
   // Aug 6, 2026 4:00 PM PDT (UTC-7) = Aug 6 23:00 UTC
@@ -346,75 +217,6 @@ describe('parseScheduleBody — schedule email field extraction', () => {
     const body = 'Pilot: Mbui, Gac=\noka\nResource: 213AN\nStart: 8/6/2026 4:00 PM\nEnd: 8/6/2026 6:30 PM';
     const fields = parseScheduleBody(body);
     assert.equal(fields.pilot, 'Mbui, Gacoka');
-  });
-});
-
-// ─── Unit tests: FAA currency (public/js/helpers.js computeCurrency) ─────────
-
-describe('computeCurrency — §61.57 / §61.56', () => {
-  const asOf = new Date('2026-09-08T12:00:00').getTime();
-  const flight = (date, extra = {}) => ({ date, approaches: [], ...extra });
-
-  test('recent day T/O and full-stop landings → day VFR current', () => {
-    const c = computeCurrency([flight('2026-08-26T00:00:00.000Z', { day_takeoffs: 4, day_landings_full_stop: 4 })], asOf);
-    assert.equal(c.day.current, true);
-    assert.equal(c.day.to, 4);
-    assert.equal(c.day.lnd, 4);
-  });
-
-  test('ISO timestamps and date-only strings are the same calendar day', () => {
-    const a = computeCurrency([flight('2026-08-26T00:00:00.000Z', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
-    const b = computeCurrency([flight('2026-08-26', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
-    assert.deepEqual(a.day, b.day);
-  });
-
-  test('falls back to the generic takeoffs/landings columns', () => {
-    const c = computeCurrency([flight('2026-08-26', { takeoffs: 3, landings: 3 })], asOf);
-    assert.equal(c.day.current, true);
-  });
-
-  test('landings older than 90 days do not count', () => {
-    const c = computeCurrency([flight('2026-06-07', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
-    assert.equal(c.day.current, false);
-  });
-
-  test('89 days ago still counts', () => {
-    const d = new Date(asOf); d.setDate(d.getDate() - 89);
-    const c = computeCurrency([flight(d.toISOString(), { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
-    assert.equal(c.day.current, true);
-  });
-
-  test('two of each is not enough', () => {
-    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 2, day_landings_full_stop: 2 })], asOf);
-    assert.equal(c.day.current, false);
-  });
-
-  test('days until lapse counts from the operation that completes 3 + 3', () => {
-    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 3, day_landings_full_stop: 3 })], asOf);
-    // Aug 26 + 90 days = Nov 24; from Sep 8 that's 77 days.
-    assert.equal(c.day.daysLeft, 77);
-  });
-
-  test('night currency uses night columns only', () => {
-    const c = computeCurrency([flight('2026-08-26', { day_takeoffs: 5, day_landings_full_stop: 5, night_takeoffs: 3, night_landings_full_stop: 3 })], asOf);
-    assert.equal(c.night.current, true);
-    assert.equal(c.night.to, 3);
-  });
-
-  test('6 approaches in 6 months → instrument current; older ones are grace', () => {
-    const six = Array.from({ length: 6 }, () => ({ approach_type: 'RNAV' }));
-    assert.equal(computeCurrency([flight('2026-08-01', { approaches: six })], asOf).ifr.current, true);
-    const old = computeCurrency([flight('2026-01-15', { approaches: six })], asOf).ifr;
-    assert.equal(old.current, false);
-    assert.equal(old.grace, true);
-  });
-
-  test('flight review within 24 months', () => {
-    const c = computeCurrency([flight('2025-09-10', { flight_review: true })], asOf);
-    assert.equal(c.bfr.current, true);
-    assert.ok(c.bfr.daysLeft > 0);
-    assert.equal(computeCurrency([flight('2024-01-01', { flight_review: true })], asOf).bfr.current, false);
-    assert.equal(computeCurrency([], asOf).bfr.daysLeft, null);
   });
 });
 
@@ -696,7 +498,7 @@ describe('Live security checks (signed out)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1
 
   test('sign-in page is public; the dashboard redirects to it', async () => {
     assert.equal((await raw('/login')).status, 200);
-    for (const path of ['/', '/index.html', '/classic', '/js/core.js', '/some/deep/link']) {
+    for (const path of ['/', '/index.html', '/assets/index.js', '/flying/12', '/some/deep/link']) {
       const r = await raw(path);
       assert.equal(r.status, 302, path);
       assert.match(r.headers.get('location'), /\/login\?next=/, path);
@@ -771,14 +573,6 @@ describe('Live API smoke tests (signed in)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1'
     assert.ok(html.includes('Gacoka'), 'page title');
     assert.ok(html.includes('id="root"'), 'React mount point');
     assert.match(html, /\/assets\/index-[\w-]+\.js/, 'hashed app bundle');
-  });
-
-  test('Classic UI stays reachable at /classic', async () => {
-    const r = await fetch(BASE + '/classic', { signal: AbortSignal.timeout(15000) });
-    assert.equal(r.status, 200);
-    const html = await r.text();
-    assert.ok(html.includes('chart.js'), 'should reference Chart.js');
-    assert.ok(html.includes('maplibre-gl'), 'should reference MapLibre GL');
   });
 
   // ── Flight log endpoints ───────────────────────────────────────────────────

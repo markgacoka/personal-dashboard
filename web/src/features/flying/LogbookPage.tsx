@@ -136,7 +136,7 @@ function MonthlyHours({ flights }: { flights: Flight[] }) {
   return (
     <div>
       <div className="h-44"><ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 4, right: 0, left: -18, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid {...gridProps} />
           <XAxis dataKey="month" {...axisProps} tickFormatter={mlabel} />
           <YAxis {...axisProps} width={44} tickFormatter={v => `${v}h`} />

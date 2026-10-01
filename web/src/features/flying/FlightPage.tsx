@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, CalendarClock, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
@@ -8,8 +9,9 @@ import { EmptyState, Skeleton, Switch } from '@/components/ui/misc'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { Stat, DL } from '@/components/data/stat'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
-import { useFlights, useHistoricMetar, useNiceAir, useRegistry, useTrack, useTrackStats } from '@/lib/queries'
+import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats } from '@/lib/queries'
 import { get } from '@/lib/api'
+import { decodeMetar } from '@/lib/weather'
 import { calDate, hours } from '@/lib/format'
 import { route, trainingLabel, isSolo } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
@@ -34,6 +36,12 @@ export default function FlightPage() {
   const setEdit = (o: boolean) => setParams(p => { if (o) p.set('edit', '1'); else p.delete('edit'); return p }, { replace: true })
 
   const pts = useMemo(() => (track.data || []).filter(p => p.lat != null && p.lon != null), [track.data])
+  const legs = useMemo(() => (f ? metarLegs(f, pts) : []), [f, pts])
+  const metarQs = useQueries({ queries: legs.map(l => ({
+    queryKey: ['metar-at', l.icao, l.when], staleTime: Infinity, retry: false,
+    queryFn: () => get<{ metar: string; valid?: string }>(`/api/metar?station=${encodeURIComponent(l.icao)}&time=${encodeURIComponent(l.when)}`).catch(() => null),
+  })) })
+  const metars = legs.map((l, i) => ({ ...l, data: metarQs[i]?.data ?? null, loading: !!metarQs[i]?.isLoading }))
   const [idx, setIdx] = useState(0)
   useEffect(() => setIdx(0), [id])
 
@@ -91,7 +99,7 @@ export default function FlightPage() {
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8">
           <Card className="overflow-hidden">
-            <FlightMap stops={stops} pts={pts} idx={idx} loading={f.has_track && track.isLoading} />
+            <FlightMap stops={stops} pts={pts} idx={idx} loading={f.has_track && (track.isLoading || !track.data)} metars={metars} />
             {pts.length >= 2 && <TrackPlayer pts={pts} idx={idx} setIdx={setIdx} />}
             {!f.has_track && <div className="border-t border-border px-5 py-3 text-sm text-fg-3">No GPS track for this flight — the map shows the planned route between airports.</div>}
           </Card>
@@ -101,7 +109,7 @@ export default function FlightPage() {
         <div className="space-y-5 xl:col-span-4">
           <AircraftCard f={f} />
           <ScheduleCard f={f} />
-          <WeatherCard f={f} stops={stops} pts={pts} />
+          <WeatherCard metars={metars} />
         </div>
       </div>
       <FlightFormDialog open={editOpen} onOpenChange={setEdit} flight={editOpen ? f : null} />
@@ -112,7 +120,9 @@ export default function FlightPage() {
 // ── Map ──────────────────────────────────────────────────────────────────────
 const PLANE_SVG = (color: string) => `<svg viewBox="0 0 32 32" width="30" height="30"><g transform="translate(16 16)" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))"><path d="M0-13c1 2 1.7 7 1.7 13S1 10 0 13c-1-3-1.7-7-1.7-13S-1-11 0-13Z" fill="${color}" stroke="#fff" stroke-width=".8"/><path d="M-1.5 0-14 6-13.4 7.6-1.5 2.4Z M1.5 0 14 6 13.4 7.6 1.5 2.4Z M-1.2 8.6-7 11.6-6.7 12.8-1.2 10.2Z M1.2 8.6 7 11.6 6.7 12.8 1.2 10.2Z" fill="${color}" stroke="#fff" stroke-width=".6"/></g></svg>`
 
-function FlightMap({ stops, pts, idx, loading }: { stops: Airport[]; pts: TrackPoint[]; idx: number; loading: boolean }) {
+function FlightMap({ stops, pts, idx, loading, metars }: { stops: Airport[]; pts: TrackPoint[]; idx: number; loading: boolean; metars: LegMetar[] }) {
+  const metarsRef = useRef(metars)
+  metarsRef.current = metars
   const mapRef = useRef<maplibregl.Map | null>(null)
   const planeRef = useRef<{ marker: maplibregl.Marker; el: HTMLDivElement } | null>(null)
   const [layers, setLayers] = useState({ satellite: false, airspace: false, airports: false })
@@ -178,8 +188,16 @@ function FlightMap({ stops, pts, idx, loading }: { stops: Airport[]; pts: TrackP
           if (a.lon == null || seen.has(a.icao)) continue
           seen.add(a.icao)
           const el = document.createElement('div')
-          el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default"><span style="width:12px;height:12px;border-radius:50%;background:${accent};border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></span><span style="font:600 11px var(--font-mono);color:var(--fg);background:var(--card);border:1px solid var(--border);border-radius:4px;padding:0 4px">${a.icao}</span></div>`
-          new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, -6] }).setLngLat([a.lon, a.lat!]).setPopup(new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(`<b style="font-family:var(--font-mono)">${a.icao}</b><div style="font-size:12px;color:var(--fg-3)">${a.name || ''}${a.city ? ` · ${a.city}` : ''}</div>${a.elevation_ft != null ? `<div style="font-size:12px">${a.elevation_ft} ft elevation</div>` : ''}`)).addTo(map)
+          el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer"><span style="width:14px;height:14px;border-radius:50%;background:${accent};border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></span><span style="font:600 11px var(--font-sans);color:var(--fg);background:var(--card);border:1px solid var(--border);border-radius:4px;padding:0 4px">${a.icao}</span></div>`
+          new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, -7] }).setLngLat([a.lon, a.lat!]).addTo(map)
+          // Weather at the time of the flight, on hover (or tap).
+          const popup = new maplibregl.Popup({ offset: 14, closeButton: false, closeOnClick: false, maxWidth: '340px' })
+          let pinned = false
+          const show = () => popup.setLngLat([a.lon!, a.lat!]).setHTML(airportPopupHtml(a, metarsRef.current.filter(m => m.icao === a.icao))).addTo(map)
+          el.addEventListener('mouseenter', show)
+          el.addEventListener('mouseleave', () => { if (!pinned) popup.remove() })
+          el.addEventListener('click', e => { e.stopPropagation(); pinned = !pinned; if (pinned) show(); else popup.remove() })
+          map.on('click', () => { pinned = false; popup.remove() })
         }
         if (pts.length >= 2) {
           const outer = document.createElement('div')
@@ -426,28 +444,52 @@ function ScheduleCard({ f }: { f: Flight }) {
 }
 
 // ── METARs at each airport around the time of the flight ─────────────────────
-function WeatherCard({ f, stops, pts }: { f: Flight; stops: Airport[]; pts: TrackPoint[] }) {
+interface LegMetar { icao: string; when: string; leg: string; data: { metar: string; valid?: string } | null; loading: boolean }
+
+// Departure at the first track point (or block-out), arrival at the last; via stops in between.
+function metarLegs(f: Flight, pts: TrackPoint[]) {
+  const stops = [f.departure, ...(f.via_airports || []), f.arrival].filter(a => a?.icao)
   const base = f.date.slice(0, 10)
   const dep = pts[0]?.ts || f.time_out || `${base}T19:00:00Z`
   const arr = pts[pts.length - 1]?.ts || f.time_in || `${base}T21:00:00Z`
-  const legs = stops.map((a, i) => {
+  return stops.map((a, i) => {
     const t = i === 0 ? dep : i === stops.length - 1 ? arr : new Date(+new Date(dep) + (+new Date(arr) - +new Date(dep)) * (i / (stops.length - 1))).toISOString()
     return { icao: a.icao, when: new Date(t).toISOString(), leg: i === 0 ? 'Departure' : i === stops.length - 1 ? 'Arrival' : 'Via' }
   })
+}
+
+const escHtml = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+function airportPopupHtml(a: Airport, obs: LegMetar[]) {
+  const head = `<div style="font-weight:600">${escHtml(a.icao)}</div><div style="font-size:12px;color:var(--fg-3)">${escHtml(a.name || '')}${a.elevation_ft != null ? ` · ${a.elevation_ft} ft` : ''}</div>`
+  const body = obs.map(o => {
+    if (o.loading) return `<div style="margin-top:8px;font-size:12px;color:var(--fg-3)">${o.leg} · loading weather…</div>`
+    if (!o.data?.metar) return `<div style="margin-top:8px;font-size:12px;color:var(--fg-3)">${o.leg} · no METAR available</div>`
+    const d = decodeMetar(o.data.metar)
+    const rows = d.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px"><span style="color:var(--fg-3)">${k}</span><span>${escHtml(v)}</span></div>`).join('')
+    return `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--fg-2);margin-bottom:4px">${o.leg}${o.data.valid ? ` · ${utc(o.data.valid)}` : ''}</div>${rows}<code style="display:block;margin-top:6px;font:11px/1.45 var(--font-mono);color:var(--fg-2);word-break:break-word">${escHtml(o.data.metar)}</code></div>`
+  }).join('')
+  return head + (body || '<div style="margin-top:8px;font-size:12px;color:var(--fg-3)">No weather for this stop</div>')
+}
+
+function WeatherCard({ metars }: { metars: LegMetar[] }) {
   return (
     <Card>
-      <CardHeader icon={<CloudSun />} title="Weather at the time" description="Nearest METAR to each leg" />
-      <CardBody className="space-y-3">{legs.map((l, i) => <MetarRow key={i} {...l} />)}</CardBody>
+      <CardHeader icon={<CloudSun />} title="Weather at the time" description="Nearest METAR to each leg · also shown when you hover an airport on the map" />
+      <CardBody className="space-y-4">{metars.map((m, i) => <MetarRow key={i} m={m} />)}</CardBody>
     </Card>
   )
 }
 
-function MetarRow({ icao, when, leg }: { icao: string; when: string; leg: string }) {
-  const { data, isLoading } = useHistoricMetar(icao, when)
+function MetarRow({ m }: { m: LegMetar }) {
+  const d = m.data?.metar ? decodeMetar(m.data.metar) : []
   return (
     <div>
-      <div className="mb-1 flex items-baseline justify-between text-sm"><span><span className="text-fg-3">{leg}</span> <span className="num font-medium">{icao}</span></span>{data?.valid && <span className="num text-xs text-fg-3">{utc(data.valid)}</span>}</div>
-      {isLoading ? <Skeleton className="h-10" /> : data?.metar ? <code className="block break-words rounded-md bg-sunken px-2.5 py-2 font-mono text-xs leading-relaxed text-fg-2 ring-1 ring-inset ring-border">{data.metar}</code> : <p className="text-sm text-fg-3">No METAR available.</p>}
+      <div className="mb-1.5 flex items-baseline justify-between text-sm"><span><span className="text-fg-3">{m.leg}</span> <span className="font-medium">{m.icao}</span></span>{m.data?.valid && <span className="num text-xs text-fg-3">{utc(m.data.valid)}</span>}</div>
+      {m.loading ? <Skeleton className="h-10" /> : m.data?.metar ? <>
+        {d.length > 0 && <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-1">{d.map(([k, v]) => <div key={k} className="flex justify-between gap-2 text-xs"><span className="text-fg-3">{k}</span><span className="num text-right">{v}</span></div>)}</div>}
+        <code className="block break-words rounded-md bg-sunken px-2.5 py-2 font-mono text-xs leading-relaxed text-fg-2 ring-1 ring-inset ring-border">{m.data.metar}</code>
+      </> : <p className="text-sm text-fg-3">No METAR available.</p>}
     </div>
   )
 }

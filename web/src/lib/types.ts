@@ -253,7 +253,7 @@ export interface Holding {
 export interface PlaidItem { id: number; item_id: string; institution: string | null; created_at: string }
 
 // ── Chess ────────────────────────────────────────────────────────────────────
-export interface ChessMonth { count: number; win: number; loss: number; draw: number; ratingStart: number | null; ratingEnd: number | null }
+export interface ChessMonth { month?: string; count: number; win: number; loss: number; draw: number; ratingStart: number | null; ratingEnd: number | null }
 export interface ChessGame { ts: number; rating: number; result: 'W' | 'L' | 'D'; color: 'w' | 'b'; opponent: string; oppRating: number; url: string }
 export interface ChessTimeClass {
   current: number | null; best: number | null

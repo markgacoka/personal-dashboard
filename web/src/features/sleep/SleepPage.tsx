@@ -162,7 +162,7 @@ function DurationChart({ rows }: { rows: SleepTrendRow[] }) {
   const Tip = makeTip<{ date: string; h: number | null }>({ title: r => calDate(r.date, { weekday: 'short', month: 'short', day: 'numeric' }), rows: r => [{ color: 'var(--c1)', label: 'Asleep', value: r.h != null ? hm(r.h * 3600)! : 'No data' }] })
   return (
     <div className="h-56"><ResponsiveContainer>
-      <BarChart data={data} margin={{ top: 4, right: 0, left: -18, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
         <CartesianGrid {...gridProps} />
         <ReferenceArea y1={7} y2={9} fill="var(--good)" fillOpacity={0.07} />
         <XAxis dataKey="date" {...axisProps} tickFormatter={label} minTickGap={24} />
@@ -179,7 +179,7 @@ function ScoreChart({ rows }: { rows: SleepTrendRow[] }) {
   const Tip = makeTip<{ date: string; score: number | null }>({ title: r => calDate(r.date, { weekday: 'short', month: 'short', day: 'numeric' }), rows: r => [{ color: 'var(--c7)', label: 'Score', value: r.score ?? 'No data' }] })
   return (
     <div className="h-56"><ResponsiveContainer>
-      <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid {...gridProps} />
         <XAxis dataKey="date" {...axisProps} tickFormatter={label} minTickGap={24} />
         <YAxis {...axisProps} width={44} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} />
@@ -200,7 +200,7 @@ function StageChart({ rows }: { rows: SleepTrendRow[] }) {
   return (
     <div>
       <div className="h-64"><ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 4, right: 0, left: -18, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid {...gridProps} />
           <XAxis dataKey="date" {...axisProps} tickFormatter={label} minTickGap={24} />
           <YAxis {...axisProps} width={44} tickFormatter={v => `${v}h`} />

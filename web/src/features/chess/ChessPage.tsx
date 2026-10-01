@@ -14,7 +14,8 @@ import type { ChessGame, ChessMonth, ChessTimeClass } from '@/lib/types'
 
 type TC = 'rapid' | 'blitz'
 const RESULT = { W: { label: 'Win', color: 'var(--good)', tone: 'good' as const }, L: { label: 'Loss', color: 'var(--bad)', tone: 'bad' as const }, D: { label: 'Draw', color: 'var(--fg-3)', tone: 'neutral' as const } }
-const monthName = (offset: number) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - offset); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
+// Month labels come from the API (Pacific calendar) so they always match the counts.
+const monthName = (m: ChessMonth, offset: number) => { if (m.month) { const [y, mo] = m.month.split('-').map(Number); return new Date(y, mo - 1, 15).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) } const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - offset); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }
 
 export default function ChessPage() {
   const { data: c, isLoading, isError, refetch } = useChess()
@@ -56,12 +57,12 @@ export default function ChessPage() {
       <div className="mt-5 grid items-start gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-5">
           <CardHeader title="Month by month" />
-          <CardBody className="space-y-4">{[[0, d.thisMonth], [1, d.lastMonth]].map(([o, m]) => <MonthRow key={o as number} name={monthName(o as number)} m={m as ChessMonth} />)}</CardBody>
+          <CardBody className="space-y-4">{[[0, d.thisMonth], [1, d.lastMonth]].map(([o, m]) => <MonthRow key={o as number} name={monthName(m as ChessMonth, o as number)} m={m as ChessMonth} />)}</CardBody>
         </Card>
         <Card className="xl:col-span-7">
-          <CardHeader icon={<Swords />} title="Recent games" description={`${d.recent.length} ${tc} games this month`} />
+          <CardHeader icon={<Swords />} title="Recent games" description={`Last ${d.recent.length} ${tc} games`} />
           <CardBody className="px-3">
-            {!d.recent.length ? <p className="px-2 text-sm text-fg-3">No {tc} games this month.</p> : (
+            {!d.recent.length ? <p className="px-2 text-sm text-fg-3">No {tc} games in the last two months.</p> : (
               <ul>
                 {[...d.recent].reverse().map(g => <GameRow key={g.url + g.ts} g={g} />)}
               </ul>
@@ -93,9 +94,9 @@ function RatingCard({ d, label }: { d: ChessTimeClass; label: string }) {
         <div className="ml-auto flex gap-3 pb-1.5 text-xs text-fg-3">{Object.entries(RESULT).map(([k, r]) => <span key={k} className="flex items-center gap-1.5"><span className="size-2.5 rounded-full" style={{ background: r.color }} />{r.label}</span>)}</div>
       </div>
       <div className="mt-5 h-64">
-        {data.length < 2 ? <div className="grid h-full place-items-center text-sm text-fg-3">Not enough games this month to plot a trend</div> : (
+        {data.length < 2 ? <div className="grid h-full place-items-center text-sm text-fg-3">Not enough recent games to plot a trend</div> : (
           <ResponsiveContainer>
-            <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+            <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="i" {...axisProps} tickFormatter={i => new Date((data[i]?.ts || 0) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} minTickGap={32} />
               <YAxis {...axisProps} width={48} domain={[Math.floor((min - 15) / 10) * 10, Math.ceil((max + 15) / 10) * 10]} allowDecimals={false} />

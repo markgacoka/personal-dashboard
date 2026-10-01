@@ -131,3 +131,20 @@ export function homeAirport() {
 export function setHomeAirport(icao: string) {
   try { localStorage.setItem('home-airport', icao.toUpperCase()) } catch { /* per-browser */ }
 }
+
+// A readable summary of a raw METAR: wind, visibility, sky, temperature, altimeter.
+export function decodeMetar(raw: string): [string, string][] {
+  const out: [string, string][] = []
+  const w = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/)
+  if (w) out.push(['Wind', w[2] === '00' ? 'Calm' : `${w[1] === 'VRB' ? 'Variable' : w[1] + '°'} ${+w[2]} kt${w[3] ? ` G${+w[3]}` : ''}`])
+  const v = raw.match(/\s(M?\d+(?:\/\d)?|\d \d\/\d)SM\b/)
+  if (v) out.push(['Visibility', `${v[1].replace('M', '<')} SM`])
+  const sky = [...raw.matchAll(/\b(FEW|SCT|BKN|OVC|VV)(\d{3})/g)].map(m => `${({ FEW: 'Few', SCT: 'Scattered', BKN: 'Broken', OVC: 'Overcast', VV: 'Vert. vis' } as Record<string, string>)[m[1]]} ${+m[2] * 100}`)
+  if (sky.length) out.push(['Sky', sky.slice(0, 2).join(', ')])
+  else if (/\b(SKC|CLR|CAVOK|NCD|NSC)\b/.test(raw)) out.push(['Sky', 'Clear'])
+  const t = raw.match(/\s(M?\d{2})\/(M?\d{2})?\s/)
+  if (t) { const c = (x: string) => (x.startsWith('M') ? -+x.slice(1) : +x); out.push(['Temp / dew', `${c(t[1])}° / ${t[2] ? c(t[2]) + '°' : '—'} C`]) }
+  const a = raw.match(/\bA(\d{4})\b/)
+  if (a) out.push(['Altimeter', `${(+a[1] / 100).toFixed(2)} inHg`])
+  return out
+}

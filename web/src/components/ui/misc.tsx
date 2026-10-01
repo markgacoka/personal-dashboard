@@ -33,9 +33,10 @@ export function Tooltip({ content, children, side = 'top' }: { content: React.Re
 
 export function Progress({ value, className, tone = 'accent' }: { value: number; className?: string; tone?: 'accent' | 'good' | 'warn' | 'bad' }) {
   const color = { accent: 'bg-accent', good: 'bg-good', warn: 'bg-warn', bad: 'bg-bad' }[tone]
+  const v = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0))
   return (
-    <RProgress.Root value={value} className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-sunken ring-1 ring-inset ring-border', className)}>
-      <RProgress.Indicator className={cn('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    <RProgress.Root value={v} className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-sunken ring-1 ring-inset ring-border', className)}>
+      <RProgress.Indicator className={cn('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${v}%` }} />
     </RProgress.Root>
   )
 }

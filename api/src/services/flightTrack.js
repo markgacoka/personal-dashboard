@@ -176,8 +176,9 @@ export async function refreshFlightTrack(pool, flightId, log) {
     'SELECT ts, on_ground FROM track_log_points WHERE flight_id = $1 ORDER BY ts', [flightId])
   const before = coverage(stored.map(r => ({ ts: r.ts.toISOString(), on_ground: r.on_ground })))
   const after = coverage(found.points)
-  // Ground points count too: a stitch that adds the taxi and stops is better.
-  const better = after.seconds > before.seconds + 60 || (after.seconds >= before.seconds && found.points.length > stored.length)
+  // Better: covers more of the flight, or about as much (sources differ by
+  // seconds at the edges) with more points, ground points (taxi, stops) included.
+  const better = after.seconds > before.seconds + 60 || (after.seconds >= before.seconds - 120 && found.points.length > stored.length)
   let saved = 0
   if (better && after.points) saved = await saveTrackPoints(pool, flightId, found.points, 'opensky', { keepGround: true })
   return { saved, replaced: better && !!after.points, before, after, counts: found.counts, legs: found.legs, pending: found.pending }

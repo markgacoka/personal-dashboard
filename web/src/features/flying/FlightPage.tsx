@@ -363,7 +363,7 @@ function TimelineCard({ id, enabled }: { id: number; enabled: boolean }) {
   if (!enabled) return null
   const t = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   const items = [
-    ...(s?.events || []).map(e => ({ at: e.from, kind: 'event' as const, e })),
+    ...(s?.events || []).map(e => ({ at: e.kind === 'departure' ? e.to : e.from, kind: 'event' as const, e })),
     ...(s?.gaps || []).map(g => ({ at: g.from, kind: 'gap' as const, g })),
   ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   return (
@@ -379,7 +379,8 @@ function TimelineCard({ id, enabled }: { id: number; enabled: boolean }) {
                 <li key={i} className="relative">
                   <span className="absolute -left-[31px] top-0.5 grid size-5 place-items-center rounded-full bg-card ring-1 ring-border"><I className="size-3 text-accent" /></span>
                   <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                    <span className="num font-medium">{t(it.e.from)}{it.e.minutes >= 1 && it.e.kind !== 'departure' && it.e.kind !== 'landing' ? `–${t(it.e.to)}` : ''}</span>
+                    {/* Departure is when it left the ground; the rest, when it arrived. */}
+                    <span className="num font-medium">{t(it.e.kind === 'departure' ? it.e.to : it.e.from)}{it.e.minutes >= 1 && it.e.kind === 'full stop' ? `–${t(it.e.to)}` : ''}</span>
                     <span className="capitalize">{it.e.kind}</span>
                     <span className="font-medium">{it.e.icao}</span>
                     <span className="text-fg-3">{it.e.name}</span>

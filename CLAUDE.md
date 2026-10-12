@@ -50,7 +50,10 @@ https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
 
 ## Flight tracks and NICE AIR auto-logging
 
-Tracks come from free sources only, merged per point (`track_log_points.source`):
+Tracks come from free sources only, stitched into one (`services/stitch.js`:
+per-source outlier removal, best source per moment, missing speed/track/rate
+derived; ground points kept with `on_ground`), each point tagged with its source:
+an owner-uploaded GPS file (GPX/KML/CSV, `POST /api/flights/:id/track-file`),
 every OpenSky leg the aircraft flew in the window (OpenSky splits a flight at
 each landing), adsb.fi and airplanes.live recent traces (about the last 24 h,
 snapshots kept in `ads_traces`), plus adsb.lol's daily archive (`services/adsblol.js`; the UTC

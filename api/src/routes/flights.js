@@ -1,7 +1,10 @@
 import { pool } from '../db/client.js'
 import { syncNiceAirToDB } from '../services/gmail.js'
 import { refreshFlightTrack } from '../services/flightTrack.js'
-import { currentBookings, runAutoLogOnce } from '../services/autolog.js'
+import { currentBookings, runAutoLogOnce, airportsForAnalysis } from '../services/autolog.js'
+import { summarize } from '../services/stitch.js'
+import { storeTrace } from '../services/recentTraces.js'
+import { parseTrackFile } from '../lib/trackFiles.js'
 import { backfillNightTimes, syncSchedulesToTimes } from '../services/schedules.js'
 
 const FLIGHT_SELECT = `
@@ -157,6 +160,31 @@ export default async function flightRoutes(fastify) {
     const r = await refreshFlightTrack(pool, id, fastify.log)
     if (r.error) return reply.status(r.error === 'Flight not found' ? 404 : 422).send({ error: r.error })
     return r
+  })
+
+  // A GPS log the owner recorded (GPX, KML, ForeFlight CSV): stored as the
+  // highest-priority source and stitched with everything else.
+  fastify.post('/api/flights/:id/track-file', { bodyLimit: 25 * 1024 * 1024 }, async (req, reply) => {
+    const id = parseInt(req.params.id)
+    const text = typeof req.body === 'string' ? req.body : Buffer.isBuffer(req.body) ? req.body.toString('utf8') : ''
+    if (!text.trim()) return reply.status(400).send({ error: 'Empty file' })
+    const { format, points } = parseTrackFile(text)
+    if (points.length < 2) return reply.status(422).send({ error: `No timestamped positions found in this ${format} file` })
+    const { rows } = await pool.query('SELECT id FROM flights WHERE id = $1', [id])
+    if (!rows.length) return reply.status(404).send({ error: 'Flight not found' })
+    await storeTrace('upload', `flight:${id}`, points)
+    const r = await refreshFlightTrack(pool, id, fastify.log)
+    return { format, points: points.length, ...r }
+  })
+
+  // What happened on the flight, from its stored (stitched) track.
+  fastify.get('/api/flights/:id/track-summary', async (req) => {
+    const { rows } = await pool.query(
+      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source, on_ground
+       FROM track_log_points WHERE flight_id = $1 ORDER BY ts`, [parseInt(req.params.id)])
+    if (!rows.length) return { sources: [], events: [], gaps: [], complete: false }
+    const points = rows.map(r => ({ ...r, ts: r.ts.toISOString() }))
+    return summarize(points, await airportsForAnalysis(fastify.log))
   })
 
   // NICE AIR auto-logger: what it has done with each booking, and a manual run.

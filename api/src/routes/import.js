@@ -298,7 +298,7 @@ export default async function importRoutes(fastify) {
   // ─── Track log retrieval ─────────────────────────────────────────────────────
   fastify.get('/api/flights/:id/track', async (req, reply) => {
     const { rows } = await pool.query(
-      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source
+      `SELECT ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source, on_ground
        FROM track_log_points WHERE flight_id=$1 ORDER BY ts`,
       [req.params.id]
     )

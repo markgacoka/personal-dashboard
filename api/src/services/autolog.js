@@ -12,6 +12,8 @@
 import { pool } from '../db/client.js'
 import { syncNiceAirToDB } from './gmail.js'
 import { collectTrack, coverage, refreshFlightTrack, saveTrackPoints, searchWindow } from './flightTrack.js'
+import { analyzeTrack, SOURCE_NAME } from './stitch.js'
+import { captureRecent } from './recentTraces.js'
 import { normalizeIcao24 } from './opensky.js'
 import { releaseParts, utcDatesBetween } from './adsblol.js'
 import { usAirportList } from './usAirports.js'
@@ -25,12 +27,6 @@ const SETTLE_MS = 30 * 60 * 1000      // after a booking ends, before looking fo
 const GIVE_UP_MS = 4 * 86_400_000     // stop waiting for evidence after this long
 
 const shortTail = t => (t || '').toUpperCase().replace(/^N/, '')
-const nm = (a, b) => {
-  const R = 3440.065, toR = Math.PI / 180
-  const dLat = (b.lat - a.lat) * toR, dLon = (b.lon - a.lon) * toR
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
-}
 const round1 = h => Math.round(h * 10) / 10
 
 // The latest email per (date, tail) decides a booking's state; a later
@@ -48,57 +44,7 @@ export function currentBookings(rows) {
     .map(r => ({ ...r, key: `${r.date_str}/${shortTail(r.tail)}/${r.start_unix}` }))
 }
 
-export function nearestAirport(p, airports) {
-  let best = null
-  for (const a of airports) {
-    if (a.lat == null || a.lon == null) continue
-    const d = nm(p, a)
-    if (!best || d < best.nm) best = { ...a, nm: d }
-  }
-  return best
-}
-
-// Stops (time spent low, slow and close to an airport), the route they imply,
-// and whether the track starts and ends on the ground at an airport.
-export function analyzeTrack(points, airports) {
-  const pts = points.filter(p => p.lat != null && p.lon != null)
-  if (!pts.length) return null
-  // A stop is an unbroken run of low points at one airport, however long the
-  // aircraft sat there (or the receivers lost it on the ground).
-  const stops = []
-  let open = false
-  for (const p of pts) {
-    const apt = nearestAirport(p, airports)
-    const near = apt && apt.nm <= 2.5
-    const elev = apt?.elevation_ft ?? 0
-    const low = p.on_ground || (p.altitude_ft != null && p.altitude_ft - elev < 700 && (p.groundspeed_kts == null || p.groundspeed_kts < 80))
-    if (!(near && low)) { open = false; continue }
-    const t = Date.parse(p.ts)
-    const last = stops.at(-1)
-    if (open && last.icao === apt.icao) { last.end = t; last.ground ||= !!p.on_ground }
-    else stops.push({ icao: apt.icao, name: apt.name, lat: apt.lat, lon: apt.lon, start: t, end: t, ground: !!p.on_ground })
-    open = true
-  }
-  const t0 = Date.parse(pts[0].ts), t1 = Date.parse(pts.at(-1).ts)
-  const startsAtAirport = !!stops[0] && stops[0].start - t0 < 5 * 60_000
-  const endsAtAirport = !!stops.length && t1 - stops.at(-1).end < 5 * 60_000 && stops.at(-1).start > t0 + 10 * 60_000
-  const moving = pts.filter(p => p.groundspeed_kts == null || p.groundspeed_kts > 5)
-  let distance = 0
-  for (let i = 1; i < pts.length; i++) distance += nm(pts[i - 1], pts[i])
-  const farthest = startsAtAirport ? Math.max(...pts.map(p => nm(stops[0], p))) : 0
-  return {
-    stops,
-    departure: startsAtAirport ? stops[0].icao : null,
-    arrival: endsAtAirport ? stops.at(-1).icao : null,
-    via: stops.slice(startsAtAirport ? 1 : 0, endsAtAirport ? -1 : undefined).map(s => s.icao),
-    landings: stops.length - (startsAtAirport ? 1 : 0),
-    complete: startsAtAirport && endsAtAirport,
-    firstMove: Date.parse((moving[0] || pts[0]).ts),
-    lastMove: Date.parse((moving.at(-1) || pts.at(-1)).ts),
-    distance_nm: Math.round(distance),
-    farthest_nm: Math.round(farthest),
-  }
-}
+export { nearestAirport, analyzeTrack } from './stitch.js'
 
 // "Kim-Cfi, Manjae" → the instructor named "Manjae Kim".
 export function matchInstructor(cfi, instructors) {
@@ -123,8 +69,7 @@ export function planEntry({ booking, analysis, counts, aircraftId, instructor, h
   const farthest = analysis?.farthest_nm || 0
   const xc = farthest > 50 || (via.length > 0 && farthest > 25)
   const dual = !!booking.cfi
-  const names = { opensky: 'OpenSky', adsblol: 'adsb.lol', adsbfi: 'adsb.fi', airplaneslive: 'airplanes.live' }
-  const sources = Object.entries(counts || {}).filter(([, n]) => n).map(([k]) => names[k] || k).join(', ') || 'no ADS-B data'
+  const sources = Object.entries(counts || {}).filter(([, n]) => n).map(([k]) => SOURCE_NAME[k] || k).join(', ') || 'no ADS-B data'
   const remarks = [
     `Auto-logged from the NICE AIR booking ${fmtLocal(booking.start_unix)}–${fmtLocal(booking.end_unix)}${booking.cfi ? ` with ${booking.cfi}` : ''}, and the ADS-B track from ${sources}.`,
     complete
@@ -179,7 +124,7 @@ async function ledger(key, b, status, { flightId = null, detail = null, bump = f
     [key, b.date_str, b.tail, status, flightId, detail])
 }
 
-async function airportsForAnalysis(log) {
+export async function airportsForAnalysis(log) {
   const { rows } = await pool.query('SELECT icao, name, lat, lon, elevation_ft FROM airports')
   const known = new Set(rows.map(r => r.icao))
   const us = await usAirportList(log).catch(() => [])
@@ -206,7 +151,7 @@ async function createEntry(entry, points) {
     const { rows: [{ id }] } = await client.query(
       `INSERT INTO flights (${cols.join(', ')}, foreflight_source) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}, $${cols.length + 1}) RETURNING id`,
       [...cols.map(c => entry[c] ?? null), AUTO_SOURCE])
-    if (points.length) await saveTrackPoints(client, id, points, 'opensky')
+    if (points.length) await saveTrackPoints(client, id, points, 'opensky', { keepGround: true })
     await client.query('COMMIT')
     return id
   } catch (e) {
@@ -233,6 +178,15 @@ export async function runAutoLog({ log, now = Date.now(), syncMail = true } = {}
 
   for (const b of currentBookings(rows)) {
     const endMs = b.end_unix * 1000
+    // In the air (or about to be): snapshot the live maps, whose files only
+    // reach back about an hour, so the whole flight is on record by landing.
+    if (now >= b.start_unix * 1000 - 30 * 60_000 && now <= endMs + 2 * 3600_000) {
+      const ac = await ensureAircraft(b.tail, log).catch(() => null)
+      if (ac?.mode_s_hex) {
+        const n = await captureRecent(normalizeIcao24(ac.mode_s_hex), log)
+        results.push({ booking: b.key, status: 'capturing', points: n })
+      }
+    }
     if (endMs > now - SETTLE_MS) continue
     const prior = byKey.get(b.key)
     if (prior && ['exists', 'no_flight', 'skipped'].includes(prior.status)) continue
@@ -283,15 +237,18 @@ export async function runAutoLog({ log, now = Date.now(), syncMail = true } = {}
 // An auto entry the owner hasn't edited is rebuilt when a better track exists.
 async function upgradeEntry(b, prior, { log, instructors, airports }) {
   const meta = JSON.parse(prior.detail || '{}')
-  if (!meta.pending?.length) return { booking: b.key, status: 'logged', flight_id: prior.flight_id }
+  // New data can still arrive while recent traces reach back to the flight, or
+  // until adsb.lol publishes the days it touched.
+  const recent = Date.now() - b.end_unix * 1000 < 30 * 3600_000
+  if (!meta.pending?.length && !recent) return { booking: b.key, status: 'logged', flight_id: prior.flight_id }
   const { rows: [f] } = await pool.query(
     `SELECT f.*, ac.mode_s_hex FROM flights f JOIN aircraft ac ON ac.id = f.aircraft_id WHERE f.id = $1`, [prior.flight_id])
   const pendingNow = []
-  for (const d of meta.pending) if (!(await releaseParts(d).catch(() => null))) pendingNow.push(d)
-  if (pendingNow.length === meta.pending.length) return { booking: b.key, status: 'logged', flight_id: f.id, pending: pendingNow }
+  for (const d of meta.pending || []) if (!(await releaseParts(d).catch(() => null))) pendingNow.push(d)
+  if (!recent && pendingNow.length === meta.pending.length) return { booking: b.key, status: 'logged', flight_id: f.id, pending: pendingNow }
 
   const { fromMs, toMs } = searchWindow({ timeOut: new Date(b.start_unix * 1000).toISOString(), timeIn: new Date(b.end_unix * 1000).toISOString() })
-  const found = await collectTrack({ hex: normalizeIcao24(f.mode_s_hex), fromMs, toMs, log })
+  const found = await collectTrack({ hex: normalizeIcao24(f.mode_s_hex), flightId: f.id, fromMs, toMs, log })
   const better = coverage(found.points).seconds > (meta.coverage?.seconds || 0) + 60
   const untouched = signature(f) === meta.signature
   let rebuilt = false
@@ -305,7 +262,7 @@ async function upgradeEntry(b, prior, { log, instructors, airports }) {
       meta.signature = signature(entry)
       rebuilt = true
     }
-    await saveTrackPoints(pool, f.id, found.points, 'opensky')
+    await saveTrackPoints(pool, f.id, found.points, 'opensky', { keepGround: true })
     meta.coverage = coverage(found.points)
   }
   meta.pending = found.pending
@@ -331,7 +288,7 @@ async function refreshRecentTracks({ log, now }) {
     const missing = days.filter(d => !cached.some(c => c.utc_date === d))
     // Community recent traces only reach back about a day: capture them once.
     const { rows: [{ n: captured }] } = await pool.query('SELECT count(*)::int AS n FROM ads_traces WHERE icao24 = $1 AND starts_at <= $3 AND ends_at >= $2', [f.mode_s_hex, new Date(fromMs), new Date(toMs)])
-    const recentDue = !captured && toMs > now - 30 * 3600_000
+    const recentDue = toMs > now - 30 * 3600_000 && (!captured || toMs > now - 6 * 3600_000)
     const published = []
     for (const d of missing) if (await releaseParts(d).catch(() => null)) published.push(d)
     if (!published.length && !recentDue) continue

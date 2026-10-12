@@ -6,9 +6,10 @@
 import { fetchOpenSkyTrack, normalizeIcao24, openSkyHeaders } from './opensky.js'
 import { getAdsbLolTrace, normalizeAdsbLol, utcDatesBetween } from './adsblol.js'
 import { recentTracePoints } from './recentTraces.js'
+import { stitch } from './stitch.js'
 import { loadSchedules, scheduleWindow } from './schedules.js'
 
-const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol', 'adsbfi', 'airplaneslive']
+const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol', 'adsbfi', 'airplaneslive', 'theairtraffic', 'adsbexchange', 'upload']
 
 // FR24 v1 /flight-tracks positions: ISO timestamp, alt ft, gspeed kt, vspeed fpm.
 export function normalizeFr24Positions(positions) {
@@ -29,22 +30,24 @@ export function normalizeFr24Positions(positions) {
 // (or each point's own `source`, for tracks merged from several providers).
 // One statement (DELETE in a CTE + INSERT), so readers never see a half-written
 // track. `db` is anything with pg's query(): the pool or a transaction client.
-export async function saveTrackPoints(db, flightId, points, source) {
+// `keepGround` keeps taxi and stop points too (stitched tracks), flagged on_ground.
+export async function saveTrackPoints(db, flightId, points, source, { keepGround = false } = {}) {
   if (!TRACK_SOURCES.includes(source)) {
     throw new Error(`saveTrackPoints: invalid source '${source}' (must be one of ${TRACK_SOURCES.join(', ')})`)
   }
-  const airborne = points.filter(p => p.lat != null && p.lon != null && !p.on_ground)
+  const airborne = points.filter(p => p.lat != null && p.lon != null && (keepGround || !p.on_ground))
   const col = k => airborne.map(p => p[k] ?? null)
   await db.query(
     `WITH cleared AS (DELETE FROM track_log_points WHERE flight_id = $1)
      INSERT INTO track_log_points
-       (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source)
-     SELECT $1, t.ts, t.lat, t.lon, t.alt, t.gs, t.trk, t.vs, t.src
-     FROM unnest($2::timestamptz[], $3::float8[], $4::float8[], $5::float8[], $6::float8[], $7::float8[], $8::float8[], $9::text[])
-       AS t(ts, lat, lon, alt, gs, trk, vs, src)`,
+       (flight_id, ts, lat, lon, altitude_ft, groundspeed_kts, track_deg, vertical_speed_fpm, source, on_ground)
+     SELECT $1, t.ts, t.lat, t.lon, t.alt, t.gs, t.trk, t.vs, t.src, t.gnd
+     FROM unnest($2::timestamptz[], $3::float8[], $4::float8[], $5::float8[], $6::float8[], $7::float8[], $8::float8[], $9::text[], $10::boolean[])
+       AS t(ts, lat, lon, alt, gs, trk, vs, src, gnd)`,
     [flightId, col('ts'), col('lat'), col('lon'), col('altitude_ft'),
      col('groundspeed_kts'), col('track_deg'), col('vertical_speed_fpm'),
-     airborne.map(p => (TRACK_SOURCES.includes(p.source) ? p.source : source))]
+     airborne.map(p => (TRACK_SOURCES.includes(p.source) ? p.source : source)),
+     airborne.map(p => !!p.on_ground)]
   )
   return airborne.length
 }
@@ -96,25 +99,7 @@ export async function openSkyTrack(hex, fromMs, toMs, log) {
   return { legs: legs.map(l => ({ from: l.estDepartureAirport, to: l.estArrivalAirport, firstSeen: l.firstSeen, lastSeen: l.lastSeen })), points }
 }
 
-// One time-ordered track from several providers. Points closer than 3 s to an
-// already kept point are dropped; readsb sources (adsb.lol, adsb.fi,
-// airplanes.live) are kept first because they carry ground speed, vertical
-// rate and ground state, which OpenSky's track rows don't.
-const RANK = { adsblol: 0, adsbfi: 1, airplaneslive: 2, opensky: 3 }
-export function mergeTracks(...lists) {
-  const all = lists.flat().filter(p => p?.ts && p.lat != null && p.lon != null)
-    .map(p => ({ ...p, t: Date.parse(p.ts) }))
-    .sort((a, b) => (RANK[a.source] ?? 4) - (RANK[b.source] ?? 4))
-  const kept = []
-  const taken = new Set()
-  for (const p of all) {
-    const key = Math.round(p.t / 3000)
-    if (taken.has(key) || taken.has(key - 1) || taken.has(key + 1)) continue
-    taken.add(key)
-    kept.push(p)
-  }
-  return kept.sort((a, b) => a.t - b.t).map(({ t, ...p }) => p)
-}
+export { mergeTracks } from './stitch.js'
 
 // Airborne coverage of a track, for deciding whether a new one is better.
 export function coverage(points) {
@@ -125,7 +110,7 @@ export function coverage(points) {
 
 // Everything known about where an aircraft flew between fromMs and toMs.
 // adsb.lol days that aren't published yet are listed in `pending`.
-export async function collectTrack({ hex, fromMs, toMs, log, useAdsbLol = true }) {
+export async function collectTrack({ hex, flightId = null, fromMs, toMs, log, useAdsbLol = true }) {
   const os = await openSkyTrack(hex, fromMs, toMs, log).catch(e => { log?.warn({ err: e.message }, 'OpenSky track failed'); return { legs: [], points: [] } })
   const adsb = [], pending = []
   if (useAdsbLol) {
@@ -137,11 +122,14 @@ export async function collectTrack({ hex, fromMs, toMs, log, useAdsbLol = true }
       } catch (e) { log?.warn({ err: e.message, day }, 'adsb.lol lookup failed'); pending.push(day) }
     }
   }
-  const recent = await recentTracePoints(hex, fromMs, toMs, log).catch(e => { log?.warn({ err: e.message }, 'Recent traces failed'); return [] })
+  const recent = await recentTracePoints(hex, fromMs, toMs, log, flightId ? [`flight:${flightId}`] : []).catch(e => { log?.warn({ err: e.message }, 'Recent traces failed'); return [] })
   const inWindow = p => { const t = Date.parse(p.ts); return t >= fromMs && t <= toMs }
-  const points = mergeTracks(os.points.filter(inWindow), adsb.filter(inWindow), recent.filter(inWindow))
-  const by = src => points.filter(p => p.source === src).length
-  return { points, legs: os.legs, pending, counts: Object.fromEntries(['opensky', 'adsblol', 'adsbfi', 'airplaneslive'].map(k => [k, by(k)])) }
+  const bySource = {}
+  for (const p of [...os.points, ...adsb, ...recent]) if (inWindow(p)) (bySource[p.source] ||= []).push(p)
+  const points = stitch(bySource)
+  const counts = {}
+  for (const p of points) counts[p.source] = (counts[p.source] || 0) + 1
+  return { points, legs: os.legs, pending, counts }
 }
 
 // The window to search for a flight's track: its block times (or its NICE AIR
@@ -182,14 +170,15 @@ export async function refreshFlightTrack(pool, flightId, log) {
   if (!f.mode_s_hex) return { error: 'No Mode S hex code for aircraft' }
   const dateStr = String(f.date).slice(0, 10)
   const { fromMs, toMs } = flightSearchWindow(f, await loadSchedules(pool, dateStr).catch(() => []))
-  const found = await collectTrack({ hex: normalizeIcao24(f.mode_s_hex), fromMs, toMs, log })
+  const found = await collectTrack({ hex: normalizeIcao24(f.mode_s_hex), flightId, fromMs, toMs, log })
 
   const { rows: stored } = await pool.query(
-    'SELECT ts, altitude_ft FROM track_log_points WHERE flight_id = $1 ORDER BY ts', [flightId])
-  const before = coverage(stored.map(r => ({ ts: r.ts.toISOString(), on_ground: false })))
+    'SELECT ts, on_ground FROM track_log_points WHERE flight_id = $1 ORDER BY ts', [flightId])
+  const before = coverage(stored.map(r => ({ ts: r.ts.toISOString(), on_ground: r.on_ground })))
   const after = coverage(found.points)
-  const better = after.seconds > before.seconds + 60 || (after.seconds >= before.seconds && after.points > before.points)
+  // Ground points count too: a stitch that adds the taxi and stops is better.
+  const better = after.seconds > before.seconds + 60 || (after.seconds >= before.seconds && found.points.length > stored.length)
   let saved = 0
-  if (better && after.points) saved = await saveTrackPoints(pool, flightId, found.points, 'opensky')
+  if (better && after.points) saved = await saveTrackPoints(pool, flightId, found.points, 'opensky', { keepGround: true })
   return { saved, replaced: better && !!after.points, before, after, counts: found.counts, legs: found.legs, pending: found.pending }
 }

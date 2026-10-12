@@ -124,3 +124,57 @@ describe('track sources', () => {
     assert.equal(await findTarMember(Readable.from([tar]), 'missing.json'), null)
   })
 })
+
+import { stitch, dropOutliers, fillDerived, summarize } from '../services/stitch.js'
+import { parseTrackFile } from '../lib/trackFiles.js'
+
+describe('stitching sources into one track', () => {
+  test('impossible jumps are dropped', () => {
+    const p = (s, lat, alt) => ({ ts: new Date(Date.UTC(2026, 9, 11, 22, 0, s)).toISOString(), lat, lon: -121, altitude_ft: alt })
+    const out = dropOutliers([p(0, 37, 3000), p(10, 37.005, 3020), p(20, 38, 3040), p(30, 37.01, 9000), p(40, 37.015, 3060)])
+    assert.deepEqual(out.map(x => x.lat), [37, 37.005, 37.015])
+  })
+
+  test('missing speed, track and vertical rate come from neighbours', () => {
+    const [a, b] = fillDerived([
+      { ts: '2026-10-11T22:00:00Z', lat: 37, lon: -121, altitude_ft: 3000 },
+      { ts: '2026-10-11T22:01:00Z', lat: 37 + 100 / 60 / 60, lon: -121, altitude_ft: 3500 },
+    ])
+    assert.equal(a.groundspeed_kts, 100) // 100/60 nm in a minute
+    assert.equal(a.track_deg, 0)
+    assert.equal(b.vertical_speed_fpm, 500)
+  })
+
+  test('the better source wins where sources overlap; others fill the gaps', () => {
+    const at = (s, src, lat) => ({ ts: new Date(Date.UTC(2026, 9, 11, 22, 0, s)).toISOString(), lat, lon: -121, source: src })
+    const out = stitch({ opensky: [at(0, 'opensky', 37), at(30, 'opensky', 37.01), at(60, 'opensky', 37.02)], airplaneslive: [at(1, 'airplaneslive', 37.0001)], upload: [at(59, 'upload', 37.0199)] })
+    assert.deepEqual(out.map(p => p.source), ['airplaneslive', 'opensky', 'upload'])
+  })
+
+  test('the summary names stops and gaps', () => {
+    const s = summarize(xc, [A, B])
+    assert.equal(s.complete, true)
+    assert.deepEqual(s.events.map(e => [e.icao, e.kind]), [['KAAA', 'departure'], ['KBBB', 'full stop'], ['KAAA', 'landing']])
+    assert.ok(s.gaps.length >= 1, 'the synthetic track has 10-minute spacing')
+  })
+})
+
+describe('owner track files', () => {
+  test('GPX', () => {
+    const { format, points } = parseTrackFile('<?xml version="1.0"?><gpx version="1.1"><trk><trkseg><trkpt lat="37.33" lon="-121.82"><ele>100</ele><time>2026-10-11T22:53:00Z</time></trkpt><trkpt lat="37.34" lon="-121.81"><ele>400</ele><time>2026-10-11T22:54:00Z</time></trkpt></trkseg></trk></gpx>')
+    assert.equal(format, 'GPX')
+    assert.equal(points.length, 2)
+    assert.equal(points[1].altitude_ft, 1312)
+  })
+  test('KML gx:Track', () => {
+    const { format, points } = parseTrackFile('<kml xmlns:gx="http://www.google.com/kml/ext/2.2"><gx:Track><when>2026-10-11T22:53:00Z</when><when>2026-10-11T22:54:00Z</when><gx:coord>-121.82 37.33 30</gx:coord><gx:coord>-121.81 37.34 120</gx:coord></gx:Track></kml>')
+    assert.equal(format, 'KML')
+    assert.deepEqual(points.map(p => p.lat), [37.33, 37.34])
+  })
+  test('ForeFlight CSV with epoch timestamps', () => {
+    const { format, points } = parseTrackFile('Timestamp,Latitude,Longitude,Altitude,Speed,Course\n1791759180,37.33,-121.82,150,0,310\n1791759240,37.34,-121.81,600,70,312\n')
+    assert.equal(format, 'CSV')
+    assert.equal(points[0].ts, '2026-10-11T22:53:00.000Z')
+    assert.equal(points[1].groundspeed_kts, 70)
+  })
+})

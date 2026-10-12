@@ -195,7 +195,7 @@ export interface LogbookStats {
 
 export interface Instructor { id: number; name: string; certificate?: string | null; rating?: string | null }
 
-export interface TrackPoint { ts: string; lat: number; lon: number; altitude_ft: number | null; groundspeed_kts: number | null; track_deg: number | null; vertical_speed_fpm: number | null; source?: string }
+export interface TrackPoint { ts: string; lat: number; lon: number; altitude_ft: number | null; groundspeed_kts: number | null; track_deg: number | null; vertical_speed_fpm: number | null; source?: string; on_ground?: boolean }
 
 export interface TrackStats {
   max_altitude_ft?: number; max_groundspeed_kts?: number; avg_groundspeed_kts?: number
@@ -264,4 +264,12 @@ export interface ChessStats {
   username: string; league?: string; lastOnline?: number; joined?: number; avatar?: string
   rapid: ChessTimeClass; blitz: ChessTimeClass
   tactics: { highest: number | null }; puzzleRush: { best: number | null }
+}
+
+export interface TrackSummary {
+  sources: { source: string; name: string; points: number }[]
+  first: string | null; last: string | null; complete: boolean
+  events: { icao: string; name?: string; kind: 'departure' | 'landing' | 'full stop' | 'touch-and-go' | 'low approach'; from: string; to: string; minutes: number; seen_on_ground: boolean }[]
+  gaps: { from: string; to: string; seconds: number; near: string | null }[]
+  distance_nm: number | null; airborne_minutes: number | null
 }

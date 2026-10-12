@@ -3,7 +3,7 @@ import { get } from './api'
 import type {
   Activity, ActivityDetail, ActivityGpx, AircraftRegistry, AirportDetail, AirportInfo, Athlete, ChessStats, DailyStats,
   Flight, Holding, Instructor, LogbookStats, Metar, NetWorth, NiceAirSchedule, NotamResponse, PlaidItem,
-  SleepLatest, SleepTrendRow, Taf, TrackPoint, TrackStats, AircraftRef,
+  SleepLatest, SleepTrendRow, Taf, TrackPoint, TrackStats, AircraftRef, TrackSummary,
 } from './types'
 
 const MIN = 60_000
@@ -45,6 +45,10 @@ export const useTrack = (id?: number, enabled = true) => useQuery({
 export const useTrackStats = (id?: number, enabled = true) => useQuery({
   queryKey: ['track-stats', id], enabled: !!id && enabled, staleTime: Infinity,
   queryFn: () => soft(get<TrackStats>(`/api/flights/${id}/track-stats`), null),
+})
+export const useTrackSummary = (id?: number, enabled = true) => useQuery({
+  queryKey: ['track-summary', id], enabled: !!id && enabled, staleTime: Infinity,
+  queryFn: () => soft(get<TrackSummary>(`/api/flights/${id}/track-summary`), null),
 })
 export const useRegistry = (tail?: string) => useQuery({
   queryKey: ['registry', tail], enabled: !!tail, staleTime: Infinity, retry: false,

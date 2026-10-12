@@ -317,7 +317,8 @@ describe('saveTrackPoints — source provenance validation', () => {
     const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
     const pt = (source) => ({ ts: '2026-10-11T22:00:00Z', lat: 1, lon: 1, on_ground: false, source });
     await saveTrackPoints(stubPool, 1, [pt('adsblol'), pt(undefined), pt('bogus')], 'opensky');
-    assert.deepEqual(calls[0].params.at(-1), ['adsblol', 'opensky', 'opensky'], 'unknown or missing point sources fall back');
+    assert.deepEqual(calls[0].params.at(-2), ['adsblol', 'opensky', 'opensky'], 'unknown or missing point sources fall back');
+    assert.deepEqual(calls[0].params.at(-1), [false, false, false], 'ground flags travel with the points');
   });
 
   test('replaces the track atomically with airborne points only, values as parameters', async () => {

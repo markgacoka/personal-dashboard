@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, Bot, CalendarClock, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bot, CalendarClock, FileUp, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { EmptyState, Skeleton, Switch } from '@/components/ui/misc'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { Stat, DL } from '@/components/data/stat'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
-import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats } from '@/lib/queries'
+import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats, useTrackSummary } from '@/lib/queries'
 import { get, post } from '@/lib/api'
 import { decodeMetar } from '@/lib/weather'
 import { calDate, hours } from '@/lib/format'
@@ -106,6 +106,7 @@ export default function FlightPage() {
             {pts.length >= 2 && <TrackPlayer pts={pts} idx={idx} setIdx={setIdx} />}
             {!f.has_track && <div className="border-t border-border px-5 py-3 text-sm text-fg-3">No GPS track for this flight — the map shows the planned route between airports.</div>}
           </Card>
+          <TimelineCard id={f.id} enabled={f.has_track} />
           <TrackStatsCard id={f.id} enabled={f.has_track} pts={pts} />
           <Notes f={f} />
         </div>
@@ -347,10 +348,83 @@ function RefreshTrackButton({ id }: { id: number }) {
         const mins = (s: number) => `${Math.round(s / 60)} min`
         const pending = r.pending?.length ? ` adsb.lol for ${r.pending.join(', ')} isn’t published yet.` : ''
         toast.success(r.replaced ? `Track updated: ${mins(r.after.seconds)} covered (was ${mins(r.before.seconds)}).${pending}` : `No better track found (${mins(r.after.seconds)} available).${pending}`, { id: t, duration: 8000 })
-        qc.invalidateQueries({ queryKey: ['track', id] }); qc.invalidateQueries({ queryKey: ['track-stats', id] }); qc.invalidateQueries({ queryKey: ['flights'] })
+        qc.invalidateQueries({ queryKey: ['track', id] }); qc.invalidateQueries({ queryKey: ['track-stats', id] }); qc.invalidateQueries({ queryKey: ['track-summary', id] }); qc.invalidateQueries({ queryKey: ['flights'] })
       } catch (e) { toast.error((e as Error).message, { id: t }) }
       setBusy(false)
     }}><RefreshCw className={cn(busy && 'animate-spin')} />Refresh track</Button>
+  )
+}
+
+// What happened on the flight, from the stitched track: departures, landings,
+// stops and where the receivers lost the aircraft.
+const EVENT_ICON = { departure: PlaneTakeoff, landing: PlaneLanding, 'full stop': PlaneLanding, 'touch-and-go': CircleDot, 'low approach': CircleDot }
+function TimelineCard({ id, enabled }: { id: number; enabled: boolean }) {
+  const { data: s, isLoading } = useTrackSummary(id, enabled)
+  if (!enabled) return null
+  const t = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const items = [
+    ...(s?.events || []).map(e => ({ at: e.from, kind: 'event' as const, e })),
+    ...(s?.gaps || []).map(g => ({ at: g.from, kind: 'gap' as const, g })),
+  ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  return (
+    <Card>
+      <CardHeader title="What happened" description={s ? `${s.complete ? 'Complete track' : 'Partial track'}${s.airborne_minutes ? ` · ${Math.floor(s.airborne_minutes / 60)}h ${s.airborne_minutes % 60}m moving` : ''}${s.distance_nm ? ` · ${s.distance_nm} nm flown` : ''}` : undefined}
+        action={<UploadTrackButton id={id} />} />
+      <CardBody>
+        {isLoading ? <Skeleton className="h-40" /> : !s || !items.length ? <p className="text-sm text-fg-3">No stops recognised in this track.</p> : (
+          <ol className="relative space-y-3 border-l border-border pl-5">
+            {items.map((it, i) => it.kind === 'event' ? (() => {
+              const I = EVENT_ICON[it.e.kind]
+              return (
+                <li key={i} className="relative">
+                  <span className="absolute -left-[31px] top-0.5 grid size-5 place-items-center rounded-full bg-card ring-1 ring-border"><I className="size-3 text-accent" /></span>
+                  <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <span className="num font-medium">{t(it.e.from)}{it.e.minutes >= 1 && it.e.kind !== 'departure' && it.e.kind !== 'landing' ? `–${t(it.e.to)}` : ''}</span>
+                    <span className="capitalize">{it.e.kind}</span>
+                    <span className="font-medium">{it.e.icao}</span>
+                    <span className="text-fg-3">{it.e.name}</span>
+                    {it.e.kind === 'full stop' && <span className="text-fg-3">· {it.e.minutes} min on the ground</span>}
+                  </div>
+                </li>
+              )
+            })() : (
+              <li key={i} className="relative">
+                <span className="absolute -left-[31px] top-0.5 grid size-5 place-items-center rounded-full bg-card ring-1 ring-border"><AlertTriangle className="size-3 text-warn" /></span>
+                <div className="text-sm text-fg-3"><span className="num">{t(it.g.from)}–{t(it.g.to)}</span> no coverage for {Math.round(it.g.seconds / 60)} min{it.g.near ? ` near ${it.g.near}` : ''}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+        {!!s?.sources.length && <div className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-3">{s.sources.map(x => <Badge key={x.source} size="md">{x.name} <span className="num font-normal text-fg-3">{x.points.toLocaleString()}</span></Badge>)}</div>}
+      </CardBody>
+    </Card>
+  )
+}
+
+// Import a GPS log recorded in the cockpit (ForeFlight, Garmin Pilot, CloudAhoy…).
+function UploadTrackButton({ id }: { id: number }) {
+  const qc = useQueryClient()
+  const ref = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <>
+      <Button size="sm" variant="ghost" loading={busy} onClick={() => ref.current?.click()}><FileUp />Import GPS file</Button>
+      <input ref={ref} type="file" accept=".gpx,.kml,.csv,application/gpx+xml,application/vnd.google-earth.kml+xml,text/csv" hidden onChange={async e => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (!file) return
+        setBusy(true)
+        try {
+          const res = await fetch(`/api/flights/${id}/track-file`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/plain' }, body: await file.text() })
+          const d = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(d.error || `Upload failed (${res.status})`)
+          toast.success(`Imported ${d.points.toLocaleString()} points from your ${d.format} file and stitched them in`)
+          for (const k of ['track', 'track-stats', 'track-summary']) qc.invalidateQueries({ queryKey: [k, id] })
+          qc.invalidateQueries({ queryKey: ['flights'] })
+        } catch (err) { toast.error((err as Error).message) }
+        setBusy(false)
+      }} />
+    </>
   )
 }
 
@@ -358,7 +432,7 @@ function Readout({ label, value, sub }: { label: string; value: string; sub?: st
   return <div><div className="text-xs text-fg-3">{label}</div><div className="num font-medium text-fg">{value}{sub && <span className="ml-1.5 font-normal text-fg-3">{sub}</span>}</div></div>
 }
 
-const SOURCE_NAME: Record<string, string> = { opensky: 'OpenSky', adsblol: 'adsb.lol', adsbfi: 'adsb.fi', airplaneslive: 'airplanes.live', fr24: 'Flightradar24', aeroapi: 'FlightAware', foreflight_csv: 'ForeFlight' }
+const SOURCE_NAME: Record<string, string> = { opensky: 'OpenSky', adsblol: 'adsb.lol', adsbfi: 'adsb.fi', airplaneslive: 'airplanes.live', theairtraffic: 'theairtraffic', adsbexchange: 'ADS-B Exchange', upload: 'Your GPS log', fr24: 'Flightradar24', aeroapi: 'FlightAware', foreflight_csv: 'ForeFlight' }
 
 function TrackStatsCard({ id, enabled, pts }: { id: number; enabled: boolean; pts: TrackPoint[] }) {
   const bySource = Object.entries(pts.reduce<Record<string, number>>((a, p) => { const k = p.source || 'opensky'; a[k] = (a[k] || 0) + 1; return a }, {}))

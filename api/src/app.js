@@ -22,6 +22,7 @@ import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 import { scheduleUsAirportsRefresh } from './services/usAirports.js'
 import { scheduleNightSync } from './services/schedules.js'
+import { scheduleAutoLog } from './services/autolog.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -79,6 +80,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
         scheduleFaaAirspaceRefresh(fastify.log) // first boot, then every 28-day AIRAC cycle
         scheduleUsAirportsRefresh(fastify.log)  // first boot, then every 28 days
         scheduleNightSync(fastify.log)          // block times from Gmail: first boot, then every 6 h
+        scheduleAutoLog(fastify.log)            // NICE AIR bookings → logbook entries, every 20 min
 
         // Seed the FAA ACFTREF table (~8K rows) on first boot, in the background.
         isAcftrefEmpty().then(empty => {

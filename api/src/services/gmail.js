@@ -79,6 +79,9 @@ export function decodeQP(str) {
 
 // Extract the last occurrence of each field from the decoded email text.
 // "Changed" emails contain two blocks (from/to) — we want the final (to) block.
+// Start/End must hold a date: the calendar attachment's "END:VCALENDAR" line
+// otherwise overwrote the booking's end time.
+const DATE_FIELDS = new Set(['start', 'end'])
 export function parseScheduleBody(raw) {
   const text = decodeQP(raw.toString())
   const lines = text.split(/\r?\n/)
@@ -86,13 +89,17 @@ export function parseScheduleBody(raw) {
   for (const line of lines) {
     for (const field of ['Pilot', 'CFI', 'Resource', 'Start', 'End']) {
       const m = line.match(new RegExp(`^${field}:\\s*(.+)`, 'i'))
-      if (m) last[field.toLowerCase()] = m[1].replace(/=\s*$/, '').trim()
+      if (!m) continue
+      const value = m[1].replace(/=\s*$/, '').trim()
+      if (DATE_FIELDS.has(field.toLowerCase()) && !/^\d{1,2}\/\d{1,2}\/\d{4}\s/.test(value)) continue
+      last[field.toLowerCase()] = value
     }
   }
   return last
 }
 
-export async function fetchNiceAirSchedules() {
+// `since` (a Date) limits the search to recent mail, for the frequent sync.
+export async function fetchNiceAirSchedules({ since } = {}) {
   const client = makeClient()
   const schedules = []
   try {
@@ -100,7 +107,7 @@ export async function fetchNiceAirSchedules() {
     const lock = await client.getMailboxLock('INBOX')
     try {
       // Search by sender — catches all schedule types regardless of subject wording
-      const uids = await client.search({ from: 'niceairaviation@paperlessfbo.net' }, { uid: true })
+      const uids = await client.search({ from: 'niceairaviation@paperlessfbo.net', ...(since ? { since } : {}) }, { uid: true })
       for (const uid of uids) {
         for await (const msg of client.fetch(uid, { envelope: true, source: true }, { uid: true })) {
           const subject = (msg.envelope?.subject || '').replace(/=\?[^?]+\?[BQ]\?[^?]+\?=/gi, s => {
@@ -150,8 +157,8 @@ export async function fetchNiceAirSchedules() {
 
 // Fetch all NICE AIR Gmail schedules and upsert them into the nice_air_schedules table.
 // Pass the pg pool as first argument. Returns { total, inserted, updated }.
-export async function syncNiceAirToDB(pool) {
-  const schedules = await fetchNiceAirSchedules()
+export async function syncNiceAirToDB(pool, opts = {}) {
+  const schedules = await fetchNiceAirSchedules(opts)
   let inserted = 0, updated = 0
   for (const s of schedules) {
     if (!s.uid) continue

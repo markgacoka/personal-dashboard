@@ -924,6 +924,35 @@ export const migrateV25 = migrateV22
 // Before the ledger existed every migration re-ran on every boot, which kept
 // re-applying one-off data fixes (V10 blanked instructor_comments on every
 // restart).
+// adsb.lol daily history as a track source; a cache of the per-aircraft traces
+// pulled out of those multi-GB daily archives; and the ledger of NICE AIR
+// bookings the auto-logger has handled, so a deleted auto-entry is never re-created.
+async function migrateV26() {
+  await pool.query(`
+    ALTER TABLE track_log_points DROP CONSTRAINT IF EXISTS track_log_points_source_check;
+    ALTER TABLE track_log_points ADD CONSTRAINT track_log_points_source_check
+      CHECK (source = ANY (ARRAY['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol']));
+    CREATE TABLE IF NOT EXISTS adsblol_traces (
+      icao24     TEXT NOT NULL,
+      utc_date   DATE NOT NULL,
+      found      BOOLEAN NOT NULL,
+      trace_gzip BYTEA,
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (icao24, utc_date)
+    );
+    CREATE TABLE IF NOT EXISTS nice_air_autolog (
+      booking_key TEXT PRIMARY KEY,
+      date_str    TEXT NOT NULL,
+      tail        TEXT NOT NULL,
+      status      TEXT NOT NULL,
+      flight_id   INTEGER REFERENCES flights(id) ON DELETE SET NULL,
+      detail      TEXT,
+      attempts    INTEGER DEFAULT 0,
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -931,7 +960,7 @@ const MIGRATIONS = [
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
-  ['024', migrateV24], ['025', migrateV25],
+  ['024', migrateV24], ['025', migrateV25], ['026', migrateV26],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

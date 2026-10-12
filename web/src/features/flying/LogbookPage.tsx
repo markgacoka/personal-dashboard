@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { BookOpen, Check, MapPin, MoreHorizontal, Pencil, Plus, Route as RouteIcon, Search, Trash2, ExternalLink, Target } from 'lucide-react'
+import { Bot, BookOpen, Check, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw, Route as RouteIcon, Search, Trash2, ExternalLink, Target } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import { PageHeader, Stat } from '@/components/data/stat'
 import { axisProps, cursorBand, gridProps, Legend, makeTip } from '@/components/data/chart'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useLogbookStats, qk } from '@/lib/queries'
-import { del } from '@/lib/api'
+import { del, get, post } from '@/lib/api'
 import { calDate, hours } from '@/lib/format'
 import { isDual, isNight, isSolo, isXC, pplProgress, route, trainingLabel } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
@@ -80,6 +80,7 @@ export default function LogbookPage() {
       </Card>
 
       <FlightTable flights={all} loading={isLoading} />
+      <AutoLogCard />
       <FlightFormDialog open={formOpen} onOpenChange={setFormOpen} />
     </div>
   )
@@ -242,7 +243,7 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
                         </Link>
                       </td>
                       <td className="whitespace-nowrap px-3"><span className="num text-fg">{f.aircraft?.tail_number}</span> <span className="text-fg-3">{f.aircraft?.model}</span></td>
-                      <td className="px-3"><span className="flex flex-wrap gap-1"><Badge>{trainingLabel(f.training_type)}</Badge>{f.flight_review && <Badge tone="accent">Review</Badge>}{f.checkride && <Badge tone="good">Checkride</Badge>}</span></td>
+                      <td className="px-3"><span className="flex flex-wrap gap-1"><Badge>{trainingLabel(f.training_type)}</Badge>{f.source === 'nice-air-auto' && <Tip content="Created from a NICE AIR booking and its ADS-B track — check the hours"><Badge tone="warn">Auto</Badge></Tip>}{f.flight_review && <Badge tone="accent">Review</Badge>}{f.checkride && <Badge tone="good">Checkride</Badge>}</span></td>
                       <td className="num px-3 text-right font-medium text-fg">{num(f.total_duration).toFixed(1)}</td>
                       {cell(f.dual_received)}{cell(f.solo)}{cell(f.cross_country)}{cell(f.night)}
                       <td className="num px-3 text-right text-fg-2">{f.landings || <span className="text-fg-3">—</span>}</td>
@@ -273,6 +274,50 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
         </>
       )}
       <FlightFormDialog open={!!editing} onOpenChange={o => !o && setEditing(null)} flight={editing} />
+    </Card>
+  )
+}
+
+// What the NICE AIR auto-logger has done with recent bookings.
+interface AutoLogRow { booking_key: string; date_str: string; tail: string; status: string; flight_id: number | null; detail: string | null; updated_at: string }
+const AUTO_STATUS: Record<string, { label: string; tone: 'good' | 'warn' | 'neutral' | 'bad' }> = {
+  logged: { label: 'Logged', tone: 'good' }, exists: { label: 'Already in logbook', tone: 'neutral' }, waiting: { label: 'Waiting for ADS-B', tone: 'warn' },
+  no_flight: { label: 'No flight seen', tone: 'neutral' }, skipped: { label: 'Skipped', tone: 'bad' },
+}
+function AutoLogCard() {
+  const qc = useQueryClient()
+  const { data } = useQuery({ queryKey: ['autolog'], queryFn: () => get<AutoLogRow[]>('/api/nice-air/autolog'), staleTime: 60_000 })
+  const [running, setRunning] = useState(false)
+  return (
+    <Card className="mt-5">
+      <CardHeader icon={<Bot />} title="Auto-logging from NICE AIR"
+        description="Every 20 minutes new booking emails are read; once a booking has ended (and wasn’t cancelled) and ADS-B shows the aircraft flew, an entry is created for you to review."
+        action={<Button size="sm" loading={running} onClick={async () => {
+          setRunning(true)
+          try { const r = await post<{ results: { status: string }[] }>('/api/nice-air/autolog/run'); toast.success(`Checked ${r.results.length} booking${r.results.length === 1 ? '' : 's'}`); qc.invalidateQueries({ queryKey: ['autolog'] }); qc.invalidateQueries({ queryKey: qk.flights }); qc.invalidateQueries({ queryKey: qk.logbook }) }
+          catch (e) { toast.error((e as Error).message) }
+          setRunning(false)
+        }}><RefreshCw />Check now</Button>} />
+      <CardBody>
+        {!data?.length ? <p className="text-sm text-fg-3">No bookings handled yet.</p> : (
+          <ul className="divide-y divide-border">
+            {data.slice(0, 8).map(r => {
+              const st = AUTO_STATUS[r.status] || { label: r.status, tone: 'neutral' as const }
+              let note = ''
+              try { const d = r.detail && r.detail.startsWith('{') ? JSON.parse(r.detail) : null; note = d ? (d.pending?.length ? `Track will be completed from adsb.lol (${d.pending.join(', ')})` : '') : r.detail || '' } catch { note = '' }
+              return (
+                <li key={r.booking_key} className="flex flex-wrap items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <span className="num w-28 text-sm text-fg-2">{calDate(r.date_str, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span className="num w-16 text-sm">N{r.tail.replace(/^N/, '')}</span>
+                  <Badge tone={st.tone}>{st.label}</Badge>
+                  <span className="min-w-0 flex-1 truncate text-sm text-fg-3">{note}</span>
+                  {r.flight_id && <Link to={`/flying/${r.flight_id}`} className="text-sm text-accent hover:underline">Open</Link>}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </CardBody>
     </Card>
   )
 }

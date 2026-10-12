@@ -1,6 +1,7 @@
 import { pool } from '../db/client.js'
 import { syncNiceAirToDB } from '../services/gmail.js'
-import { autoFetchOpenSkyTrack } from '../services/flightTrack.js'
+import { refreshFlightTrack } from '../services/flightTrack.js'
+import { currentBookings, runAutoLogOnce } from '../services/autolog.js'
 import { backfillNightTimes, syncSchedulesToTimes } from '../services/schedules.js'
 
 const FLIGHT_SELECT = `
@@ -89,6 +90,23 @@ async function withViaAirports(flights) {
   return flights.map(f => ({ ...f, via_airports: (f.via || []).map(ic => byIcao[ic] || { icao: ic }) }))
 }
 
+// Block times come from the NICE AIR booking for the entry's date and tail,
+// when there is one (the latest email for that booking decides, so a
+// cancelled booking is ignored).
+export async function applyBookingTimes(flightId) {
+  const { rows: [f] } = await pool.query(
+    `SELECT f.date::text, ac.tail_number FROM flights f JOIN aircraft ac ON ac.id = f.aircraft_id WHERE f.id = $1`, [flightId])
+  if (!f) return null
+  const { rows } = await pool.query(
+    `SELECT type, date_str, tail, cfi, start_unix, end_unix, received_at FROM nice_air_schedules WHERE date_str = $1`, [String(f.date).slice(0, 10)])
+  const short = t => (t || '').toUpperCase().replace(/^N/, '')
+  const b = currentBookings(rows).find(x => short(x.tail) === short(f.tail_number))
+  if (!b) return null
+  await pool.query('UPDATE flights SET time_out = $2, time_in = $3 WHERE id = $1',
+    [flightId, new Date(b.start_unix * 1000).toISOString(), new Date(b.end_unix * 1000).toISOString()])
+  return b
+}
+
 export default async function flightRoutes(fastify) {
   fastify.get('/api/flights', async (req) => {
     const { date, tail, departure } = req.query
@@ -116,13 +134,40 @@ export default async function flightRoutes(fastify) {
     )
     const flightId = rows[0].id
 
-    // Background: refresh NICE AIR bookings so the new entry gets block times,
-    // and fetch its OpenSky track (a no-op without a Mode S hex or data).
-    syncNiceAirToDB(pool).catch(() => {})
-    autoFetchOpenSkyTrack(pool, flightId).catch(() => {})
-
     await insertApproaches(flightId, req.body.approaches)
+
+    // Background: pull the latest NICE AIR booking emails, take the entry's
+    // block times from its booking, then collect its whole track (every leg,
+    // OpenSky plus adsb.lol) inside that window.
+    ;(async () => {
+      await syncNiceAirToDB(pool, { since: new Date(Date.now() - 21 * 86_400_000) }).catch(e => fastify.log.warn({ err: e.message }, 'NICE AIR sync failed'))
+      await applyBookingTimes(flightId)
+      const r = await refreshFlightTrack(pool, flightId, fastify.log)
+      fastify.log.info({ flightId, ...r, legs: r.legs?.length }, 'Track collected for new flight')
+    })().catch(e => fastify.log.warn({ err: e.message, flightId }, 'New-flight follow-up failed'))
     return reply.status(201).send({ id: flightId })
+  })
+
+  // Re-collect a flight's track from the free sources (OpenSky legs + adsb.lol).
+  // The first adsb.lol lookup for a day streams part of a multi-GB archive, so
+  // this can take a few minutes.
+  fastify.post('/api/flights/:id/refresh-track', async (req, reply) => {
+    const id = parseInt(req.params.id)
+    req.raw.setTimeout?.(25 * 60_000)
+    const r = await refreshFlightTrack(pool, id, fastify.log)
+    if (r.error) return reply.status(r.error === 'Flight not found' ? 404 : 422).send({ error: r.error })
+    return r
+  })
+
+  // NICE AIR auto-logger: what it has done with each booking, and a manual run.
+  fastify.get('/api/nice-air/autolog', async () => {
+    const { rows } = await pool.query(
+      'SELECT booking_key, date_str, tail, status, flight_id, detail, attempts, updated_at FROM nice_air_autolog ORDER BY date_str DESC, updated_at DESC LIMIT 100')
+    return rows
+  })
+  fastify.post('/api/nice-air/autolog/run', async (req) => {
+    req.raw.setTimeout?.(25 * 60_000)
+    return { results: await runAutoLogOnce({ log: fastify.log }) }
   })
 
   fastify.put('/api/flights/:id', async (req, reply) => {

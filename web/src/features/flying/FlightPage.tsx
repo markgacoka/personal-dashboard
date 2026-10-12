@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, CalendarClock, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bot, CalendarClock, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,7 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, Popov
 import { Stat, DL } from '@/components/data/stat'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats } from '@/lib/queries'
-import { get } from '@/lib/api'
+import { get, post } from '@/lib/api'
 import { decodeMetar } from '@/lib/weather'
 import { calDate, hours } from '@/lib/format'
 import { route, trainingLabel, isSolo } from '@/lib/flying'
@@ -69,6 +70,7 @@ export default function FlightPage() {
             {f.flight_review && <Badge tone="accent" size="md">Flight review</Badge>}
             {f.checkride && <Badge tone="good" size="md">Checkride</Badge>}
             {f.ipc && <Badge tone="accent" size="md">IPC</Badge>}
+            {f.source === 'nice-air-auto' && <Badge tone="warn" size="md"><Bot />Auto-logged · review</Badge>}
           </div>
           <h1 className="num text-3xl font-semibold tracking-tight">{route(f).join(' → ')}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-3">
@@ -78,6 +80,7 @@ export default function FlightPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <RefreshTrackButton id={f.id} />
           <Button onClick={() => setEdit(true)}><Pencil />Edit</Button>
           <Menu>
             <MenuTrigger asChild><Button size="icon" aria-label="More actions"><MoreHorizontal /></Button></MenuTrigger>
@@ -103,7 +106,7 @@ export default function FlightPage() {
             {pts.length >= 2 && <TrackPlayer pts={pts} idx={idx} setIdx={setIdx} />}
             {!f.has_track && <div className="border-t border-border px-5 py-3 text-sm text-fg-3">No GPS track for this flight — the map shows the planned route between airports.</div>}
           </Card>
-          <TrackStatsCard id={f.id} enabled={f.has_track} source={f.track_source} />
+          <TrackStatsCard id={f.id} enabled={f.has_track} pts={pts} />
           <Notes f={f} />
         </div>
         <div className="space-y-5 xl:col-span-4">
@@ -330,11 +333,35 @@ function TrackPlayer({ pts, idx, setIdx }: { pts: TrackPoint[]; idx: number; set
   )
 }
 
+// Re-collect the track from the free sources: every OpenSky leg, plus
+// adsb.lol's daily archive (the first lookup for a day takes a minute or two).
+function RefreshTrackButton({ id }: { id: number }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  return (
+    <Button disabled={busy} onClick={async () => {
+      setBusy(true)
+      const t = toast.loading('Collecting the track from OpenSky and adsb.lol… this can take a couple of minutes')
+      try {
+        const r = await post<{ replaced: boolean; after: { points: number; seconds: number }; before: { seconds: number }; counts: Record<string, number>; pending: string[] }>(`/api/flights/${id}/refresh-track`)
+        const mins = (s: number) => `${Math.round(s / 60)} min`
+        const pending = r.pending?.length ? ` adsb.lol for ${r.pending.join(', ')} isn’t published yet.` : ''
+        toast.success(r.replaced ? `Track updated: ${mins(r.after.seconds)} covered (was ${mins(r.before.seconds)}).${pending}` : `No better track found (${mins(r.after.seconds)} available).${pending}`, { id: t, duration: 8000 })
+        qc.invalidateQueries({ queryKey: ['track', id] }); qc.invalidateQueries({ queryKey: ['track-stats', id] }); qc.invalidateQueries({ queryKey: ['flights'] })
+      } catch (e) { toast.error((e as Error).message, { id: t }) }
+      setBusy(false)
+    }}><RefreshCw className={cn(busy && 'animate-spin')} />Refresh track</Button>
+  )
+}
+
 function Readout({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return <div><div className="text-xs text-fg-3">{label}</div><div className="num font-medium text-fg">{value}{sub && <span className="ml-1.5 font-normal text-fg-3">{sub}</span>}</div></div>
 }
 
-function TrackStatsCard({ id, enabled, source }: { id: number; enabled: boolean; source: string | null }) {
+const SOURCE_NAME: Record<string, string> = { opensky: 'OpenSky', adsblol: 'adsb.lol', fr24: 'Flightradar24', aeroapi: 'FlightAware', foreflight_csv: 'ForeFlight' }
+
+function TrackStatsCard({ id, enabled, pts }: { id: number; enabled: boolean; pts: TrackPoint[] }) {
+  const bySource = Object.entries(pts.reduce<Record<string, number>>((a, p) => { const k = p.source || 'opensky'; a[k] = (a[k] || 0) + 1; return a }, {}))
   const { data: s, isLoading } = useTrackStats(id, enabled)
   if (!enabled) return null
   if (isLoading) return <Skeleton className="h-24" />
@@ -350,7 +377,7 @@ function TrackStatsCard({ id, enabled, source }: { id: number; enabled: boolean;
   ]
   return (
     <Card>
-      <CardHeader title="GPS track" description={source ? `Recorded by ${source === 'fr24' ? 'Flightradar24' : source === 'aeroapi' ? 'FlightAware' : source}` : undefined} />
+      <CardHeader title="GPS track" description={bySource.length ? `From ${bySource.map(([k, n]) => `${SOURCE_NAME[k] || k} (${n.toLocaleString()} points)`).join(' and ')}` : undefined} />
       <CardBody className="grid grid-cols-2 gap-5 sm:grid-cols-4 lg:grid-cols-7">
         {items.filter(([, v]) => v).map(([l, v]) => <Stat key={l} label={l} value={v} size="sm" />)}
       </CardBody>

@@ -304,16 +304,20 @@ describe('saveTrackPoints — source provenance validation', () => {
     );
   });
 
-  test('accepts each of the four known sources', async () => {
+  test('accepts each of the known sources, and per-point sources for merged tracks', async () => {
     const { saveTrackPoints } = await import('../services/flightTrack.js');
-    for (const source of ['opensky', 'fr24', 'aeroapi', 'foreflight_csv']) {
+    for (const source of ['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol']) {
       const calls = [];
       const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
       const saved = await saveTrackPoints(stubPool, 1, [], source);
       assert.equal(saved, 0, 'no airborne points → nothing saved, but no error either');
       assert.equal(calls.length, 1, 'replacing a track is one statement');
-      assert.equal(calls[0].params.at(-1), source);
     }
+    const calls = [];
+    const stubPool = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
+    const pt = (source) => ({ ts: '2026-10-11T22:00:00Z', lat: 1, lon: 1, on_ground: false, source });
+    await saveTrackPoints(stubPool, 1, [pt('adsblol'), pt(undefined), pt('bogus')], 'opensky');
+    assert.deepEqual(calls[0].params.at(-1), ['adsblol', 'opensky', 'opensky'], 'unknown or missing point sources fall back');
   });
 
   test('replaces the track atomically with airborne points only, values as parameters', async () => {

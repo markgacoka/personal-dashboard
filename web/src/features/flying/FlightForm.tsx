@@ -14,7 +14,7 @@ import { calDate, hours } from '@/lib/format'
 import { num, cn } from '@/lib/utils'
 import type { AircraftRef, AircraftRegistry, Airport, Approach, Flight } from '@/lib/types'
 
-interface Detected { departure_icao?: string; arrival_icao?: string; departure_time?: string; arrival_time?: string; duration_min?: number; icao24?: string; first_seen_unix?: number }
+interface Detected { via?: string[]; legs?: number; departure_icao?: string; arrival_icao?: string; departure_time?: string; arrival_time?: string; duration_min?: number; icao24?: string; first_seen_unix?: number; last_seen_unix?: number }
 
 type Step = 'lookup' | 'pick' | 'details'
 const today = () => new Date().toISOString().slice(0, 10)
@@ -144,8 +144,16 @@ function LookupStep({ seed, onNext }: { seed: { date: string; tail: string; dep:
 
 // ── Step 2: an existing entry, an ADS-B detection, or a new flight ───────────
 function PickStep({ seed, matches, onBack, onPick }: { seed: { date: string; tail: string; dep: string }; matches: { db: Flight[]; detected: Detected[]; needsAuth: boolean }; onBack: () => void; onPick: (p: { flight?: Flight; detected?: Detected }) => void }) {
-  const dbArr = new Set<string | undefined>(matches.db.map(f => f.arrival?.icao))
-  const fresh = matches.detected.filter(d => !dbArr.has(d.arrival_icao))
+  // OpenSky reports each leg of a cross-country separately: offer the whole day
+  // as one flight, then the individual legs.
+  const legs = [...matches.detected].sort((a, b) => (a.first_seen_unix || 0) - (b.first_seen_unix || 0))
+  const whole: Detected | null = legs.length > 1 ? {
+    ...legs[0], legs: legs.length,
+    arrival_icao: legs.at(-1)!.arrival_icao, arrival_time: legs.at(-1)!.arrival_time,
+    via: legs.slice(0, -1).map(l => l.arrival_icao).filter((x): x is string => !!x),
+    duration_min: legs[0].first_seen_unix && legs.at(-1)!.last_seen_unix ? Math.round((legs.at(-1)!.last_seen_unix! - legs[0].first_seen_unix!) / 60) : undefined,
+  } : null
+  const fresh = matches.db.length ? [] : [...(whole ? [whole] : []), ...legs]
   const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '')
   const Row = ({ children, onClick }: { children: React.ReactNode; onClick: () => void }) => (
     <button onClick={onClick} className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-left transition-colors hover:border-border-strong hover:bg-hover">{children}<ArrowRight className="ml-auto size-4 text-fg-3" /></button>
@@ -157,8 +165,8 @@ function PickStep({ seed, matches, onBack, onPick }: { seed: { date: string; tai
         <Row key={f.id} onClick={() => onPick({ flight: f })}><Search className="size-4 text-fg-3" /><div><div className="num font-medium">{route(f).join(' → ')}</div><div className="text-sm text-fg-3">{trainingLabel(f.training_type)} · {hours(f.total_duration)}h · {f.landings || 0} landings · edit this entry</div></div></Row>
       ))}</div>}
       {fresh.length > 0 && <div className="space-y-2"><div className="flex items-center gap-1.5 text-sm font-medium text-fg-3"><Broadcast className="size-4" />Detected by ADS-B (OpenSky)</div>{fresh.map((d, i) => (
-        <Row key={i} onClick={() => onPick({ detected: d })}><Plane className="size-4 text-accent" /><div><div className="num font-medium">{seed.dep} → {d.arrival_icao || 'Unknown'}</div><div className="text-sm text-fg-3">Departed {time(d.departure_time)}{d.duration_min != null ? ` · ${Math.floor(d.duration_min / 60)}h ${d.duration_min % 60}m` : ''} · import</div></div></Row>
-      ))}</div>}
+        <Row key={i} onClick={() => onPick({ detected: d })}><Plane className="size-4 text-accent" /><div><div className="num font-medium">{[d.departure_icao || seed.dep, ...(d.via || []), d.arrival_icao || 'Unknown'].join(' → ')}</div><div className="text-sm text-fg-3">{d.legs ? `All ${d.legs} legs · ` : ''}Departed {time(d.departure_time)}{d.duration_min != null ? ` · ${Math.floor(d.duration_min / 60)}h ${d.duration_min % 60}m seen` : ''} · import</div></div></Row>
+      ))}<p className="text-xs text-fg-3">OpenSky often loses small aircraft at low altitude, so legs can be missing. After you save, the track is filled in from every leg OpenSky saw, plus adsb.lol’s daily archive once it’s published (the morning after, UTC).</p></div>}
       {!matches.db.length && !fresh.length && <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-fg-3">No existing entry or ADS-B detection for this aircraft and date.</p>}
       {matches.needsAuth && <p className="text-xs text-fg-3">ADS-B detection needs OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET on the server.</p>}
       <div className="flex justify-between gap-2 pt-2">
@@ -184,7 +192,7 @@ function DetailsStep({ seed, onBack, onDone }: { seed: { date: string; dep: stri
   const n1 = (v: unknown) => (num(v) > 0 ? num(v).toFixed(1) : '')
   const [v, setV] = useState<Vals>(() => ({
     date: f?.date.slice(0, 10) || seed.date, aircraft_id: s(f?.aircraft?.id ?? seed.aircraft?.id), departure_icao: f?.departure?.icao || d?.departure_icao || seed.dep,
-    arrival_icao: f?.arrival?.icao || d?.arrival_icao || '', via: (f?.via || []).join(', '), training_type: f?.training_type || '', instructor_id: s(f?.instructor_id),
+    arrival_icao: f?.arrival?.icao || d?.arrival_icao || '', via: (f?.via || d?.via || []).join(', '), training_type: f?.training_type || '', instructor_id: s(f?.instructor_id),
     ...Object.fromEntries(TIME_FIELDS.map(([k]) => [k, k === 'instrument' ? n1(f?.simulated_instrument) : k === 'total_duration' && !f && d?.duration_min ? (d.duration_min / 60).toFixed(1) : n1(f?.[k as keyof Flight])])),
     ...Object.fromEntries(OPS_FIELDS.map(([k]) => [k, num(f?.[k as keyof Flight]) > 0 ? String(f?.[k as keyof Flight]) : ''])),
     distance_nm: n1(f?.distance_nm), hobbs_start: s(f?.hobbs_start), hobbs_end: s(f?.hobbs_end), tach_start: s(f?.tach_start), tach_end: s(f?.tach_end),

@@ -48,6 +48,19 @@ Requires `BETTER_AUTH_SECRET` (32+ characters) in `/var/www/app/.env`; the API
 refuses to start in production without it. `BETTER_AUTH_URL` defaults to
 https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
 
+## Flight tracks and NICE AIR auto-logging
+
+Tracks come from free sources only, merged per point (`track_log_points.source`):
+every OpenSky leg the aircraft flew in the window (OpenSky splits a flight at
+each landing), plus adsb.lol's daily archive (`services/adsblol.js`; the UTC
+day is published ~3–4 h after it ends, streamed and cached in `adsblol_traces`).
+`services/autolog.js` runs every 20 min: syncs NICE AIR booking emails, and for
+each booking from 2026-10-11 on that has ended, wasn't cancelled, and has ADS-B
+evidence, creates an entry with `foreflight_source = 'nice-air-auto'`. The
+`nice_air_autolog` ledger stops deleted entries coming back; untouched auto
+entries are rebuilt when adsb.lol adds coverage. `POST /api/nice-air/autolog/run`
+runs it now; `POST /api/flights/:id/refresh-track` re-collects one track.
+
 ## Mail
 
 `#mail` is a mail client for hello@gacoka.com backed by a self-hosted

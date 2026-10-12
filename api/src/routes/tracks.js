@@ -88,15 +88,21 @@ export default async function trackRoutes(fastify) {
     const windowClosed = end < Math.floor(Date.now() / 1000) - 3600 // +1 h to settle
     const forAircraft = flights => icao24 ? flights.filter(f => f.icao24?.toLowerCase() === normalizeIcao24(icao24)) : flights
 
+    // With the aircraft known, list every leg it flew that day (any departure
+    // airport): a cross-country with stops is several OpenSky "flights".
+    const byAircraft = !!icao24
+    const cacheKey = byAircraft ? `icao24:${normalizeIcao24(icao24)}` : dep
     if (windowClosed) {
       const cached = await queryRowsOrNull(
-        'SELECT flights_json FROM opensky_departures_cache WHERE departure_icao=$1 AND date_str=$2', [dep, date])
+        'SELECT flights_json FROM opensky_departures_cache WHERE departure_icao=$1 AND date_str=$2', [cacheKey, date])
       if (cached?.length) return { flights: forAircraft(cached[0].flights_json), needs_auth: false, source: 'opensky_cache' }
     }
 
     try {
       const r = await fetch(
-        `https://opensky-network.org/api/flights/departure?airport=${encodeURIComponent(dep)}&begin=${begin}&end=${end}`,
+        byAircraft
+          ? `https://opensky-network.org/api/flights/aircraft?icao24=${normalizeIcao24(icao24)}&begin=${begin}&end=${end}`
+          : `https://opensky-network.org/api/flights/departure?airport=${encodeURIComponent(dep)}&begin=${begin}&end=${end}`,
         { headers: await openSkyHeaders(fastify.log), signal: AbortSignal.timeout(12000) }
       )
       if (r.status === 401 || r.status === 403) {
@@ -115,7 +121,7 @@ export default async function trackRoutes(fastify) {
       const shaped = raw.map(f => ({
         icao24:          f.icao24,
         callsign:        f.callsign?.trim() || null,
-        departure_icao:  f.estDepartureAirport || dep,
+        departure_icao:  f.estDepartureAirport || (byAircraft ? null : dep),
         arrival_icao:    f.estArrivalAirport || null,
         departure_time:  f.firstSeen ? new Date(f.firstSeen * 1000).toISOString() : null,
         arrival_time:    f.lastSeen  ? new Date(f.lastSeen  * 1000).toISOString() : null,
@@ -128,7 +134,7 @@ export default async function trackRoutes(fastify) {
           `INSERT INTO opensky_departures_cache (departure_icao, date_str, flights_json)
            VALUES ($1, $2, $3)
            ON CONFLICT (departure_icao, date_str) DO UPDATE SET flights_json=$3, fetched_at=NOW()`,
-          [dep, date, JSON.stringify(shaped)]
+          [cacheKey, date, JSON.stringify(shaped)]
         )
       }
       return { flights: forAircraft(shaped), needs_auth: false, source: 'opensky' }

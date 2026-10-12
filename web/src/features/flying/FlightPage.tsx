@@ -341,7 +341,7 @@ function RefreshTrackButton({ id }: { id: number }) {
   return (
     <Button disabled={busy} onClick={async () => {
       setBusy(true)
-      const t = toast.loading('Collecting the track from OpenSky and adsb.lol… this can take a couple of minutes')
+      const t = toast.loading('Collecting the track from OpenSky, adsb.fi, airplanes.live and adsb.lol… this can take a couple of minutes')
       try {
         const r = await post<{ replaced: boolean; after: { points: number; seconds: number }; before: { seconds: number }; counts: Record<string, number>; pending: string[] }>(`/api/flights/${id}/refresh-track`)
         const mins = (s: number) => `${Math.round(s / 60)} min`
@@ -358,7 +358,7 @@ function Readout({ label, value, sub }: { label: string; value: string; sub?: st
   return <div><div className="text-xs text-fg-3">{label}</div><div className="num font-medium text-fg">{value}{sub && <span className="ml-1.5 font-normal text-fg-3">{sub}</span>}</div></div>
 }
 
-const SOURCE_NAME: Record<string, string> = { opensky: 'OpenSky', adsblol: 'adsb.lol', fr24: 'Flightradar24', aeroapi: 'FlightAware', foreflight_csv: 'ForeFlight' }
+const SOURCE_NAME: Record<string, string> = { opensky: 'OpenSky', adsblol: 'adsb.lol', adsbfi: 'adsb.fi', airplaneslive: 'airplanes.live', fr24: 'Flightradar24', aeroapi: 'FlightAware', foreflight_csv: 'ForeFlight' }
 
 function TrackStatsCard({ id, enabled, pts }: { id: number; enabled: boolean; pts: TrackPoint[] }) {
   const bySource = Object.entries(pts.reduce<Record<string, number>>((a, p) => { const k = p.source || 'opensky'; a[k] = (a[k] || 0) + 1; return a }, {}))

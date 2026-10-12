@@ -120,9 +120,9 @@ export async function getAdsbLolTrace(icao24, utcDate, log) {
   return { trace: json ? JSON.parse(json) : null }
 }
 
-// readsb trace rows: [secondsAfterTimestamp, lat, lon, alt_ft | 'ground',
+// readsb trace rows (adsb.lol, adsb.fi and airplanes.live all run readsb): [secondsAfterTimestamp, lat, lon, alt_ft | 'ground',
 // groundspeed_kt, track_deg, flags, baro_rate_fpm, ...].
-export function normalizeAdsbLol(trace) {
+export function normalizeAdsbLol(trace, source = 'adsblol') {
   if (!trace?.trace) return []
   const t0 = trace.timestamp
   return trace.trace.map(p => ({
@@ -134,7 +134,7 @@ export function normalizeAdsbLol(trace) {
     track_deg:          p[5] ?? null,
     vertical_speed_fpm: p[7] ?? null,
     on_ground:          p[3] === 'ground',
-    source:             'adsblol',
+    source,
   })).filter(p => p.lat != null && p.lon != null)
 }
 

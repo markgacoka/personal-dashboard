@@ -123,7 +123,8 @@ export function planEntry({ booking, analysis, counts, aircraftId, instructor, h
   const farthest = analysis?.farthest_nm || 0
   const xc = farthest > 50 || (via.length > 0 && farthest > 25)
   const dual = !!booking.cfi
-  const sources = [counts?.opensky && 'OpenSky', counts?.adsblol && 'adsb.lol'].filter(Boolean).join(' and ') || 'no ADS-B data'
+  const names = { opensky: 'OpenSky', adsblol: 'adsb.lol', adsbfi: 'adsb.fi', airplaneslive: 'airplanes.live' }
+  const sources = Object.entries(counts || {}).filter(([, n]) => n).map(([k]) => names[k] || k).join(', ') || 'no ADS-B data'
   const remarks = [
     `Auto-logged from the NICE AIR booking ${fmtLocal(booking.start_unix)}–${fmtLocal(booking.end_unix)}${booking.cfi ? ` with ${booking.cfi}` : ''}, and the ADS-B track from ${sources}.`,
     complete
@@ -328,10 +329,12 @@ async function refreshRecentTracks({ log, now }) {
     const days = utcDatesBetween(fromMs, toMs)
     const { rows: cached } = await pool.query('SELECT utc_date::text FROM adsblol_traces WHERE icao24 = $1 AND utc_date = ANY($2::date[])', [f.mode_s_hex, days])
     const missing = days.filter(d => !cached.some(c => c.utc_date === d))
-    if (!missing.length) continue
+    // Community recent traces only reach back about a day: capture them once.
+    const { rows: [{ n: captured }] } = await pool.query('SELECT count(*)::int AS n FROM ads_traces WHERE icao24 = $1 AND starts_at <= $3 AND ends_at >= $2', [f.mode_s_hex, new Date(fromMs), new Date(toMs)])
+    const recentDue = !captured && toMs > now - 30 * 3600_000
     const published = []
     for (const d of missing) if (await releaseParts(d).catch(() => null)) published.push(d)
-    if (!published.length) continue
+    if (!published.length && !recentDue) continue
     const r = await refreshFlightTrack(pool, f.id, log)
     out.push({ flight_id: f.id, status: r.replaced ? 'track_improved' : 'track_checked', counts: r.counts, before: r.before, after: r.after })
   }

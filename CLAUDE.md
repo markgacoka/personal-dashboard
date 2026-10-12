@@ -52,7 +52,8 @@ https://gacoka.com. Writes must come from the site's own Origin (CSRF defence).
 
 Tracks come from free sources only, merged per point (`track_log_points.source`):
 every OpenSky leg the aircraft flew in the window (OpenSky splits a flight at
-each landing), plus adsb.lol's daily archive (`services/adsblol.js`; the UTC
+each landing), adsb.fi and airplanes.live recent traces (about the last 24 h,
+snapshots kept in `ads_traces`), plus adsb.lol's daily archive (`services/adsblol.js`; the UTC
 day is published ~3–4 h after it ends, streamed and cached in `adsblol_traces`).
 `services/autolog.js` runs every 20 min: syncs NICE AIR booking emails, and for
 each booking from 2026-10-11 on that has ended, wasn't cancelled, and has ADS-B

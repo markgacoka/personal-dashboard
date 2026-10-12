@@ -953,6 +953,26 @@ async function migrateV26() {
   `)
 }
 
+// Recent-trace snapshots from community ADS-B networks (adsb.fi,
+// airplanes.live). Their files only cover about the last day, so each fetch is
+// kept and later refreshes still have it.
+async function migrateV27() {
+  await pool.query(`
+    ALTER TABLE track_log_points DROP CONSTRAINT IF EXISTS track_log_points_source_check;
+    ALTER TABLE track_log_points ADD CONSTRAINT track_log_points_source_check
+      CHECK (source = ANY (ARRAY['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol', 'adsbfi', 'airplaneslive']));
+    CREATE TABLE IF NOT EXISTS ads_traces (
+      source     TEXT NOT NULL,
+      icao24     TEXT NOT NULL,
+      starts_at  TIMESTAMPTZ NOT NULL,
+      ends_at    TIMESTAMPTZ NOT NULL,
+      trace_gzip BYTEA NOT NULL,
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (source, icao24, starts_at)
+    );
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -960,7 +980,7 @@ const MIGRATIONS = [
   ['013', migrateV13], ['014', migrateV14], ['015', migrateV15], ['016', migrateV16],
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
-  ['024', migrateV24], ['025', migrateV25], ['026', migrateV26],
+  ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

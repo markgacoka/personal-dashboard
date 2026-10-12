@@ -5,9 +5,10 @@
 //                     vertical_speed_fpm, on_ground }
 import { fetchOpenSkyTrack, normalizeIcao24, openSkyHeaders } from './opensky.js'
 import { getAdsbLolTrace, normalizeAdsbLol, utcDatesBetween } from './adsblol.js'
+import { recentTracePoints } from './recentTraces.js'
 import { loadSchedules, scheduleWindow } from './schedules.js'
 
-const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol']
+const TRACK_SOURCES = ['opensky', 'fr24', 'aeroapi', 'foreflight_csv', 'adsblol', 'adsbfi', 'airplaneslive']
 
 // FR24 v1 /flight-tracks positions: ISO timestamp, alt ft, gspeed kt, vspeed fpm.
 export function normalizeFr24Positions(positions) {
@@ -96,12 +97,14 @@ export async function openSkyTrack(hex, fromMs, toMs, log) {
 }
 
 // One time-ordered track from several providers. Points closer than 3 s to an
-// already kept point are dropped; adsb.lol points are kept first because they
-// carry ground speed, vertical rate and ground state.
+// already kept point are dropped; readsb sources (adsb.lol, adsb.fi,
+// airplanes.live) are kept first because they carry ground speed, vertical
+// rate and ground state, which OpenSky's track rows don't.
+const RANK = { adsblol: 0, adsbfi: 1, airplaneslive: 2, opensky: 3 }
 export function mergeTracks(...lists) {
   const all = lists.flat().filter(p => p?.ts && p.lat != null && p.lon != null)
     .map(p => ({ ...p, t: Date.parse(p.ts) }))
-    .sort((a, b) => (a.source === 'adsblol' ? 0 : 1) - (b.source === 'adsblol' ? 0 : 1))
+    .sort((a, b) => (RANK[a.source] ?? 4) - (RANK[b.source] ?? 4))
   const kept = []
   const taken = new Set()
   for (const p of all) {
@@ -134,10 +137,11 @@ export async function collectTrack({ hex, fromMs, toMs, log, useAdsbLol = true }
       } catch (e) { log?.warn({ err: e.message, day }, 'adsb.lol lookup failed'); pending.push(day) }
     }
   }
+  const recent = await recentTracePoints(hex, fromMs, toMs, log).catch(e => { log?.warn({ err: e.message }, 'Recent traces failed'); return [] })
   const inWindow = p => { const t = Date.parse(p.ts); return t >= fromMs && t <= toMs }
-  const points = mergeTracks(os.points.filter(inWindow), adsb.filter(inWindow))
+  const points = mergeTracks(os.points.filter(inWindow), adsb.filter(inWindow), recent.filter(inWindow))
   const by = src => points.filter(p => p.source === src).length
-  return { points, legs: os.legs, pending, counts: { opensky: by('opensky'), adsblol: by('adsblol') } }
+  return { points, legs: os.legs, pending, counts: Object.fromEntries(['opensky', 'adsblol', 'adsbfi', 'airplaneslive'].map(k => [k, by(k)])) }
 }
 
 // The window to search for a flight's track: its block times (or its NICE AIR

@@ -62,7 +62,7 @@ export function makeDrill(rng: Rng = Math.random): Scenario {
     {
       ...base, phase: 'Weather', title: 'Pick the runway',
       situation: `${ap.name} (${ap.icao}) reports wind ${wtxt}. You are ${nm} nm ${compass8(brgFrom)} of the field at ${alt.toLocaleString()} ft.`,
-      radio: [{ from: `${ap.icao} ${ap.wx.kind}`, text: `${ap.name} automated weather. Wind ${wtxt}. Visibility 10. Sky clear. Altimeter 30.01.`, voice: 2 }],
+      radio: [{ from: `${ap.icao} ${ap.wx?.kind ?? "weather"}`, text: `${ap.name} automated weather. Wind ${wtxt}. Visibility 10. Sky clear. Altimeter 30.01.`, voice: 2 }],
       info: [{ kind: 'supplement', title: `Chart Supplement · ${ap.icao}` }],
       q: { kind: 'choice', prompt: `Wind ${wtxt}. Which runway?`, options: rwyOpts, answer: best.ident, why: `Runway ${best.ident} (${fmtHdg(best.hdg)}°) is most closely aligned with the wind.`, refs: ['AIM 4-3-3'] },
     },

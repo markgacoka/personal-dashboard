@@ -21,6 +21,8 @@ import { runMigrations } from './db/migrate.js'
 import { importAcftref, isAcftrefEmpty } from './services/faa-registry.js'
 import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 import { scheduleUsAirportsRefresh } from './services/usAirports.js'
+import { scheduleNasrRefresh } from './services/nasr.js'
+import patternRoutes from './routes/pattern.js'
 import { scheduleNightSync } from './services/schedules.js'
 import { scheduleAutoLog } from './services/autolog.js'
 
@@ -70,6 +72,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
       await fastify.register(flightRoutes)
       await fastify.register(importRoutes)
       await fastify.register(sleepRoutes)
+      await fastify.register(patternRoutes)
       await fastify.register(mailRoutes, { background }) // answers "not configured" until MAIL_* is set
       if (process.env.PLAID_CLIENT_ID) {
         await fastify.register(financeRoutes)
@@ -79,6 +82,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
       if (background) {
         scheduleFaaAirspaceRefresh(fastify.log) // first boot, then every 28-day AIRAC cycle
         scheduleUsAirportsRefresh(fastify.log)  // first boot, then every 28 days
+        scheduleNasrRefresh(fastify.log)        // every US airport for the pattern trainer, per NASR cycle
         scheduleNightSync(fastify.log)          // block times from Gmail: first boot, then every 6 h
         scheduleAutoLog(fastify.log)            // NICE AIR bookings → logbook entries, every 20 min
 

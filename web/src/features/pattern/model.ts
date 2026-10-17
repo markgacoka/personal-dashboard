@@ -7,7 +7,7 @@ export type Phase = 'Preflight' | 'Weather' | 'Position' | 'Descent' | 'Radio' |
 export type At = { polar: [number, number] } | { leg: Leg; rwy: string } | { entry45: string } | { pt: Pt }
 
 export type Fly =
-  | { entry: EntryKind; rwy: string; then?: Outcome }
+  | { entry: EntryKind; rwy: string; then?: Outcome; flip?: boolean }
   | { pattern: Outcome; rwy: string; from: Leg }
   | { direct: At[]; alt: number[] }
   | { circuit: string }
@@ -64,6 +64,8 @@ export interface Scenario {
   id: string
   title: string
   airport: string
+  ap?: Airport // generated scenarios carry their own airport
+  source?: string
   blurb: string
   tags: string[]
   wind: Wind
@@ -88,7 +90,8 @@ export function atHeading(ap: Airport, step: Pick<Step, 'at' | 'hdg'>): number {
 export function flyPath(ap: Airport, fly: Fly, from: WP): WP[] {
   if ('direct' in fly) return [from, ...fly.direct.map((a, i) => ({ p: atPoint(ap, a), alt: fly.alt[i] ?? from.alt }))]
   if ('circuit' in fly) return circuit(findEnd(ap.runways, fly.circuit), ap.tpa, ap.elev)
-  const e = findEnd(ap.runways, fly.rwy)
+  const e0 = findEnd(ap.runways, fly.rwy)
+  const e = 'flip' in fly && fly.flip ? { ...e0, side: e0.side === 'L' ? 'R' as const : 'L' as const, out: [-e0.out[0], -e0.out[1]] as Pt } : e0
   if ('pattern' in fly) return [from, ...patternPath(e, fly.from, fly.pattern, ap.tpa, ap.elev).slice(1)]
   const entry = entryPath(e, fly.entry, from, ap.tpa, ap.elev)
   if (!fly.then || fly.entry === 'straight' || fly.entry === 'base') return entry

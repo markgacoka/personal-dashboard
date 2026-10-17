@@ -25,6 +25,7 @@ export const router = createBrowserRouter([
       { path: 'flying', element: page(() => import('@/features/flying/LogbookPage')) },
       { path: 'flying/weather', element: page(() => import('@/features/flying/WeatherPage')) },
       { path: 'flying/pilot', element: page(() => import('@/features/flying/PilotPage')) },
+      { path: 'flying/pattern/us/:id', element: page(() => import('@/features/pattern/PatternPage')) },
       { path: 'flying/pattern/:scenario?', element: page(() => import('@/features/pattern/PatternPage')) },
       { path: 'flying/:id', element: page(() => import('@/features/flying/FlightPage')) },
       { path: 'money', element: page(() => import('@/features/money/MoneyPage')) },

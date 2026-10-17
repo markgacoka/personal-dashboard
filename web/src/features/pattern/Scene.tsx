@@ -176,7 +176,7 @@ export function Scene({ ap, sock, pattern, zones = [], traffic = [], own, candid
           <div className="h-1.5 border-x-2 border-b-2 border-fg-2" style={{ width: scale / px }} />
           <div className="num mt-0.5 text-2xs text-fg-2">{scale} nm</div>
         </div>
-        <div className="hidden rounded-md border border-border bg-card/90 px-2 py-1 text-xs text-fg-2 shadow-card sm:block">Magnetic north up · runway layout schematic</div>
+        <div className="hidden rounded-md border border-border bg-card/90 px-2 py-1 text-xs text-fg-2 shadow-card sm:block">Magnetic north up · {ap.surveyed ? 'runways from FAA survey data' : 'runway layout schematic'}</div>
       </div>
     </div>
   )

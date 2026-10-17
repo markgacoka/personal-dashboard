@@ -11,7 +11,7 @@ export interface Airport {
   tpaNote: string
   towered: boolean
   freqs: { label: string; mhz: string; note?: string }[]
-  wx: { kind: 'ASOS' | 'AWOS-3' | 'ATIS'; mhz: string; phone?: string }
+  wx: { kind: string; mhz?: string; phone?: string; station?: string; distNm?: number } | null
   runways: RunwayDef[]
   circle?: Pt
   remarks: string[]
@@ -19,6 +19,7 @@ export interface Airport {
   waterLabel?: string
   ridges?: { path: Pt[]; label: string }[]
   classD?: number
+  surveyed?: boolean // runway positions from FAA runway-end coordinates
 }
 
 export const AIRPORTS: Record<string, Airport> = {

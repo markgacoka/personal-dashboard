@@ -17,6 +17,7 @@ import { AirportDiagram, Scene, Windsock, type CandState, type Candidate } from 
 import { Instruments } from './Instruments'
 import { InfoCard, RadioPanel } from './Info'
 import { LETTERS, Quiz } from './Quiz'
+import { AnyAirportCard, markVisited, randomAirport, UsLoading, useUsScenario, type Filters } from './UsAirports'
 
 interface Prefs { autoplay: boolean; hideText: boolean }
 type Scores = Record<string, { best: number; total: number; at: string }>
@@ -28,8 +29,33 @@ function useStored<T>(key: string, init: T) {
 }
 
 export default function PatternPage() {
-  const { scenario } = useParams()
+  const { scenario, id } = useParams()
   const [prefs, setPrefs] = useStored<Prefs>('pattern-prefs', { autoplay: true, hideText: false })
+  if (id) return <UsArrival key={id} id={id.toUpperCase()} prefs={prefs} setPrefs={setPrefs} />
+  return <Curated scenario={scenario} prefs={prefs} setPrefs={setPrefs} />
+}
+
+function UsArrival({ id, prefs, setPrefs }: { id: string; prefs: Prefs; setPrefs: (p: Prefs) => void }) {
+  const { rec, cond, sc, mode, again } = useUsScenario(id)
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  if (!sc) return <UsLoading id={id} rec={rec.data} mode={mode} error={(rec.error as Error | null)?.message} />
+  const next = async () => {
+    setBusy(true)
+    try {
+      let f: Filters = { scope: 'public', tower: 'any', near: '0', state: '', wx: 'live' }
+      try { f = { ...f, ...JSON.parse(localStorage.getItem('pattern-filters') || '{}') } } catch { /* defaults */ }
+      navigate(`/flying/pattern/us/${(await randomAirport(f)).id}?wx=${mode}`)
+    } finally { setBusy(false) }
+  }
+  return (
+    <Runner key={String(cond.dataUpdatedAt)} sc={sc} prefs={prefs} setPrefs={setPrefs}
+      onFinish={score => markVisited(rec.data!.id, score, sc.steps.length)} onAgain={again}
+      actions={<><Button variant="primary" onClick={next} loading={busy}><Shuffle />Next airport</Button><Button onClick={again}><RotateCcw />Same airport, new conditions</Button></>} />
+  )
+}
+
+function Curated({ scenario, prefs, setPrefs }: { scenario?: string; prefs: Prefs; setPrefs: (p: Prefs) => void }) {
   const [scores, setScores] = useStored<Scores>('pattern-scores', {})
   const [drillSeed, setDrillSeed] = useState(0)
   const sc = useMemo(() => scenario === 'drill' ? makeDrill() : SCENARIOS.find(s => s.id === scenario), [scenario, drillSeed])
@@ -44,8 +70,9 @@ export default function PatternPage() {
 function Library({ scores, prefs, setPrefs }: { scores: Scores; prefs: Prefs; setPrefs: (p: Prefs) => void }) {
   return (
     <div>
-      <PageHeader title="Pattern trainer" description="Real Bay Area airports and real Chart Supplement data. Make the call at each point of the arrival, from preflight to rollout." />
+      <PageHeader title="Pattern trainer" description="Any airport in the United States from the FAA’s own data, plus hand-built Bay Area scenarios. Make the call at each point of the arrival, from preflight to rollout." />
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+        <AnyAirportCard />
         {SCENARIOS.map(sc => <ScenarioCard key={sc.id} sc={sc} score={scores[sc.id]} />)}
         <Card className="flex flex-col">
           <CardHeader icon={<Shuffle />} title="Entry drill" description="Endless random arrivals: a random airport, wind and position. Pick the runway, find the downwind, place yourself, choose the entry and the heading." />
@@ -58,7 +85,7 @@ function Library({ scores, prefs, setPrefs }: { scores: Scores; prefs: Prefs; se
             <p>On the map, click a lettered path or a runway end to answer. The windsock panel shows the wind at the runway, which isn’t always what the AWOS said.</p>
             <label className="flex items-center justify-between gap-3"><span>Play radio automatically</span><Switch checked={prefs.autoplay} onCheckedChange={v => setPrefs({ ...prefs, autoplay: v })} /></label>
             <label className="flex items-center justify-between gap-3"><span>Listen only (hide transcripts until played)</span><Switch checked={prefs.hideText} onCheckedChange={v => setPrefs({ ...prefs, hideText: v })} /></label>
-            <p className="text-fg-3">Airport data checked against AirNav on Oct 16, 2026. NOTAMs, TFRs, weather and traffic are invented for the exercise. Training aid only: verify against the current Chart Supplement and your POH.</p>
+            <p className="text-fg-3">“Any US airport” uses the FAA NASR subscription (refreshed every 28-day cycle) with live METARs and NOTAMs or generated weather; the generated traffic and windsock shifts are for practice. The hand-built scenarios use AirNav data checked Oct 16, 2026, with invented NOTAMs, TFRs, weather and traffic. Training aid only: verify against the current Chart Supplement and your POH.</p>
           </CardBody>
         </Card>
       </div>
@@ -88,8 +115,8 @@ function ScenarioCard({ sc, score }: { sc: Scenario; score?: Scores[string] }) {
   )
 }
 
-function Runner({ sc, prefs, setPrefs, onFinish, onAgain }: { sc: Scenario; prefs: Prefs; setPrefs: (p: Prefs) => void; onFinish: (score: number) => void; onAgain: () => void }) {
-  const ap = AIRPORTS[sc.airport]
+function Runner({ sc, prefs, setPrefs, onFinish, onAgain, actions }: { sc: Scenario; prefs: Prefs; setPrefs: (p: Prefs) => void; onFinish: (score: number) => void; onAgain: () => void; actions?: React.ReactNode }) {
+  const ap = sc.ap ?? AIRPORTS[sc.airport]
   const [i, setI] = useState(0)
   const [results, setResults] = useState<boolean[]>([])
   const done = i >= sc.steps.length
@@ -99,14 +126,14 @@ function Runner({ sc, prefs, setPrefs, onFinish, onAgain }: { sc: Scenario; pref
     <div>
       <PageHeader
         title={sc.title}
-        description={<span><span className="num">{ap.icao}</span> · {ap.name} · {ap.towered ? 'Towered' : 'Non-towered'} · elevation <span className="num">{ap.elev}</span> ft · pattern <span className="num">{ap.tpa.toLocaleString()}</span> MSL</span>}
+        description={<span><span className="num">{ap.icao}</span> · {ap.city ?? ap.name} · {ap.towered ? 'Towered' : 'Non-towered'} · elevation <span className="num">{ap.elev.toLocaleString()}</span> ft · pattern <span className="num">{ap.tpa.toLocaleString()}</span> MSL{sc.source && <span className="block text-sm">{sc.source}</span>}</span>}
         actions={<>
           <label className="hidden items-center gap-2 text-sm text-fg-2 sm:flex"><Switch checked={prefs.hideText} onCheckedChange={v => setPrefs({ ...prefs, hideText: v })} />Listen only</label>
           <Button variant="ghost" size="sm" onClick={() => navigate('/flying/pattern')}><ArrowLeft />All scenarios</Button>
         </>}
       />
       <Stepper steps={sc.steps} i={i} results={results} />
-      {done ? <Results sc={sc} results={results} onRestart={() => { setResults([]); setI(0); if (sc.id === 'drill') onAgain() }} /> : (
+      {done ? <Results sc={sc} results={results} actions={actions} onRestart={() => { setResults([]); setI(0); if (sc.id === 'drill') onAgain() }} /> : (
         <StepView key={i} ap={ap} sc={sc} step={sc.steps[i]} index={i} prefs={prefs}
           onAnswer={ok => setResults(r => { const x = r.slice(); x[i] = ok; return x })}
           onNext={() => setI(i + 1)} last={i === sc.steps.length - 1} />
@@ -248,7 +275,7 @@ function WindLine({ ap, wind, rwy }: { ap: Airport; wind: Wind; rwy?: string }) 
   return <span className="num text-fg-3">Wind {txt} · {rwy}: {Math.abs(Math.round(c.head))} {c.head >= 0 ? 'head' : 'tail'}, {Math.abs(Math.round(c.cross))} cross</span>
 }
 
-function Results({ sc, results, onRestart }: { sc: Scenario; results: boolean[]; onRestart: () => void }) {
+function Results({ sc, results, onRestart, actions }: { sc: Scenario; results: boolean[]; onRestart: () => void; actions?: React.ReactNode }) {
   const score = results.filter(Boolean).length
   const phases = [...new Set(sc.steps.map(s => s.phase))].map(p => {
     const idx = sc.steps.map((s, k) => [s, k] as const).filter(([s]) => s.phase === p).map(([, k]) => k)
@@ -267,7 +294,7 @@ function Results({ sc, results, onRestart }: { sc: Scenario; results: boolean[];
             </div>
           ))}
           <div className="flex gap-2 pt-2">
-            <Button variant="primary" onClick={onRestart}><RotateCcw />{sc.id === 'drill' ? 'New drill' : 'Fly it again'}</Button>
+            {actions ?? <Button variant="primary" onClick={onRestart}><RotateCcw />{sc.id === 'drill' ? 'New drill' : 'Fly it again'}</Button>}
             <Button asChild><Link to="/flying/pattern">All scenarios</Link></Button>
           </div>
         </CardBody>

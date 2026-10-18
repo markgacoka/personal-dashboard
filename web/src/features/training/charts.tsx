@@ -62,10 +62,9 @@ export function VolumeChart({ activities, days = 30, height = 200 }: { activitie
 }
 
 // ── Training-load calendar: one cell per day, darker = more load ─────────────
-const RAMP = ['var(--sunken)', '#cde2fb', '#9ec5f4', '#5598e7', '#256abf', '#104281']
-const RAMP_DARK = ['var(--sunken)', '#0d366b', '#184f95', '#256abf', '#3987e5', '#86b6ef']
+const RAMP = ['var(--sunken)', '#0d366b', '#184f95', '#256abf', '#3987e5', '#86b6ef']
 
-export function LoadCalendar({ activities, weeks = 26, dark }: { activities: Activity[]; weeks?: number; dark?: boolean }) {
+export function LoadCalendar({ activities, weeks = 26 }: { activities: Activity[]; weeks?: number }) {
   const { cols, max, months } = useMemo(() => {
     const byDay = new Map<string, { load: number; mins: number; n: number }>()
     for (const a of activities) {
@@ -96,7 +95,6 @@ export function LoadCalendar({ activities, weeks = 26, dark }: { activities: Act
     }
     return { cols, max, months }
   }, [activities, weeks])
-  const ramp = dark ? RAMP_DARK : RAMP
   const level = (v: number) => (v <= 0 ? 0 : Math.min(5, 1 + Math.floor((v / (max || 1)) * 4.999)))
   return (
     <div className="overflow-x-auto scrollbar-none">
@@ -105,21 +103,21 @@ export function LoadCalendar({ activities, weeks = 26, dark }: { activities: Act
           {months.map(m => <span key={m.col + m.label} className="absolute" style={{ left: m.col * 15 }}>{m.label}</span>)}
         </div>
         <div className="flex gap-[3px]">
-          <div className="mr-1 grid w-6 grid-rows-7 gap-[3px] text-[10px] leading-3 text-fg-3">
+          <div className="mr-1 grid w-6 grid-rows-7 gap-[3px] text-2xs leading-3 text-fg-3">
             {['Mon', '', 'Wed', '', 'Fri', '', ''].map((l, i) => <span key={i} className="h-3">{l}</span>)}
           </div>
           {cols.map((col, ci) => (
             <div key={ci} className="grid grid-rows-7 gap-[3px]">
               {col.map(cell => (
                 <Tip key={cell.day} content={cell.future ? null : `${short(cell.day, { weekday: 'short', month: 'short', day: 'numeric' })} · ${cell.v ? `${cell.v.n} session${cell.v.n > 1 ? 's' : ''}, ${Math.round(cell.v.mins)} min${cell.v.load ? `, load ${Math.round(cell.v.load)}` : ''}` : 'Rest'}`}>
-                  <span className={cn('size-3 rounded-[3px]', cell.future && 'opacity-0')} style={{ background: ramp[cell.v ? level(cell.v.load || cell.v.mins) : 0], boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--fg) 6%, transparent)' }} />
+                  <span className={cn('size-3 rounded-[3px]', cell.future && 'opacity-0')} style={{ background: RAMP[cell.v ? level(cell.v.load || cell.v.mins) : 0], boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--fg) 6%, transparent)' }} />
                 </Tip>
               ))}
             </div>
           ))}
         </div>
         <div className="ml-7 flex items-center gap-1.5 text-xs text-fg-3">
-          Less {ramp.map((c, i) => <span key={i} className="size-3 rounded-[3px]" style={{ background: c, boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--fg) 6%, transparent)' }} />)} More
+          Less {RAMP.map((c, i) => <span key={i} className="size-3 rounded-[3px]" style={{ background: c, boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--fg) 6%, transparent)' }} />)} More
           <span className="ml-2">· shaded by Garmin training load</span>
         </div>
       </div>

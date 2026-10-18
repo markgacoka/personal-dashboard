@@ -39,7 +39,7 @@ export default function SleepPage() {
     <div>
       <PageHeader title="Sleep" description="Nightly recovery from Garmin" />
       <div className="grid gap-5 xl:grid-cols-12">
-        <div className="xl:col-span-8">{latest.isLoading ? <Skeleton className="h-[420px]" /> : latest.data ? <LastNight s={latest.data} /> : <Card className="grid h-full place-items-center p-10 text-sm text-fg-3">No detail for the most recent night.</Card>}</div>
+        <div className="xl:col-span-8">{latest.isLoading ? <Skeleton className="h-[26.25rem]" /> : latest.data ? <LastNight s={latest.data} /> : <Card className="grid h-full place-items-center p-10 text-sm text-fg-3">No detail for the most recent night.</Card>}</div>
         <Card className="xl:col-span-4">
           <CardHeader title="30-night averages" description={`${nights.length} nights recorded`} />
           <CardBody className="grid grid-cols-2 gap-5">
@@ -80,9 +80,9 @@ function LastNight({ s }: { s: SleepLatest }) {
       <CardHeader icon={<Moon />} title="Last night" description={calDate(s.date, { weekday: 'long', month: 'long', day: 'numeric' })} action={q && <Badge tone={score != null && score >= 80 ? 'good' : score != null && score >= 60 ? 'warn' : 'bad'} size="md">{titleCase(q)}</Badge>} />
       <CardBody>
         <div className="flex flex-wrap items-center gap-6">
-          <Ring value={score} size={96} stroke={8} color={ringColor}><div className="text-center"><div className="num text-2xl font-semibold">{score ?? '—'}</div><div className="text-[11px] text-fg-3">score</div></div></Ring>
+          <Ring value={score} size={96} stroke={8} color={ringColor}><div className="text-center"><div className="num text-2xl font-medium">{score ?? '—'}</div><div className="text-2xs text-fg-3">score</div></div></Ring>
           <div>
-            <div className="num text-4xl font-semibold tracking-tight">{hm(d.sleepTimeSeconds) ?? '—'}</div>
+            <div className="num text-4xl font-medium">{hm(d.sleepTimeSeconds) ?? '—'}</div>
             <div className="mt-1 text-sm text-fg-2"><span className="num">{clockLocal(d.sleepStartTimestampLocal)}</span> → <span className="num">{clockLocal(d.sleepEndTimestampLocal)}</span>{d.awakeCount ? <span className="text-fg-3"> · woke {d.awakeCount}×</span> : null}</div>
           </div>
           <div className="ml-auto grid grid-cols-3 gap-x-6 gap-y-3 sm:grid-cols-5">

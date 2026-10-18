@@ -406,7 +406,7 @@ function Setup({ h, loading, recheck }: { h?: Health; loading: boolean; recheck:
   const meter = (n: number | undefined, of: number, label: string) => (
     <Card><CardBody className="pt-5">
       <div className="text-sm text-fg-3">{label}</div>
-      <div className="mt-1 text-2xl font-semibold"><span className="num">{n ?? '—'}</span><span className="text-base font-normal text-fg-3"> / {of}</span></div>
+      <div className="mt-1 text-2xl font-medium"><span className="num">{n ?? '—'}</span><span className="text-base font-normal text-fg-3"> / {of}</span></div>
       <Progress value={of ? ((n || 0) / of) * 100 : 0} className="mt-3" tone={of && (n || 0) / of > 0.9 ? 'warn' : 'accent'} />
     </CardBody></Card>
   )
@@ -417,7 +417,7 @@ function Setup({ h, loading, recheck }: { h?: Health; loading: boolean; recheck:
         {meter(h.sentThisMonth, h.monthlyLimit, 'Sent this month')}
         <Card><CardBody className="pt-5">
           <div className="text-sm text-fg-3">Checks passing</div>
-          <div className="mt-1 text-2xl font-semibold"><span className="num">{passing}</span><span className="text-base font-normal text-fg-3"> / {required.length}</span></div>
+          <div className="mt-1 text-2xl font-medium"><span className="num">{passing}</span><span className="text-base font-normal text-fg-3"> / {required.length}</span></div>
           <div className={cn('mt-2 text-sm', passing === required.length ? 'text-good' : 'text-warn')}>{passing === required.length ? 'Mail is set up correctly' : `${required.length - passing} record${required.length - passing === 1 ? '' : 's'} to fix`}</div>
         </CardBody></Card>
       </div>

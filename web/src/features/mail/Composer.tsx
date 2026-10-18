@@ -220,7 +220,7 @@ function ComposerWindow({ s, boot, register, onClosed, reopen }: { s: State; boo
   const tool = 'grid size-8 place-items-center rounded-md text-fg-3 hover:bg-hover hover:text-fg [&_svg]:size-4'
   return (
     <section aria-label={title} className={cn('fixed z-40 flex flex-col border border-border bg-card shadow-pop',
-      min ? 'bottom-0 right-4 h-12 w-80 rounded-t-lg lg:right-8' : 'inset-0 sm:inset-auto sm:bottom-0 sm:right-4 sm:h-[min(640px,calc(100dvh-5rem))] sm:w-[600px] sm:rounded-t-xl lg:right-8')}
+      min ? 'bottom-0 right-4 h-12 w-80 rounded-t-lg lg:right-8' : 'inset-0 sm:inset-auto sm:bottom-0 sm:right-4 sm:h-[min(640px,calc(100dvh-5rem))] sm:w-[37.5rem] sm:rounded-t-xl lg:right-8')}
       onDragOver={e => { if (e.dataTransfer.types.includes('Files')) e.preventDefault() }} onDrop={e => { if (e.dataTransfer.files.length) { e.preventDefault(); upload([...e.dataTransfer.files]) } }}>
       <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-border px-4', min && 'cursor-pointer border-0')} onClick={() => min && setMin(false)}>
         <span className="font-medium">{title}</span>

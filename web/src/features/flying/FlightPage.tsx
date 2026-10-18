@@ -46,7 +46,7 @@ export default function FlightPage() {
   const [idx, setIdx] = useState(0)
   useEffect(() => setIdx(0), [id])
 
-  if (isLoading) return <div className="space-y-4"><Skeleton className="h-10 w-96" /><Skeleton className="h-[520px]" /></div>
+  if (isLoading) return <div className="space-y-4"><Skeleton className="h-10 w-96" /><Skeleton className="h-[32.5rem]" /></div>
   if (!f) return <EmptyState icon={Plane} title="Flight not found" className="py-24" action={<Button asChild><Link to="/flying">Back to logbook</Link></Button>} />
 
   const stops = [f.departure, ...(f.via_airports || []), f.arrival].filter(Boolean) as Airport[]
@@ -72,7 +72,7 @@ export default function FlightPage() {
             {f.ipc && <Badge tone="accent" size="md">IPC</Badge>}
             {f.source === 'nice-air-auto' && <Badge tone="warn" size="md"><Bot />Auto-logged · review</Badge>}
           </div>
-          <h1 className="num text-3xl font-semibold tracking-tight">{route(f).join(' → ')}</h1>
+          <h1 className="num text-3xl font-medium">{route(f).join(' → ')}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-3">
             <span>{calDate(f.date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
             <span>·</span><span><span className="num text-fg-2">{f.aircraft?.tail_number}</span> {f.aircraft?.make} {f.aircraft?.model}</span>
@@ -174,12 +174,12 @@ function FlightMap({ stops, pts, idx, loading, metars }: { stops: Airport[]; pts
 
   useEffect(() => { if (mapRef.current?.isStyleLoaded()) applyLayers(mapRef.current, layers) }, [layers, applyLayers])
 
-  if (loading) return <Skeleton className="h-[520px] rounded-none" />
+  if (loading) return <Skeleton className="h-[32.5rem] rounded-none" />
   const coords: [number, number][] = pts.length >= 2 ? pts.map(p => [p.lon, p.lat]) : stops.filter(s => s.lon != null).map(s => [s.lon!, s.lat!])
 
   return (
     <div className="relative">
-      <MapView key={mapKey} className="h-[520px]" fullscreen center={coords[0]} zoom={9} onLoad={map => {
+      <MapView key={mapKey} className="h-[32.5rem]" fullscreen center={coords[0]} zoom={9} onLoad={map => {
         mapRef.current = map
         const accent = cssVar('--accent')
         if (coords.length >= 2) {
@@ -495,10 +495,10 @@ function AircraftCard({ f }: { f: Flight }) {
     <Card className="overflow-hidden">
       <div className="relative aspect-[16/9] bg-sunken">
         {r?.photo_url && !broken ? <img src={r.photo_url} alt={`${ac.tail_number}`} className="size-full object-cover" onError={() => setBroken(true)} /> : <div className="grid size-full place-items-center"><Plane className="size-10 text-fg-3" /></div>}
-        {r?.owner && <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-[11px] text-white">{r.owner}</span>}
+        {r?.owner && <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-2xs text-white">{r.owner}</span>}
       </div>
       <CardBody className="pt-4">
-        <div className="num text-xl font-semibold">{ac.tail_number}</div>
+        <div className="num text-xl font-medium">{ac.tail_number}</div>
         <div className="text-sm text-fg-3">{r?.make || ac.make} {r?.model || ac.model}{(r?.year || ac.year) ? ` · ${r?.year || ac.year}` : ''}</div>
         {isLoading ? <Skeleton className="mt-4 h-32" /> : <>
           <DL className="mt-3" items={[

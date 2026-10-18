@@ -2,19 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 // maplibre-gl looks for its worker next to its own module, which bundling moves; hand it the bundled worker.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { usePrefs } from '@/lib/prefs'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/misc'
 
 maplibregl.setWorkerUrl(workerUrl)
 
-export const BASEMAP = {
-  light: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  dark: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-}
+export const BASEMAP = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
-// A MapLibre map that follows the theme: the base style is chosen at creation,
-// so a theme change rebuilds the map and `onLoad` re-adds the overlays.
+// A MapLibre map on the dark basemap; `onLoad` adds the overlays once the style is ready.
 export function MapView({ className, onLoad, center, zoom = 9, controls = true, fullscreen = false }: {
   className?: string
   onLoad: (map: maplibregl.Map) => void | (() => void)
@@ -24,7 +19,6 @@ export function MapView({ className, onLoad, center, zoom = 9, controls = true, 
   fullscreen?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const { resolved } = usePrefs()
   const [ready, setReady] = useState(false)
   const loadRef = useRef(onLoad)
   loadRef.current = onLoad
@@ -33,7 +27,7 @@ export function MapView({ className, onLoad, center, zoom = 9, controls = true, 
     if (!ref.current) return
     setReady(false)
     const map = new maplibregl.Map({
-      container: ref.current, style: BASEMAP[resolved], center: center || [-121.8, 37.3], zoom,
+      container: ref.current, style: BASEMAP, center: center || [-121.8, 37.3], zoom,
       attributionControl: false, cooperativeGestures: false, fadeDuration: 0,
     })
     if (controls) map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: false }), 'top-right')
@@ -46,7 +40,7 @@ export function MapView({ className, onLoad, center, zoom = 9, controls = true, 
     ro.observe(ref.current)
     return () => { ro.disconnect(); try { cleanup?.() } catch { /* */ } map.remove() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved])
+  }, [])
 
   return (
     <div className={cn('relative overflow-hidden', className)}>

@@ -27,8 +27,8 @@ export default function ChessPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <ChessAvatar src={c.avatar} />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{c.username}</h1>
+        <div className="min-w-[12rem] flex-1">
+          <h1 className="text-2xl font-medium sm:text-3xl">{c.username}</h1>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-sm text-fg-3">
             {c.league && <span>{c.league} league</span>}
             {c.joined && <><span>·</span><span>Member since {new Date(c.joined * 1000).getFullYear()}</span></>}

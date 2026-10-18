@@ -44,7 +44,7 @@ export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover
                     hover === o.id && !submitted && state === 'off' && 'border-border-strong bg-hover')}>
                   <span className={cn('mt-0.5 grid size-6 shrink-0 place-items-center text-xs font-semibold',
                     q.kind === 'multi' ? 'rounded' : 'rounded-full',
-                    state === 'on' ? 'bg-accent text-accent-fg' : state === 'right' ? 'bg-good text-white' : state === 'wrong' ? 'bg-bad text-white' : 'bg-sunken text-fg-2 ring-1 ring-inset ring-border')}>
+                    state === 'on' ? 'bg-accent text-accent-fg' : state === 'right' ? 'bg-good text-black' : state === 'wrong' ? 'bg-bad text-black' : 'bg-sunken text-fg-2 ring-1 ring-inset ring-border')}>
                     {state === 'right' ? <Check className="size-3.5" /> : state === 'wrong' ? <X className="size-3.5" /> : q.kind === 'multi' ? (on ? <Check className="size-3.5" /> : '') : LETTERS[i]}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -90,7 +90,7 @@ function OrderQ({ q, picked, toggle, reset, submitted }: { q: Extract<Question, 
               return (
                 <li key={id}>
                   <button onClick={() => toggle(id)} disabled={submitted} className={cn('flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm animate-in', submitted ? (right ? 'bg-good-soft text-fg' : 'bg-bad-soft text-fg') : 'bg-accent-soft text-fg hover:bg-hover')}>
-                    <span className={cn('num grid size-5 shrink-0 place-items-center rounded-full text-2xs font-semibold', submitted ? (right ? 'bg-good text-white' : 'bg-bad text-white') : 'bg-accent text-accent-fg')}>{i + 1}</span>
+                    <span className={cn('num grid size-5 shrink-0 place-items-center rounded-full text-2xs font-semibold', submitted ? (right ? 'bg-good text-black' : 'bg-bad text-black') : 'bg-accent text-accent-fg')}>{i + 1}</span>
                     {label(id)}
                   </button>
                 </li>

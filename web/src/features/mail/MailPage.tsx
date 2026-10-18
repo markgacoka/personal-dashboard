@@ -56,7 +56,7 @@ function MailClient() {
         </Drawer.Portal>
       </Drawer.Root>
 
-      <section className={cn('flex min-w-0 flex-col border-r border-border xl:w-[420px] xl:shrink-0 2xl:w-[480px]', threadId ? 'hidden xl:flex' : 'flex flex-1 xl:flex-none')}>
+      <section className={cn('flex min-w-0 flex-col border-r border-border xl:w-[26.25rem] xl:shrink-0 2xl:w-[30rem]', threadId ? 'hidden xl:flex' : 'flex flex-1 xl:flex-none')}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
           <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={() => setRailOpen(true)} aria-label="Folders"><MenuIcon /></Button>
           <div className="relative flex-1">
@@ -90,7 +90,7 @@ function Rail({ boot, folder, onPick, onCompose }: { boot: MailBoot; folder: str
       className={cn('flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-fg-2 hover:bg-hover hover:text-fg', folder === k && 'bg-card font-medium text-fg shadow-card ring-1 ring-border')}>
       {dot ? <span className="size-2.5 shrink-0 rounded-full" style={{ background: dot }} /> : I && <I className="size-4 shrink-0" strokeWidth={1.9} />}
       <span className="truncate">{label}</span>
-      {strong && n ? <span className="num ml-auto rounded-full bg-accent px-1.5 text-[11px] font-medium leading-[18px] text-accent-fg">{n}</span> : count(n)}
+      {strong && n ? <span className="num ml-auto rounded-full bg-accent px-1.5 text-2xs font-medium leading-[18px] text-accent-fg">{n}</span> : count(n)}
     </button>
   )
   const create = async (e: React.FormEvent) => {
@@ -277,7 +277,7 @@ function ThreadList({ boot, folder, q, tab, setTab, openId, onOpen, searchRef }:
                       {(labels.length > 0 || t.draft || t.scheduledAt) && <div className="mt-1 flex flex-wrap gap-1">
                         {t.draft && <Badge tone="bad">Draft</Badge>}
                         {t.scheduledAt && <Badge tone="warn"><Clock />{mailDateLong(t.scheduledAt)}</Badge>}
-                        {labels.map(l => <span key={l.id} className="inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-[11px] font-medium ring-1 ring-inset ring-border"><span className="size-1.5 rounded-full" style={{ background: labelColor(l.color) }} />{l.name}</span>)}
+                        {labels.map(l => <span key={l.id} className="inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-2xs font-medium ring-1 ring-inset ring-border"><span className="size-1.5 rounded-full" style={{ background: labelColor(l.color) }} />{l.name}</span>)}
                       </div>}
                     </button>
                     <div className="absolute right-2 top-2 hidden items-center rounded-md border border-border bg-card shadow-card group-hover:flex">

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export const axisProps = {
   tickLine: false,
   axisLine: false,
-  tick: { fill: 'var(--axis)', fontSize: 12, fontFamily: 'var(--font-sans)' },
+  tick: { fill: 'var(--axis)', fontSize: '0.75rem', fontFamily: 'var(--font-sans)' },
   tickMargin: 8,
 } as const
 
@@ -22,7 +22,7 @@ export interface TipRow { color?: string; label: React.ReactNode; value: React.R
 
 export function TipBox({ title, rows, footer }: { title?: React.ReactNode; rows: TipRow[]; footer?: React.ReactNode }) {
   return (
-    <div className="min-w-36 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-pop">
+    <div className="min-w-36 rounded-lg bg-[#1f1f1f] px-3 py-2.5 text-sm shadow-pop">
       {title && <div className="mb-1 text-xs font-medium text-fg-3">{title}</div>}
       <div className="space-y-0.5">
         {rows.map((r, i) => (

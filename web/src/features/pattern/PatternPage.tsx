@@ -225,7 +225,7 @@ function StepView({ ap, sc, step, index, prefs, onAnswer, onNext, last }: { ap: 
           own={{ s: own, trail, ahead: flying ? flight!.filter(s => s.s > own.s) : undefined, hidden: step.hideOwnship && !submitted }}
           candidates={candidates} focus={focus} runwayPick={runwayPick}
           onCandidate={id => !submitted && setPicked([id])} onHoverCandidate={setHover}
-          className="h-[360px] rounded-none border-0 border-b sm:h-[440px] 2xl:h-[520px]" />
+          className="h-[22.5rem] rounded-none border-0 border-b sm:h-[27.5rem] 2xl:h-[32.5rem]" />
         <Instruments s={own} gs={step.gs} icao={ap.icao} com={step.com} trend={trend} hidden={step.hideOwnship && !submitted} />
         <div className="grid gap-5 border-t border-border px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="min-w-0">

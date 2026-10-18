@@ -76,7 +76,7 @@ function Document({ icon, tone, title, number, name, issued, issuedLabel, expire
             </dl>
           </div>
           <div className="sm:w-40 sm:text-right">
-            <div className={cn('num text-4xl font-semibold tracking-tight', state === 'bad' ? 'text-bad' : state === 'warn' ? 'text-warn' : 'text-fg')}>{left.toLocaleString()}</div>
+            <div className={cn('num text-4xl font-medium', state === 'bad' ? 'text-bad' : state === 'warn' ? 'text-warn' : 'text-fg')}>{left.toLocaleString()}</div>
             <div className="text-sm text-fg-3">days remaining</div>
             <div className="mt-3 space-y-1 text-sm"><div><span className="text-fg-3">Valid through</span><br />{longDate(expires)}</div></div>
           </div>

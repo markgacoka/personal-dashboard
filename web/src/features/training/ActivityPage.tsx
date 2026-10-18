@@ -34,7 +34,7 @@ export default function ActivityPage() {
       <div className="mb-6 flex flex-wrap items-start gap-4">
         <span className="grid size-12 place-items-center rounded-xl" style={{ background: `color-mix(in oklch, ${cfg.color} 14%, transparent)`, color: cfg.color }}><cfg.icon className="size-6" /></span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{a.activityName || cfg.label}</h1>
+          <h1 className="text-2xl font-medium">{a.activityName || cfg.label}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-3">
             <span>{cfg.label}</span><span>·</span>
             <span>{new Date(a.startTimeLocal).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
@@ -56,7 +56,7 @@ export default function ActivityPage() {
 
       {hasMap && (
         <Card className="mb-5 overflow-hidden">
-          {gpx.isLoading ? <Skeleton className="h-[440px] rounded-none" /> : <RouteMap points={pts} color={cfg.color} />}
+          {gpx.isLoading ? <Skeleton className="h-[27.5rem] rounded-none" /> : <RouteMap points={pts} color={cfg.color} />}
           <div className="border-t border-border px-5 pb-4 pt-3">
             <div className="mb-2 flex items-baseline gap-2"><Mountain className="size-4 self-center text-fg-3" /><span className="text-sm font-medium">Elevation</span>{a.elevationGain ? <span className="text-sm text-fg-3">· {Math.round(a.elevationGain * 3.28084).toLocaleString()} ft gained</span> : null}</div>
             {gpx.isLoading ? <Skeleton className="h-40" /> : <ElevationChart points={pts} />}
@@ -84,7 +84,7 @@ export default function ActivityPage() {
 function RouteMap({ points, color }: { points: [number, number, number | null][]; color: string }) {
   const line = mapColor(color.startsWith('var(') ? color.slice(4, -1) : color)
   return (
-    <MapView className="h-[440px]" fullscreen center={[points[0][0], points[0][1]]} zoom={12} onLoad={map => {
+    <MapView className="h-[27.5rem]" fullscreen center={[points[0][0], points[0][1]]} zoom={12} onLoad={map => {
       const coords = points.map(p => [p[0], p[1]] as [number, number])
       map.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } })
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.9 } })
@@ -209,7 +209,7 @@ function Splits({ a, d }: { a: Activity; d?: ActivityDetail }) {
     <Card className="mt-5 overflow-hidden">
       <CardHeader title="Intervals and splits" />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[45rem] text-sm">
           <thead><tr className="border-y border-border bg-sunken text-left text-xs text-fg-3">
             {['Type', 'Count', 'Distance', 'Time', 'Pace', 'Avg HR', 'Max HR', 'Avg power', 'NP', 'Cadence', 'Calories'].map((h, i) => <th key={h} className={`py-2 font-medium ${i === 0 ? 'pl-5' : 'px-3'}`}>{h}</th>)}
           </tr></thead>

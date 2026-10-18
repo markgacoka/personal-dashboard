@@ -32,7 +32,7 @@ export default function TodayPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm text-fg-3">{today}</div>
-          <h1 className="mt-0.5 text-3xl font-semibold tracking-tight">{greeting()}, {first}</h1>
+          <h1 className="mt-0.5 text-3xl font-medium">{greeting()}, {first}</h1>
         </div>
         <AttentionStrip />
       </div>
@@ -246,7 +246,7 @@ function NetWorthCard({ className }: { className?: string }) {
       <CardBody>
         {isLoading || !nw ? <Skeleton className="h-52" /> : (
           <>
-            <div className="text-3xl font-semibold tracking-tight"><span className="num money">{dollars(nw.total)}</span></div>
+            <div className="text-3xl font-medium"><span className="num money">{dollars(nw.total)}</span></div>
             <div className={cn('mt-1 flex items-center gap-1 text-sm', up ? 'text-good' : 'text-bad')}>
               {up ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
               <span className="num money">{signed(nw.delta, v => dollars(v, { compact: true }))}</span><span className="text-fg-3">over 30 days</span>

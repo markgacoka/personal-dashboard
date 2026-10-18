@@ -81,7 +81,7 @@ export default function WeatherPage() {
 }
 
 function Cond({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
-  return <div><div className="text-sm text-fg-3">{label}</div><div className={cn('num mt-0.5 text-xl font-semibold', warn && 'text-warn')}>{value}</div>{sub && <div className={cn('text-sm', warn ? 'text-warn' : 'text-fg-3')}>{sub}</div>}</div>
+  return <div><div className="text-sm text-fg-3">{label}</div><div className={cn('num mt-0.5 text-xl font-medium', warn && 'text-warn')}>{value}</div>{sub && <div className={cn('text-sm', warn ? 'text-warn' : 'text-fg-3')}>{sub}</div>}</div>
 }
 
 function RunwaysCard({ runways, wdir, wspd, best, freqs, className }: { runways: Runway[]; wdir: number | 'VRB' | null; wspd: number; best?: string | null; freqs: { type: string; freq_mhz: string }[]; className?: string }) {

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { EmptyState, Segmented, Skeleton } from '@/components/ui/misc'
 import { PageHeader, Stat } from '@/components/data/stat'
 import { useActivities } from '@/lib/queries'
-import { usePrefs } from '@/lib/prefs'
 import { actDuration, PRIMARY, sportOf, SPORTS, TE_LABEL, type Sport } from '@/lib/sports'
 import { hm, miles, speedFor } from '@/lib/format'
 import type { Activity } from '@/lib/types'
@@ -19,7 +18,6 @@ const PAGE = 25
 
 export default function TrainingPage() {
   const { data: acts, isLoading, isError } = useActivities()
-  const { resolved } = usePrefs()
   const all = acts || []
 
   const weeks = useMemo(() => {
@@ -40,7 +38,7 @@ export default function TrainingPage() {
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-8">
           <CardHeader icon={<CalendarDays />} title="Consistency" description="Last six months" />
-          <CardBody>{isLoading ? <Skeleton className="h-36" /> : <LoadCalendar activities={all} dark={resolved === 'dark'} />}</CardBody>
+          <CardBody>{isLoading ? <Skeleton className="h-36" /> : <LoadCalendar activities={all} />}</CardBody>
         </Card>
         <Card className="xl:col-span-4">
           <CardHeader title="This week" description="Monday to today" />
@@ -101,7 +99,7 @@ function ActivityTable({ activities, loading }: { activities: Activity[]; loadin
   return (
     <Card className="mt-5">
       <div className="flex flex-wrap items-center gap-3 px-5 pb-3 pt-4">
-        <h2 className="mr-auto text-base font-semibold tracking-tight">Activities</h2>
+        <h2 className="mr-auto text-base font-medium">Activities</h2>
         <Segmented value={filter} onChange={v => { setFilter(v); setShown(PAGE) }} options={options} size="sm" />
         <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-fg-3" />
@@ -112,7 +110,7 @@ function ActivityTable({ activities, loading }: { activities: Activity[]; loadin
         <EmptyState icon={Search} title="No activities match" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[47.5rem] text-sm">
             <thead>
               <tr className="border-y border-border bg-sunken text-left text-xs font-medium text-fg-3">
                 <th className="py-2 pl-5 pr-3 font-medium">Activity</th>
@@ -140,7 +138,7 @@ function ActivityTable({ activities, loading }: { activities: Activity[]; loadin
                       <Link to={`/training/${a.activityId}`} className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                         <span className="grid size-8 shrink-0 place-items-center rounded-md" style={{ background: `color-mix(in oklch, ${cfg.color} 14%, transparent)`, color: cfg.color }}><cfg.icon className="size-4" /></span>
                         <span className="min-w-0">
-                          <span className="block max-w-[320px] truncate font-medium text-fg group-hover:text-accent">{a.activityName || cfg.label}</span>
+                          <span className="block max-w-[20rem] truncate font-medium text-fg group-hover:text-accent">{a.activityName || cfg.label}</span>
                           <span className="block text-xs text-fg-3">{d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {cfg.label}</span>
                         </span>
                       </Link>

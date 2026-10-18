@@ -1,81 +1,50 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/geist';
+@import '@fontsource-variable/inter';
 @import '@fontsource-variable/geist-mono';
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 /* ── Tokens ───────────────────────────────────────────────────────────────────
-   One page plane, one card surface, hairline borders. Chart series use the
-   validated dataviz palette (light/dark steps chosen per surface). */
+   One dark theme, after bencho.dev: a black canvas, near-black cards without
+   shadows, lighter wells inside them, white primary actions and pill controls.
+   Text steps keep at least 4.5:1 on every surface (fg-3 on --sunken ≈ 5:1). */
 :root {
-  color-scheme: light;
-  --bg: oklch(0.978 0.002 95);
-  --card: oklch(1 0 0);
-  --sunken: oklch(0.965 0.003 95);
-  --hover: oklch(0.955 0.003 95);
-  --border: oklch(0.915 0.004 95);
-  --border-strong: oklch(0.855 0.005 95);
-  --fg: oklch(0.205 0.012 265);
-  --fg-2: oklch(0.44 0.012 265);
-  --fg-3: oklch(0.575 0.01 265);
-  --accent: oklch(0.53 0.2 264);
-  --accent-hover: oklch(0.48 0.2 264);
-  --accent-fg: oklch(0.99 0 0);
-  --accent-soft: oklch(0.53 0.2 264 / 0.09);
-  --ring: oklch(0.53 0.2 264 / 0.45);
-
-  --good: oklch(0.56 0.15 150);
-  --good-soft: oklch(0.56 0.15 150 / 0.1);
-  --warn: oklch(0.62 0.15 65);
-  --warn-soft: oklch(0.75 0.16 75 / 0.14);
-  --bad: oklch(0.56 0.2 25);
-  --bad-soft: oklch(0.56 0.2 25 / 0.09);
-
-  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
-  --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7; --c8: #e34948;
-  --grid: #e8e7e1;
-  --axis: #898781;
-
-  --shadow-card: 0 1px 2px oklch(0.2 0.01 265 / 0.04);
-  --shadow-pop: 0 12px 32px -8px oklch(0.2 0.02 265 / 0.18), 0 2px 6px oklch(0.2 0.02 265 / 0.06);
-}
-
-.dark {
   color-scheme: dark;
-  --bg: oklch(0.155 0.005 265);
-  --card: oklch(0.192 0.006 265);
-  --sunken: oklch(0.172 0.005 265);
-  --hover: oklch(0.235 0.007 265);
-  --border: oklch(0.262 0.007 265);
-  --border-strong: oklch(0.33 0.008 265);
-  --fg: oklch(0.965 0.003 265);
-  --fg-2: oklch(0.78 0.008 265);
-  --fg-3: oklch(0.64 0.01 265);
-  --accent: oklch(0.68 0.16 264);
-  --accent-hover: oklch(0.74 0.14 264);
-  --accent-fg: oklch(0.16 0.02 265);
-  --accent-soft: oklch(0.68 0.16 264 / 0.14);
-  --ring: oklch(0.68 0.16 264 / 0.5);
+  --bg: #000000;
+  --card: #151515;
+  --sunken: #1f1f1f;
+  --hover: #242424;
+  --border: #242424;
+  --border-strong: #333333;
+  --fg: #fafafa;
+  --fg-2: #bdbdbd;
+  --fg-3: #8e8d88;
+  --accent: oklch(0.72 0.15 252);
+  --accent-hover: oklch(0.78 0.13 252);
+  --accent-fg: #000000;
+  --accent-soft: oklch(0.72 0.15 252 / 0.16);
+  --ring: oklch(0.72 0.15 252 / 0.6);
+  --pill: rgb(255 255 255 / 0.09);
+  --pill-hover: rgb(255 255 255 / 0.14);
 
-  --good: oklch(0.72 0.15 150);
-  --good-soft: oklch(0.72 0.15 150 / 0.13);
-  --warn: oklch(0.8 0.14 75);
-  --warn-soft: oklch(0.8 0.14 75 / 0.13);
-  --bad: oklch(0.7 0.17 25);
-  --bad-soft: oklch(0.7 0.17 25 / 0.13);
+  --good: oklch(0.77 0.16 152);
+  --good-soft: oklch(0.77 0.16 152 / 0.14);
+  --warn: oklch(0.83 0.14 80);
+  --warn-soft: oklch(0.83 0.14 80 / 0.14);
+  --bad: oklch(0.72 0.17 25);
+  --bad-soft: oklch(0.72 0.17 25 / 0.15);
 
-  --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
-  --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767;
-  --grid: #2a2b2e;
-  --axis: #8a8a86;
+  --c1: #3987e5; --c2: #e4673a; --c3: #1fb07c; --c4: #d99a00;
+  --c5: #de5d8c; --c6: #3a9d23; --c7: #9085e9; --c8: #e66767;
+  --grid: #262626;
+  --axis: #8e8d88;
 
+  --ease-spring: cubic-bezier(0.28, 1.4, 0.36, 1);
   --shadow-card: none;
-  --shadow-pop: 0 16px 40px -8px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.06);
+  --shadow-pop: 0 20px 48px -12px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.08);
 }
 
 @theme inline {
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --color-bg: var(--bg);
@@ -91,6 +60,8 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
+  --color-pill: var(--pill);
+  --color-pill-hover: var(--pill-hover);
   --color-good: var(--good);
   --color-good-soft: var(--good-soft);
   --color-warn: var(--warn);
@@ -107,49 +78,72 @@
   --color-c8: var(--c8);
 
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  --font-weight-semibold: 560;
+  --font-weight-bold: 640;
 
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
 
-  --text-2xs: 11px;
-  --text-2xs--line-height: 14px;
-  --text-xs: 12px;
-  --text-xs--line-height: 16px;
-  --text-sm: 13px;
-  --text-sm--line-height: 20px;
-  --text-base: 14px;
-  --text-base--line-height: 22px;
-  --text-lg: 16px;
-  --text-lg--line-height: 24px;
-  --text-xl: 20px;
-  --text-xl--line-height: 28px;
-  --text-2xl: 26px;
-  --text-2xl--line-height: 32px;
-  --text-3xl: 34px;
-  --text-3xl--line-height: 40px;
-  --text-4xl: 44px;
-  --text-4xl--line-height: 48px;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.012em;
+  --text-3xl: 2.125rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-3xl--letter-spacing: -0.015em;
+  --text-4xl: 2.75rem;
+  --text-4xl--line-height: 3rem;
+  --text-4xl--letter-spacing: -0.02em;
 
-  --animate-in: fade-in 160ms ease-out;
+  --animate-in: fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
   @keyframes fade-in {
-    from { opacity: 0; transform: translateY(2px); }
+    from { opacity: 0; transform: translateY(4px) scale(0.985); }
     to { opacity: 1; transform: none; }
   }
 }
 
 @layer base {
   * { border-color: var(--border); }
-  html { -webkit-text-size-adjust: 100%; }
+  /* Everything is sized in rem, so the whole UI scales up on large monitors and TVs. */
+  html { -webkit-text-size-adjust: 100%; background: var(--bg); font-size: 100%; }
+  @media (min-width: 1920px) { html { font-size: 106.25%; } }
+  @media (min-width: 2560px) { html { font-size: 125%; } }
+  @media (min-width: 3200px) { html { font-size: 150%; } }
+  @media (min-width: 3800px) { html { font-size: 175%; } }
   body {
     @apply bg-bg text-fg font-sans text-base antialiased;
+    font-feature-settings: 'cv11', 'ss03';
+    text-rendering: optimizeLegibility;
   }
+  h1, h2, h3 { letter-spacing: -0.011em; }
   :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-  ::selection { background: var(--accent-soft); }
+  ::selection { background: oklch(0.72 0.15 252 / 0.35); color: var(--fg); }
+  /* Grid children never force the page wider than the viewport (wide tables scroll inside their card). */
+  .grid > * { min-width: 0; }
   button { cursor: pointer; }
   button:disabled { cursor: default; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; background-clip: padding-box; }
+  * { scrollbar-color: #2a2a2a transparent; }
 }
 
 @layer utilities {
@@ -166,6 +160,9 @@
   @keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .masked .money { filter: blur(7px); user-select: none; transition: filter 150ms; }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  /* bencho's press feedback: a quick springy scale on anything pressable. */
+  .press { transition: scale 200ms var(--ease-spring), background-color 160ms, color 160ms, opacity 160ms; }
+  .press:active:not(:disabled) { scale: 0.96; }
 }
 
 /* Pattern trainer */
@@ -182,7 +179,8 @@
 .maplibregl-ctrl-group { background: var(--card) !important; border: 1px solid var(--border); box-shadow: var(--shadow-card) !important; border-radius: var(--radius-md) !important; overflow: hidden; }
 .maplibregl-ctrl-group button { width: 32px !important; height: 32px !important; }
 .maplibregl-ctrl-group button + button { border-top: 1px solid var(--border) !important; }
-.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+.maplibregl-ctrl-attrib a { color: var(--fg-3) !important; }
 .maplibregl-popup-content { background: var(--card) !important; color: var(--fg); border: 1px solid var(--border); border-radius: var(--radius-lg) !important; box-shadow: var(--shadow-pop) !important; padding: 12px 14px !important; font-family: var(--font-sans); }
 .maplibregl-popup-tip { display: none; }
 .maplibregl-ctrl-attrib { font-size: 10px; background: color-mix(in oklch, var(--card) 80%, transparent) !important; }

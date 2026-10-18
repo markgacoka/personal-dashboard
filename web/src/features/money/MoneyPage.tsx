@@ -92,7 +92,7 @@ function Hero({ total, delta, history, days, dim }: { total: number; delta: numb
   return (
     <div className={cn('p-5 transition-opacity', dim && 'opacity-60')}>
       <div className="text-sm text-fg-3">Total net worth</div>
-      <div className="mt-1 text-4xl font-semibold tracking-tight"><span className="num money">{dollars(total)}</span></div>
+      <div className="mt-1 text-4xl font-medium"><span className="num money">{dollars(total)}</span></div>
       <div className={cn('mt-1.5 flex items-center gap-1.5 text-sm', up ? 'text-good' : 'text-bad')}>
         {up ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
         <span className="num money font-medium">{signed(delta, v => dollars(v))}</span>
@@ -177,7 +177,7 @@ function HoldingsCard({ holdings, loading }: { holdings: Holding[]; loading: boo
       <CardHeader title="Holdings" description={holdings.length ? `${holdings.length} positions · ${dollars(total, { compact: true })}` : undefined} />
       {loading ? <Skeleton className="m-5 h-60" /> : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead><tr className="border-y border-border bg-sunken text-left text-xs text-fg-3">
               <th className="py-2 pl-5 font-medium">Position</th><th className="px-3 font-medium">Weight</th><th className="px-3 text-right font-medium">Value</th><th className="px-3 text-right font-medium">Gain</th><th className="px-3 text-right font-medium">All-time</th><th className="py-2 pl-3 pr-5 text-right font-medium">YTD</th>
             </tr></thead>
@@ -190,7 +190,7 @@ function HoldingsCard({ holdings, loading }: { holdings: Holding[]; loading: boo
                 const tone = (n: number | null | undefined) => (n == null ? 'text-fg-3' : n >= 0 ? 'text-good' : 'text-bad')
                 return (
                   <tr key={i} className="border-b border-border last:border-0">
-                    <td className="max-w-[260px] py-2.5 pl-5"><div className="num font-medium">{h.ticker && !h.ticker.startsWith('CUR:') ? h.ticker : '—'}</div><div className="truncate text-xs text-fg-3" title={h.name || ''}>{h.name || '—'} · {h.institution || h.account_name}</div></td>
+                    <td className="max-w-[16.25rem] py-2.5 pl-5"><div className="num font-medium">{h.ticker && !h.ticker.startsWith('CUR:') ? h.ticker : '—'}</div><div className="truncate text-xs text-fg-3" title={h.name || ''}>{h.name || '—'} · {h.institution || h.account_name}</div></td>
                     <td className="px-3"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-sunken"><div className="h-full rounded-full bg-accent" style={{ width: `${(v / total) * 100}%` }} /></div><span className="num text-xs text-fg-3">{((v / total) * 100).toFixed(1)}%</span></div></td>
                     <td className="num money px-3 text-right">{dollars(v)}</td>
                     <td className={cn('num money px-3 text-right', tone(gain))}>{gain == null ? '—' : signed(gain, x => dollars(x, { compact: true }))}</td>
@@ -213,7 +213,7 @@ function Goal({ total, retirement }: { total: number; retirement: number }) {
     <Card>
       <CardHeader icon={<Target />} title="Retirement goal" description="Progress toward $1.5M in total assets" />
       <CardBody>
-        <div className="mb-2 flex items-baseline justify-between"><span className="num text-2xl font-semibold">{p.toFixed(1)}%</span><span className="num money text-sm text-fg-3">{dollars(Math.max(0, GOAL - total), { compact: true })} to go</span></div>
+        <div className="mb-2 flex items-baseline justify-between"><span className="num text-2xl font-medium">{p.toFixed(1)}%</span><span className="num money text-sm text-fg-3">{dollars(Math.max(0, GOAL - total), { compact: true })} to go</span></div>
         <Progress value={p} className="h-2" />
         <div className="mt-2 flex justify-between text-sm text-fg-3"><span><span className="num money text-fg-2">{dollars(total, { compact: true })}</span> total assets</span><span><span className="num money text-fg-2">{dollars(retirement, { compact: true })}</span> in retirement accounts</span></div>
       </CardBody>

@@ -90,7 +90,7 @@ export function Reader({ threadId, folder, boot, onClose }: { threadId: string; 
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6">
-          <h1 className="text-xl font-semibold tracking-tight">{t.subject || '(no subject)'}</h1>
+          <h1 className="text-xl font-medium">{t.subject || '(no subject)'}</h1>
           {labels.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{labels.map(l => (
             <span key={l.id} className="inline-flex h-6 items-center gap-1.5 rounded-full px-2 text-xs font-medium ring-1 ring-inset ring-border"><span className="size-2 rounded-full" style={{ background: labelColor(l.color) }} />{l.name}<button aria-label={`Remove label ${l.name}`} onClick={() => act([t.threadId], 'unlabel', { labelId: l.id }, true).then(() => qc.invalidateQueries({ queryKey: ['mail', 'thread', threadId] }))}><X className="size-3" /></button></span>
           ))}</div>}

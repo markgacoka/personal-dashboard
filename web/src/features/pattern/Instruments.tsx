@@ -27,7 +27,7 @@ function Cell({ label, value, sub, accent }: { label: string; value: React.React
   return (
     <div className="min-w-0">
       <div className="text-sm text-fg-3">{label}</div>
-      <div className={cn('num text-xl font-semibold leading-7', accent && 'text-accent')}>{value}</div>
+      <div className={cn('num text-xl font-medium leading-7', accent && 'text-accent')}>{value}</div>
       {sub && <div className="num text-sm text-fg-3">{sub}</div>}
     </div>
   )
@@ -35,7 +35,7 @@ function Cell({ label, value, sub, accent }: { label: string; value: React.React
 
 function HeadingDial({ hdg }: { hdg: number }) {
   return (
-    <svg viewBox="-34 -34 68 68" className="size-[68px] shrink-0" role="img" aria-label={`Heading ${fmtHdg(hdg)}`}>
+    <svg viewBox="-34 -34 68 68" className="size-[4.25rem] shrink-0" role="img" aria-label={`Heading ${fmtHdg(hdg)}`}>
       <circle r={32} fill="var(--card)" stroke="var(--border-strong)" />
       <g transform={`rotate(${-hdg})`} style={{ transition: 'transform 80ms linear' }}>
         {Array.from({ length: 36 }, (_, i) => <line key={i} x1={0} y1={-31} x2={0} y2={i % 3 ? -28 : -25} stroke="var(--fg-3)" strokeWidth={i % 3 ? 0.6 : 1.1} transform={`rotate(${i * 10})`} />)}

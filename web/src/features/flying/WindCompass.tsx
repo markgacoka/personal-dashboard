@@ -18,7 +18,7 @@ export function WindCompass({ wdir, wspd, wgst, runways, best, size = 176 }: {
   }
 
   return (
-    <svg width={size} height={size} viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} className="shrink-0 overflow-visible" role="img"
+    <svg style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }} viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} className="shrink-0 overflow-visible" role="img"
       aria-label={calm ? 'Wind calm' : vrb ? `Wind variable at ${wspd} knots` : `Wind from ${wdir} degrees at ${wspd} knots`}>
       <circle r={R} fill="none" stroke="var(--border-strong)" strokeWidth={1} />
       {Array.from({ length: 72 }, (_, i) => {

@@ -2,7 +2,7 @@ import { Command } from 'cmdk'
 import { Dialog as RDialog } from 'radix-ui'
 import { useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Eye, LogOut, Moon, PenLine, Plane, Plus, Search, Sun } from 'lucide-react'
+import { Eye, LogOut, PenLine, Plane, Plus, Search } from 'lucide-react'
 import { usePrefs } from '@/lib/prefs'
 import { useFlights } from '@/lib/queries'
 import { route, trainingLabel } from '@/lib/flying'
@@ -15,26 +15,26 @@ import { signOut } from '@/lib/auth'
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { resolved, setTheme, toggleMask, masked } = usePrefs()
+  const { toggleMask, masked } = usePrefs()
   const { data: flights } = useFlights()
   // Activities come from whatever is already cached; the palette never triggers a Garmin read.
   const activities = (qc.getQueryData<Activity[]>(['activities']) || []).slice(0, 60)
 
   const run = (fn: () => void) => { onOpenChange(false); fn() }
-  const item = 'flex h-10 cursor-default select-none items-center gap-3 rounded-md px-3 text-sm text-fg data-[selected=true]:bg-hover [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-fg-3'
-  const group = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-3'
+  const item = 'flex h-10 cursor-default select-none items-center gap-3 rounded-md px-3 text-sm text-fg data-[selected=true]:bg-white/[0.07] [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-fg-3'
+  const group = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-sm [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-fg-3'
 
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
-        <RDialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in" />
-        <RDialog.Content className="fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-pop outline-none data-[state=open]:animate-in">
+        <RDialog.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in" />
+        <RDialog.Content className="fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-1.5rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl bg-[#171717] shadow-pop outline-none data-[state=open]:animate-in">
           <RDialog.Title className="sr-only">Command palette</RDialog.Title>
           <RDialog.Description className="sr-only">Search pages, flights and actions</RDialog.Description>
           <Command loop className="flex flex-col">
-            <div className="flex items-center gap-2 border-b border-border px-4">
+            <div className="flex items-center gap-2.5 border-b border-white/[0.07] px-5">
               <Search className="size-4 text-fg-3" />
-              <Command.Input autoFocus placeholder="Search pages, flights, activities, actions…" className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-fg-3" />
+              <Command.Input autoFocus placeholder="Search pages, flights, activities, actions…" className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-fg-3" />
             </div>
             <Command.List className="max-h-[min(60vh,440px)] overflow-y-auto p-1.5">
               <Command.Empty className="py-10 text-center text-sm text-fg-3">No results</Command.Empty>
@@ -49,7 +49,6 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               <Command.Group heading="Actions" className={group}>
                 <Command.Item value="log a flight new" onSelect={() => run(() => navigate('/flying?log=1'))} className={item}><Plus />Log a flight</Command.Item>
                 <Command.Item value="compose new email message" onSelect={() => run(() => navigate('/mail?compose=1'))} className={item}><PenLine />Compose email</Command.Item>
-                <Command.Item value="toggle theme dark light" onSelect={() => run(() => setTheme(resolved === 'dark' ? 'light' : 'dark'))} className={item}>{resolved === 'dark' ? <Sun /> : <Moon />}Switch to {resolved === 'dark' ? 'light' : 'dark'} theme</Command.Item>
                 <Command.Item value="privacy balances hide show mask" onSelect={() => run(toggleMask)} className={item}><Eye />{masked ? 'Show' : 'Hide'} balances</Command.Item>
                 <Command.Item value="sign out log out" onSelect={() => run(signOut)} className={item}><LogOut />Sign out</Command.Item>
               </Command.Group>

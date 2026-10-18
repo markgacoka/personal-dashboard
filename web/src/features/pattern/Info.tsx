@@ -100,7 +100,7 @@ function Supplement({ ap }: { ap: Airport }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         {ap.freqs.map(f => <div key={f.label} className="contents"><span className="text-fg-3">{f.label}</span><span className="num">{f.mhz}{f.note && <span className="text-fg-3"> · {f.note}</span>}</span></div>)}
       </div>
-      <ul className="space-y-1 font-mono text-[13px] leading-relaxed text-fg-2">{ap.remarks.map(r => <li key={r}>{r}</li>)}</ul>
+      <ul className="space-y-1 font-mono text-sm leading-relaxed text-fg-2">{ap.remarks.map(r => <li key={r}>{r}</li>)}</ul>
     </div>
   )
 }

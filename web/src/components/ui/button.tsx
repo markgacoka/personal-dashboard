@@ -5,23 +5,23 @@ import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background,color,box-shadow,opacity] duration-150 disabled:opacity-50 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none',
+  'press inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium tracking-[-0.006em] disabled:opacity-40 disabled:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none',
   {
     variants: {
       variant: {
-        primary: 'bg-accent text-accent-fg hover:bg-accent-hover shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]',
-        secondary: 'bg-card text-fg border border-border hover:bg-hover hover:border-border-strong shadow-card',
-        ghost: 'text-fg-2 hover:bg-hover hover:text-fg',
-        danger: 'bg-bad text-white hover:opacity-90',
+        primary: 'bg-fg text-bg hover:bg-fg/88',
+        secondary: 'bg-pill text-fg hover:bg-pill-hover',
+        ghost: 'text-fg-2 hover:bg-pill hover:text-fg',
+        danger: 'bg-bad text-black hover:opacity-90',
         'danger-ghost': 'text-bad hover:bg-bad-soft',
-        link: 'text-accent hover:underline underline-offset-4 px-0 h-auto',
+        link: 'text-accent hover:underline underline-offset-4 px-0 h-auto active:scale-100',
       },
       size: {
-        sm: 'h-8 px-2.5 text-sm',
-        md: 'h-9 px-3.5 text-sm',
-        lg: 'h-10 px-4 text-base',
+        sm: 'h-8 px-3 text-sm',
+        md: 'h-9 px-4 text-sm',
+        lg: 'h-11 px-5 text-base',
         icon: 'size-9',
-        'icon-sm': 'size-8 [&_svg]:size-[15px]',
+        'icon-sm': 'size-8 [&_svg]:size-[0.9375rem]',
       },
     },
     defaultVariants: { variant: 'secondary', size: 'md' },

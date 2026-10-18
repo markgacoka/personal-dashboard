@@ -76,7 +76,7 @@ export default function LogbookPage() {
 
       <Card className="mt-5 overflow-hidden">
         <CardHeader icon={<RouteIcon />} title="Where you’ve flown" description="Every airport in the logbook, connected by the routes flown" />
-        {isLoading ? <Skeleton className="h-[360px] rounded-none" /> : all.length ? <RoutesMap flights={all} /> : <p className="border-t border-border px-5 py-10 text-center text-sm text-fg-3">Airports appear here once flights are logged.</p>}
+        {isLoading ? <Skeleton className="h-[22.5rem] rounded-none" /> : all.length ? <RoutesMap flights={all} /> : <p className="border-t border-border px-5 py-10 text-center text-sm text-fg-3">Airports appear here once flights are logged.</p>}
       </Card>
 
       <FlightTable flights={all} loading={isLoading} />
@@ -153,7 +153,7 @@ function MonthlyHours({ flights }: { flights: Flight[] }) {
 function RoutesMap({ flights }: { flights: Flight[] }) {
   const navigate = useNavigate()
   return (
-    <MapView className="h-[360px] border-t border-border" onLoad={map => {
+    <MapView className="h-[22.5rem] border-t border-border" onLoad={map => {
       const apts = new Map<string, { icao: string; name?: string; lon: number; lat: number; n: number }>()
       const legs = new Map<string, { a: [number, number]; b: [number, number]; n: number }>()
       for (const f of flights) {
@@ -209,7 +209,7 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
   return (
     <Card className="mt-5 overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 px-5 pb-3 pt-4">
-        <h2 className="mr-auto text-base font-semibold tracking-tight">Flights</h2>
+        <h2 className="mr-auto text-base font-medium">Flights</h2>
         <Segmented size="sm" value={filter} onChange={v => { setFilter(v); setShown(25) }} options={[
           { value: 'all', label: 'All', count: counts.all }, { value: 'dual', label: 'Dual', count: counts.dual }, { value: 'solo', label: 'Solo', count: counts.solo },
           { value: 'xc', label: 'Cross-country', count: counts.xc }, { value: 'night', label: 'Night', count: counts.night },
@@ -222,7 +222,7 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
       {loading ? <div className="space-y-2 p-5 pt-0">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div> : !flights.length ? <EmptyState icon={BookOpen} title="No flights logged yet">Use Log flight to add the first entry.</EmptyState> : !rows.length ? <EmptyState icon={Search} title="No flights match" /> : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[53.75rem] text-sm">
               <thead><tr className="border-y border-border bg-sunken text-left text-xs text-fg-3">
                 <th className="py-2 pl-5 pr-3 font-medium">Date</th><th className="px-3 font-medium">Route</th><th className="px-3 font-medium">Aircraft</th><th className="px-3 font-medium">Lesson</th>
                 <th className="px-3 text-right font-medium">Total</th><th className="px-3 text-right font-medium">Dual</th><th className="px-3 text-right font-medium">Solo</th><th className="px-3 text-right font-medium">XC</th><th className="px-3 text-right font-medium">Night</th><th className="px-3 text-right font-medium">Ldg</th><th className="w-12 pr-3" />

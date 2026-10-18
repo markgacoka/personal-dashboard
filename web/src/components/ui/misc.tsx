@@ -8,8 +8,8 @@ export function Skeleton({ className, ...p }: React.HTMLAttributes<HTMLDivElemen
 
 export function Switch({ className, ...p }: React.ComponentProps<typeof RSwitch.Root>) {
   return (
-    <RSwitch.Root className={cn('peer inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent bg-border-strong transition-colors data-[state=checked]:bg-accent disabled:opacity-50', className)} {...p}>
-      <RSwitch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow-sm transition-transform data-[state=checked]:translate-x-4" />
+    <RSwitch.Root className={cn('peer inline-flex h-6 w-10 shrink-0 items-center rounded-full border border-transparent bg-[#3a3a3a] transition-colors duration-200 data-[state=checked]:bg-fg disabled:opacity-50', className)} {...p}>
+      <RSwitch.Thumb className="block size-5 translate-x-0.5 rounded-full bg-white shadow-sm transition-[translate,background-color] duration-300 ease-[var(--ease-spring)] data-[state=checked]:translate-x-[1.0625rem] data-[state=checked]:bg-black" />
     </RSwitch.Root>
   )
 }
@@ -25,7 +25,7 @@ export function Tooltip({ content, children, side = 'top' }: { content: React.Re
     <RTooltip.Root>
       <RTooltip.Trigger asChild>{children}</RTooltip.Trigger>
       <RTooltip.Portal>
-        <RTooltip.Content side={side} sideOffset={6} className="z-50 max-w-72 rounded-md bg-fg px-2.5 py-1.5 text-xs text-bg shadow-pop animate-in">{content}</RTooltip.Content>
+        <RTooltip.Content side={side} sideOffset={6} className="z-50 max-w-72 rounded-md bg-[#2a2a2a] px-2.5 py-1.5 text-sm text-fg shadow-pop animate-in">{content}</RTooltip.Content>
       </RTooltip.Portal>
     </RTooltip.Root>
   )
@@ -35,7 +35,7 @@ export function Progress({ value, className, tone = 'accent' }: { value: number;
   const color = { accent: 'bg-accent', good: 'bg-good', warn: 'bg-warn', bad: 'bg-bad' }[tone]
   const v = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0))
   return (
-    <RProgress.Root value={v} className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-sunken ring-1 ring-inset ring-border', className)}>
+    <RProgress.Root value={v} className={cn('relative h-1.5 w-full overflow-hidden rounded-full bg-pill', className)}>
       <RProgress.Indicator className={cn('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${v}%` }} />
     </RProgress.Root>
   )
@@ -43,10 +43,10 @@ export function Progress({ value, className, tone = 'accent' }: { value: number;
 
 export const Tabs = RTabs.Root
 export function TabsList({ className, ...p }: React.ComponentProps<typeof RTabs.List>) {
-  return <RTabs.List className={cn('inline-flex items-center gap-1 border-b border-border', className)} {...p} />
+  return <RTabs.List className={cn('inline-flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none', className)} {...p} />
 }
 export function TabsTrigger({ className, ...p }: React.ComponentProps<typeof RTabs.Trigger>) {
-  return <RTabs.Trigger className={cn('-mb-px inline-flex h-9 items-center gap-1.5 border-b-2 border-transparent px-2.5 text-sm font-medium text-fg-3 transition-colors hover:text-fg data-[state=active]:border-fg data-[state=active]:text-fg [&_svg]:size-4', className)} {...p} />
+  return <RTabs.Trigger className={cn('press inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-fg-3 hover:text-fg data-[state=active]:bg-pill data-[state=active]:text-fg [&_svg]:size-4', className)} {...p} />
 }
 export const TabsContent = RTabs.Content
 
@@ -55,12 +55,12 @@ export function Segmented<T extends string>({ value, onChange, options, classNam
   value: T; onChange: (v: T) => void; options: { value: T; label: React.ReactNode; count?: number }[]; className?: string; size?: 'sm' | 'md'
 }) {
   return (
-    <div role="radiogroup" className={cn('inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-sunken p-0.5 ring-1 ring-inset ring-border scrollbar-none', className)}>
+    <div role="radiogroup" className={cn('inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-pill p-1 scrollbar-none', className)}>
       {options.map(o => (
         <button key={o.value} role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
-          className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 font-medium text-fg-3 transition-colors hover:text-fg',
-            size === 'sm' ? 'h-7 text-xs' : 'h-8 text-sm',
-            value === o.value && 'bg-card text-fg shadow-[0_1px_2px_oklch(0_0_0/0.08)] ring-1 ring-border')}>
+          className={cn('press inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 font-medium text-fg-3 hover:text-fg',
+            size === 'sm' ? 'h-7 text-sm' : 'h-8 text-sm',
+            value === o.value && 'bg-[#3a3a3a] text-fg')}>
           {o.label}
           {o.count != null && <span className="tnum text-xs text-fg-3">{o.count}</span>}
         </button>
@@ -72,7 +72,7 @@ export function Segmented<T extends string>({ value, onChange, options, classNam
 export function EmptyState({ icon: Icon, title, children, action, className }: { icon?: LucideIcon; title: string; children?: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col items-center justify-center px-6 py-12 text-center', className)}>
-      {Icon && <div className="mb-3 grid size-10 place-items-center rounded-full bg-sunken ring-1 ring-border"><Icon className="size-5 text-fg-3" /></div>}
+      {Icon && <div className="mb-4 grid size-11 place-items-center rounded-full bg-pill"><Icon className="size-5 text-fg-2" /></div>}
       <div className="text-base font-medium text-fg">{title}</div>
       {children && <p className="mt-1 max-w-sm text-sm text-fg-3">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -81,5 +81,5 @@ export function EmptyState({ icon: Icon, title, children, action, className }: {
 }
 
 export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <kbd className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-sunken px-1 font-mono text-[11px] text-fg-3', className)}>{children}</kbd>
+  return <kbd className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-sm bg-white/[0.08] px-1 font-sans text-xs text-fg-3', className)}>{children}</kbd>
 }

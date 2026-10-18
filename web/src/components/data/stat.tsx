@@ -12,7 +12,7 @@ export function Stat({ label, value, unit, sub, tone, size = 'md', className, hi
   return (
     <div className={cn('min-w-0', className)}>
       {hint ? <Tooltip content={hint}><div className="w-fit cursor-help underline decoration-border-strong decoration-dotted underline-offset-4">{lbl}</div></Tooltip> : lbl}
-      <div className={cn('mt-1 flex items-baseline gap-1 font-semibold tracking-tight', sz, toneCls)}>
+      <div className={cn('mt-1 flex items-baseline gap-1 font-medium', sz, toneCls)}>
         <span className={cn('num', money && 'money')}>{value ?? '—'}</span>
         {unit && value != null && value !== '—' && <span className="text-sm font-normal text-fg-3">{unit}</span>}
       </div>
@@ -23,10 +23,10 @@ export function Stat({ label, value, unit, sub, tone, size = 'md', className, hi
 
 export function PageHeader({ title, description, actions, children, className }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; children?: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('mb-6 flex flex-wrap items-end gap-x-4 gap-y-3', className)}>
+    <div className={cn('mb-6 flex flex-wrap items-end gap-x-4 gap-y-3 sm:mb-8', className)}>
       <div className="min-w-0 flex-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-fg">{title}</h1>
-        {description && <div className="mt-1 text-base text-fg-3">{description}</div>}
+        <h1 className="text-2xl font-medium text-fg sm:text-3xl">{title}</h1>
+        {description && <div className="mt-1.5 text-base text-fg-3">{description}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       {children}

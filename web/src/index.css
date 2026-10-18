@@ -44,6 +44,9 @@
 }
 
 @theme inline {
+  /* Ultrawide and 4K-at-100% screens: room for one more column, not bigger type. */
+  --breakpoint-3xl: 160rem;
+
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -121,12 +124,10 @@
 
 @layer base {
   * { border-color: var(--border); }
-  /* Everything is sized in rem, so the whole UI scales up on large monitors and TVs. */
+  /* Size comes from the device (OS display scaling, browser zoom), never from the
+     window width: a wide screen gets more room, not bigger text. Everything is in
+     rem so zoom scales the whole UI evenly. */
   html { -webkit-text-size-adjust: 100%; background: var(--bg); font-size: 100%; }
-  @media (min-width: 1920px) { html { font-size: 106.25%; } }
-  @media (min-width: 2560px) { html { font-size: 125%; } }
-  @media (min-width: 3200px) { html { font-size: 150%; } }
-  @media (min-width: 3800px) { html { font-size: 175%; } }
   body {
     @apply bg-bg text-fg font-sans text-base antialiased;
     font-feature-settings: 'cv11', 'ss03';

@@ -52,7 +52,7 @@ export function AnyAirportCard() {
   const s = status.data
 
   return (
-    <Card className="md:col-span-2 2xl:col-span-3">
+    <Card className="md:col-span-2 2xl:col-span-3 3xl:col-span-4">
       <CardHeader icon={<Globe2 />} title="Any US airport"
         description={s?.airports ? `${s.suitable.toLocaleString()} airports a 172 can use, from ${s.airports.toLocaleString()} in the FAA’s NASR data (cycle ${s.cycle}). Real runways, traffic directions, pattern altitudes, frequencies and remarks; ${f.wx === 'live' ? 'live METAR and NOTAMs' : 'generated weather'}.` : 'The FAA airport data is loading on the server.'}
         action={done > 0 && <Badge tone="accent">{done} practised</Badge>} />

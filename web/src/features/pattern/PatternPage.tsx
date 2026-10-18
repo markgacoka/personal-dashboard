@@ -75,7 +75,7 @@ function Library({ scores, prefs, setPrefs }: { scores: Scores; prefs: Prefs; se
     <div>
       <PageHeader title="Pattern trainer" description="Fly an arrival one decision at a time, from preflight to rollout, at any airport in the United States or in hand-built Bay Area scenarios." />
       <HowItWorks prefs={prefs} setPrefs={setPrefs} />
-      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4">
         <AnyAirportCard />
         {SCENARIOS.map(sc => <ScenarioCard key={sc.id} sc={sc} score={scores[sc.id]} />)}
         <Card className="flex flex-col">

@@ -20,8 +20,6 @@
 }
 
 html { font-size: 100%; background: var(--bg); }
-@media (min-width: 2560px) { html { font-size: 125%; } }
-@media (min-width: 3800px) { html { font-size: 175%; } }
 
 body.auth-page {
   min-height: 100dvh;

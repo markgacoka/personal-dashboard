@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { CloudSun, Globe2, RefreshCw, Search, Shuffle } from 'lucide-react'
-import { Card, CardBody, CardHeader } from '@/components/ui/card'
+import { Card, CardBody } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,63 +52,56 @@ export function AnyAirportCard() {
   const s = status.data
 
   return (
-    <Card className="md:col-span-2 2xl:col-span-3 3xl:col-span-4">
-      <CardHeader icon={<Globe2 />} title="Any US airport"
-        description={s?.airports ? `${s.suitable.toLocaleString()} airports a 172 can use, from ${s.airports.toLocaleString()} in the FAA’s NASR data (cycle ${s.cycle}). Real runways, traffic directions, pattern altitudes, frequencies and remarks; ${f.wx === 'live' ? 'live METAR and NOTAMs' : 'generated weather'}.` : 'The FAA airport data is loading on the server.'}
-        action={done > 0 && <Badge tone="accent">{done} practised</Badge>} />
-      <CardBody>
+    <Card className="col-span-full">
+      <CardBody className="space-y-4 pt-5 sm:pt-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="grid size-7 place-items-center rounded-full bg-pill text-fg-2"><Globe2 className="size-3.5" /></div>
+          <h2 className="text-base font-medium">Any US airport</h2>
+          <span className="text-sm text-fg-3">{s?.airports ? <><span className="num">{s.suitable.toLocaleString()}</span> airports a 172 can use · FAA data, cycle {s.cycle}</> : 'FAA airport data is loading'}</span>
+          {done > 0 && <Badge tone="accent" className="ml-auto">{done} practised</Badge>}
+        </div>
         {!s?.airports && !status.isLoading ? (
           <div className="flex flex-wrap items-center gap-3 text-sm text-fg-2">
             <span>{s?.refreshing ? 'Downloading this cycle’s NASR subscription from the FAA (about a minute)…' : 'No FAA data loaded yet.'}</span>
             {!s?.refreshing && <Button size="sm" onClick={() => post('/api/pattern/refresh').finally(() => status.refetch())}><RefreshCw />Load it now</Button>}
           </div>
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div>
-              <div className="mb-2 text-sm font-medium text-fg-2">Find an airport</div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-fg-3" />
-                <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Identifier, name or city (e.g. KSEE, Bend, Truckee)" className="pl-8" aria-label="Search airports" />
-              </div>
-              <ul className="mt-2 divide-y divide-border">
-                {results.isFetching && !results.data ? [0, 1, 2].map(i => <li key={i} className="py-2"><Skeleton className="h-9" /></li>) :
-                  (results.data || []).slice(0, 8).map(a => (
-                    <li key={a.id}>
-                      <button onClick={() => go(a.id)} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-hover">
-                        <span className="num w-12 shrink-0 font-semibold">{ident(a)}</span>
-                        <span className="min-w-0 flex-1"><span className="block truncate text-sm text-fg">{titleCase(a.name)}</span><span className="block text-xs text-fg-3">{titleCase(a.city)}, {a.state}</span></span>
-                        {a.towered && <Badge>Towered</Badge>}
-                        {!a.public && <Badge tone="warn">Private</Badge>}
-                        {!a.suitable && <Badge tone="bad">No 172 runway</Badge>}
-                      </button>
-                    </li>
-                  ))}
-                {debounced.length >= 2 && results.data?.length === 0 && <li className="py-3 text-sm text-fg-3">No airport matches “{debounced}”.</li>}
-              </ul>
+        ) : <>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-60 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" />
+              <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Find an airport: identifier, name or city" className="pl-9" aria-label="Search airports" />
             </div>
-            <div>
-              <div className="mb-2 text-sm font-medium text-fg-2">Or practise somewhere you’ve never been</div>
-              <div className="space-y-3 text-sm">
-                <Row label="Airports"><Segmented size="sm" value={f.scope} onChange={v => set({ scope: v })} options={[{ value: 'public', label: 'Public use' }, { value: 'all', label: 'Include private' }]} /></Row>
-                <Row label="Tower"><Segmented size="sm" value={f.tower} onChange={v => set({ tower: v })} options={[{ value: 'any', label: 'Any' }, { value: 'yes', label: 'Towered' }, { value: 'no', label: 'Non-towered' }]} /></Row>
-                <Row label="Where"><Segmented size="sm" value={f.near} onChange={v => set({ near: v })} options={[{ value: '0', label: 'Anywhere' }, { value: '150', label: `≤150 nm of ${homeAirport()}` }, { value: '400', label: '≤400 nm' }]} /></Row>
-                <Row label="State"><Input value={f.state} onChange={e => set({ state: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) })} placeholder="Any" className="num h-8 w-20 uppercase" aria-label="State" /></Row>
-                <Row label="Weather"><Segmented size="sm" value={f.wx} onChange={v => set({ wx: v })} options={[{ value: 'live', label: 'Live METAR + NOTAMs' }, { value: 'generated', label: 'Generated' }]} /></Row>
-              </div>
-              <div className="mt-4 flex items-center gap-3">
-                <Button variant="primary" onClick={surprise} loading={busy}><Shuffle />Surprise me</Button>
-                {err && <span className="text-sm text-bad">{err}</span>}
-              </div>
-            </div>
+            <Button variant="primary" onClick={surprise} loading={busy}><Shuffle />Surprise me</Button>
           </div>
-        )}
+          {debounced.length >= 2 && (
+            <ul className="divide-y divide-border">
+              {results.isFetching && !results.data ? [0, 1, 2].map(i => <li key={i} className="py-2"><Skeleton className="h-9" /></li>) :
+                (results.data || []).slice(0, 8).map(a => (
+                  <li key={a.id}>
+                    <button onClick={() => go(a.id)} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-hover">
+                      <span className="num w-12 shrink-0 font-semibold">{ident(a)}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-fg">{titleCase(a.name)} <span className="text-fg-3">· {titleCase(a.city)}, {a.state}</span></span>
+                      {a.towered && <Badge>Towered</Badge>}
+                      {!a.public && <Badge tone="warn">Private</Badge>}
+                      {!a.suitable && <Badge tone="bad">No 172 runway</Badge>}
+                    </button>
+                  </li>
+                ))}
+              {results.data?.length === 0 && <li className="py-3 text-sm text-fg-3">No airport matches “{debounced}”.</li>}
+            </ul>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented size="sm" value={f.scope} onChange={v => set({ scope: v })} options={[{ value: 'public', label: 'Public use' }, { value: 'all', label: 'Include private' }]} />
+            <Segmented size="sm" value={f.tower} onChange={v => set({ tower: v })} options={[{ value: 'any', label: 'Any tower' }, { value: 'yes', label: 'Towered' }, { value: 'no', label: 'Non-towered' }]} />
+            <Segmented size="sm" value={f.near} onChange={v => set({ near: v })} options={[{ value: '0', label: 'Anywhere' }, { value: '150', label: `≤150 nm of ${homeAirport()}` }, { value: '400', label: '≤400 nm' }]} />
+            <Segmented size="sm" value={f.wx} onChange={v => set({ wx: v })} options={[{ value: 'live', label: 'Live weather' }, { value: 'generated', label: 'Generated' }]} />
+            <Input value={f.state} onChange={e => set({ state: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) })} placeholder="State" className="num h-9 w-20 uppercase" aria-label="State" />
+            {err && <span className="text-sm text-bad">{err}</span>}
+          </div>
+        </>}
       </CardBody>
     </Card>
   )
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-fg-3">{label}</span>{children}</div>
 }
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])

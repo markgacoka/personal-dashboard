@@ -75,13 +75,10 @@ function Library({ scores, prefs, setPrefs }: { scores: Scores; prefs: Prefs; se
     <div>
       <PageHeader title="Pattern trainer" description="Fly an arrival one decision at a time, from preflight to rollout, at any airport in the United States or in hand-built Bay Area scenarios." />
       <HowItWorks prefs={prefs} setPrefs={setPrefs} />
-      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4">
+      <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
         <AnyAirportCard />
         {SCENARIOS.map(sc => <ScenarioCard key={sc.id} sc={sc} score={scores[sc.id]} />)}
-        <Card className="flex flex-col">
-          <CardHeader icon={<Shuffle />} title="Entry drill" description="Endless random arrivals: a random airport, wind and position. Pick the runway, find the downwind, place yourself, choose the entry and the heading." />
-          <CardBody className="mt-auto"><Button asChild variant="primary"><Link to="/flying/pattern/drill">Start a drill<ChevronRight /></Link></Button></CardBody>
-        </Card>
+        <DrillCard />
       </div>
       <p className="mt-6 max-w-4xl text-sm text-fg-3">“Any US airport” uses the FAA NASR subscription (refreshed every 28-day cycle) with live METARs and NOTAMs or generated weather; generated traffic and windsock shifts are for practice. The hand-built scenarios use AirNav data checked Oct 16, 2026, with invented NOTAMs, TFRs, weather and traffic. Training aid only: verify against the current Chart Supplement and your POH.</p>
     </div>
@@ -118,20 +115,34 @@ function ScenarioCard({ sc, score }: { sc: Scenario; score?: Scores[string] }) {
   const ap = AIRPORTS[sc.airport]
   const best = sc.wind.spd ? rankEnds(ap.runways, sc.wind)[0].e.ident : undefined
   return (
-    <Card className="flex flex-col overflow-hidden">
-      <Link to={`/flying/pattern/${sc.id}`} className="block" tabIndex={-1} aria-hidden>
-        <FieldView ap={ap} wind={sc.wind} pattern={best} compact className="h-44 border-b border-white/[0.06]" />
-      </Link>
-      <CardHeader title={sc.title} description={<span><span className="num">{ap.icao}</span> · {ap.name} · {sc.steps.length} decisions</span>} />
-      <CardBody className="flex flex-1 flex-col gap-4">
-        <p className="text-sm leading-relaxed text-fg-2">{sc.blurb}</p>
-        <div className="flex flex-wrap gap-1.5">{sc.tags.map(t => <Badge key={t}>{t}</Badge>)}</div>
-        <div className="mt-auto flex items-center gap-3">
-          <Button asChild variant="primary"><Link to={`/flying/pattern/${sc.id}`}>{score ? 'Fly again' : 'Start'}<ChevronRight /></Link></Button>
-          {score && <div className="flex flex-1 items-center gap-2"><Progress value={(score.best / score.total) * 100} tone={score.best === score.total ? 'good' : 'accent'} /><span className="num shrink-0 text-sm text-fg-2">Best {score.best}/{score.total}</span></div>}
+    <Link to={`/flying/pattern/${sc.id}`} title={sc.blurb} className="press group block overflow-hidden rounded-xl bg-card ring-1 ring-inset ring-white/[0.04] hover:ring-white/[0.12] active:scale-[0.99]">
+      <FieldView ap={ap} wind={sc.wind} pattern={best} compact className="h-32" />
+      <div className="space-y-2 px-5 py-4">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-medium leading-snug text-fg">{sc.title}</div>
+            <div className="text-sm text-fg-3"><span className="num">{ap.icao}</span> · {sc.steps.length} decisions{score && <> · <span className={cn('num', score.best === score.total ? 'text-good' : 'text-fg-2')}>best {score.best}/{score.total}</span></>}</div>
+          </div>
+          <ChevronRight className="mt-1 size-4 shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-fg" />
         </div>
-      </CardBody>
-    </Card>
+        <div className="flex flex-wrap gap-1.5">{sc.tags.map(t => <Badge key={t}>{t}</Badge>)}</div>
+      </div>
+    </Link>
+  )
+}
+
+function DrillCard() {
+  return (
+    <Link to="/flying/pattern/drill" className="press group flex flex-col overflow-hidden rounded-xl bg-card ring-1 ring-inset ring-white/[0.04] hover:ring-white/[0.12] active:scale-[0.99]">
+      <div className="grid h-32 place-items-center" style={{ background: 'radial-gradient(100% 100% at 50% 50%, #141a16 0%, #0f1311 80%)' }}><Shuffle className="size-8 text-fg-3" /></div>
+      <div className="flex items-start gap-2 px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-medium text-fg">Entry drill</div>
+          <div className="text-sm text-fg-3">Endless random arrivals: runway, downwind, position, entry</div>
+        </div>
+        <ChevronRight className="mt-1 size-4 shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-fg" />
+      </div>
+    </Link>
   )
 }
 

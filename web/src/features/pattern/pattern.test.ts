@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { AIRPORTS } from './airports'
-import { angleDiff, bearing, components, findEnd, legPoint, polar, rankEnds, descentPlan, smooth, sampleAt, compass8 } from './geo'
+import { angleDiff, bearing, components, findEnd, legAt, legPoint, polar, rankEnds, descentPlan, smooth, sampleAt, compass8 } from './geo'
 import { spoken } from './radio'
 import { makeDrill, whereRelative } from './drill'
 import { SCENARIOS } from './scenarios'
@@ -104,5 +104,23 @@ describe('grading', () => {
     const order = { kind: 'order' as const, prompt: '', why: '', items: [{ id: 'x', label: '' }, { id: 'y', label: '' }] }
     expect(grade(order, ['x', 'y'])).toBe(true)
     expect(grade(order, ['y', 'x'])).toBe(false)
+  })
+})
+
+describe('leg narration', () => {
+  const e = findEnd(AIRPORTS.KWVI.runways, '20')
+  const legOf = (leg: Parameters<typeof legPoint>[1]) => {
+    const tr = flyTrack(AIRPORTS.KWVI, { circuit: '20' }, { p: [0, 0], alt: 1165 })
+    const p = legPoint(e, leg)
+    const s = tr.reduce((a, b) => (Math.hypot(b.p[0] - p[0], b.p[1] - p[1]) < Math.hypot(a.p[0] - p[0], a.p[1] - p[1]) ? b : a))
+    return legAt(e, s, AIRPORTS.KWVI.elev)
+  }
+  test('downwind', () => expect(legOf('mid')).toBe('Left downwind'))
+  test('base', () => expect(legOf('baseMid')).toBe('Left base'))
+  test('final', () => expect(legOf('final')).toBe('Final'))
+  test('crosswind', () => expect(legOf('crosswind')).toBe('Left crosswind'))
+  test('a 45 entry is named', () => {
+    const tr = flyTrack(AIRPORTS.KWVI, { entry: '45', rwy: '20' }, { p: atPoint(AIRPORTS.KWVI, { entry45: '20' }), alt: 1165 })
+    expect(legAt(e, sampleAt(tr, 0.3), AIRPORTS.KWVI.elev)).toBe('45° entry to downwind')
   })
 })

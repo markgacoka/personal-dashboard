@@ -33,6 +33,9 @@ export interface Info {
   profile?: { alt: number; tpa: number; gs: number; fpm: number; nowNm: number; atTpaNm: number }
 }
 
+// PAPI: four lights, outermost first. VASI: two bars, far (upper) then near.
+export interface Lights { kind: 'PAPI' | 'VASI'; colors: ('W' | 'R')[] }
+
 export interface Opt { id: string; label: string; why: string; fly?: Fly; rwy?: string }
 
 export type Question =
@@ -53,6 +56,7 @@ export interface Step {
   wind?: Wind
   sock?: Wind
   hideOwnship?: boolean
+  lights?: Lights // what the PAPI/VASI shows out the window
   info?: Info[]
   radio?: Tx[]
   scene?: { pattern?: string; zones?: Zone[]; traffic?: TrafficDef[]; closed?: string[] }

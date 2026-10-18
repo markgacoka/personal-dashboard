@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Headphones, Pause, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { Airport } from './airports'
 import { descentPlan, runwayEnds } from './geo'
@@ -30,9 +29,9 @@ export function RadioPanel({ txs, autoplay, hideText }: { txs: Tx[]; autoplay: b
   if (!txs.length) return null
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2">
         <Headphones className="size-4 text-fg-3" />
-        <span className="text-sm font-medium text-fg-2">Radio</span>
+        <span className="text-sm font-medium text-fg">On the radio</span>
         <div className="ml-auto flex gap-1.5">
           {speechAvailable() ? (
             line != null
@@ -41,17 +40,17 @@ export function RadioPanel({ txs, autoplay, hideText }: { txs: Tx[]; autoplay: b
           ) : <span className="text-sm text-fg-3">Audio isn’t available in this browser</span>}
         </div>
       </div>
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {txs.map((t, i) => {
           const masked = hideText && !heard.has(i) && !t.you
           return (
-            <li key={i} className={cn('flex items-start gap-2.5 rounded-md px-2 py-1.5 transition-colors', line === i && 'bg-accent-soft')}>
-              <button onClick={() => play(i, i + 1)} className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border border-border text-fg-2 hover:bg-hover hover:text-fg" aria-label={`Play ${t.from}`}>
-                {line === i ? <span className="flex h-3 items-end gap-[2px]">{[0, 1, 2].map(k => <span key={k} className="w-[3px] animate-pulse rounded-sm bg-accent" style={{ height: `${6 + k * 3}px`, animationDelay: `${k * 120}ms` }} />)}</span> : <Play className="size-3.5" />}
+            <li key={i} className={cn('flex items-end gap-2 animate-in', t.you && 'flex-row-reverse')}>
+              <button onClick={() => play(i, i + 1)} className={cn('press grid size-8 shrink-0 place-items-center rounded-full', line === i ? 'bg-fg text-bg' : 'bg-pill text-fg-2 hover:bg-pill-hover hover:text-fg')} aria-label={`Play ${t.from}`}>
+                {line === i ? <span className="flex h-3 items-end gap-[2px]">{[0, 1, 2].map(k => <span key={k} className="w-[3px] animate-pulse rounded-sm bg-bg" style={{ height: `${6 + k * 3}px`, animationDelay: `${k * 120}ms` }} />)}</span> : <Play className="size-3.5" />}
               </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5"><span className={cn('text-sm font-medium', t.you ? 'text-accent' : 'text-fg')}>{t.from}</span>{t.you && <Badge tone="accent">Your call</Badge>}</div>
-                <p className={cn('text-sm leading-relaxed text-fg-2', masked && 'select-none blur-[5px]')}>{t.text}</p>
+              <div className={cn('min-w-0 max-w-[88%] rounded-2xl px-3.5 py-2.5 transition-colors', t.you ? 'rounded-br-md bg-accent-soft' : 'rounded-bl-md bg-sunken', line === i && 'ring-1 ring-fg/40')}>
+                <div className={cn('mb-0.5 text-xs font-medium', t.you ? 'text-accent' : 'text-fg-3')}>{t.you ? 'You transmit' : t.from}</div>
+                <p className={cn('text-sm leading-relaxed text-fg', masked && 'select-none blur-[5px]')}>{t.text}</p>
                 {masked && <p className="text-xs text-fg-3">Transcript hidden. Press play and listen.</p>}
               </div>
             </li>
@@ -72,7 +71,7 @@ export function InfoCard({ info, ap, reveal }: { info: Info; ap: Airport; reveal
   )
   return (
     <div className="space-y-2">
-      {(info.lines || []).map(l => <code key={l} className="block break-words rounded-md bg-sunken px-3 py-2 font-mono text-sm leading-relaxed text-fg-2 ring-1 ring-inset ring-border">{l}</code>)}
+      {(info.lines || []).map(l => <code key={l} className="block break-words rounded-lg bg-sunken px-3.5 py-2.5 font-mono text-sm leading-relaxed text-fg">{l}</code>)}
     </div>
   )
 }
@@ -87,13 +86,13 @@ function Supplement({ ap }: { ap: Airport }) {
         <span className="text-fg-3">Tower</span><span>{ap.towered ? 'Yes (see remarks for hours)' : 'No, non-towered'}</span>
       </div>
       <table className="w-full">
-        <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1 font-medium">Runway</th><th className="pb-1 font-medium">Heading</th><th className="pb-1 font-medium">Size</th><th className="pb-1 font-medium">Traffic</th></tr></thead>
+        <thead><tr className="text-left text-xs text-fg-3 [&>th]:pb-1 [&>th]:pr-3 [&>th]:font-medium"><th>Runway</th><th>Heading</th><th>Size</th><th>Traffic</th></tr></thead>
         <tbody>{ends.map(e => (
-          <tr key={e.ident} className="border-t border-border">
+          <tr key={e.ident} className="border-t border-border [&>td]:pr-3">
             <td className="num py-1.5 font-semibold">{e.ident}</td>
             <td className="num">{String(e.hdg).padStart(3, '0')}°</td>
             <td className="num text-fg-2">{e.lengthFt.toLocaleString()} ft{e.displacedNm > 0 && <span className="text-fg-3"> · thld dsplcd {Math.round(e.displacedNm * 6076)} ft</span>}</td>
-            <td><Badge tone={e.side === 'R' ? 'warn' : 'neutral'}>{e.side === 'R' ? 'Right' : 'Left'}</Badge></td>
+            <td className={e.side === 'R' ? 'font-medium text-warn' : 'text-fg-2'}>{e.side === 'R' ? 'Right' : 'Left'}</td>
           </tr>
         ))}</tbody>
       </table>

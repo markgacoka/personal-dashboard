@@ -141,6 +141,11 @@ export function liveConditions(rec: NasrAirport, m: AwcMetar, station: string, n
 }
 
 // ── The scenario ──────────────────────────────────────────────────────────────
+const LIGHTS: Record<string, ('W' | 'R')[]> = {
+  '3 white, 1 red': ['W', 'W', 'W', 'R'], '2 white, 2 red': ['W', 'W', 'R', 'R'], '1 white, 3 red': ['W', 'R', 'R', 'R'], '4 red': ['R', 'R', 'R', 'R'],
+  'white over white': ['W', 'W'], 'red over white': ['R', 'W'], 'red over red': ['R', 'R'],
+}
+
 export function makeArrival(rec: NasrAirport, c: Conditions, rng: Rng = Math.random): Scenario {
   const ap = toAirport(rec)
   const id = ident(rec)
@@ -423,6 +428,7 @@ export function makeArrival(rec: NasrAirport, c: Conditions, rng: Rng = Math.ran
     const reading = pick(rng, papi ? [['3 white, 1 red', 'slightly high'], ['2 white, 2 red', 'on glidepath'], ['1 white, 3 red', 'slightly low'], ['4 red', 'well below']] : [['white over white', 'high'], ['red over white', 'on glidepath'], ['red over red', 'low']])
     steps.push({
       at: { leg: 'final', rwy: best.e.ident }, alt: ap.tpa - 500, gs: 65, time: hh, phase: 'Landing', title: papi ? 'Read the PAPI' : 'Read the VASI', scene: { pattern: best.e.ident },
+      lights: { kind: papi ? 'PAPI' : 'VASI', colors: LIGHTS[reading[0]] },
       situation: `Final for ${best.e.ident}. The ${papi ? 'PAPI' : 'VASI'} (FAA code ${nend.vgsi}) shows ${reading[0]}.`,
       q: {
         kind: 'choice', prompt: 'What does it tell you?', answer: reading[1],
@@ -474,6 +480,8 @@ export function makeArrival(rec: NasrAirport, c: Conditions, rng: Rng = Math.ran
   return finish()
 
   function finish(): Scenario {
+    const closed = ap.runways.flatMap(r => r.ends).filter(id => c.closures.some(cl => cl.split('/').some(x => sameRwy(x, id))))
+    if (closed.length) steps.forEach(s => { s.scene = { ...s.scene, closed } })
     return {
       id: `us-${rec.id}`, title: `${titleCase(rec.name)} (${id})`, airport: id, ap,
       source: `FAA NASR cycle ${rec.cycle}${c.source === 'live' ? ` · live weather from ${c.station}` : ' · generated weather'}`,

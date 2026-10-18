@@ -209,3 +209,22 @@ const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest'
 export const compass8 = (brg: number) => COMPASS[Math.round(norm360(brg) / 45) % 8]
 export const clock = (hdg: number, brgTo: number) => { const h = Math.round(norm360(brgTo - hdg) / 30) % 12; return h === 0 ? 12 : h }
 export const fmtHdg = (h: number) => String(Math.round(norm360(h)) % 360 || 360).padStart(3, '0')
+
+// Which part of the pattern a sample is on, for narrating a flight around runway end `e`.
+export function legAt(e: RunwayEnd, s: Sample, elev: number): string {
+  const rel: Pt = [s.p[0] - e.threshold[0], s.p[1] - e.threshold[1]]
+  const along = rel[0] * e.dir[0] + rel[1] * e.dir[1]
+  const lat = rel[0] * e.out[0] + rel[1] * e.out[1]
+  const off = (h: number) => Math.abs(angleDiff(s.hdg, h))
+  const turn = e.side === 'L' ? 'Left' : 'Right'
+  const onAxis = Math.abs(lat) < 0.25
+  if (onAxis && along > -0.05 && along < e.lengthNm + 0.05 && s.alt < elev + 60) return 'On the runway'
+  if (onAxis && along < 0 && off(e.hdg) < 30) return 'Final'
+  if (onAxis && along > e.lengthNm && off(e.hdg) < 30) return 'Upwind'
+  if (lat > 0.35 && off(e.hdg + 180) < 30) return Math.abs(along - e.displacedNm) < 0.15 ? `${turn} downwind, abeam the numbers` : `${turn} downwind`
+  if (along < 0.1 && lat > -0.2 && lat < 1.4 && off(e.hdg + (e.side === 'L' ? 90 : -90)) < 40) return `${turn} base`
+  if (along > e.lengthNm * 0.8 && lat > -0.2 && off(e.hdg + (e.side === 'L' ? -90 : 90)) < 40) return `${turn} crosswind`
+  if (lat > 0.8 && off(e.hdg + 180) < 75) return '45° entry to downwind'
+  if (lat < 0.4 && along > -0.3 && along < e.lengthNm + 0.3 && off(bearing([0, 0], e.out)) < 45) return 'Crossing midfield'
+  return Math.hypot(s.p[0], s.p[1]) > 3 ? 'Inbound' : 'Maneuvering'
+}

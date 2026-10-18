@@ -817,7 +817,7 @@ export const SCENARIOS: Scenario[] = [
         after: { fly: { pattern: 'final', rwy: '31R', from: 'mid' } },
       },
       {
-        phase: 'Landing', title: 'Read the PAPI',
+        phase: 'Landing', title: 'Read the PAPI', lights: { kind: 'PAPI', colors: ['W', 'W', 'W', 'R'] },
         situation: 'On a one-mile final for 31R. The PAPI (on the left side) shows three white lights and one red.',
         at: { leg: 'final', rwy: '31R' }, alt: 480, gs: 62, time: '22:28', scene: { pattern: '31R' },
         q: {

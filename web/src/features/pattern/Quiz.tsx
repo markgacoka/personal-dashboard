@@ -6,7 +6,7 @@ import type { Question } from './model'
 
 export const LETTERS = 'ABCDEFGH'
 
-export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover, onSubmit }: {
+export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover }: {
   q: Question
   picked: string[]
   setPicked: (p: string[]) => void
@@ -14,7 +14,6 @@ export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover
   correct: boolean
   hover: string | null
   setHover: (id: string | null) => void
-  onSubmit: () => void
 }) {
   const toggle = (id: string) => {
     if (submitted) return
@@ -25,7 +24,7 @@ export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover
 
   return (
     <div>
-      <p className="text-base font-medium text-fg">{q.prompt}</p>
+      <p className="text-lg font-medium leading-snug text-fg">{q.prompt}</p>
       {q.kind === 'order' ? <OrderQ q={q} picked={picked} toggle={toggle} reset={() => setPicked([])} submitted={submitted} /> : (
         <ul className="mt-3 space-y-2">
           {q.options.map((o, i) => {
@@ -36,15 +35,15 @@ export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover
               <li key={o.id}>
                 <button
                   onClick={() => toggle(o.id)} onPointerEnter={() => setHover(o.id)} onPointerLeave={() => setHover(null)} disabled={submitted}
-                  className={cn('flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-[background,border-color] duration-150',
+                  className={cn('press flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-[background,border-color] duration-150 active:scale-[0.99]',
                     state === 'on' && 'border-accent bg-accent-soft',
-                    state === 'off' && 'border-border hover:border-border-strong hover:bg-hover',
+                    state === 'off' && 'border-transparent bg-sunken hover:bg-hover',
                     state === 'right' && 'border-good bg-good-soft',
                     state === 'wrong' && 'border-bad bg-bad-soft',
                     hover === o.id && !submitted && state === 'off' && 'border-border-strong bg-hover')}>
                   <span className={cn('mt-0.5 grid size-6 shrink-0 place-items-center text-xs font-semibold',
                     q.kind === 'multi' ? 'rounded' : 'rounded-full',
-                    state === 'on' ? 'bg-accent text-accent-fg' : state === 'right' ? 'bg-good text-black' : state === 'wrong' ? 'bg-bad text-black' : 'bg-sunken text-fg-2 ring-1 ring-inset ring-border')}>
+                    state === 'on' ? 'bg-accent text-accent-fg' : state === 'right' ? 'bg-good text-black' : state === 'wrong' ? 'bg-bad text-black' : 'bg-pill text-fg-2')}>
                     {state === 'right' ? <Check className="size-3.5" /> : state === 'wrong' ? <X className="size-3.5" /> : q.kind === 'multi' ? (on ? <Check className="size-3.5" /> : '') : LETTERS[i]}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -59,12 +58,9 @@ export function Quiz({ q, picked, setPicked, submitted, correct, hover, setHover
       )}
 
       {!submitted ? (
-        <div className="mt-4 flex items-center gap-3">
-          <Button variant="primary" onClick={onSubmit} disabled={!picked.length}>Check answer</Button>
-          {q.kind !== 'choice' && <span className="text-sm text-fg-3">{q.kind === 'multi' ? 'Select all that apply' : `${picked.length} selected`}</span>}
-        </div>
+        q.kind === 'multi' && <p className="mt-3 text-sm text-fg-3">Select all that apply.</p>
       ) : (
-        <div className={cn('mt-4 rounded-md px-4 py-3 animate-in', correct ? 'bg-good-soft' : 'bg-bad-soft')}>
+        <div className={cn('mt-4 rounded-xl px-4 py-3.5 animate-in', correct ? 'bg-good-soft' : 'bg-bad-soft')}>
           <div className={cn('mb-1 flex items-center gap-2 text-sm font-semibold', correct ? 'text-good' : 'text-bad')}>
             {correct ? <CircleCheck className="size-4" /> : <CircleX className="size-4" />}{correct ? 'Correct' : 'Not quite'}
           </div>
@@ -101,7 +97,7 @@ function OrderQ({ q, picked, toggle, reset, submitted }: { q: Extract<Question, 
       </div>
       {!submitted && (
         <div className="flex flex-wrap gap-2">
-          {pool.map(it => <button key={it.id} onClick={() => toggle(it.id)} className="rounded-full border border-border px-3 py-1.5 text-sm text-fg-2 transition-colors hover:border-border-strong hover:bg-hover hover:text-fg">{it.label}</button>)}
+          {pool.map(it => <button key={it.id} onClick={() => toggle(it.id)} className="press rounded-full bg-pill px-3.5 py-2 text-sm text-fg hover:bg-pill-hover">{it.label}</button>)}
           {picked.length > 0 && <Button size="sm" variant="ghost" onClick={reset}><RotateCcw />Reset</Button>}
         </div>
       )}

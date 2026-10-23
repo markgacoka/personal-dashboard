@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, Bot, CalendarClock, FileUp, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bot, CalendarClock, FileUp, ImagePlus, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,12 +11,12 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, Popov
 import { Stat, DL } from '@/components/data/stat'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats, useTrackSummary } from '@/lib/queries'
-import { get, post } from '@/lib/api'
+import { del, get, post } from '@/lib/api'
 import { decodeMetar } from '@/lib/weather'
 import { calDate, hours, usd } from '@/lib/format'
-import { route, trainingLabel, isSolo } from '@/lib/flying'
+import { flightCost, route, trainingLabel, isSolo } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
-import type { Airport, Flight, TrackPoint } from '@/lib/types'
+import type { AircraftRegistry, Airport, Flight, TrackPoint } from '@/lib/types'
 import type { FeatureCollection } from 'geojson'
 import { FlightFormDialog } from './FlightForm'
 import { useDeleteFlight } from './LogbookPage'
@@ -481,6 +481,55 @@ function Notes({ f }: { f: Flight }) {
 }
 
 // ── Aircraft ─────────────────────────────────────────────────────────────────
+// The owner's own photo, for aircraft no public photo site has (school aircraft
+// often aren't). With children it's a labelled button; otherwise an icon that
+// replaces the photo, or a menu to replace or remove one already uploaded.
+function PhotoButton({ tail, uploaded, onDone, children }: { tail: string; uploaded?: boolean; onDone: () => void; children?: React.ReactNode }) {
+  const qc = useQueryClient()
+  const ref = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const key = ['registry', tail]
+  const apply = (photo: { url?: string | null; credit?: string | null; link?: string | null; source?: string | null } | null) => {
+    qc.setQueryData<AircraftRegistry | null>(key, r => r && { ...r, photo_url: photo?.url ?? null, photo_credit: photo?.credit ?? null, photo_link: photo?.link ?? null, photo_source: photo?.source ?? null })
+    onDone()
+    qc.invalidateQueries({ queryKey: key })
+  }
+  const remove = async () => {
+    try {
+      await del(`/api/aircraft/${encodeURIComponent(tail)}/photo`)
+      apply(null)
+    } catch (err) { toast.error((err as Error).message) }
+  }
+  const pick = () => ref.current?.click()
+  return (
+    <>
+      {children ? <Button size="sm" loading={busy} onClick={pick}><ImagePlus />{children}</Button>
+        : uploaded ? (
+          <Menu>
+            <MenuTrigger asChild><Button size="icon-sm" loading={busy} aria-label="Photo options" className="bg-black/55 text-white hover:bg-black/70"><ImagePlus /></Button></MenuTrigger>
+            <MenuContent>
+              <MenuItem onSelect={pick}><ImagePlus />Replace photo</MenuItem>
+              <MenuItem danger onSelect={remove}><Trash2 />Remove photo</MenuItem>
+            </MenuContent>
+          </Menu>
+        ) : <Button size="icon-sm" loading={busy} aria-label="Use your own photo" title="Use your own photo" onClick={pick} className="bg-black/55 text-white hover:bg-black/70"><ImagePlus /></Button>}
+      <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={async e => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (!file) return
+        setBusy(true)
+        try {
+          const res = await fetch(`/api/aircraft/${encodeURIComponent(tail)}/photo`, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': file.type }, body: file })
+          const d = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(res.status === 413 ? 'That photo is over 8 MB' : d.error || `Upload failed (${res.status})`)
+          apply(d)
+        } catch (err) { toast.error((err as Error).message) }
+        setBusy(false)
+      }} />
+    </>
+  )
+}
+
 function AircraftCard({ f }: { f: Flight }) {
   const ac = f.aircraft
   const { data: r, isLoading } = useRegistry(ac?.tail_number)
@@ -495,7 +544,14 @@ function AircraftCard({ f }: { f: Flight }) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[16/9] bg-sunken">
-        {r?.photo_url && !broken ? <img src={r.photo_url} alt={`${ac.tail_number}`} className="size-full object-cover" onError={() => setBroken(true)} /> : <div className="grid size-full place-items-center"><Plane className="size-10 text-fg-3" /></div>}
+        {r?.photo_url && !broken ? <img src={r.photo_url} alt={`${ac.tail_number}`} className="size-full object-cover" onError={() => setBroken(true)} /> : (
+          <div className="grid size-full place-items-center content-center gap-3">
+            <Plane className="size-10 text-fg-3" />
+            {!isLoading && <PhotoButton tail={ac.tail_number} onDone={() => setBroken(false)}>Add a photo of {ac.tail_number}</PhotoButton>}
+          </div>
+        )}
+        {r?.photo_url && !broken && <div className="absolute right-2 top-2"><PhotoButton tail={ac.tail_number} uploaded={r.photo_source === 'upload'} onDone={() => setBroken(false)} /></div>}
+        {r?.photo_url && !broken && r.photo_credit && <a href={r.photo_link || undefined} target="_blank" rel="noreferrer" className="absolute bottom-2 left-2 rounded bg-black/55 px-1.5 py-0.5 text-2xs text-white hover:underline">© {r.photo_credit}</a>}
         {r?.owner && <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-2xs text-white">{r.owner}</span>}
       </div>
       <CardBody className="pt-4">
@@ -548,18 +604,9 @@ function ScheduleCard({ f }: { f: Flight }) {
 
 // ── What NICE AIR billed ─────────────────────────────────────────────────────
 function CostCard({ f }: { f: Flight }) {
-  const c = f.cost
+  const c = flightCost(f)
   if (!c) return null
-  const linesOf = (kind: string) => c.lines.filter(l => l.kind === kind)
-  const part = (kind: string) => {
-    const ls = linesOf(kind)
-    if (!ls.length) return null
-    const h = ls.reduce((a, l) => a + (l.hours || 0), 0)
-    return { amount: ls.reduce((a, l) => a + l.amount, 0), hours: h }
-  }
-  const instruction = part('instruction'), ground = part('ground')
-  const total = (c.aircraft || 0) + (instruction?.amount || 0) + (ground?.amount || 0)
-  const misc = linesOf('misc')
+  const { instruction, ground, total, misc } = c
   const hobbs = num(f.hobbs_end) - num(f.hobbs_start)
   const money = (n: number, h?: number) => <span className="num">{h ? <span className="text-fg-3">{h.toFixed(1)} h · </span> : null}{usd(n)}</span>
   return (

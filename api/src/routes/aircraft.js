@@ -1,17 +1,50 @@
 // Aircraft: FAA registry lookup, the ACFTREF reference sync, creating an
-// aircraft record, and a photo from Planespotters.
+// aircraft record, and its photo (the owner's upload or a public source).
 import { pool } from '../db/client.js'
 import { fetchWithTimeout } from '../lib/http.js'
 import { lookupAircraft, importAcftref } from '../services/faa-registry.js'
+import { findPhoto, forgetPhoto, normTail, MAX_UPLOAD_BYTES, PHOTO_UA, UPLOAD_TYPES } from '../services/aircraftPhoto.js'
 
 export default async function aircraftRoutes(fastify) {
+  // Raw image bodies for photo uploads (encapsulated to these routes).
+  for (const type of UPLOAD_TYPES) {
+    fastify.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_UPLOAD_BYTES }, (req, body, done) => done(null, body))
+  }
+
+  // ── The owner's own photo of an aircraft ─────────────────────────────────────
+  fastify.get('/api/aircraft/:tail/photo', async (req, reply) => {
+    const { rows: [p] } = await pool.query('SELECT content_type, data FROM aircraft_photos WHERE tail_number = $1', [normTail(req.params.tail)])
+    if (!p) return reply.status(404).send({ error: 'No photo' })
+    // URLs carry ?v=<updated>, so a replaced photo gets a new URL.
+    return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type(p.content_type).send(p.data)
+  })
+  fastify.put('/api/aircraft/:tail/photo', async (req, reply) => {
+    const type = String(req.headers['content-type'] || '').split(';')[0]
+    if (!UPLOAD_TYPES.includes(type) || !Buffer.isBuffer(req.body) || !req.body.length) {
+      return reply.status(415).send({ error: 'Send a JPEG, PNG or WebP image' })
+    }
+    const tail = normTail(req.params.tail)
+    await pool.query(
+      `INSERT INTO aircraft_photos (tail_number, content_type, data, updated_at) VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (tail_number) DO UPDATE SET content_type = $2, data = $3, updated_at = NOW()`, [tail, type, req.body])
+    forgetPhoto(tail)
+    return findPhoto(tail)
+  })
+  fastify.delete('/api/aircraft/:tail/photo', async (req, reply) => {
+    const tail = normTail(req.params.tail)
+    await pool.query('DELETE FROM aircraft_photos WHERE tail_number = $1', [tail])
+    forgetPhoto(tail)
+    return reply.status(204).send()
+  })
+
   // ── Aircraft registration: FAA HTML + adsbdb + ACFTREF seats ─────────────────
   fastify.get('/api/external/aircraft/:n', async (req, reply) => {
     const n = req.params.n.toUpperCase().replace(/[^A-Z0-9]/g, '')
     try {
       const data = await lookupAircraft(n)
       if (!data) return reply.status(404).send({ error: 'Not found in FAA registry' })
-      return data
+      const photo = await findPhoto(n, { hex: data.mode_s_hex, known: data.photo_url })
+      return { ...data, photo_url: photo?.url || null, photo_credit: photo?.credit || null, photo_link: photo?.link || null, photo_source: photo?.source || null }
     } catch (e) {
       fastify.log.warn({ n, err: e.message }, 'Aircraft lookup failed')
       return reply.status(502).send({ error: 'Registry temporarily unavailable' })
@@ -63,7 +96,7 @@ export default async function aircraftRoutes(fastify) {
   fastify.get('/api/external/aircraft-photo/:reg', async (req, reply) => {
     const reg = req.params.reg.toUpperCase().replace(/[^A-Z0-9]/g, '')
     try {
-      const r = await fetchWithTimeout(`https://api.planespotters.net/pub/photos/reg/${encodeURIComponent(reg)}`, { ms: 8000 })
+      const r = await fetchWithTimeout(`https://api.planespotters.net/pub/photos/reg/${encodeURIComponent(reg)}`, { ms: 8000, headers: { 'User-Agent': PHOTO_UA } })
       if (!r.ok) return reply.status(404).send({ error: 'No photo found' })
       const d = await r.json()
       const photo = Array.isArray(d.photos) ? d.photos[0] : null

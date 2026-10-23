@@ -19,6 +19,24 @@ export const TRAINING_TYPES: Record<string, string> = {
 
 export const trainingLabel = (t?: string | null) => (t && TRAINING_TYPES[t]) || (t ? t : 'Flight')
 
+// What NICE AIR billed for a flight, by part: aircraft, flight instruction and
+// pre/post-ground instruction make the cost; misc items (headset rental) don't.
+// Null when no charge is linked to the flight.
+export function flightCost(f: Pick<Flight, 'cost'>) {
+  const c = f.cost
+  if (!c) return null
+  const part = (kind: 'instruction' | 'ground') => {
+    const ls = c.lines.filter(l => l.kind === kind)
+    return ls.length ? { amount: sum(ls.map(l => l.amount)), hours: sum(ls.map(l => l.hours || 0)) } : null
+  }
+  const instruction = part('instruction'), ground = part('ground')
+  return {
+    aircraft: c.aircraft, instruction, ground,
+    misc: c.lines.filter(l => l.kind === 'misc'),
+    total: (c.aircraft || 0) + (instruction?.amount || 0) + (ground?.amount || 0),
+  }
+}
+
 export const APPROACH_TYPES = ['ILS', 'RNAV (GPS)', 'VOR', 'NDB', 'LOC', 'LOC/BC', 'LDA', 'SDF', 'Visual']
 
 export function route(f: Pick<Flight, 'departure' | 'arrival' | 'via'>) {

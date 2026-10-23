@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { computeCurrency, route } from './flying'
+import { computeCurrency, flightCost, route } from './flying'
 import { sportOf } from './sports'
 import type { Flight } from './types'
 
@@ -65,4 +65,23 @@ describe('sportOf', () => {
     expect([s('lap_swimming'), s('indoor_rowing'), s('yoga'), s('strength_training'), s('hiking')]).toEqual(['swimming', 'rowing', 'yoga', 'strength', 'hiking'])
   })
   test('unknown falls back to other', () => { expect(s('bogus_activity')).toBe('other'); expect(s('')).toBe('other'); expect(s(null)).toBe('other') })
+})
+
+describe('flightCost', () => {
+  test('aircraft plus flight and ground instruction; misc listed, not counted', () => {
+    const c = flightCost({ cost: { aircraft: 195.8, lines: [
+      { kind: 'instruction', amount: 71.5, hours: 1.1, comment: '' },
+      { kind: 'ground', amount: 13, hours: 0.2, comment: '' },
+      { kind: 'misc', amount: 10, hours: null, comment: 'Headset' },
+    ] } })!
+    expect(c.total).toBeCloseTo(280.3)
+    expect(c.instruction).toEqual({ amount: 71.5, hours: 1.1 })
+    expect(c.misc).toHaveLength(1)
+  })
+  test('nothing billed → null; a solo has no instruction parts', () => {
+    expect(flightCost({ cost: null })).toBeNull()
+    const solo = flightCost({ cost: { aircraft: 129.6, lines: [] } })!
+    expect(solo.total).toBe(129.6)
+    expect(solo.instruction).toBeNull()
+  })
 })

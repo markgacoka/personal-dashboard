@@ -15,14 +15,16 @@ import { axisProps, cursorBand, gridProps, Legend, makeTip } from '@/components/
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useLogbookStats, qk } from '@/lib/queries'
 import { del, get, post } from '@/lib/api'
-import { calDate, hours } from '@/lib/format'
-import { isDual, isNight, isSolo, isXC, pplProgress, route, trainingLabel } from '@/lib/flying'
+import { calDate, hours, usd } from '@/lib/format'
+import { flightCost, isDual, isNight, isSolo, isXC, pplProgress, route, trainingLabel } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
 import type { Flight } from '@/lib/types'
 import { FlightFormDialog } from './FlightForm'
 
 type Filter = 'all' | 'solo' | 'dual' | 'night' | 'xc'
 const FILTERS: Record<Filter, (f: Flight) => boolean> = { all: () => true, solo: isSolo, dual: isDual, night: isNight, xc: isXC }
+
+const cost = (f: Flight) => flightCost(f)?.total ?? null
 
 export function useDeleteFlight() {
   const qc = useQueryClient()
@@ -46,12 +48,13 @@ export default function LogbookPage() {
   const formOpen = params.get('log') === '1'
   const setFormOpen = (o: boolean) => setParams(p => { if (o) p.set('log', '1'); else p.delete('log'); return p }, { replace: true })
   const all = flights || []
+  const spent = all.reduce((s, f) => s + (cost(f) || 0), 0)
 
   if (isError) return <EmptyState icon={BookOpen} title="The logbook is unavailable" className="py-24">The database didn’t respond.</EmptyState>
 
   return (
     <div>
-      <PageHeader title="Logbook" description={stats ? `${stats.total_flights} flights · ${num(stats.total_hours).toFixed(1)} hours · private pilot training` : 'Loading…'}
+      <PageHeader title="Logbook" description={stats ? `${stats.total_flights} flights · ${num(stats.total_hours).toFixed(1)} hours${spent ? ` · ${usd(spent)} spent` : ''} · private pilot training` : 'Loading…'}
         actions={<Button variant="primary" onClick={() => setFormOpen(true)}><Plus />Log flight</Button>} />
 
       <div className="grid gap-5 xl:grid-cols-12">
@@ -222,16 +225,16 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
       {loading ? <div className="space-y-2 p-5 pt-0">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div> : !flights.length ? <EmptyState icon={BookOpen} title="No flights logged yet">Use Log flight to add the first entry.</EmptyState> : !rows.length ? <EmptyState icon={Search} title="No flights match" /> : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[53.75rem] text-sm">
+            <table className="w-full min-w-[59rem] text-sm">
               <thead><tr className="border-y border-border bg-sunken text-left text-xs text-fg-3">
                 <th className="py-2 pl-5 pr-3 font-medium">Date</th><th className="px-3 font-medium">Route</th><th className="px-3 font-medium">Aircraft</th><th className="px-3 font-medium">Lesson</th>
-                <th className="px-3 text-right font-medium">Total</th><th className="px-3 text-right font-medium">Dual</th><th className="px-3 text-right font-medium">Solo</th><th className="px-3 text-right font-medium">XC</th><th className="px-3 text-right font-medium">Night</th><th className="px-3 text-right font-medium">Ldg</th><th className="w-12 pr-3" />
+                <th className="px-3 text-right font-medium">Total</th><th className="px-3 text-right font-medium">Dual</th><th className="px-3 text-right font-medium">Solo</th><th className="px-3 text-right font-medium">XC</th><th className="px-3 text-right font-medium">Night</th><th className="px-3 text-right font-medium">Ldg</th><th className="px-3 text-right font-medium">Cost</th><th className="w-12 pr-3" />
               </tr></thead>
               <tbody>
                 {page.flatMap(f => {
                   const month = calDate(f.date, { month: 'long', year: 'numeric' })
                   const out = []
-                  if (month !== lastMonth) { lastMonth = month; out.push(<tr key={month}><td colSpan={11} className="px-5 pb-1.5 pt-4 text-xs font-medium text-fg-3">{month}</td></tr>) }
+                  if (month !== lastMonth) { lastMonth = month; out.push(<tr key={month}><td colSpan={12} className="px-5 pb-1.5 pt-4 text-xs font-medium text-fg-3">{month}</td></tr>) }
                   const cell = (v: unknown) => <td className="num px-3 text-right text-fg-2">{hours(v) ?? <span className="text-fg-3">—</span>}</td>
                   out.push(
                     <tr key={f.id} onClick={() => navigate(`/flying/${f.id}`)} className="group cursor-pointer border-b border-border last:border-0 hover:bg-hover">
@@ -247,6 +250,7 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
                       <td className="num px-3 text-right font-medium text-fg">{num(f.total_duration).toFixed(1)}</td>
                       {cell(f.dual_received)}{cell(f.solo)}{cell(f.cross_country)}{cell(f.night)}
                       <td className="num px-3 text-right text-fg-2">{f.landings || <span className="text-fg-3">—</span>}</td>
+                      <td className="num whitespace-nowrap px-3 text-right text-fg-2">{cost(f) ? usd(cost(f)!) : <span className="text-fg-3">—</span>}</td>
                       <td className="pr-3" onClick={e => e.stopPropagation()}>
                         <Menu>
                           <MenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label="Flight actions" className="opacity-60 group-hover:opacity-100"><MoreHorizontal /></Button></MenuTrigger>
@@ -266,7 +270,8 @@ function FlightTable({ flights, loading }: { flights: Flight[]; loading: boolean
               <tfoot><tr className="border-t border-border bg-sunken text-sm">
                 <td colSpan={4} className="py-2.5 pl-5 text-fg-3">{rows.length === flights.length ? 'All flights' : `${rows.length} matching flights`}</td>
                 {(['total_duration', 'dual_received', 'solo', 'cross_country', 'night'] as const).map(k => <td key={k} className="num px-3 text-right font-medium">{rows.reduce((s, f) => s + num(f[k]), 0).toFixed(1)}</td>)}
-                <td className="num px-3 text-right font-medium">{rows.reduce((s, f) => s + (f.landings || 0), 0)}</td><td />
+                <td className="num px-3 text-right font-medium">{rows.reduce((s, f) => s + (f.landings || 0), 0)}</td>
+                <td className="num whitespace-nowrap px-3 text-right font-medium">{usd(rows.reduce((s, f) => s + (cost(f) || 0), 0))}</td><td />
               </tr></tfoot>
             </table>
           </div>

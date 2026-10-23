@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test src/test/wx.test.js src/test/routes.test.js src/test/mail.test.js src/test/passkey.test.js src/test/autolog.test.js src/test/nasr.test.js src/test/niceAirPortal.test.js"
+    "test": "node --test src/test/wx.test.js src/test/routes.test.js src/test/mail.test.js src/test/passkey.test.js src/test/autolog.test.js src/test/nasr.test.js src/test/niceAirPortal.test.js src/test/aircraftPhoto.test.js"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.6",

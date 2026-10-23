@@ -6,6 +6,7 @@ import { summarize } from '../services/stitch.js'
 import { storeTrace } from '../services/recentTraces.js'
 import { parseTrackFile } from '../lib/trackFiles.js'
 import { backfillNightTimes, syncSchedulesToTimes } from '../services/schedules.js'
+import { portalStatus, syncNiceAirPortalOnce } from '../services/niceAirPortal.js'
 
 const FLIGHT_SELECT = `
   SELECT
@@ -44,7 +45,14 @@ const FLIGHT_SELECT = `
       ) ORDER BY ap.id)
       FROM approaches ap WHERE ap.flight_id = f.id),
       '[]'::json
-    ) AS approaches
+    ) AS approaches,
+    (SELECT json_build_object(
+        'aircraft', (SELECT sum(charge)::float8 FROM nice_air_meter WHERE flight_id = f.id),
+        'lines', COALESCE((SELECT json_agg(json_build_object('kind', c.kind, 'amount', c.amount::float8, 'hours', c.hours, 'comment', c.comment) ORDER BY c.kind, c.key)
+                           FROM nice_air_charges c WHERE c.flight_id = f.id AND c.kind IN ('instruction', 'ground', 'misc')), '[]'::json))
+     WHERE EXISTS (SELECT 1 FROM nice_air_meter WHERE flight_id = f.id)
+        OR EXISTS (SELECT 1 FROM nice_air_charges WHERE flight_id = f.id)
+    ) AS cost
   FROM flights f
   JOIN airports dep ON dep.icao = f.departure_icao
   JOIN airports arr ON arr.icao = f.arrival_icao
@@ -196,6 +204,18 @@ export default async function flightRoutes(fastify) {
   fastify.post('/api/nice-air/autolog/run', async (req) => {
     req.raw.setTimeout?.(25 * 60_000)
     return { results: await runAutoLogOnce({ log: fastify.log }) }
+  })
+
+  // NICE AIR portal sync (charges and Hobbs): its state, and a manual run.
+  fastify.get('/api/nice-air/portal', async () => portalStatus())
+  fastify.post('/api/nice-air/portal/sync', async (req, reply) => {
+    req.raw.setTimeout?.(5 * 60_000)
+    try {
+      return { ok: true, ...(await syncNiceAirPortalOnce({ log: fastify.log })) }
+    } catch (e) {
+      fastify.log.warn({ err: e.message }, 'NICE AIR portal sync failed')
+      return reply.status(502).send({ error: e.message })
+    }
   })
 
   fastify.put('/api/flights/:id', async (req, reply) => {

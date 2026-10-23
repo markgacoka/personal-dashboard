@@ -1012,6 +1012,44 @@ async function migrateV29() {
   `)
 }
 
+// NICE AIR portal mirror: My Flights (aircraft charge and Hobbs per flight) and
+// the account statement, each row linked to the logbook entry it belongs to.
+async function migrateV30() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nice_air_meter (
+      key         TEXT PRIMARY KEY,
+      date_str    TEXT NOT NULL,
+      tail        TEXT NOT NULL,
+      charge      NUMERIC(10,2) NOT NULL,
+      meter_start DOUBLE PRECISION NOT NULL,
+      meter_end   DOUBLE PRECISION NOT NULL,
+      hours       DOUBLE PRECISION NOT NULL,
+      cfi         TEXT,
+      flight_id   INTEGER REFERENCES flights(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS nice_air_meter_flight ON nice_air_meter (flight_id);
+    CREATE TABLE IF NOT EXISTS nice_air_charges (
+      key         TEXT PRIMARY KEY,
+      posted_on   DATE NOT NULL,
+      applies_on  DATE NOT NULL,
+      activity    TEXT NOT NULL,
+      kind        TEXT NOT NULL CHECK (kind IN ('aircraft', 'instruction', 'ground', 'misc', 'payment')),
+      amount      NUMERIC(10,2) NOT NULL,
+      tax         NUMERIC(10,2) NOT NULL DEFAULT 0,
+      balance     NUMERIC(10,2) NOT NULL,
+      hours       DOUBLE PRECISION,
+      comment     TEXT NOT NULL,
+      flight_id   INTEGER REFERENCES flights(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS nice_air_charges_flight ON nice_air_charges (flight_id);
+    CREATE TABLE IF NOT EXISTS nice_air_portal_meta (
+      key        TEXT PRIMARY KEY,
+      value      TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -1020,7 +1058,7 @@ const MIGRATIONS = [
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
-  ['029', migrateV29],
+  ['029', migrateV29], ['030', migrateV30],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

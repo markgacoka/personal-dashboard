@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { bytes, duration, hours, mailDate, miles, pace } from './format'
+import { bytes, duration, hours, mailDate, miles, pace, usd } from './format'
 
 describe('miles', () => {
   test('nothing for zero or missing', () => { expect(miles(0)).toBeNull(); expect(miles(null)).toBeNull() })
@@ -34,4 +34,8 @@ describe('mail formatting', () => {
     expect(mailDate('garbage', now)).toBe('')
   })
   test('sizes', () => { expect(bytes(0)).toBe('0 B'); expect(bytes(2048)).toBe('2 KB'); expect(bytes(3.5 * 1024 * 1024)).toBe('3.5 MB') })
+})
+
+describe('usd', () => {
+  test('cents and thousands', () => { expect(usd(195.8)).toBe('$195.80'); expect(usd(1234.5)).toBe('$1,234.50') })
 })

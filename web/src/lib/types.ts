@@ -172,6 +172,14 @@ export interface Flight {
   via_airports: Airport[]
   aircraft: AircraftRef
   approaches: Approach[]
+  cost: FlightCost | null
+}
+
+// What NICE AIR billed for a flight: the aircraft (from My Flights) and the
+// statement lines linked to it. Misc lines (headset rental) aren't flight cost.
+export interface FlightCost {
+  aircraft: number | null
+  lines: { kind: 'instruction' | 'ground' | 'misc'; amount: number; hours: number | null; comment: string }[]
 }
 
 export interface LogbookStats {

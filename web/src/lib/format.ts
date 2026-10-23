@@ -40,6 +40,8 @@ export function hours(v: unknown, digits = 1) {
 
 export const int = (n: number) => Math.round(n).toLocaleString('en-US')
 
+export const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+
 // Flight and daily-stat dates are calendar dates ("2026-08-19" or midnight UTC).
 // Anchor at UTC noon and format in UTC so the day never shifts with the viewer's zone.
 export function calDate(value: string, opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }) {

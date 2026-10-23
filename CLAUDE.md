@@ -65,6 +65,23 @@ evidence, creates an entry with `foreflight_source = 'nice-air-auto'`. The
 entries are rebuilt when adsb.lol adds coverage. `POST /api/nice-air/autolog/run`
 runs it now; `POST /api/flights/:id/refresh-track` re-collects one track.
 
+## NICE AIR charges and Hobbs
+
+`services/niceAirPortal.js` signs in to NICE AIR's Paperless141 portal
+(niceair.paperlessfbo.com; no API, so ASP.NET form postbacks) with
+`NICE_AIR_USERNAME` / `NICE_AIR_PASSWORD` from `.env`, turns paging off and
+downloads the two Excel exports: My Flights (aircraft charge, Hobbs meter) and
+the account statement. They're mirrored into `nice_air_meter` and
+`nice_air_charges` (an export with fewer rows than stored is refused) and linked
+to logbook entries by date, tail and duration. A flight's cost (`cost` on
+`GET /api/flights/:id`) is the aircraft charge plus that day's flight and
+pre/post-ground instruction; headset rental is listed but not counted, and
+ground lessons on days without a flight stay unlinked. Hobbs readings fill
+`hobbs_start`/`hobbs_end` only where both are empty; NICE AIR has no tach data.
+It runs every 12 h, and hourly while a logbook flight in a booking from the
+last 3 days has no charge yet. `GET /api/nice-air/portal` shows its state;
+`POST /api/nice-air/portal/sync` runs it now.
+
 ## Mail
 
 `#mail` is a mail client for hello@gacoka.com backed by a self-hosted

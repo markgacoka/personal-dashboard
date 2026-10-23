@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, Bot, CalendarClock, FileUp, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bot, CalendarClock, FileUp, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats, useTrackSummary } from '@/lib/queries'
 import { get, post } from '@/lib/api'
 import { decodeMetar } from '@/lib/weather'
-import { calDate, hours } from '@/lib/format'
+import { calDate, hours, usd } from '@/lib/format'
 import { route, trainingLabel, isSolo } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
 import type { Airport, Flight, TrackPoint } from '@/lib/types'
@@ -113,6 +113,7 @@ export default function FlightPage() {
         <div className="space-y-5 xl:col-span-4">
           <AircraftCard f={f} />
           <ScheduleCard f={f} />
+          <CostCard f={f} />
           <WeatherCard metars={metars} />
         </div>
       </div>
@@ -540,6 +541,38 @@ function ScheduleCard({ f }: { f: Flight }) {
           ]} />
           {s.type === 'changed' && <Badge tone="warn" className="mt-3">Schedule was changed</Badge>}
         </>}
+      </CardBody>
+    </Card>
+  )
+}
+
+// ── What NICE AIR billed ─────────────────────────────────────────────────────
+function CostCard({ f }: { f: Flight }) {
+  const c = f.cost
+  if (!c) return null
+  const linesOf = (kind: string) => c.lines.filter(l => l.kind === kind)
+  const part = (kind: string) => {
+    const ls = linesOf(kind)
+    if (!ls.length) return null
+    const h = ls.reduce((a, l) => a + (l.hours || 0), 0)
+    return { amount: ls.reduce((a, l) => a + l.amount, 0), hours: h }
+  }
+  const instruction = part('instruction'), ground = part('ground')
+  const total = (c.aircraft || 0) + (instruction?.amount || 0) + (ground?.amount || 0)
+  const misc = linesOf('misc')
+  const hobbs = num(f.hobbs_end) - num(f.hobbs_start)
+  const money = (n: number, h?: number) => <span className="num">{h ? <span className="text-fg-3">{h.toFixed(1)} h · </span> : null}{usd(n)}</span>
+  return (
+    <Card>
+      <CardHeader icon={<Receipt />} title="Cost" description="Billed by NICE AIR" />
+      <CardBody>
+        <DL items={[
+          ['Aircraft', c.aircraft != null ? money(c.aircraft, hobbs > 0 ? hobbs : undefined) : null],
+          ['Flight instruction', instruction ? money(instruction.amount, instruction.hours) : null],
+          ['Ground instruction', ground ? money(ground.amount, ground.hours) : null],
+          ['Total', <span className="num font-semibold">{usd(total)}</span>],
+        ]} />
+        {!!misc.length && <p className="mt-3 text-sm text-fg-3">Not included: {misc.map(l => `${l.comment.replace(/^Misc\.-(Non-)?Taxable\s*/i, '').replace(/\s+on \d{1,2}\/\d{1,2}(\/\d{2,4})?$/, '').toLowerCase().replace(/^\w/, ch => ch.toUpperCase())} ${usd(l.amount)}`).join(', ')}</p>}
       </CardBody>
     </Card>
   )

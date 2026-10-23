@@ -770,11 +770,11 @@ describe('Live API smoke tests (signed in)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1'
 // to the database, so point them at a restored copy, e.g.
 //   DATABASE_URL=postgres://…/dashboard_copy SKIP_SMOKE=1 npm test
 //
-// Uses aircraft N213AN (id 36, mode_s_hex a1c4b4) at KRHV on 2026-08-26 with
-// time_out anchored to exactly 17:41:41Z — the OpenSky query key already
-// cached in opensky_tracks_cache from production use, so the track fetch is
-// a cache hit (deterministic, no live network dependency) rather than a
-// fabricated flight. Every write this test makes is deleted in the final
+// Uses aircraft N213AN (id 36, mode_s_hex a1c4b4) at KRHV on 2026-08-26, a
+// real flight rather than a fabricated one. Its track comes from the free
+// sources (OpenSky, adsb.lol's daily archive), so the first run on a fresh
+// copy downloads the archive days its booking touches; later runs hit the
+// adsblol_traces cache. Every write this test makes is deleted in the final
 // test, which cascades track_log_points via the FK's ON DELETE CASCADE.
 
 const DB_SKIP = !process.env.DATABASE_URL ? 'DATABASE_URL not set'
@@ -934,25 +934,25 @@ describe('New flight entry — full write path (DB integration)', { skip: DB_SKI
     assert.equal(typeof f.arrival.lat, 'number', 'arrival airport lat should be populated');
   });
 
-  test('OpenSky auto-fetch populates track_log_points tagged source=opensky', async () => {
-    // The route fires this fire-and-forget, so poll briefly for it to land —
-    // it's a cache hit, so in practice this resolves in well under a second.
+  test('a new flight collects its track, each point tagged with its real source', async () => {
+    // The route fires this fire-and-forget, so poll for it to land. A cold
+    // adsb.lol archive download takes ~15 s; a cached one well under a second.
     let flight;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 180; i++) {
       const res = await app.inject({ method: 'GET', url: `/api/flights/${createdFlightId}` });
       flight = res.json();
       if (flight.has_track) break;
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 500));
     }
-    assert.equal(flight.has_track, true, 'OpenSky auto-fetch should have populated a track from cached data');
-    assert.equal(flight.track_source, 'opensky', 'a new UI-logged flight must be tagged with its real source');
+    assert.equal(flight.has_track, true, 'the free sources should have produced a track');
+    const SOURCES = ['opensky', 'adsblol', 'adsbfi', 'airplaneslive', 'theairtraffic', 'adsbexchange'];
 
     const trackRes = await app.inject({ method: 'GET', url: `/api/flights/${createdFlightId}/track` });
     assert.equal(trackRes.statusCode, 200);
     const points = trackRes.json();
     assert.ok(points.length > 0, 'should have track points');
     for (const p of points) {
-      assert.equal(p.source, 'opensky');
+      assert.ok(SOURCES.includes(p.source), `unexpected point source ${p.source}`);
       assert.equal(typeof p.lat, 'number');
       assert.equal(typeof p.lon, 'number');
       assert.ok(p.ts);

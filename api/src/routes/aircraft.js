@@ -11,9 +11,9 @@ export default async function aircraftRoutes(fastify) {
     fastify.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_UPLOAD_BYTES }, (req, body, done) => done(null, body))
   }
 
-  // ── The owner's own photo of an aircraft ─────────────────────────────────────
+  // ── The owner's chosen photo: an upload, or a credited link ─────────────────────────────────────
   fastify.get('/api/aircraft/:tail/photo', async (req, reply) => {
-    const { rows: [p] } = await pool.query('SELECT content_type, data FROM aircraft_photos WHERE tail_number = $1', [normTail(req.params.tail)])
+    const { rows: [p] } = await pool.query('SELECT content_type, data FROM aircraft_photos WHERE tail_number = $1 AND data IS NOT NULL', [normTail(req.params.tail)])
     if (!p) return reply.status(404).send({ error: 'No photo' })
     // URLs carry ?v=<updated>, so a replaced photo gets a new URL.
     return reply.header('Cache-Control', 'private, max-age=31536000, immutable').type(p.content_type).send(p.data)
@@ -26,7 +26,7 @@ export default async function aircraftRoutes(fastify) {
     const tail = normTail(req.params.tail)
     await pool.query(
       `INSERT INTO aircraft_photos (tail_number, content_type, data, updated_at) VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (tail_number) DO UPDATE SET content_type = $2, data = $3, updated_at = NOW()`, [tail, type, req.body])
+       ON CONFLICT (tail_number) DO UPDATE SET content_type = $2, data = $3, url = NULL, credit = NULL, link = NULL, source = NULL, updated_at = NOW()`, [tail, type, req.body])
     forgetPhoto(tail)
     return findPhoto(tail)
   })

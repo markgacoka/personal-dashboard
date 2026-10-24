@@ -40,9 +40,13 @@ async function fromPlanespotters(kind, id) {
   return src ? { url: src, credit: p.photographer || null, link: p.link || null, source: 'Planespotters.net' } : null
 }
 
+// The owner's choice: their own upload, or a link to a photo picked by hand.
 export async function uploadedPhoto(tail) {
-  const { rows: [r] } = await pool.query('SELECT extract(epoch FROM updated_at)::bigint AS v FROM aircraft_photos WHERE tail_number = $1', [normTail(tail)])
-  return r ? { url: `/api/aircraft/${normTail(tail)}/photo?v=${r.v}`, credit: null, link: null, source: 'upload' } : null
+  const { rows: [r] } = await pool.query(
+    'SELECT extract(epoch FROM updated_at)::bigint AS v, url, credit, link, source FROM aircraft_photos WHERE tail_number = $1', [normTail(tail)])
+  if (!r) return null
+  if (r.url) return { url: r.url, credit: r.credit, link: r.link, source: r.source }
+  return { url: `/api/aircraft/${normTail(tail)}/photo?v=${r.v}`, credit: null, link: null, source: 'upload' }
 }
 
 // { url, credit, link, source } or null. `known` is a photo URL the registry

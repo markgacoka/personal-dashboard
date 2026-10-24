@@ -1,7 +1,7 @@
 // Aircraft photos: public-source helpers, and the owner's upload round trip.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { airportDataFullSize, normTail } from '../services/aircraftPhoto.js'
+import { airportDataFullSize, normTail, findPhoto, forgetPhoto } from '../services/aircraftPhoto.js'
 
 describe('photo helpers', () => {
   test('airport-data thumbnails map to the full-size original', () => {
@@ -33,6 +33,14 @@ describe('owner photo upload (DB integration)', { skip: !process.env.DATABASE_UR
   test('only JPEG, PNG or WebP bodies are accepted', async () => {
     const res = await app.inject({ method: 'PUT', url: `/api/aircraft/${TAIL}/photo`, headers: { 'content-type': 'application/json' }, payload: '{}' })
     assert.equal(res.statusCode, 415)
+  })
+
+  test('a linked photo is used, with its credit', async () => {
+    await pool.query(`INSERT INTO aircraft_photos (tail_number, url, credit, link, source) VALUES ($1, 'https://cdn.example/x.jpg', 'A. Spotter', 'https://example/photo/1', 'JetPhotos')
+      ON CONFLICT (tail_number) DO UPDATE SET url = EXCLUDED.url, credit = EXCLUDED.credit, link = EXCLUDED.link, source = EXCLUDED.source, data = NULL, content_type = NULL`, [TAIL])
+    forgetPhoto(TAIL)
+    assert.deepEqual(await findPhoto(TAIL), { url: 'https://cdn.example/x.jpg', credit: 'A. Spotter', link: 'https://example/photo/1', source: 'JetPhotos' })
+    assert.equal((await app.inject({ method: 'GET', url: `/api/aircraft/${TAIL}/photo` })).statusCode, 404, 'nothing stored to serve')
   })
 
   test('an upload is served back and becomes the photo', async () => {

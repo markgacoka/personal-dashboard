@@ -103,6 +103,51 @@ export function nearestAirport(p, airports) {
   return best
 }
 
+// Landings the receivers didn't see: the aircraft drops out of coverage low
+// and coming down, and reappears low and climbing, with time in between to
+// reach an airport, land and come back. Small fields away from the receivers
+// (King City, say) are only ever visited this way.
+const GAP_MIN_S = 4 * 60
+const LOW_AGL = 3000
+export function gapStops(pts, airports) {
+  const out = []
+  // Altitude change over the two covered minutes next to the gap (step -1:
+  // the minutes before point i, +1: the minutes after it).
+  const trend = (i, step) => {
+    let j = i
+    while (pts[j + step] && Math.abs(Date.parse(pts[j + step].ts) - Date.parse(pts[i].ts)) <= 120_000) j += step
+    const [x, y] = step < 0 ? [pts[j], pts[i]] : [pts[i], pts[j]]
+    return x.altitude_ft != null && y.altitude_ft != null ? y.altitude_ft - x.altitude_ft : 0
+  }
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i]
+    const secs = (Date.parse(b.ts) - Date.parse(a.ts)) / 1000
+    if (secs < GAP_MIN_S || a.on_ground || b.on_ground || a.altitude_ft == null || b.altitude_ft == null) continue
+    if (trend(i - 1, -1) >= 0 || trend(i, 1) <= 0) continue
+    // The faster of the two speeds: one side is often a slow climb-out.
+    const kts = Math.max(60, Math.min(Math.max(a.groundspeed_kts || 0, b.groundspeed_kts || 0) || 100, 140))
+    // A gap that starts or ends in a field's pattern is more of the pattern
+    // (sparse tracks), not a trip somewhere else.
+    if ([a, b].some(p => (nearestAirport(p, airports)?.nm ?? Infinity) < 3)) continue
+    let best = null
+    for (const apt of airports) {
+      if (apt.lat == null || apt.lon == null) continue
+      const elev = apt.elevation_ft ?? 0
+      if (a.altitude_ft - elev > LOW_AGL || b.altitude_ft - elev > LOW_AGL) continue
+      const d1 = nm(a, apt), d2 = nm(apt, b)
+      if (d1 + d2 > 40) continue
+      // Out and back at cruise, plus a minute on the runway.
+      if (((d1 + d2) / kts) * 3600 + 60 > secs) continue
+      if (!best || d1 + d2 < best.d) best = { apt, d: d1 + d2, d1 }
+    }
+    if (!best) continue
+    const at = Date.parse(a.ts) + (best.d1 / kts) * 3600_000
+    const { apt } = best
+    out.push({ icao: apt.icao, name: apt.name, lat: apt.lat, lon: apt.lon, start: at, end: at, ground: false, minAgl: 0, unseen: true })
+  }
+  return out
+}
+
 // Stops (unbroken runs of low, slow points close to one airport), the route
 // they imply, and whether the track starts and ends on the ground.
 export function analyzeTrack(points, airports) {
@@ -122,6 +167,8 @@ export function analyzeTrack(points, airports) {
     else stops.push({ icao: apt.icao, name: apt.name, lat: apt.lat, lon: apt.lon, start: t, end: t, ground: !!p.on_ground, minAgl: p.on_ground ? 0 : p.altitude_ft - elev })
     open = true
   }
+  stops.push(...gapStops(pts, airports))
+  stops.sort((a, b) => a.start - b.start)
   const t0 = Date.parse(pts[0].ts), t1 = Date.parse(pts.at(-1).ts)
   const startsAtAirport = !!stops[0] && stops[0].start - t0 < 5 * 60_000
   const endsAtAirport = !!stops.length && t1 - stops.at(-1).end < 5 * 60_000 && stops.at(-1).start > t0 + 10 * 60_000
@@ -157,8 +204,8 @@ export function summarize(points, airports) {
     const first = i === 0 && a.departure, last = i === a.stops.length - 1 && a.arrival
     const minutes = Math.round((s.end - s.start) / 60_000)
     const kind = first ? 'departure' : last ? 'landing'
-      : s.ground ? (minutes >= 3 ? 'full stop' : 'touch-and-go') : s.minAgl < 300 ? 'touch-and-go' : 'low approach'
-    return { icao: s.icao, name: s.name, kind, from: new Date(s.start).toISOString(), to: new Date(s.end).toISOString(), minutes, seen_on_ground: s.ground }
+      : s.unseen ? 'unseen landing' : s.ground ? (minutes >= 3 ? 'full stop' : 'touch-and-go') : s.minAgl < 300 ? 'touch-and-go' : 'low approach'
+    return { icao: s.icao, name: s.name, kind, from: new Date(s.start).toISOString(), to: new Date(s.end).toISOString(), minutes, seen_on_ground: s.ground, ...(s.unseen ? { unseen: true } : {}) }
   })
   return {
     sources: Object.entries(sources).map(([k, n]) => ({ source: k, name: SOURCE_NAME[k] || k, points: n })).sort((x, y) => y.points - x.points),

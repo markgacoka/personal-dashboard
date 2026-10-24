@@ -125,7 +125,7 @@ describe('track sources', () => {
   })
 })
 
-import { stitch, dropOutliers, fillDerived, summarize } from '../services/stitch.js'
+import { stitch, dropOutliers, fillDerived, summarize, gapStops } from '../services/stitch.js'
 import { parseTrackFile } from '../lib/trackFiles.js'
 
 describe('stitching sources into one track', () => {
@@ -156,6 +156,36 @@ describe('stitching sources into one track', () => {
     assert.equal(s.complete, true)
     assert.deepEqual(s.events.map(e => [e.icao, e.kind]), [['KAAA', 'departure'], ['KBBB', 'full stop'], ['KAAA', 'landing']])
     assert.ok(s.gaps.length >= 1, 'the synthetic track has 10-minute spacing')
+  })
+})
+
+// 2026-02-27: down toward King City, out of coverage for 14 minutes, back
+// climbing on the reciprocal. Points from the stored track.
+describe('landings out of receiver coverage', () => {
+  const KKIC = { icao: 'KKIC', name: 'Mesa del Rey', lat: 36.2283, lon: -120.9917, elevation_ft: 370 }
+  const KSNS = { icao: 'KSNS', name: 'Salinas', lat: 36.6628, lon: -121.6064, elevation_ft: 85 }
+  const at = (t, lat, lon, alt, gs) => ({ ts: `2026-02-28T${t}Z`, lat, lon, altitude_ft: alt, groundspeed_kts: gs })
+  const before = [at('01:24:33', 36.298, -121.209, 3000, 106), at('01:25:07', 36.290, -121.190, 2500, 108), at('01:25:45', 36.279, -121.171, 2100, 110), at('01:26:04', 36.273, -121.163, 1900, 111)]
+  const after = [at('01:39:49', 36.270, -121.169, 1800, 77), at('01:40:06', 36.275, -121.174, 2000, 79), at('01:41:05', 36.292, -121.192, 2500, 84)]
+
+  test('a low gap that goes down and comes back up is a landing at the field in reach', () => {
+    const [s] = gapStops([...before, ...after], [KSNS, KKIC])
+    assert.equal(s.icao, 'KKIC')
+    assert.equal(s.unseen, true)
+    const ev = summarize([...before, ...after], [KSNS, KKIC]).events
+    assert.deepEqual(ev.map(e => [e.icao, e.kind]), [['KKIC', 'unseen landing']])
+  })
+
+  test('a gap at altitude, or one too short to get there and back, is not', () => {
+    const high = p => ({ ...p, altitude_ft: p.altitude_ft + 4000 })
+    assert.equal(gapStops([...before.map(high), ...after.map(high)], [KKIC]).length, 0)
+    const quick = after.map(p => ({ ...p, ts: p.ts.replace('01:39', '01:28').replace('01:40', '01:28').replace('01:41', '01:29') }))
+    assert.equal(gapStops([...before, ...quick], [KKIC]).length, 0)
+  })
+
+  test('level flight through a gap is not a landing', () => {
+    const level = [...before, ...after].map(p => ({ ...p, altitude_ft: 2000 }))
+    assert.equal(gapStops(level, [KKIC]).length, 0)
   })
 })
 

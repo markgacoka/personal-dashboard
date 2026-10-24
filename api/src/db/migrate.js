@@ -1062,6 +1062,45 @@ async function migrateV31() {
   `)
 }
 
+// Logbook corrections. The ForeFlight import left "landings" empty where only
+// the day/night full-stop counts were entered, so those counts are the total.
+// Routes gain the airports the GPS tracks show were visited but weren't
+// written down: King City during a coverage gap on 2026-02-27, and pattern
+// work at San Martin (E16) and San Jose. Each route change names the flight's
+// date and current route, so it applies once and only to that entry.
+const ROUTE_ADDITIONS = [
+  [59, '2025-10-21', '{KAPC}', ['E16']], [70, '2025-10-23', '{}', ['E16']], [36, '2025-10-28', '{}', ['E16']],
+  [29, '2025-11-11', '{}', ['E16', 'KSJC']], [61, '2026-02-27', '{}', ['KKIC']], [47, '2026-03-28', '{}', ['E16']],
+  [64, '2026-04-03', '{}', ['E16']], [24, '2026-04-05', '{}', ['E16']], [52, '2026-04-06', '{}', ['E16']],
+  [22, '2026-06-11', '{}', ['E16']], [98, '2026-08-19', '{}', ['E16']],
+]
+async function migrateV32() {
+  await pool.query(`
+    UPDATE flights SET landings = COALESCE(day_landings_full_stop, 0) + GREATEST(COALESCE(night_landings_full_stop, 0), COALESCE(night_landings, 0))
+    WHERE COALESCE(landings, 0) = 0 AND COALESCE(day_landings_full_stop, 0) + GREATEST(COALESCE(night_landings_full_stop, 0), COALESCE(night_landings, 0)) > 0;
+    UPDATE flights SET night_landings = night_landings_full_stop
+    WHERE COALESCE(night_landings, 0) = 0 AND COALESCE(night_landings_full_stop, 0) > 0;
+  `)
+  for (const [id, date, via, add] of ROUTE_ADDITIONS) {
+    await pool.query(`UPDATE flights SET via = via || $4::text[] WHERE id = $1 AND date = $2 AND via = $3::text[]`, [id, date, via, add])
+  }
+}
+
+// A chosen photo can also be a link to someone else's, credited, for aircraft
+// the automatic sources miss: JetPhotos has NICE AIR's 172Ps but turns away
+// server lookups, so those are picked by hand and stored here.
+async function migrateV33() {
+  await pool.query(`
+    ALTER TABLE aircraft_photos ALTER COLUMN content_type DROP NOT NULL, ALTER COLUMN data DROP NOT NULL;
+    ALTER TABLE aircraft_photos ADD COLUMN IF NOT EXISTS url TEXT, ADD COLUMN IF NOT EXISTS credit TEXT,
+      ADD COLUMN IF NOT EXISTS link TEXT, ADD COLUMN IF NOT EXISTS source TEXT;
+    INSERT INTO aircraft_photos (tail_number, url, credit, link, source) VALUES
+      ('N227AN', 'https://cdn.jetphotos.com/full/6/773569_1768111620.jpg', 'Mark Solomita', 'https://www.jetphotos.com/photo/11980878', 'JetPhotos'),
+      ('N225AN', 'https://cdn.jetphotos.com/full/6/731154_1745985765.jpg', 'Mark Solomita', 'https://www.jetphotos.com/photo/11692092', 'JetPhotos')
+    ON CONFLICT (tail_number) DO NOTHING;
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -1070,7 +1109,7 @@ const MIGRATIONS = [
   ['017', migrateV17], ['018', migrateV18], ['019', migrateV19], ['020', migrateV20],
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
-  ['029', migrateV29], ['030', migrateV30], ['031', migrateV31],
+  ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

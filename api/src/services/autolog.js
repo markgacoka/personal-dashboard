@@ -12,7 +12,7 @@
 import { pool } from '../db/client.js'
 import { syncNiceAirToDB } from './gmail.js'
 import { collectTrack, coverage, refreshFlightTrack, saveTrackPoints, searchWindow } from './flightTrack.js'
-import { analyzeTrack, SOURCE_NAME } from './stitch.js'
+import { analyzeTrack, nm, SOURCE_NAME } from './stitch.js'
 import { captureRecent } from './recentTraces.js'
 import { normalizeIcao24 } from './opensky.js'
 import { releaseParts, utcDatesBetween } from './adsblol.js'
@@ -128,7 +128,10 @@ export async function airportsForAnalysis(log) {
   const { rows } = await pool.query('SELECT icao, name, lat, lon, elevation_ft FROM airports')
   const known = new Set(rows.map(r => r.icao))
   const us = await usAirportList(log).catch(() => [])
-  return [...rows, ...us.filter(a => a.icao && !known.has(a.icao))]
+  // The same field under another identifier (E16 and KE16) would split one
+  // stop into many as the nearest flips between them.
+  const same = a => rows.some(r => r.lat != null && a.lat != null && nm(r, a) < 0.5)
+  return [...rows, ...us.filter(a => a.icao && !known.has(a.icao) && !same(a))]
 }
 
 // Make sure every airport on a planned route exists (flights JOIN airports).

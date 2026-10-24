@@ -177,7 +177,8 @@ export default async function importRoutes(fastify) {
             fl(r[F.dual_given]), fl(r[F.dual_received]),
             fl(r[F.simulated_flight]), fl(r[F.ground_training]),
             intv(r[F.day_takeoffs]) + intv(r[F.night_takeoffs]),
-            intv(r[F.all_landings]),
+            // ForeFlight leaves AllLandings empty when only the full-stop counts were entered.
+            intv(r[F.all_landings]) || intv(r[F.day_landings_full_stop]) + intv(r[F.night_landings_full_stop]),
             intv(r[F.day_takeoffs]), intv(r[F.day_landings_full_stop]),
             intv(r[F.night_takeoffs]), intv(r[F.night_landings_full_stop]),
             intv(r[F.night_landings_full_stop]),

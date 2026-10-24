@@ -48,13 +48,12 @@ export default function LogbookPage() {
   const formOpen = params.get('log') === '1'
   const setFormOpen = (o: boolean) => setParams(p => { if (o) p.set('log', '1'); else p.delete('log'); return p }, { replace: true })
   const all = flights || []
-  const spent = all.reduce((s, f) => s + (cost(f) || 0), 0)
 
   if (isError) return <EmptyState icon={BookOpen} title="The logbook is unavailable" className="py-24">The database didn’t respond.</EmptyState>
 
   return (
     <div>
-      <PageHeader title="Logbook" description={stats ? `${stats.total_flights} flights · ${num(stats.total_hours).toFixed(1)} hours${spent ? ` · ${usd(spent)} spent` : ''} · private pilot training` : 'Loading…'}
+      <PageHeader title="Logbook" description={stats ? `${stats.total_flights} flights · ${num(stats.total_hours).toFixed(1)} hours` : 'Loading…'}
         actions={<Button variant="primary" onClick={() => setFormOpen(true)}><Plus />Log flight</Button>} />
 
       <div className="grid gap-5 xl:grid-cols-12">

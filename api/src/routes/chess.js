@@ -1,7 +1,8 @@
-// GET /api/chess/stats — Chess.com public API proxy with 1-hour in-memory cache
+// GET /api/chess/stats — Chess.com public API proxy. chess.com's own data is
+// at most seconds old, so the cache only absorbs bursts of page loads.
 const USERNAME = 'gacoka'
 const UA = 'personal-dashboard/1.0 (markgacoka@gmail.com)'
-const CACHE_TTL = 60 * 60 * 1000
+const CACHE_TTL = 60 * 1000
 
 let _cache = null
 let _cacheAt = 0

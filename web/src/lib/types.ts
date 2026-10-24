@@ -277,7 +277,7 @@ export interface ChessStats {
 export interface TrackSummary {
   sources: { source: string; name: string; points: number }[]
   first: string | null; last: string | null; complete: boolean
-  events: { icao: string; name?: string; kind: 'departure' | 'landing' | 'full stop' | 'touch-and-go' | 'low approach'; from: string; to: string; minutes: number; seen_on_ground: boolean }[]
+  events: { icao: string; name?: string; kind: 'departure' | 'landing' | 'full stop' | 'touch-and-go' | 'low approach' | 'unseen landing'; from: string; to: string; minutes: number; seen_on_ground: boolean; unseen?: boolean }[]
   gaps: { from: string; to: string; seconds: number; near: string | null }[]
   distance_nm: number | null; airborne_minutes: number | null
 }

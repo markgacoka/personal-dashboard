@@ -133,6 +133,19 @@ export function setHomeAirport(icao: string) {
 }
 
 // A readable summary of a raw METAR: wind, visibility, sky, temperature, altimeter.
+// Flight category from a raw METAR: the lowest broken/overcast layer (or
+// vertical visibility) and the prevailing visibility.
+export function metarCategory(raw: string): 'VFR' | 'MVFR' | 'IFR' | 'LIFR' | null {
+  const ceil = Math.min(...[...raw.matchAll(/\b(BKN|OVC|VV)(\d{3})/g)].map(m => +m[2] * 100), Infinity)
+  const v = raw.match(/\s(M)?(?:(\d+) )?(\d+)(?:\/(\d))?SM\b/)
+  if (!v && ceil === Infinity) return null
+  const vis = v ? (v[1] ? 0 : (+(v[2] || 0)) + (v[4] ? +v[3] / +v[4] : +v[3])) : Infinity
+  if (ceil < 500 || vis < 1) return 'LIFR'
+  if (ceil < 1000 || vis < 3) return 'IFR'
+  if (ceil <= 3000 || vis <= 5) return 'MVFR'
+  return 'VFR'
+}
+
 export function decodeMetar(raw: string): [string, string][] {
   const out: [string, string][] = []
   const w = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/)

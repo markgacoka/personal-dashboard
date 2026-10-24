@@ -80,4 +80,4 @@ export const useYtd = (tickers: string[]) => useQuery({
 })
 
 // ── Chess ────────────────────────────────────────────────────────────────────
-export const useChess = () => useQuery({ queryKey: ['chess'], queryFn: () => get<ChessStats>('/api/chess/stats'), staleTime: 30 * MIN, retry: 1 })
+export const useChess = () => useQuery({ queryKey: ['chess'], queryFn: () => get<ChessStats>('/api/chess/stats'), staleTime: MIN, refetchInterval: 2 * MIN, retry: 1 })

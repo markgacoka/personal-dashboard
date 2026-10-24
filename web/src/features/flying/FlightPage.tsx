@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, Bot, CalendarClock, FileUp, ImagePlus, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUp, Bot, ChevronRight, CalendarClock, FileUp, ImagePlus, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import { Stat, DL } from '@/components/data/stat'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { useFlights, useNiceAir, useRegistry, useTrack, useTrackStats, useTrackSummary } from '@/lib/queries'
 import { del, get, post } from '@/lib/api'
-import { decodeMetar } from '@/lib/weather'
+import { decodeMetar, metarCategory } from '@/lib/weather'
 import { calDate, hours, usd } from '@/lib/format'
 import { flightCost, route, trainingLabel, isSolo } from '@/lib/flying'
 import { num, cn } from '@/lib/utils'
@@ -51,7 +51,7 @@ export default function FlightPage() {
 
   const stops = [f.departure, ...(f.via_airports || []), f.arrival].filter(Boolean) as Airport[]
   const stats: [string, string | null, string?][] = [
-    ['Total', hours(f.total_duration), 'h'], ['Dual received', hours(f.dual_received), 'h'], ['Dual given', hours(f.dual_given), 'h'], ['PIC', hours(f.pic), 'h'],
+    ['Total', hours(f.total_duration), 'h'], ['Hobbs', f.hobbs_start != null && f.hobbs_end != null && num(f.hobbs_end) > num(f.hobbs_start) ? (num(f.hobbs_end) - num(f.hobbs_start)).toFixed(1) : null, 'h'], ['Dual received', hours(f.dual_received), 'h'], ['Dual given', hours(f.dual_given), 'h'], ['PIC', hours(f.pic), 'h'],
     ['Solo', hours(f.solo), 'h'], ['Cross-country', hours(f.cross_country), 'h'], ['Night', hours(f.night), 'h'],
     ['Actual instrument', hours(f.actual_instrument), 'h'], ['Simulated instrument', hours(f.simulated_instrument), 'h'],
     ['Take-offs', f.takeoffs ? String(f.takeoffs) : null], ['Landings', f.landings ? String(f.landings) : null],
@@ -358,7 +358,7 @@ function RefreshTrackButton({ id }: { id: number }) {
 
 // What happened on the flight, from the stitched track: departures, landings,
 // stops and where the receivers lost the aircraft.
-const EVENT_ICON = { departure: PlaneTakeoff, landing: PlaneLanding, 'full stop': PlaneLanding, 'touch-and-go': CircleDot, 'low approach': CircleDot }
+const EVENT_ICON = { departure: PlaneTakeoff, landing: PlaneLanding, 'full stop': PlaneLanding, 'touch-and-go': CircleDot, 'low approach': CircleDot, 'unseen landing': PlaneLanding }
 function TimelineCard({ id, enabled }: { id: number; enabled: boolean }) {
   const { data: s, isLoading } = useTrackSummary(id, enabled)
   if (!enabled) return null
@@ -386,6 +386,7 @@ function TimelineCard({ id, enabled }: { id: number; enabled: boolean }) {
                     <span className="font-medium">{it.e.icao}</span>
                     <span className="text-fg-3">{it.e.name}</span>
                     {it.e.kind === 'full stop' && <span className="text-fg-3">· {it.e.minutes} min on the ground</span>}
+                    {it.e.kind === 'unseen landing' && <span className="text-fg-3">· out of receiver coverage, inferred from the track</span>}
                   </div>
                 </li>
               )
@@ -462,7 +463,7 @@ function TrackStatsCard({ id, enabled, pts }: { id: number; enabled: boolean; pt
 }
 
 function Notes({ f }: { f: Flight }) {
-  if (!f.remarks && !f.instructor_comments && !f.approaches?.length && !(f.hobbs_start && f.hobbs_end) && !(f.tach_start && f.tach_end)) return null
+  if (!f.remarks && !f.instructor_comments && !f.approaches?.length && !(f.source && f.source !== 'manual')) return null
   return (
     <Card>
       <CardHeader title="Notes" />
@@ -471,8 +472,6 @@ function Notes({ f }: { f: Flight }) {
         {f.instructor_comments && <div><div className="mb-1 text-sm font-medium text-fg-3">Instructor comments</div><p className="whitespace-pre-wrap text-base leading-relaxed">{f.instructor_comments}</p></div>}
         {!!f.approaches?.length && <div><div className="mb-1.5 text-sm font-medium text-fg-3">Approaches</div><div className="flex flex-wrap gap-1.5">{f.approaches.map((a, i) => <Badge key={i} size="md">{a.approach_type}{a.runway ? ` Rwy ${a.runway}` : ''} <span className="num">{a.airport_icao}</span>{a.circle_to_land ? ' · circle' : ''}</Badge>)}</div></div>}
         <DL items={[
-          ['Hobbs', f.hobbs_start && f.hobbs_end ? <span className="num">{f.hobbs_start} → {f.hobbs_end}</span> : null],
-          ['Tach', f.tach_start && f.tach_end ? <span className="num">{f.tach_start} → {f.tach_end}</span> : null],
           ['Source', f.source && f.source !== 'manual' ? f.source : null],
         ]} />
       </CardBody>
@@ -584,10 +583,12 @@ function ScheduleCard({ f }: { f: Flight }) {
   const s = (schedules || []).filter(x => x.date_str === f.date.slice(0, 10) && x.tail?.replace(/^N/, '') === short && x.type !== 'cancelled')
     .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0]
   const clock = (v?: string) => (v || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—'
+  const meters = ([['Hobbs', f.hobbs_start, f.hobbs_end], ['Tach', f.tach_start, f.tach_end]] as const).filter(([, a, b]) => a != null && b != null && num(b) >= num(a))
   return (
     <Card>
       <CardHeader icon={<CalendarClock />} title="NICE AIR booking" description={s ? undefined : 'From the flight school’s emails'} />
       <CardBody>
+        {!!meters.length && <div className="mb-4 space-y-4 border-b border-border pb-4">{meters.map(([l, a, b]) => <MeterReadout key={l} label={l} start={num(a)} end={num(b)} />)}</div>}
         {isLoading ? <Skeleton className="h-20" /> : !s ? <p className="text-sm text-fg-3">No booking on record for this flight.</p> : <>
           <DL items={[
             ['Instructor', s.cfi || null],
@@ -599,6 +600,29 @@ function ScheduleCard({ f }: { f: Flight }) {
         </>}
       </CardBody>
     </Card>
+  )
+}
+
+// A Hobbs or tach reading the way the meter shows it: digit windows, tenths
+// inverted, with the time it ran.
+function MeterReadout({ label, start, end }: { label: string; start: number; end: number }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between text-sm"><span className="text-fg-3">{label}</span><span className="num font-medium">{(end - start).toFixed(1)} h</span></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Odometer value={start} label={`${label} start`} /><ArrowRight className="size-4 text-fg-3" aria-hidden /><Odometer value={end} label={`${label} end`} />
+      </div>
+    </div>
+  )
+}
+
+function Odometer({ value, label }: { value: number; label: string }) {
+  const [whole, tenth] = value.toFixed(1).split('.')
+  return (
+    <span role="img" aria-label={`${label} ${value.toFixed(1)}`} className="inline-flex overflow-hidden rounded-md font-mono text-sm ring-1 ring-inset ring-border">
+      {whole.padStart(5, '0').split('').map((c, i) => <span key={i} className="w-[1.25em] bg-sunken py-1 text-center text-fg">{c}</span>)}
+      <span className="w-[1.25em] bg-fg py-1 text-center font-medium text-bg">{tenth}</span>
+    </span>
   )
 }
 
@@ -657,21 +681,41 @@ function airportPopupHtml(a: Airport, obs: LegMetar[]) {
 function WeatherCard({ metars }: { metars: LegMetar[] }) {
   return (
     <Card>
-      <CardHeader icon={<CloudSun />} title="Weather at the time" description="Nearest METAR to each leg · also shown when you hover an airport on the map" />
-      <CardBody className="space-y-4">{metars.map((m, i) => <MetarRow key={i} m={m} />)}</CardBody>
+      <CardHeader icon={<CloudSun />} title="Weather at the time" description="Nearest METAR to each stop" />
+      <CardBody className="divide-y divide-border">{metars.map((m, i) => <MetarRow key={i} m={m} />)}</CardBody>
     </Card>
   )
 }
 
+const CATEGORY_TONE = { VFR: 'good', MVFR: 'accent', IFR: 'bad', LIFR: 'bad' } as const
+
 function MetarRow({ m }: { m: LegMetar }) {
-  const d = m.data?.metar ? decodeMetar(m.data.metar) : []
+  const raw = m.data?.metar || ''
+  const d = Object.fromEntries(raw ? decodeMetar(raw) : [])
+  const cat = raw ? metarCategory(raw) : null
+  const dir = raw.match(/\b(\d{3})\d{2,3}(?:G\d{2,3})?KT\b/)?.[1]
+  const facts: [string, React.ReactNode][] = [
+    ['Wind', d.Wind && <span className="inline-flex items-center gap-1">{dir && d.Wind !== 'Calm' && <ArrowUp className="size-3.5 text-fg-3" style={{ transform: `rotate(${+dir + 180}deg)` }} aria-hidden />}{d.Wind}</span>],
+    ['Visibility', d.Visibility], ['Sky', d.Sky],
+    ['Temp / dew', d['Temp / dew']?.replace(/ C$/, '')], ['Altimeter', d.Altimeter?.replace(/ inHg$/, '')],
+  ]
   return (
-    <div>
-      <div className="mb-1.5 flex items-baseline justify-between text-sm"><span><span className="text-fg-3">{m.leg}</span> <span className="font-medium">{m.icao}</span></span>{m.data?.valid && <span className="num text-xs text-fg-3">{utc(m.data.valid)}</span>}</div>
-      {m.loading ? <Skeleton className="h-10" /> : m.data?.metar ? <>
-        {d.length > 0 && <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-1">{d.map(([k, v]) => <div key={k} className="flex justify-between gap-2 text-xs"><span className="text-fg-3">{k}</span><span className="num text-right">{v}</span></div>)}</div>}
-        <code className="block break-words rounded-md bg-sunken px-2.5 py-2 font-mono text-xs leading-relaxed text-fg-2 ring-1 ring-inset ring-border">{m.data.metar}</code>
-      </> : <p className="text-sm text-fg-3">No METAR available.</p>}
+    <div className="py-4 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-2">
+        <span className="w-16 text-xs text-fg-3">{m.leg}</span>
+        <span className="num font-medium">{m.icao}</span>
+        {cat && <Badge tone={CATEGORY_TONE[cat]}>{cat}</Badge>}
+        {m.data?.valid && <span className="num ml-auto text-xs text-fg-3">{utc(m.data.valid)}</span>}
+      </div>
+      {m.loading ? <Skeleton className="mt-3 h-16" /> : raw ? <>
+        <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-3">
+          {facts.filter(([, v]) => v).map(([k, v]) => <div key={k} className="min-w-0"><div className="text-xs text-fg-3">{k}</div><div className="num text-sm">{v}</div></div>)}
+        </div>
+        <details className="group mt-3">
+          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-fg-3 hover:text-fg-2"><ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />Raw report</summary>
+          <code className="mt-1.5 block break-words font-mono text-xs leading-relaxed text-fg-2">{raw}</code>
+        </details>
+      </> : <p className="mt-2 text-sm text-fg-3">No METAR available.</p>}
     </div>
   )
 }

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, ArrowRight, ArrowUp, Bot, ChevronRight, CalendarClock, FileUp, ImagePlus, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ArrowUp, Bot, Cloud, Eye, Gauge, Thermometer, Wind, FileUp, ImagePlus, PlaneLanding, PlaneTakeoff, CircleDot, AlertTriangle, CloudSun, Layers, MoreHorizontal, Pause, Pencil, Plane, Play, Receipt, RefreshCw, SkipBack, SkipForward, Trash2, User } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,7 @@ export default function FlightPage() {
 
   const stops = [f.departure, ...(f.via_airports || []), f.arrival].filter(Boolean) as Airport[]
   const stats: [string, string | null, string?][] = [
-    ['Total', hours(f.total_duration), 'h'], ['Hobbs', f.hobbs_start != null && f.hobbs_end != null && num(f.hobbs_end) > num(f.hobbs_start) ? (num(f.hobbs_end) - num(f.hobbs_start)).toFixed(1) : null, 'h'], ['Dual received', hours(f.dual_received), 'h'], ['Dual given', hours(f.dual_given), 'h'], ['PIC', hours(f.pic), 'h'],
+    ['Total', hours(f.total_duration), 'h'], ['Dual received', hours(f.dual_received), 'h'], ['Dual given', hours(f.dual_given), 'h'], ['PIC', hours(f.pic), 'h'],
     ['Solo', hours(f.solo), 'h'], ['Cross-country', hours(f.cross_country), 'h'], ['Night', hours(f.night), 'h'],
     ['Actual instrument', hours(f.actual_instrument), 'h'], ['Simulated instrument', hours(f.simulated_instrument), 'h'],
     ['Take-offs', f.takeoffs ? String(f.takeoffs) : null], ['Landings', f.landings ? String(f.landings) : null],
@@ -112,8 +112,7 @@ export default function FlightPage() {
         </div>
         <div className="space-y-5 xl:col-span-4">
           <AircraftCard f={f} />
-          <ScheduleCard f={f} />
-          <CostCard f={f} />
+          <NiceAirCard f={f} pts={pts} />
           <WeatherCard metars={metars} />
         </div>
       </div>
@@ -575,77 +574,94 @@ function AircraftCard({ f }: { f: Flight }) {
   )
 }
 
-// ── NICE AIR booking for this flight ─────────────────────────────────────────
-function ScheduleCard({ f }: { f: Flight }) {
+// ── NICE AIR: the booking, what ran, and what it cost ───────────────────────
+// NICE AIR writes instructors as "Li-Cfi, Ye"; show "Ye Li".
+const cfiName = (s?: string) => {
+  const m = (s || '').match(/^\s*([^,]+?)(?:-Cfi)?\s*,\s*(.+?)\s*$/i)
+  return m ? `${m[2]} ${m[1]}` : s || null
+}
+const bookingTime = (date: string, v?: string) => {
+  const t = (v || '').replace(/^\d+\/\d+\/\d+\s+/, '')
+  const d = t ? new Date(`${date.slice(0, 10).replace(/-/g, '/')} ${t}`) : null
+  return d && !isNaN(+d) ? d : null
+}
+const hrs = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`
+
+function NiceAirCard({ f, pts }: { f: Flight; pts: TrackPoint[] }) {
   const { data: schedules, isLoading } = useNiceAir()
-  const tail = f.aircraft?.tail_number || ''
-  const short = tail.replace(/^N/, '')
+  const short = (f.aircraft?.tail_number || '').replace(/^N/, '')
   const s = (schedules || []).filter(x => x.date_str === f.date.slice(0, 10) && x.tail?.replace(/^N/, '') === short && x.type !== 'cancelled')
     .sort((a, b) => (b.received || '').localeCompare(a.received || ''))[0]
-  const clock = (v?: string) => (v || '').replace(/^\d+\/\d+\/\d+\s+/, '') || '—'
-  const meters = ([['Hobbs', f.hobbs_start, f.hobbs_end], ['Tach', f.tach_start, f.tach_end]] as const).filter(([, a, b]) => a != null && b != null && num(b) >= num(a))
+  const c = flightCost(f)
+  const hobbs = f.hobbs_start != null && f.hobbs_end != null && num(f.hobbs_end) >= num(f.hobbs_start) ? { from: num(f.hobbs_start), to: num(f.hobbs_end) } : null
+  if (isLoading) return <Skeleton className="h-64" />
+  if (!s && !c && !hobbs) return null
+  const start = s && bookingTime(f.date, s.start_local), end = s && bookingTime(f.date, s.end_local)
+  const cfi = f.instructor_name || cfiName(s?.cfi)
   return (
     <Card>
-      <CardHeader icon={<CalendarClock />} title="NICE AIR booking" description={s ? undefined : 'From the flight school’s emails'} />
-      <CardBody>
-        {!!meters.length && <div className="mb-4 space-y-4 border-b border-border pb-4">{meters.map(([l, a, b]) => <MeterReadout key={l} label={l} start={num(a)} end={num(b)} />)}</div>}
-        {isLoading ? <Skeleton className="h-20" /> : !s ? <p className="text-sm text-fg-3">No booking on record for this flight.</p> : <>
-          <DL items={[
-            ['Instructor', s.cfi || null],
-            ['Scheduled', <span className="num">{clock(s.start_local)} – {clock(s.end_local)}</span>],
-            ['Block out', f.time_out ? <span className="num">{local(f.time_out)}</span> : null],
-            ['Block in', f.time_in ? <span className="num">{local(f.time_in)}</span> : null],
-          ]} />
-          {s.type === 'changed' && <Badge tone="warn" className="mt-3">Schedule was changed</Badge>}
-        </>}
+      <CardHeader icon={<Receipt />} title="NICE AIR"
+        description={s ? <>Booked <span className="num">{start && end ? `${local(+start)} – ${local(+end)}` : `${s.start_local} – ${s.end_local}`}</span>{cfi ? ` with ${cfi}` : ''}</> : 'No booking on record'}
+        action={s?.type === 'changed' ? <Badge tone="warn">Rescheduled</Badge> : undefined} />
+      <CardBody className="space-y-6">
+        <TimeChart booked={start && end ? [+start, +end] : null} tracked={pts.length >= 2 ? [Date.parse(pts[0].ts), Date.parse(pts[pts.length - 1].ts)] : null} hobbs={hobbs} />
+        {c && <Bill f={f} c={c} hobbs={hobbs} />}
       </CardBody>
     </Card>
   )
 }
 
-// A Hobbs or tach reading the way the meter shows it: digit windows, tenths
-// inverted, with the time it ran.
-function MeterReadout({ label, start, end }: { label: string; start: number; end: number }) {
+// The booking against what the track saw, on one clock; Hobbs alongside.
+function TimeChart({ booked, tracked, hobbs }: { booked: [number, number] | null; tracked: [number, number] | null; hobbs: { from: number; to: number } | null }) {
+  const spans = [booked, tracked].filter(Boolean) as [number, number][]
+  const lo = Math.min(...spans.map(x => x[0])), hi = Math.max(...spans.map(x => x[1]))
+  const pos = (t: number) => `${((t - lo) / (hi - lo || 1)) * 100}%`
+  const bar = (x: [number, number], cls: string) => <div className="relative h-2.5 rounded-full bg-sunken"><div className={cn('absolute inset-y-0 rounded-full', cls)} style={{ left: pos(x[0]), width: `calc(${pos(x[1])} - ${pos(x[0])})` }} /></div>
+  const rows: [string, React.ReactNode, string][] = []
+  if (booked) rows.push(['Booked', bar(booked, 'bg-fg-3/60'), hrs(booked[1] - booked[0])])
+  if (tracked) rows.push(['Tracked', bar(tracked, 'bg-accent'), hrs(tracked[1] - tracked[0])])
+  if (!rows.length && !hobbs) return null
+  const row = (l: string, v: React.ReactNode, d: string) => <Fragment key={l}><span className="text-sm text-fg-3">{l}</span><div className="min-w-0">{v}</div><span className="num text-right text-sm font-medium">{d}</span></Fragment>
   return (
-    <div>
-      <div className="mb-2 flex items-baseline justify-between text-sm"><span className="text-fg-3">{label}</span><span className="num font-medium">{(end - start).toFixed(1)} h</span></div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Odometer value={start} label={`${label} start`} /><ArrowRight className="size-4 text-fg-3" aria-hidden /><Odometer value={end} label={`${label} end`} />
-      </div>
+    <div className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-x-3 gap-y-3">
+      {rows.map(([l, v, d]) => row(l, v, d))}
+      {spans.length > 0 && <><span /><div className="num -mt-1.5 flex justify-between text-xs text-fg-3"><span>{local(lo)}</span><span>{local(hi)}</span></div><span /></>}
+      {hobbs && row('Hobbs', <span className="num text-sm text-fg-2">{hobbs.from.toFixed(1)} <span className="text-fg-3">→</span> {hobbs.to.toFixed(1)}</span>, `${(hobbs.to - hobbs.from).toFixed(1)} h`)}
     </div>
   )
 }
 
-function Odometer({ value, label }: { value: number; label: string }) {
-  const [whole, tenth] = value.toFixed(1).split('.')
-  return (
-    <span role="img" aria-label={`${label} ${value.toFixed(1)}`} className="inline-flex overflow-hidden rounded-md font-mono text-sm ring-1 ring-inset ring-border">
-      {whole.padStart(5, '0').split('').map((c, i) => <span key={i} className="w-[1.25em] bg-sunken py-1 text-center text-fg">{c}</span>)}
-      <span className="w-[1.25em] bg-fg py-1 text-center font-medium text-bg">{tenth}</span>
-    </span>
-  )
-}
+const BILL_COLOR = { aircraft: 'bg-c1', instruction: 'bg-c3', ground: 'bg-c4' } as const
 
-// ── What NICE AIR billed ─────────────────────────────────────────────────────
-function CostCard({ f }: { f: Flight }) {
-  const c = flightCost(f)
-  if (!c) return null
-  const { instruction, ground, total, misc } = c
-  const hobbs = num(f.hobbs_end) - num(f.hobbs_start)
-  const money = (n: number, h?: number) => <span className="num">{h ? <span className="text-fg-3">{h.toFixed(1)} h · </span> : null}{usd(n)}</span>
+function Bill({ f, c, hobbs }: { f: Flight; c: NonNullable<ReturnType<typeof flightCost>>; hobbs: { from: number; to: number } | null }) {
+  const hobbsH = hobbs ? hobbs.to - hobbs.from : 0
+  const rate = (amount: number, h?: number | null) => h ? `${h.toFixed(1)} h × ${usd(amount / h).replace(/\.00$/, '')}` : null
+  const parts = ([
+    ['aircraft', `Aircraft · ${f.aircraft?.tail_number || ''}`, c.aircraft, rate(c.aircraft || 0, hobbsH || null)],
+    ['instruction', 'Flight instruction', c.instruction?.amount ?? null, rate(c.instruction?.amount || 0, c.instruction?.hours)],
+    ['ground', 'Ground instruction', c.ground?.amount ?? null, rate(c.ground?.amount || 0, c.ground?.hours)],
+  ] as const).filter(([, , amount]) => amount)
+  const misc = c.misc.map(l => `${l.comment.replace(/^Misc\.-(Non-)?Taxable\s*/i, '').replace(/\s+on \d{1,2}\/\d{1,2}(\/\d{2,4})?$/, '').toLowerCase()} ${usd(l.amount)}`)
   return (
-    <Card>
-      <CardHeader icon={<Receipt />} title="Cost" description="Billed by NICE AIR" />
-      <CardBody>
-        <DL items={[
-          ['Aircraft', c.aircraft != null ? money(c.aircraft, hobbs > 0 ? hobbs : undefined) : null],
-          ['Flight instruction', instruction ? money(instruction.amount, instruction.hours) : null],
-          ['Ground instruction', ground ? money(ground.amount, ground.hours) : null],
-          ['Total', <span className="num font-semibold">{usd(total)}</span>],
-        ]} />
-        {!!misc.length && <p className="mt-3 text-sm text-fg-3">Not included: {misc.map(l => `${l.comment.replace(/^Misc\.-(Non-)?Taxable\s*/i, '').replace(/\s+on \d{1,2}\/\d{1,2}(\/\d{2,4})?$/, '').toLowerCase().replace(/^\w/, ch => ch.toUpperCase())} ${usd(l.amount)}`).join(', ')}</p>}
-      </CardBody>
-    </Card>
+    <div className="border-t border-border pt-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm text-fg-3">Billed for this flight</span>
+        <span className="num money text-2xl font-medium">{usd(c.total)}</span>
+      </div>
+      <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+        {parts.map(([k, , amount]) => <div key={k} className={BILL_COLOR[k]} style={{ flexGrow: amount || 0 }} />)}
+      </div>
+      <ul className="mt-4 space-y-3">
+        {parts.map(([k, label, amount, sub]) => (
+          <li key={k} className="flex items-start gap-2.5 text-sm">
+            <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', BILL_COLOR[k])} />
+            <div className="min-w-0 flex-1"><div>{label}</div>{sub && <div className="num text-xs text-fg-3">{sub}</div>}</div>
+            <span className="num money">{usd(amount || 0)}</span>
+          </li>
+        ))}
+      </ul>
+      {!!misc.length && <p className="mt-4 text-xs text-fg-3">Also charged that day, not counted: {misc.join(', ')}</p>}
+    </div>
   )
 }
 
@@ -678,44 +694,51 @@ function airportPopupHtml(a: Airport, obs: LegMetar[]) {
   return head + (body || '<div style="margin-top:8px;font-size:12px;color:var(--fg-3)">No weather for this stop</div>')
 }
 
+// Stops that share one report (a local flight: departure, touch-and-goes and
+// arrival at the home field) are shown once.
 function WeatherCard({ metars }: { metars: LegMetar[] }) {
+  const groups: { legs: string[]; m: LegMetar }[] = []
+  for (const m of metars) {
+    const last = groups.at(-1)
+    if (last && last.m.icao === m.icao && last.m.data?.metar && last.m.data.metar === m.data?.metar) last.legs.push(m.leg)
+    else groups.push({ legs: [m.leg], m })
+  }
   return (
     <Card>
       <CardHeader icon={<CloudSun />} title="Weather at the time" description="Nearest METAR to each stop" />
-      <CardBody className="divide-y divide-border">{metars.map((m, i) => <MetarRow key={i} m={m} />)}</CardBody>
+      <CardBody className="divide-y divide-border">{groups.map((g, i) => <MetarBlock key={i} legs={g.legs} m={g.m} />)}</CardBody>
     </Card>
   )
 }
 
 const CATEGORY_TONE = { VFR: 'good', MVFR: 'accent', IFR: 'bad', LIFR: 'bad' } as const
 
-function MetarRow({ m }: { m: LegMetar }) {
+function MetarBlock({ legs, m }: { legs: string[]; m: LegMetar }) {
   const raw = m.data?.metar || ''
   const d = Object.fromEntries(raw ? decodeMetar(raw) : [])
   const cat = raw ? metarCategory(raw) : null
   const dir = raw.match(/\b(\d{3})\d{2,3}(?:G\d{2,3})?KT\b/)?.[1]
-  const facts: [string, React.ReactNode][] = [
-    ['Wind', d.Wind && <span className="inline-flex items-center gap-1">{dir && d.Wind !== 'Calm' && <ArrowUp className="size-3.5 text-fg-3" style={{ transform: `rotate(${+dir + 180}deg)` }} aria-hidden />}{d.Wind}</span>],
-    ['Visibility', d.Visibility], ['Sky', d.Sky],
-    ['Temp / dew', d['Temp / dew']?.replace(/ C$/, '')], ['Altimeter', d.Altimeter?.replace(/ inHg$/, '')],
+  const facts: [typeof Wind, string, React.ReactNode][] = [
+    [dir && d.Wind !== 'Calm' ? (p => <ArrowUp {...p} style={{ transform: `rotate(${+dir + 180}deg)` }} />) as typeof Wind : Wind, 'Wind', d.Wind],
+    [Eye, 'Visibility', d.Visibility],
+    [Cloud, 'Sky', d.Sky],
+    [Thermometer, 'Temperature / dew point', d['Temp / dew']?.replace(/ C$/, '')],
+    [Gauge, 'Altimeter', d.Altimeter?.replace(/ inHg$/, '')],
   ]
   return (
     <div className="py-4 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-2">
-        <span className="w-16 text-xs text-fg-3">{m.leg}</span>
+      <div className="flex items-baseline gap-2">
         <span className="num font-medium">{m.icao}</span>
-        {cat && <Badge tone={CATEGORY_TONE[cat]}>{cat}</Badge>}
-        {m.data?.valid && <span className="num ml-auto text-xs text-fg-3">{utc(m.data.valid)}</span>}
+        <span className="truncate text-sm text-fg-3">{legs.join(' · ')}</span>
+        {cat && <Badge tone={CATEGORY_TONE[cat]} className="self-center">{cat}</Badge>}
+        {m.data?.valid && <span className="num ml-auto shrink-0 text-xs text-fg-3" title={utc(m.data.valid)}>{local(m.data.valid)}</span>}
       </div>
-      {m.loading ? <Skeleton className="mt-3 h-16" /> : raw ? <>
-        <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-3">
-          {facts.filter(([, v]) => v).map(([k, v]) => <div key={k} className="min-w-0"><div className="text-xs text-fg-3">{k}</div><div className="num text-sm">{v}</div></div>)}
+      {m.loading ? <Skeleton className="mt-3 h-14" /> : raw ? <>
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          {facts.filter(([, , v]) => v).map(([I, k, v]) => <span key={k} className="num inline-flex items-center gap-1.5" title={k}><I className="size-3.5 shrink-0 text-fg-3" aria-label={k} />{v}</span>)}
         </div>
-        <details className="group mt-3">
-          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-fg-3 hover:text-fg-2"><ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />Raw report</summary>
-          <code className="mt-1.5 block break-words font-mono text-xs leading-relaxed text-fg-2">{raw}</code>
-        </details>
-      </> : <p className="mt-2 text-sm text-fg-3">No METAR available.</p>}
+        <p className="mt-2.5 break-words font-mono text-xs leading-relaxed text-fg-3">{raw}</p>
+      </> : <p className="mt-1.5 text-sm text-fg-3">No weather station reports here.</p>}
     </div>
   )
 }

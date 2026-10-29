@@ -646,7 +646,7 @@ function Bill({ f, c, hobbs }: { f: Flight; c: NonNullable<ReturnType<typeof fli
     <div className="border-t border-border pt-5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm text-fg-3">Billed for this flight</span>
-        <span className="num money text-2xl font-medium">{usd(c.total)}</span>
+        <span className="num text-2xl font-medium">{usd(c.total)}</span>
       </div>
       <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
         {parts.map(([k, , amount]) => <div key={k} className={BILL_COLOR[k]} style={{ flexGrow: amount || 0 }} />)}
@@ -656,7 +656,7 @@ function Bill({ f, c, hobbs }: { f: Flight; c: NonNullable<ReturnType<typeof fli
           <li key={k} className="flex items-start gap-2.5 text-sm">
             <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', BILL_COLOR[k])} />
             <div className="min-w-0 flex-1"><div>{label}</div>{sub && <div className="num text-xs text-fg-3">{sub}</div>}</div>
-            <span className="num money">{usd(amount || 0)}</span>
+            <span className="num">{usd(amount || 0)}</span>
           </li>
         ))}
       </ul>

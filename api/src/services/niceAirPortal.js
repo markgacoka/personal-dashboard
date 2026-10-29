@@ -240,9 +240,34 @@ export function linkToFlights({ meter, charges, flights }) {
   const hobbs = []
   for (const m of meter) {
     const f = flights.find(x => x.id === meterLinks.get(m.key))
-    if (f && f.hobbs_start == null && f.hobbs_end == null) hobbs.push({ flight_id: f.id, hobbs_start: m.meter_start, hobbs_end: m.meter_end })
+    const update = f && hobbsUpdate(f, m)
+    if (update) hobbs.push(update)
   }
   return { meter: meterLinks, charges: chargeLinks, hobbs }
+}
+
+// NICE AIR's Hobbs meter is the logged time. A linked flight takes the meter
+// readings and hours as its total; time columns that equalled the old total
+// (all-dual, all-solo, all-XC) follow it, and partial ones are capped by it.
+const FOLLOWS_TOTAL = ['dual_received', 'dual_given', 'pic', 'sic', 'solo', 'cross_country']
+const WITHIN_TOTAL = ['night', 'instrument', 'actual_instrument']
+export const HOBBS_COLUMNS = ['hobbs_start', 'hobbs_end', 'total_duration', ...FOLLOWS_TOTAL, ...WITHIN_TOTAL]
+const tenth = v => (v == null || v === '' ? null : Math.round(parseFloat(v) * 10) / 10)
+
+export function hobbsUpdate(f, m) {
+  const set = {}
+  if (tenth(f.hobbs_start) !== tenth(m.meter_start)) set.hobbs_start = m.meter_start
+  if (tenth(f.hobbs_end) !== tenth(m.meter_end)) set.hobbs_end = m.meter_end
+  const total = tenth(m.hours), old = tenth(f.total_duration)
+  if (total != null && total !== old) {
+    set.total_duration = total
+    for (const k of FOLLOWS_TOTAL) {
+      const v = tenth(f[k])
+      if ((v === old && v > 0) || v > total) set[k] = total
+    }
+    for (const k of WITHIN_TOTAL) if (tenth(f[k]) > total) set[k] = total
+  }
+  return Object.keys(set).length ? { flight_id: f.id, ...set } : null
 }
 
 // ── Storage and the sync job ─────────────────────────────────────────────────
@@ -273,13 +298,13 @@ async function storeExports(client, meter, charges) {
   }
 }
 
-// Links the stored mirror to the logbook. Safe to run any time (after a flight
-// is added or deleted); writes only links and empty Hobbs fields.
+// Links the stored mirror to the logbook and brings each linked flight's Hobbs
+// and times in line with the meter. Safe to run any time.
 export async function linkStored(db = pool) {
   const { rows: meter } = await db.query('SELECT key, date_str, tail, charge::float8, meter_start, meter_end, hours, cfi FROM nice_air_meter')
   const { rows: charges } = await db.query('SELECT key, applies_on::text, kind, hours FROM nice_air_charges')
   const { rows: flights } = await db.query(
-    `SELECT f.id, f.date::text, ac.tail_number AS tail, f.total_duration, f.hobbs_start, f.hobbs_end
+    `SELECT f.id, f.date::text, ac.tail_number AS tail, ${HOBBS_COLUMNS.map(c => `f.${c}`).join(', ')}
      FROM flights f JOIN aircraft ac ON ac.id = f.aircraft_id`)
   const links = linkToFlights({ meter, charges, flights })
   for (const [table, rows, map] of [['nice_air_meter', meter, links.meter], ['nice_air_charges', charges, links.charges]]) {
@@ -287,10 +312,11 @@ export async function linkStored(db = pool) {
       await db.query(`UPDATE ${table} SET flight_id = $2 WHERE key = $1 AND flight_id IS DISTINCT FROM $2`, [r.key, map.get(r.key) ?? null])
     }
   }
-  for (const h of links.hobbs) {
-    await db.query('UPDATE flights SET hobbs_start = $2, hobbs_end = $3 WHERE id = $1 AND hobbs_start IS NULL AND hobbs_end IS NULL', [h.flight_id, h.hobbs_start, h.hobbs_end])
+  for (const { flight_id, ...set } of links.hobbs) {
+    const cols = Object.keys(set).filter(c => HOBBS_COLUMNS.includes(c))
+    await db.query(`UPDATE flights SET ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')} WHERE id = $1`, [flight_id, ...cols.map(c => set[c])])
   }
-  return { flights_linked: links.meter.size, unlinked_flights: meter.length - links.meter.size, charges_linked: links.charges.size, hobbs_filled: links.hobbs.length }
+  return { flights_linked: links.meter.size, unlinked_flights: meter.length - links.meter.size, charges_linked: links.charges.size, hobbs_updated: links.hobbs.length }
 }
 
 async function setMeta(key, value) {
@@ -374,7 +400,7 @@ export function scheduleNiceAirPortalSync(log) {
     try {
       const s = await portalStatus()
       if (isDue({ lastAttempt: s.last_attempt, lastSuccess: s.last_success, awaiting: s.awaiting.length })) await syncNiceAirPortalOnce({ log })
-      else if (s.unlinked_flights) await linkStored() // a flight logged after its charge arrived
+      else await linkStored() // a flight logged or edited after its charge arrived
     } catch (e) {
       log?.warn({ err: e.message }, 'NICE AIR portal sync failed')
     }

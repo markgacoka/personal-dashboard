@@ -2,7 +2,7 @@
 // to logbook entries. Pure logic only; fixtures mirror the portal's formats.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSheetXml, parseMeterRows, parseStatement, classifyCharge, linkToFlights, isDue, METER_HEADER, STATEMENT_HEADER } from '../services/niceAirPortal.js'
+import { parseSheetXml, parseMeterRows, parseStatement, classifyCharge, linkToFlights, hobbsUpdate, isDue, METER_HEADER, STATEMENT_HEADER } from '../services/niceAirPortal.js'
 
 const cell = v => typeof v === 'number' ? `<x:c t="n"><x:v>${v.toFixed(2)}</x:v></x:c>` : `<x:c t="str"><x:v>${v}</x:v></x:c>`
 const sheet = rows => `<?xml version="1.0" encoding="utf-8"?><x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:sheetData>${
@@ -76,7 +76,7 @@ describe('linking to the logbook', () => {
   const flights = [
     { id: 42, date: '2026-02-20', tail: 'N739HE', total_duration: '1.0', hobbs_start: null, hobbs_end: null },
     { id: 65, date: '2026-02-20', tail: 'N739HE', total_duration: '0.8', hobbs_start: null, hobbs_end: null },
-    { id: 159, date: '2026-10-22', tail: 'N227AN', total_duration: '0.8', hobbs_start: 4579.5, hobbs_end: 4580.6 },
+    { id: 159, date: '2026-10-22', tail: 'N227AN', total_duration: '0.8', dual_received: '0.8', pic: '0', night: '0', hobbs_start: 4579.5, hobbs_end: 4580.6 },
   ]
   const charges = [
     { key: 'c1', applies_on: '2026-02-20', kind: 'instruction', hours: 1.0 },
@@ -112,9 +112,22 @@ describe('linking to the logbook', () => {
     for (const k of ['c4', 'c5', 'c6']) assert.equal(links.charges.has(k), false, k)
   })
 
-  test('Hobbs fills only flights without readings', () => {
-    assert.deepEqual(links.hobbs.map(h => h.flight_id).sort(), [42, 65])
+  test('the meter sets Hobbs readings, and the total where the logged time disagrees', () => {
+    assert.deepEqual(links.hobbs.map(h => h.flight_id).sort((a, b) => a - b), [42, 65, 159])
     assert.deepEqual(links.hobbs.find(h => h.flight_id === 65), { flight_id: 65, hobbs_start: 8997.5, hobbs_end: 8998.3 })
+    assert.deepEqual(links.hobbs.find(h => h.flight_id === 159),
+      { flight_id: 159, hobbs_start: 4579.6, hobbs_end: 4580.7, total_duration: 1.1, dual_received: 1.1 })
+  })
+})
+
+describe('Hobbs as the logged time', () => {
+  const m = { meter_start: 100, meter_end: 101.5, hours: 1.5 }
+  test('a flight that already agrees is left alone', () => {
+    assert.equal(hobbsUpdate({ id: 1, hobbs_start: 100, hobbs_end: 101.5, total_duration: '1.5', dual_received: '1.5' }, m), null)
+  })
+  test('columns that were the whole flight follow the total; partial ones are capped by it', () => {
+    const f = { id: 1, hobbs_start: 100, hobbs_end: 101.5, total_duration: '2.0', dual_received: '2.0', pic: '0', cross_country: '2.0', night: '1.8', instrument: '0.3' }
+    assert.deepEqual(hobbsUpdate(f, m), { flight_id: 1, total_duration: 1.5, dual_received: 1.5, cross_country: 1.5, night: 1.5 })
   })
 })
 

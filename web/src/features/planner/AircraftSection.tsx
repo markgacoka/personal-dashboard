@@ -10,6 +10,7 @@ import { ATOMATOFLAMES, AV1ATES, FLAPS, POH_CHECKLISTS } from './checklists'
 import type { AircraftPlanning, Plan } from './model'
 import type { ProfileMatch } from './poh'
 import { KV, NumField, StatusIcon, SubHead, Synced } from './ui'
+import { PohLink } from './RefPanel'
 
 export function AircraftSection({ plan, set, fleet, registry, match, planning, savePlanning, saving, night }: {
   plan: Plan; set: (p: Partial<Plan>) => void; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; match: ProfileMatch | null
@@ -45,7 +46,8 @@ export function AircraftSection({ plan, set, fleet, registry, match, planning, s
           {p && (
             <>
               <div>
-                <SubHead right={<span className="text-xs text-fg-3">{p.source}</span>}>{p.model} · {p.engine}</SubHead>
+                <SubHead right={<span className="flex flex-wrap gap-3 text-xs"><PohLink fig="limits">Limitations</PohLink><PohLink fig="speeds">Speeds</PohLink><PohLink fig="emergency">Emergency</PohLink></span>}>{p.model} · {p.engine}</SubHead>
+                <p className="-mt-1 mb-2 text-xs text-fg-3">{p.source}</p>
                 <Rows items={[
                   ['Vso / Vs1', `${p.vspeeds.vso} / ${p.vspeeds.vs1} KIAS`],
                   ['Vr (lift-off, short field)', `${p.vspeeds.vr} KIAS`],
@@ -178,7 +180,7 @@ function PohChecklists({ plan, set }: { plan: Plan; set: (p: Partial<Plan>) => v
   const label = { preflight: 'Preflight inspection', ground: 'On the ground', departure: 'Departure', enroute: 'En route', arrival: 'Arrival' }
   return (
     <div>
-      <SubHead right={<span className="text-xs text-fg-3">172P POH Section 4</span>}>Checklists by phase</SubHead>
+      <SubHead right={<PohLink fig="checklist">172P POH Section 4</PohLink>}>Checklists by phase</SubHead>
       <div className="space-y-3">
         {phases.map(ph => (
           <div key={ph}>

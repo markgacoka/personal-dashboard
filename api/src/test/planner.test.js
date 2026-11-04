@@ -55,3 +55,10 @@ test('sunrise and sunset at Reid-Hillview (NOAA, within 2 minutes)', () => {
   assert.ok(Math.abs(s.rise - Date.parse('2026-06-21T12:48:00Z')) < 2 * 60_000, s.rise.toISOString())
   assert.ok(Math.abs(s.set - Date.parse('2026-06-22T03:32:00Z')) < 3 * 60_000, s.set.toISOString())
 })
+
+test('Leidos briefing email names its route (quoted-printable soft breaks)', async () => {
+  const { simpleRoute } = await import('../services/briefingText.js')
+  assert.deepEqual(simpleRoute('Your Leidos Flight Service Route Standard Briefing Email from KRHV to KCVH is attached'), ['KRHV', 'KCVH'])
+  assert.deepEqual(simpleRoute('Briefing Email fr=\r\nom KRHV to KSNS is'), ['KRHV', 'KSNS'])
+  assert.deepEqual(simpleRoute('nothing here'), [])
+})

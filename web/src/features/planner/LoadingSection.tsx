@@ -4,8 +4,9 @@ import { inEnvelope } from './calc'
 import type { AircraftPlanning, Derived, Plan } from './model'
 import type { AircraftProfile } from './poh'
 import { NumField, SubHead } from './ui'
+import { PohLink } from './RefPanel'
 
-export function LoadingSection({ plan, set, d, profile, planning, savePlanning }: { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; profile: AircraftProfile | null; planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void }) {
+export function LoadingSection({ plan, set, d, profile, planning, savePlanning, readOnly }: { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; profile: AircraftProfile | null; planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; readOnly?: boolean }) {
   if (!profile) return <p className="text-sm text-fg-3">Choose the aircraft first.</p>
   const tank = profile.fuel.find(f => f.key === (planning.tanks || 'standard')) ?? profile.fuel[0]
   const loads = (k: keyof Plan['loads']) => (v: number) => set({ loads: { ...plan.loads, [k]: Math.max(0, v) } })
@@ -16,7 +17,7 @@ export function LoadingSection({ plan, set, d, profile, planning, savePlanning }
   return (
     <div className="grid gap-6 xl:grid-cols-5">
       <div className="space-y-5 xl:col-span-2">
-        <div className="grid grid-cols-2 gap-3">
+        {!readOnly && <div className="grid grid-cols-2 gap-3">
           <NumField label={st.front.label} value={plan.loads.front} onChange={loads('front')} unit="lb" hint={`Arm ${st.front.arm} in (${st.front.range})`} />
           <NumField label={st.rear.label} value={plan.loads.rear} onChange={loads('rear')} unit="lb" hint={`Arm ${st.rear.arm} in`} />
           <NumField label={st.bag1.label} value={plan.loads.bag1} onChange={loads('bag1')} unit="lb" hint={`Arm ${st.bag1.arm} in · max ${st.bag1.max} lb`} />
@@ -26,7 +27,7 @@ export function LoadingSection({ plan, set, d, profile, planning, savePlanning }
             <Select value={planning.tanks || 'standard'} onChange={e => savePlanning({ ...planning, tanks: e.target.value })}>{profile.fuel.map(f => <option key={f.key} value={f.key}>{f.label} — {f.usable} gal</option>)}</Select>
             <button className="mt-1 text-xs text-accent hover:underline" onClick={() => set({ fuelGal: tank.usable })}>Full ({tank.usable} gal)</button>
           </label>
-        </div>
+        </div>}
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Item</th><th className="pb-1.5 text-right font-medium">Weight</th><th className="pb-1.5 text-right font-medium">Arm</th><th className="pb-1.5 text-right font-medium">Moment/1000</th></tr></thead>
           <tbody className="num">
@@ -43,7 +44,7 @@ export function LoadingSection({ plan, set, d, profile, planning, savePlanning }
             })}
           </tbody>
         </table>
-        <p className="text-xs text-fg-3">Landing subtracts the navlog's trip fuel ({d.totals.tripFuel.toFixed(1)} gal). {profile.figures.wb}.</p>
+        <p className="text-xs text-fg-3">Landing subtracts the navlog's trip fuel ({d.totals.tripFuel.toFixed(1)} gal). <PohLink fig="wb">POH Fig. 6-5</PohLink> · <PohLink fig="cg">CG limits p. 2-7</PohLink></p>
       </div>
       <div className="xl:col-span-3">
         <SubHead right={<span className="text-xs text-fg-3">Normal (solid) and utility (dashed) category</span>}>Center of gravity envelope</SubHead>

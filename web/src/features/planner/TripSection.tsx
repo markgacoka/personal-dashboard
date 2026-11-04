@@ -17,7 +17,7 @@ export const freqLabel = (u: string) => FREQ_LABEL[u] || u
 export function TripSection({ plan, set, airports, d, weather, airspace, cycle }: {
   plan: Plan; set: (p: Partial<Plan>) => void; airports: Airport[]; d: Derived; weather: import('./model').WeatherBundle | null; airspace: unknown; cycle: string | null
 }) {
-  const byId = (id: string) => airports.find(a => a.icao === id || a.id === id || `K${a.id}` === id)
+  const byId = (raw: string) => { const id = raw.replace(/\*$/, ''); return airports.find(a => a.icao === id || a.id === id || `K${a.id}` === id) }
   const route = plan.route.map(byId).filter(Boolean) as Airport[]
   const dest = route.length >= 2 ? route[route.length - 1] : null
   const alternate = plan.alternate ? byId(plan.alternate) ?? null : null
@@ -34,11 +34,13 @@ export function TripSection({ plan, set, airports, d, weather, airspace, cycle }
             <ol className="space-y-1.5">
               {plan.route.map((id, i) => {
                 const a = byId(id)
-                const role = i === 0 ? 'Departure' : i === plan.route.length - 1 ? 'Destination' : 'Stop'
+                const overfly = id.endsWith('*'), middle = i > 0 && i < plan.route.length - 1
+                const role = i === 0 ? 'Departure' : i === plan.route.length - 1 ? 'Destination' : overfly ? 'Fly over' : 'Land'
                 return (
                   <li key={`${id}-${i}`} className="flex items-center gap-2 rounded-lg px-3 py-2 ring-1 ring-inset ring-border">
-                    <span className="num w-12 shrink-0 font-medium text-fg">{a?.icao || id}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-fg-3">{a ? titleCase(a.name) : 'Not found'}<span className="ml-2 text-xs">{role}</span></span>
+                    <span className="num w-12 shrink-0 font-medium text-fg">{a?.icao || id.replace(/\*$/, '')}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-fg-3">{a ? titleCase(a.name) : 'Not found'}{!middle && <span className="ml-2 text-xs">{role}</span>}</span>
+                    {middle && <button onClick={() => set({ route: plan.route.map((x, k) => (k === i ? (overfly ? x.replace(/\*$/, '') : `${x}*`) : x)) })} className={cn('h-7 shrink-0 rounded-full px-2.5 text-xs ring-1 ring-inset', overfly ? 'text-fg-2 ring-border' : 'bg-accent-soft text-accent ring-accent/30')} title="Land here, or use it as a checkpoint">{overfly ? 'Fly over' : 'Land'}</button>}
                     <Button size="icon-sm" variant="ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><ArrowUp /></Button>
                     <Button size="icon-sm" variant="ghost" disabled={i === plan.route.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><ArrowDown /></Button>
                     <Button size="icon-sm" variant="ghost" onClick={() => set({ route: plan.route.filter((_, k) => k !== i) })} aria-label="Remove"><X /></Button>

@@ -44,7 +44,7 @@ export function Shell() {
   return (
     <div className="min-h-dvh bg-bg">
       <Sidebar collapsed={collapsed} onToggle={toggle} />
-      <div className={cn('flex min-h-dvh flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-[15.5rem]')}>
+      <div className={cn('flex min-h-dvh flex-col transition-[padding] duration-200 print:!pl-0', collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-[15.5rem]')}>
         <TopBar onSearch={() => setPaletteOpen(true)} />
         <main className={cn('flex-1', fullBleed ? 'flex min-h-0 flex-col' : 'px-4 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-14 lg:pt-6 2xl:px-10')}>
           <Outlet />
@@ -84,7 +84,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const { data: athlete } = useAthlete()
   const name = athlete?.fullName || 'Gacoka'
   return (
-    <aside className={cn('fixed inset-y-0 left-0 z-30 hidden flex-col bg-bg transition-[width] duration-200 lg:flex', collapsed ? 'w-[4.5rem]' : 'w-[15.5rem]')}>
+    <aside className={cn('fixed inset-y-0 left-0 z-30 hidden flex-col print:!hidden bg-bg transition-[width] duration-200 lg:flex', collapsed ? 'w-[4.5rem]' : 'w-[15.5rem]')}>
       <div className={cn('flex h-16 items-center gap-2.5 px-5', collapsed && 'justify-center px-0')}>
         <Avatar src={athlete?.profileImageUrlSmall} name={name} />
         {!collapsed && <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{name}</div><div className="truncate text-sm text-fg-3">gacoka.com</div></div>}
@@ -124,7 +124,7 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
   const { masked, toggleMask } = usePrefs()
   const title = sectionFor(loc.pathname)
   return (
-    <header className="sticky top-0 z-20 grid h-16 grid-cols-[1fr_auto] items-center gap-2 bg-bg/80 px-4 backdrop-blur-xl sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8 2xl:px-10">
+    <header className="sticky top-0 z-20 print:hidden grid h-16 grid-cols-[1fr_auto] items-center gap-2 bg-bg/80 px-4 backdrop-blur-xl sm:px-6 md:grid-cols-[1fr_auto_1fr] lg:px-8 2xl:px-10">
       <div className="flex min-w-0 items-center gap-2.5">
         <Link to="/" className="lg:hidden"><Brand /></Link>
         <div className="min-w-0 truncate text-sm font-medium text-fg">{title}</div>
@@ -183,7 +183,7 @@ function MobileNav() {
   const unread = unreadCount(data)
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-bg/85 pb-safe backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 print:hidden border-t border-white/[0.07] bg-bg/85 pb-safe backdrop-blur-xl lg:hidden">
         <div className="grid h-16 grid-cols-5">
           {TABS.map(t => (
             <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => cn('press flex flex-col items-center justify-center gap-1 text-xs font-medium text-fg-3', isActive && 'text-fg')}>

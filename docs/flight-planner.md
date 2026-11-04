@@ -101,7 +101,25 @@ on the corridor, PIREP turbulence or icing, ATC delay at an airport, NOTAM
 runway/airport closure keyword, sample (unverified) empty weight, closest-model
 POH.
 
-## Layout
+## Layout (wizard)
+
+The seven questions are steps 1–7 of a wizard (step bar on top, Back/Next at
+the bottom, progress saved in the draft); step 8, Review, shows every step
+read-only with Edit links and the go/no-go decision, and is what Print prints.
+A reference panel (docked right on wide screens, full-screen on phones) keeps
+the POH and the weather briefing open on every step; POH figure links in the
+steps jump to the page. POHs and briefings are PDFs in `planner_documents`:
+uploaded, or briefings imported from the Leidos Flight Service emails
+(DO_NOT_REPLY@afss.com) with "From email".
+
+The navlog has one row per checkpoint: departure, top of climb, airports
+within 5 nm of the line (≥ 8 nm apart), top of descent, each stop or fly-over
+point — with wind, TAS, TC, WCA, TH, variation, MH, deviation/CH, distance
+leg/remaining, GS, ETE, ETA, fuel leg/remaining and terrain, plus actual GS,
+ATA and fuel columns to fill in flight. Route entries ending in `*` are flown
+over (no landing, no ground time).
+
+### Original layout notes
 
 Header: plan name, route chips, departure time, overall verdict.
 Left rail (≥ xl): the seven questions with status, sticky; on smaller screens a

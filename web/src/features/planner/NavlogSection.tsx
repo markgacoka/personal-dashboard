@@ -5,52 +5,15 @@ import { Badge } from '@/components/ui/badge'
 import type { AircraftRegistry } from '@/lib/types'
 import type { AircraftPlanning, Airport, Derived, Plan } from './model'
 import { freqLabel } from './TripSection'
-import { SubHead, Synced, deg3, fmtMin, fmtTime, fmtZ } from './ui'
+import { NavlogTable } from './NavlogTable'
+import { SubHead, Synced, fmtMin, fmtZ } from './ui'
 
-export function NavlogSection({ plan, d, airports, terrainAt, planning, registry }: { plan: Plan; d: Derived; airports: Airport[]; terrainAt?: string; planning: AircraftPlanning; registry: AircraftRegistry | null | undefined }) {
+export function NavlogSection({ plan, set, d, airports, terrainAt, planning, registry, readOnly }: { readOnly?: boolean; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; airports: Airport[]; terrainAt?: string; planning: AircraftPlanning; registry: AircraftRegistry | null | undefined }) {
   if (!d.legs.length) return <p className="text-sm text-fg-3">Add at least two airports, a departure time and the aircraft to build the navlog.</p>
-  let rem = d.totals.distNm, fuel = d.totals.usableFuel - d.totals.taxiFuel
   const alt = plan.alternate ? airports.find(a => a.icao === plan.alternate || a.id === plan.alternate) : null
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[64rem] text-sm">
-          <thead>
-            <tr className="text-left text-xs text-fg-3">
-              <th className="pb-2 font-medium">Leg</th><th className="pb-2 text-right font-medium">Alt</th><th className="pb-2 text-right font-medium">Wind / temp</th>
-              <th className="pb-2 text-right font-medium">TAS</th><th className="pb-2 text-right font-medium">TC</th><th className="pb-2 text-right font-medium">WCA</th>
-              <th className="pb-2 text-right font-medium">TH</th><th className="pb-2 text-right font-medium">Var</th><th className="pb-2 text-right font-medium">MH</th>
-              <th className="pb-2 text-right font-medium">Dist / rem</th><th className="pb-2 text-right font-medium">GS</th><th className="pb-2 text-right font-medium">ETE</th>
-              <th className="pb-2 text-right font-medium">ETA</th><th className="pb-2 text-right font-medium">Fuel / rem</th><th className="pb-2 text-right font-medium">Terrain</th>
-            </tr>
-          </thead>
-          <tbody className="num">
-            {d.legs.map((l, i) => {
-              rem -= l.distNm; fuel -= l.fuelGal
-              return (
-                <tr key={i} className="border-t border-border align-top">
-                  <td className="py-2.5 font-sans"><span className="num font-medium text-fg">{l.from.icao || l.from.id} → {l.to.icao || l.to.id}</span>{l.climb && <div className="text-xs text-fg-3">climb {fmtMin(l.climb.min)}, {l.climb.nm.toFixed(0)} nm, {l.climb.gal.toFixed(1)} gal</div>}</td>
-                  <td className="py-2.5 text-right">{plan.cruiseAlt.toLocaleString()}</td>
-                  <td className="py-2.5 text-right">{l.wind ? `${l.wind.dir == null ? 'L&V' : deg3(l.wind.dir)}/${l.wind.spd}` : 'calm?'}{l.wind?.temp != null && <span className="text-fg-3"> {l.wind.temp > 0 ? '+' : ''}{l.wind.temp}°</span>}{l.wind && <div className="font-sans text-xs text-fg-3">{l.wind.stations.join(', ')}</div>}</td>
-                  <td className="py-2.5 text-right">{l.tas}</td>
-                  <td className="py-2.5 text-right">{deg3(l.tc)}</td>
-                  <td className="py-2.5 text-right">{Number.isNaN(l.wca) ? '—' : `${l.wca >= 0 ? '+' : '−'}${Math.abs(Math.round(l.wca))}`}</td>
-                  <td className="py-2.5 text-right">{deg3(l.th)}</td>
-                  <td className="py-2.5 text-right">{Math.abs(Math.round(l.varEast))}{l.varEast >= 0 ? 'E' : 'W'}</td>
-                  <td className="py-2.5 text-right font-medium">{deg3(l.mh)}</td>
-                  <td className="py-2.5 text-right">{l.distNm.toFixed(1)} <span className="text-fg-3">/ {Math.max(0, rem).toFixed(1)}</span></td>
-                  <td className="py-2.5 text-right">{Math.round(l.gs)}</td>
-                  <td className="py-2.5 text-right">{fmtMin(l.eteMin)}</td>
-                  <td className="py-2.5 text-right">{fmtTime(l.arriveAt)}<div className="text-xs text-fg-3">{fmtZ(l.arriveAt)}</div></td>
-                  <td className="py-2.5 text-right">{l.fuelGal.toFixed(1)} <span className="text-fg-3">/ {fuel.toFixed(1)}</span></td>
-                  <td className="py-2.5 text-right">{l.terrainMax != null ? l.terrainMax.toLocaleString() : '—'}</td>
-                </tr>
-              )
-            })}
-            <tr className="border-t border-border-strong font-medium"><td className="py-2.5 font-sans">Totals</td><td colSpan={8} /><td className="text-right">{d.totals.distNm.toFixed(1)}</td><td /><td className="text-right">{fmtMin(d.totals.eteMin)}</td><td /><td className="text-right">{d.totals.tripFuel.toFixed(1)}</td><td /></tr>
-          </tbody>
-        </table>
-      </div>
+      <NavlogTable plan={plan} set={set} d={d} readOnly={readOnly} />
       <div className="flex flex-wrap gap-x-6 gap-y-1">
         <Synced at={d.fb ? undefined : null} source={d.fb ? `Winds aloft: FB ${d.fb.fcst}-hour forecast based on ${d.fb.product.basedOn}Z, for use ${d.fb.product.forUse.join('–')}Z (NOAA AWC)` : 'No winds aloft'} />
         <Synced at={terrainAt} label="Terrain" source="highest point within the sampled line (Open-Meteo, Copernicus 90 m) — obstacles not included" />

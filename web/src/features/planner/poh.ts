@@ -230,3 +230,9 @@ export function profileFor(model?: string | null): ProfileMatch {
     note: model ? `No POH profile for "${model}". Showing the 1982 172P only as a reference — do not use these numbers for this airplane.` : 'Choose an aircraft.',
   }
 }
+
+// Pages of the scanned 172P POH (N54829 copy, as stored in the planner) for jumping to a figure.
+export const POH_PAGES_172P: Record<string, number> = {
+  limits: 18, airspeed: 19, weights: 21, cg: 22, fuel: 24, emergency: 31, glide: 38, speeds: 48, checklist: 50,
+  beforeTakeoff: 53, landingChecklist: 54, stall: 80, takeoff: 82, climb: 85, cruise: 86, landing: 94, wb: 102,
+}

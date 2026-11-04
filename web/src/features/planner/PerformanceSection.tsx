@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import type { Derived } from './model'
 import type { AircraftProfile } from './poh'
 import { SubHead, fmtTime } from './ui'
+import { PohLink } from './RefPanel'
 
 export function PerformanceSection({ d, profile }: { d: Derived; profile: AircraftProfile | null }) {
   if (!profile) return <p className="text-sm text-fg-3">Choose the aircraft first.</p>
@@ -44,7 +45,7 @@ export function PerformanceSection({ d, profile }: { d: Derived; profile: Aircra
       <div className="grid gap-4 text-sm text-fg-3 lg:grid-cols-2">
         <div>
           <SubHead>How these are computed</SubHead>
-          <p>{profile.figures.takeoff} and {profile.figures.landing}, interpolated for pressure altitude (field elevation corrected by the altimeter setting) and temperature from the latest METAR, and for weight across the 2,400/2,200/2,000 lb takeoff sheets. Weight at each stop subtracts the navlog's fuel burn. POH corrections: −10 % per 9 kt headwind, +10 % per 2 kt tailwind, and for grass +15 % (takeoff) / +45 % (landing) of the ground roll. Runways use the gust value. Landing uses the distance past any displaced threshold.</p>
+          <p><PohLink fig="takeoff">{profile.figures.takeoff}</PohLink> and <PohLink fig="landing">{profile.figures.landing}</PohLink>, interpolated for pressure altitude (field elevation corrected by the altimeter setting) and temperature from the latest METAR, and for weight across the 2,400/2,200/2,000 lb takeoff sheets. Weight at each stop subtracts the navlog's fuel burn. POH corrections: −10 % per 9 kt headwind, +10 % per 2 kt tailwind, and for grass +15 % (takeoff) / +45 % (landing) of the ground roll. Runways use the gust value. Landing uses the distance past any displaced threshold.</p>
         </div>
         <div>
           <SubHead>Speeds at these weights</SubHead>

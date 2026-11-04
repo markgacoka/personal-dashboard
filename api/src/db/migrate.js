@@ -1125,6 +1125,31 @@ async function migrateV34() {
   `)
 }
 
+// Reference PDFs for the planner: POHs (by model) and weather briefings
+// (uploaded, or imported from the Leidos briefing emails), with a figure → page map.
+async function migrateV35() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS planner_documents (
+      id           SERIAL PRIMARY KEY,
+      kind         TEXT NOT NULL CHECK (kind IN ('poh', 'briefing', 'other')),
+      title        TEXT NOT NULL,
+      model        TEXT,
+      tail_number  TEXT,
+      route        TEXT[],
+      filename     TEXT,
+      content_type TEXT NOT NULL DEFAULT 'application/pdf',
+      bytes        BYTEA NOT NULL,
+      size         INTEGER NOT NULL,
+      page_map     JSONB,
+      source       TEXT NOT NULL DEFAULT 'upload',
+      source_ref   TEXT,
+      created_at   TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS planner_documents_kind ON planner_documents (kind, created_at DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS planner_documents_source ON planner_documents (source, source_ref) WHERE source_ref IS NOT NULL;
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -1134,7 +1159,7 @@ const MIGRATIONS = [
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
-  ['034', migrateV34],
+  ['034', migrateV34], ['035', migrateV35],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

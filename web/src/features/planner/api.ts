@@ -75,3 +75,27 @@ export function usePlans() {
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/planner/plans/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
   return { ...q, create, update, remove }
 }
+
+export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
+  queryKey: ['planner', 'corridor', bbox && Object.values(bbox).map(v => v.toFixed(2)).join(',')], enabled: !!bbox, staleTime: Infinity,
+  queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
+})
+
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; source: string; created_at: string }
+export function useDocuments() {
+  const qc = useQueryClient()
+  const key = ['planner', 'documents']
+  const q = useQuery({ queryKey: key, staleTime: 5 * MIN, queryFn: () => get<PlannerDoc[]>('/api/planner/documents') })
+  const upload = useMutation({
+    mutationFn: async ({ file, kind, model, route }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string }) => {
+      const qs = new URLSearchParams({ kind, title: file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}) })
+      const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: file, credentials: 'same-origin' })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Upload failed (${r.status})`)
+      return r.json() as Promise<PlannerDoc>
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+  })
+  const importBriefings = useMutation({ mutationFn: () => post<{ added: number }>('/api/planner/briefings/import'), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
+  const remove = useMutation({ mutationFn: (id: number) => del(`/api/planner/documents/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
+  return { ...q, upload, importBriefings, remove }
+}

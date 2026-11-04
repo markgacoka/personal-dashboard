@@ -128,7 +128,7 @@ function ConditionsCard({ className }: { className?: string }) {
   const { brief: b, info, detail, isLoading } = useAirportBrief(icao)
   return (
     <Card className={className}>
-      <CardHeader icon={<CloudSun />} title={<span>Conditions at <span className="num">{icao}</span></span>} description={info?.name || 'Home airport'} action={<More to="/flying/weather">Brief</More>} />
+      <CardHeader icon={<CloudSun />} title={<span>Conditions at <span className="num">{icao}</span></span>} description={info?.name || 'Home airport'} action={<More to="/flying/plan">Plan</More>} />
       <CardBody>
         {isLoading ? <Skeleton className="h-44" /> : !b ? <p className="py-10 text-center text-sm text-fg-3">No current METAR for {icao}.</p> : (
           <div className="flex items-center gap-5">

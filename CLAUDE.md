@@ -76,11 +76,23 @@ the account statement. They're mirrored into `nice_air_meter` and
 to logbook entries by date, tail and duration. A flight's cost (`cost` on
 `GET /api/flights/:id`) is the aircraft charge plus that day's flight and
 pre/post-ground instruction; headset rental is listed but not counted, and
-ground lessons on days without a flight stay unlinked. Hobbs readings fill
-`hobbs_start`/`hobbs_end` only where both are empty; NICE AIR has no tach data.
+ground lessons on days without a flight stay unlinked. The meter row is the
+logged time: a linked flight takes its Hobbs readings and hours as its total
+(all-dual/solo/PIC/XC columns follow; night/instrument are capped), re-checked
+every scheduler tick; NICE AIR has no tach data.
 It runs every 12 h, and hourly while a logbook flight in a booking from the
 last 3 days has no charge yet. `GET /api/nice-air/portal` shows its state;
 `POST /api/nice-air/portal/sync` runs it now.
+
+## Flight planner
+
+`/flying/plan` (spec: `docs/flight-planner.md`). Calculations are pure and
+client-side (`web/src/features/planner/calc.ts`, `model.ts`'s `derive()`), with
+172P POH tables transcribed in `poh.ts` (figure numbers kept). The API side
+(`routes/planner.js`) serves NASR airport records, a weather/risk bundle from
+aviationweather.gov, FAA NAS status and tfr.faa.gov (`services/awc.js`,
+`services/faaStatus.js`, cached in memory), D-ATIS, terrain, and the saved
+`planner_plans` / `planner_aircraft` / `planner_settings` tables.
 
 ## Mail
 

@@ -7,6 +7,13 @@
 // Returns null for polar conditions where civil twilight doesn't occur.
 
 export function civilTwilightUTC(dateStr, lat, lon) {
+  const t = sunEvent(dateStr, lat, lon, 96)
+  return t && { dawn: t.rise, dusk: t.set }
+}
+
+// Sun crossing the given zenith angle: 90.833° is sunrise/sunset (refraction and
+// the sun's radius), 96° civil twilight.
+export function sunEvent(dateStr, lat, lon, zenith = 90.833) {
   const base = new Date(dateStr + 'T00:00:00Z')
   // Julian date for solar noon on this date
   const jd = base.getTime() / 86400000 + 2440587.5 + 0.5
@@ -44,7 +51,7 @@ export function civilTwilightUTC(dateStr, lat, lon) {
 
   // Hour angle for civil twilight (zenith = 96°)
   const latRad = lat * Math.PI / 180
-  const cosHA  = (Math.cos(96 * Math.PI / 180) - Math.sin(latRad) * Math.sin(decl))
+  const cosHA  = (Math.cos(zenith * Math.PI / 180) - Math.sin(latRad) * Math.sin(decl))
                / (Math.cos(latRad) * Math.cos(decl))
   if (Math.abs(cosHA) > 1) return null  // polar — no civil twilight
 
@@ -54,7 +61,7 @@ export function civilTwilightUTC(dateStr, lat, lon) {
   const solarNoonMin = 720 - 4 * lon - eot
 
   return {
-    dawn: new Date(base.getTime() + (solarNoonMin - HA * 4) * 60000),
-    dusk: new Date(base.getTime() + (solarNoonMin + HA * 4) * 60000),
+    rise: new Date(base.getTime() + (solarNoonMin - HA * 4) * 60000),
+    set: new Date(base.getTime() + (solarNoonMin + HA * 4) * 60000),
   }
 }

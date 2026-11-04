@@ -23,6 +23,7 @@ import { scheduleFaaAirspaceRefresh } from './services/faaAirspace.js'
 import { scheduleUsAirportsRefresh } from './services/usAirports.js'
 import { scheduleNasrRefresh } from './services/nasr.js'
 import patternRoutes from './routes/pattern.js'
+import plannerRoutes from './routes/planner.js'
 import { scheduleNightSync } from './services/schedules.js'
 import { scheduleAutoLog } from './services/autolog.js'
 import { scheduleNiceAirPortalSync } from './services/niceAirPortal.js'
@@ -74,6 +75,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
       await fastify.register(importRoutes)
       await fastify.register(sleepRoutes)
       await fastify.register(patternRoutes)
+      await fastify.register(plannerRoutes)
       await fastify.register(mailRoutes, { background }) // answers "not configured" until MAIL_* is set
       if (process.env.PLAID_CLIENT_ID) {
         await fastify.register(financeRoutes)

@@ -1101,6 +1101,30 @@ async function migrateV33() {
   `)
 }
 
+// Flight planner: saved plans, per-tail planning data (empty weight and moment,
+// equipment, inspection dates) and settings such as personal minimums.
+async function migrateV34() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS planner_plans (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL,
+      data       JSONB NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS planner_aircraft (
+      tail_number TEXT PRIMARY KEY,
+      data        JSONB NOT NULL,
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS planner_settings (
+      key        TEXT PRIMARY KEY,
+      data       JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -1110,6 +1134,7 @@ const MIGRATIONS = [
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
+  ['034', migrateV34],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

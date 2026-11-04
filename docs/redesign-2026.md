@@ -34,7 +34,7 @@ with the classic `/js` and `/css` paths.
 | `/sleep` | Sleep | Last night, hypnogram, vitals, 30-night trends |
 | `/flying` | Logbook | Totals vs. §61.109 minimums, filterable flight table, log/edit flight |
 | `/flying/:id` | Flight detail | Map-first view, track playback with altitude/speed profile, aircraft, weather, NICE AIR |
-| `/flying/weather` | Airport brief | METAR, wind/runway compass, TAF, NOTAMs for the home airport |
+| `/flying/plan` | Airport brief (`/flying/weather` redirects) | VFR flight planner: seven questions from route to go/no-go — see `docs/flight-planner.md` |
 | `/flying/pilot` | Credentials + currency | Certificates, medical, §61.56/§61.57 currency |
 | `/money`, `/money/connections` | Finance dashboard, Linked accounts | Net worth trend, allocation, accounts, holdings, retirement goal; Plaid items |
 | `/chess` | Chess progress | Rating trend, record, monthly comparison, recent games |

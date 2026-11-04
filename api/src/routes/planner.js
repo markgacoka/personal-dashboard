@@ -6,9 +6,12 @@ import * as awc from '../services/awc.js'
 import { nasStatus, tfrs, datis, elevations } from '../services/faaStatus.js'
 import { sunEvent } from '../services/twilight.js'
 import { importBriefings } from '../services/briefings.js'
+import { resolveRoute } from '../services/waypoints.js'
+import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
+import { fetchWithTimeout } from '../lib/http.js'
 
 const ID = /^[A-Z0-9]{2,4}$/
-const TAIL = /^N?[A-Z0-9]{1,5}$/
+const TAIL = /^[A-Z0-9][A-Z0-9-]{1,7}$/
 const APPROACH_USE = /APCH|CLASS [BC]/
 const nm = (a, b) => Math.hypot((b.lat - a.lat) * 60, (b.lon - a.lon) * 60 * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180))
 
@@ -58,7 +61,7 @@ export default async function plannerRoutes(fastify) {
 
   // GET /api/planner/airports?ids=RHV,KSNS&date=2026-11-04
   fastify.get('/api/planner/airports', async req => {
-    const list = String(req.query.ids || '').split(',').slice(0, 12)
+    const list = String(req.query.ids || '').split(',').slice(0, 30)
     const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : new Date().toISOString().slice(0, 10)
     const airports = await nasrAirports(list)
     const { rows: [meta] } = await pool.query("SELECT value, updated_at FROM nasr_meta WHERE key = 'cycle'")
@@ -158,8 +161,10 @@ export default async function plannerRoutes(fastify) {
   fastify.get('/api/planner/documents/:id/file', async (req, reply) => {
     const { rows: [d] } = await pool.query('SELECT content_type, bytes, filename FROM planner_documents WHERE id = $1', [Number(req.params.id)])
     if (!d) return reply.status(404).send({ error: 'No such document' })
+    // Framed by the planner's reference panel (same origin only).
     return reply.header('Cache-Control', 'private, max-age=31536000, immutable')
-      .header('Content-Disposition', `inline; filename="${String(d.filename || 'document.pdf').replace(/["\\\r\n]/g, '')}"`)
+      .header('Content-Security-Policy', "frame-ancestors 'self'").header('X-Frame-Options', 'SAMEORIGIN')
+      .header('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${String(d.filename || 'document.pdf').replace(/["\\\r\n]/g, '')}"`)
       .type(d.content_type).send(d.bytes)
   })
   // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF)
@@ -193,6 +198,43 @@ export default async function plannerRoutes(fastify) {
       importing ||= importBriefings(pool, { log: fastify.log }).finally(() => { importing = null })
       return await importing
     } catch (e) { return reply.status(502).send({ error: e.message }) }
+  })
+
+  // POST /api/planner/resolve {tokens: ['KRHV', 'VPCOY', 'SJC090020', '3720N12150W', 'KHAF']}
+  fastify.post('/api/planner/resolve', async (req, reply) => {
+    const tokens = Array.isArray(req.body?.tokens) ? req.body.tokens.map(t => String(t).slice(0, 24)).filter(Boolean) : null
+    if (!tokens) return reply.status(400).send({ error: 'tokens[] required' })
+    const { rows: [meta] } = await pool.query("SELECT value FROM nasr_meta WHERE key = 'cycle'")
+    return { cycle: meta?.value ?? null, points: await resolveRoute(tokens) }
+  })
+
+  // POH for an aircraft: the closest publicly posted handbook, stored on first use.
+  fastify.get('/api/planner/poh/catalog', async () => CATALOG.map(({ key, make, variant, years, title, profile, url, units }) => ({ key, make, variant, years, title, profile, url, units })))
+  fastify.post('/api/planner/poh/find', async (req, reply) => {
+    const { make, model, year } = req.body || {}
+    const m = matchPoh({ make, model, year: Number(year) || null })
+    if (!m) return { match: null, doc: null }
+    const { url, title, variant, years, profile, units, key } = m.entry
+    try {
+      const doc = await ensurePoh(m.entry, fastify.log)
+      return { match: { key, title, variant, years, profile, url, units, exact: m.exact, sameYears: m.sameYears }, doc }
+    } catch (e) {
+      return reply.status(502).send({ error: e.message, match: { key, title, variant, years, profile, url, units, exact: m.exact } })
+    }
+  })
+
+  // Latest NEXRAD composite time for the radar overlay (Iowa Environmental Mesonet tiles).
+  let radarMeta = null
+  fastify.get('/api/planner/radar', async () => {
+    if (radarMeta && Date.now() - radarMeta.at < 120_000) return radarMeta.data
+    try {
+      const r = await fetchWithTimeout('https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', { ms: 8000 })
+      const j = await r.json()
+      radarMeta = { at: Date.now(), data: { valid: j?.meta?.valid ?? null, fetchedAt: new Date().toISOString(), tiles: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png' } }
+    } catch (e) {
+      radarMeta = { at: Date.now(), data: { valid: null, fetchedAt: new Date().toISOString(), error: e.message, tiles: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png' } }
+    }
+    return radarMeta.data
   })
 
   // ── Saved planner state ─────────────────────────────────────────────────────

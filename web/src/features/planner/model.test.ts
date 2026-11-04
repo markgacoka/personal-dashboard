@@ -122,3 +122,38 @@ describe('derive: navlog rows', () => {
     expect(+stop.legs[1].departAt - +stop.legs[0].arriveAt).toBe(15 * 60_000)
   })
 })
+
+describe('derive: waypoints and E6B row overrides', () => {
+  const points: Inputs['points'] = [
+    { token: 'KRHV', overfly: false, kind: 'airport', id: 'RHV', label: 'KRHV' },
+    { token: 'SNS090010', overfly: false, kind: 'radial', id: 'SNS090010', label: 'SNS090010', name: 'SNS radial', lat: 37.0, lon: -121.6, magVar: 15, freq: '117.3', type: 'Radial/DME' },
+    { token: 'KSNS', overfly: false, kind: 'airport', id: 'SNS', label: 'KSNS' },
+  ]
+  const d = derive(plan({ route: ['KRHV', 'SNS090010', 'KSNS'] }), inputs({ points }))
+  test('a non-airport point is flown over: two legs, one landing', () => {
+    expect(d.legs).toHaveLength(2)
+    expect(d.legs[0].stop).toBe(false)
+    expect(d.navlog.find(r => r.to.id === 'SNS090010')?.to.kind).toBe('waypoint')
+    expect(d.wx.filter(w => w.role !== 'alternate')).toHaveLength(2)
+    expect(d.checks.filter(c => c.status === 'nogo')).toEqual([])
+  })
+  test('the waypoint carries its own variation and frequency', () => {
+    const r = d.navlog.find(x => x.to.id === 'SNS090010')!
+    expect(r.to.freq).toBe('117.3')
+  })
+  test('typed wind and CAS replace the forecast for that row only', () => {
+    const base = derive(plan(), inputs())
+    const row = base.navlog.find(r => r.phase === 'cruise')!
+    const o = derive(plan({ overrides: { [row.key]: { wdir: 160, wspd: 30, cas: 100 } } }), inputs())
+    const r2 = o.navlog.find(r => r.key === row.key)!
+    expect(r2.wind?.dir).toBe(160); expect(r2.wind?.spd).toBe(30)
+    expect(r2.tas).toBeGreaterThan(100) // TAS > CAS at altitude
+    expect(r2.gs).toBeLessThan(r2.tas) // headwind on a southbound leg
+    expect(r2.overridden.sort()).toEqual(['cas', 'wdir', 'wspd'])
+    expect(o.navlog.filter(r => r.key !== row.key).every(r => r.overridden.length === 0)).toBe(true)
+  })
+  test('a route that ends at a waypoint is rejected', () => {
+    const bad = derive(plan({ route: ['KRHV', 'SNS090010'] }), inputs({ points }))
+    expect(bad.checks.some(c => c.status === 'nogo' && /end at an airport/.test(c.title))).toBe(true)
+  })
+})

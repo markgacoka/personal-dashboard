@@ -30,13 +30,30 @@ the bottom collects every check with a link back to where it came from.
 | 7 | Is it safe there and back? | Weather & risks | METAR/TAF at ETA per airport, ATIS, PIREPs, SIGMET/G-AIRMET/CWA on the corridor, TFRs, NOTAMs, ATC delays, winds aloft, freezing level, daylight |
 | — | Go or no-go? | Decision | Every check, grouped by question, with the reason |
 
-## Inputs (what the pilot types)
+## Inputs
 
-Route (airport IDs, in order), alternate (suggested, overridable), departure
-time (local), cruise altitude and RPM, tail number, people and baggage weights
-by station, fuel on board, IMSAFE/PAVE answers, personal minimums, the
-aircraft's empty weight/moment and inspection dates (saved per tail), equipment.
-Everything else is fetched or derived on the page.
+What the pilot types (step where it's asked):
+
+| Input | Step | Notes |
+|---|---|---|
+| Tail number (free text, any country) | Aircraft & route | Registry → make/model/year; prefix → country → units (lb/kg, gal/L, inHg/hPa) |
+| Make, model, year | Aircraft & route | Only when the registry has no record (non-US) or to correct it |
+| Route | Aircraft & route / Trip | SkyVector/ForeFlight tokens: airports, navaids, fixes, VFR waypoints (VP…), radial/DME (SJC090020, SJC/090/20), coordinates (3720N12150W, 372030N1215015W, 37.33/-121.83). Starts and ends at an airport; middle airports are fly-over unless marked Land |
+| Departure date/time, cruise altitude, cruise RPM, ground time per stop | Aircraft & route | |
+| Alternate | Trip | Suggested from suitable airports near the destination |
+| IMSAFE, PAVE, personal minimums | Pilot | |
+| Empty weight and moment, inspections, equipment, aircraft color | Aircraft / NavLog | Saved per tail |
+| Weights by station, fuel on board, tanks | Weight & balance | |
+| Per-row wind, temperature, CAS (optional, E6B style) and compass deviation | Navlog | Replace the forecast/POH value for that row |
+| Pilot name, phone, address, home base | NavLog (flight plan block 14) | Saved once |
+| In flight: time off, ATD/ATA, actual GS, fuel, block times, ATIS code | NavLog | |
+
+Derived: POH (matched by make/model/year from a catalog of public POH PDFs,
+downloaded once into `planner_documents`, viewable and downloadable on every
+step), V-speeds, limits, envelope, fuel capacity, takeoff/climb/cruise/landing
+from the POH tables, TC/distance, magnetic variation (NASR), winds/temps aloft
+(FB), WCA/TH/MH/CH/GS/ETE/ETA/fuel per row, weather at each ETA, hazards,
+runways, frequencies, terrain, airspace, daylight.
 
 ## Data sources (free; every block shows when it was fetched or issued)
 
@@ -102,6 +119,21 @@ runway/airport closure keyword, sample (unverified) empty weight, closest-model
 POH.
 
 ## Layout (wizard)
+
+Step 1, Aircraft & route, asks for the tail and the route first and lists every
+input (entered vs derived). Steps 2–8 are the seven questions, then Review and
+the NavLog: the NICE AIR / Jeppesen VFR Navigation Log front (navlog, airport &
+ATIS advisories, frequencies, block times) and reverse (weather log, FAA flight
+plan, notes and NOTAMs, position report), filled from the plan and printable.
+
+Map: FAA VFR sectional tiles (ArcGIS), NEXRAD radar (Iowa Environmental
+Mesonet, scan time shown), METARs, PIREPs, SIGMET/G-AIRMET, CWA, TFRs, NOTAM
+counts per airport, airspace, the route with every waypoint.
+
+E6B: per row, TAS = CAS ÷ √σ (density ratio from pressure altitude and OAT,
+as E6BX), wind triangle WCA = asin(Vw·sin(W−TC)/TAS), GS = TAS·cos WCA −
+Vw·cos(W−TC), MH = TH − east variation, CH = MH ± deviation, ETE = dist/GS,
+fuel = ETE × GPH.
 
 The seven questions are steps 1–7 of a wizard (step bar on top, Back/Next at
 the bottom, progress saved in the draft); step 8, Review, shows every step

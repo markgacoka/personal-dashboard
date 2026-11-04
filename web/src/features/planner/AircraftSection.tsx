@@ -12,6 +12,18 @@ import type { ProfileMatch } from './poh'
 import { KV, NumField, StatusIcon, SubHead, Synced } from './ui'
 import { PohLink } from './RefPanel'
 
+export function TailInput({ value, onCommit, fleet }: { value: string | null; onCommit: (t: string | null) => void; fleet: AircraftRef[] }) {
+  const [v, setV] = useState(value ?? '')
+  useEffect(() => setV(value ?? ''), [value])
+  const commit = () => { const t = v.toUpperCase().replace(/\s+/g, ''); if (t !== (value ?? '')) onCommit(t || null) }
+  return (
+    <>
+      <Input value={v} onChange={e => setV(e.target.value.toUpperCase())} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit() }} list="planner-fleet-2" placeholder="N54829" className="num uppercase" spellCheck={false} />
+      <datalist id="planner-fleet-2">{fleet.map(a => <option key={a.id} value={a.tail_number}>{a.make} {a.model}{a.year ? ` (${a.year})` : ''}</option>)}</datalist>
+    </>
+  )
+}
+
 export function AircraftSection({ plan, set, fleet, registry, match, planning, savePlanning, saving, night }: {
   plan: Plan; set: (p: Partial<Plan>) => void; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; match: ProfileMatch | null
   planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; saving: boolean; night: boolean
@@ -23,10 +35,7 @@ export function AircraftSection({ plan, set, fleet, registry, match, planning, s
         <div className="space-y-4 xl:col-span-2">
           <label className="block">
             <span className="mb-1 block text-sm text-fg-2">Tail number</span>
-            <Select value={plan.tail ?? ''} onChange={e => set({ tail: e.target.value || null })} className="num">
-              <option value="">Choose…</option>
-              {fleet.map(a => <option key={a.id} value={a.tail_number}>{a.tail_number} · {a.make} {a.model}{a.year ? ` (${a.year})` : ''}</option>)}
-            </Select>
+            <TailInput value={plan.tail} onCommit={t => set({ tail: t, aircraft: undefined })} fleet={fleet} />
           </label>
           {registry?.photo_url && <img src={registry.photo_url} alt={plan.tail ?? ''} className="aspect-[16/9] w-full rounded-lg object-cover ring-1 ring-border" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
           {registry && (

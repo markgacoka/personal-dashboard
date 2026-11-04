@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react'
-import { BookOpen, CloudSun, ExternalLink, Mail, Upload, X } from 'lucide-react'
+import { BookOpen, CloudSun, Download, ExternalLink, Mail, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
@@ -31,14 +31,14 @@ export function PohLink({ fig, children }: { fig: keyof typeof POH_PAGES_172P | 
   return <button type="button" onClick={() => r?.show('poh', fig)} className="inline-flex items-center gap-1 text-accent hover:underline"><BookOpen className="size-3.5" />{children}</button>
 }
 
-export function RefPanel({ model, route, date, className }: { model: string | null; route: string[]; date: string; className?: string }) {
+export function RefPanel({ model, route, date, className, pohDocId, pohStatus }: { model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null }) {
   const r = useRefs()!
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)
   const { tab, page, docId } = r.state
   const list = (docs.data || []).filter(d => d.kind === tab)
   // POH: same model first; briefing: same route and newest first.
-  const ranked = useMemo(() => [...list].sort((a, b) => score(b, tab, model, route, date) - score(a, tab, model, route, date)), [list, tab, model, route, date])
+  const ranked = useMemo(() => [...list].sort((a, b) => (tab === 'poh' && pohDocId ? Number(b.id === pohDocId) - Number(a.id === pohDocId) : 0) || score(b, tab, model, route, date) - score(a, tab, model, route, date)), [list, tab, model, route, date, pohDocId])
   const doc = ranked.find(d => d.id === docId[tab]) ?? ranked[0] ?? null
   const pageNo = tab === 'poh' ? page : null
   const src = doc ? `/api/planner/documents/${doc.id}/file#${pageNo ? `page=${pageNo}&` : ''}view=FitH` : null
@@ -63,14 +63,16 @@ export function RefPanel({ model, route, date, className }: { model: string | nu
         <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} loading={docs.upload.isPending}><Upload />Upload</Button>
         {tab === 'briefing' && <Button size="sm" variant="ghost" loading={docs.importBriefings.isPending} onClick={() => docs.importBriefings.mutate(undefined, { onSuccess: d => toast.success(d.added ? `${d.added} briefing${d.added > 1 ? 's' : ''} imported` : 'No new briefings in email'), onError: e => toast.error(e.message) })}><Mail />From email</Button>}
         {src && <Button asChild size="sm" variant="ghost"><a href={src} target="_blank" rel="noopener noreferrer"><ExternalLink />Open</a></Button>}
+        {doc && <Button asChild size="sm" variant="ghost"><a href={`/api/planner/documents/${doc.id}/file?download=1`} download={doc.filename ?? `${doc.title}.pdf`}><Download />Download</a></Button>}
       </div>
-      {tab === 'poh' && doc && (
+      {tab === 'poh' && doc && (doc.page_map || doc.model === '172P') && (
         <div className="flex flex-wrap gap-1 px-3 pb-2">
           {[['Limits', 'limits'], ['Speeds', 'speeds'], ['Checklists', 'checklist'], ['Emergency', 'emergency'], ['Takeoff 5-5', 'takeoff'], ['Climb 5-7', 'climb'], ['Cruise 5-8', 'cruise'], ['Landing 5-11', 'landing'], ['W&B 6-5', 'wb']].map(([l, k]) => (
             <button key={k} onClick={() => r.show('poh', (doc.page_map ?? POH_PAGES_172P)[k])} className={cn('h-7 rounded-full px-2.5 text-xs ring-1 ring-inset ring-border', page === (doc.page_map ?? POH_PAGES_172P)[k] ? 'bg-pill text-fg' : 'text-fg-3 hover:text-fg')}>{l}</button>
           ))}
         </div>
       )}
+      {tab === 'poh' && pohStatus && <p className="px-3 pb-2 text-xs text-fg-3">{pohStatus}</p>}
       {tab === 'briefing' && doc && <Synced className="px-3 pb-2" at={doc.created_at} label={doc.source === 'gmail' ? 'Received' : 'Uploaded'} source={doc.source === 'gmail' ? 'Leidos Flight Service (email)' : doc.filename ?? ''} />}
       <div className="min-h-0 flex-1 px-1 pb-1">
         {src ? <iframe key={src} title={doc!.title} src={src} className="h-full w-full rounded-lg bg-white" />

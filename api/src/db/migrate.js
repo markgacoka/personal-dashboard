@@ -1150,6 +1150,26 @@ async function migrateV35() {
   `)
 }
 
+// Navaids and fixes (incl. VFR waypoints) from the same NASR cycle, so a route
+// can name VORs, NDBs and VP… waypoints the way SkyVector and ForeFlight do.
+async function migrateV36() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nasr_points (
+      id       TEXT NOT NULL,
+      type     TEXT NOT NULL,
+      name     TEXT,
+      state    TEXT,
+      lat      DOUBLE PRECISION NOT NULL,
+      lon      DOUBLE PRECISION NOT NULL,
+      elev     REAL,
+      mag_var  REAL,
+      freq     TEXT,
+      vfr      BOOLEAN NOT NULL DEFAULT FALSE
+    );
+    CREATE INDEX IF NOT EXISTS nasr_points_id ON nasr_points (id);
+  `)
+}
+
 const MIGRATIONS = [
   ['001', migrate],    ['002', migrateV2],  ['003', migrateV3],  ['004', migrateV4],
   ['005', migrateV5],  ['006', migrateV6],  ['007', migrateV7],  ['008', migrateV8],
@@ -1159,7 +1179,7 @@ const MIGRATIONS = [
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
-  ['034', migrateV34], ['035', migrateV35],
+  ['034', migrateV34], ['035', migrateV35], ['036', migrateV36],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

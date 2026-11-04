@@ -37,10 +37,13 @@ const CSP = {
     'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
     'img-src': ["'self'", 'data:', 'blob:', 'https:'],
     'connect-src': ["'self'", 'https://*.basemaps.cartocdn.com', 'https://basemaps.cartocdn.com',
-                    'https://server.arcgisonline.com', 'https://*.plaid.com', 'https://cdn.jsdelivr.net'],
+                    'https://server.arcgisonline.com', 'https://*.plaid.com', 'https://cdn.jsdelivr.net',
+                    // Flight planner chart and radar tiles.
+                    'https://tiles.arcgis.com', 'https://mesonet.agron.iastate.edu'],
     'worker-src': ["'self'", 'blob:'],
     'child-src': ["'self'", 'blob:'],
-    'frame-src': ['https://cdn.plaid.com'],
+    // 'self': the planner shows stored POH and briefing PDFs in a frame.
+    'frame-src': ["'self'", 'https://cdn.plaid.com'],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],

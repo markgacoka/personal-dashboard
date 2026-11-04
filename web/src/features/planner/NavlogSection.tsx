@@ -7,13 +7,15 @@ import type { AircraftPlanning, Airport, Derived, Plan } from './model'
 import { freqLabel } from './TripSection'
 import { NavlogTable } from './NavlogTable'
 import { SubHead, Synced, fmtMin, fmtZ } from './ui'
+import { isWaypoint } from './model'
+import { toF, type Units, US } from './units'
 
-export function NavlogSection({ plan, set, d, airports, terrainAt, planning, registry, readOnly }: { readOnly?: boolean; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; airports: Airport[]; terrainAt?: string; planning: AircraftPlanning; registry: AircraftRegistry | null | undefined }) {
-  if (!d.legs.length) return <p className="text-sm text-fg-3">Add at least two airports, a departure time and the aircraft to build the navlog.</p>
+export function NavlogSection({ plan, set, d, airports, terrainAt, planning, registry, readOnly, u = US }: { readOnly?: boolean; u?: Units; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; airports: Airport[]; terrainAt?: string; planning: AircraftPlanning; registry: AircraftRegistry | null | undefined }) {
+  if (!d.legs.length) return <p className="text-sm text-fg-3">Add a route that starts and ends at an airport, a departure time and the aircraft to build the navlog.</p>
   const alt = plan.alternate ? airports.find(a => a.icao === plan.alternate || a.id === plan.alternate) : null
   return (
     <>
-      <NavlogTable plan={plan} set={set} d={d} readOnly={readOnly} />
+      <NavlogTable plan={plan} set={set} d={d} readOnly={readOnly} u={u} />
       <div className="flex flex-wrap gap-x-6 gap-y-1">
         <Synced at={d.fb ? undefined : null} source={d.fb ? `Winds aloft: FB ${d.fb.fcst}-hour forecast based on ${d.fb.product.basedOn}Z, for use ${d.fb.product.forUse.join('–')}Z (NOAA AWC)` : 'No winds aloft'} />
         <Synced at={terrainAt} label="Terrain" source="highest point within the sampled line (Open-Meteo, Copernicus 90 m) — obstacles not included" />
@@ -28,11 +30,11 @@ export function NavlogSection({ plan, set, d, airports, terrainAt, planning, reg
               ['Trip (climb + cruise)', d.totals.tripFuel],
               [`Legal reserve (${plan.night ? 45 : 30} min, §91.151)`, d.totals.reserveFuel],
               ['Your reserve (personal minimums)', d.totals.personalReserveFuel],
-            ].map(([k, v]) => <div key={k as string} className="contents"><dt className="font-sans text-fg-3">{k}</dt><dd className="text-right">{(v as number).toFixed(1)} gal</dd></div>)}
-            <dt className="border-t border-border pt-1 font-sans font-medium">Required</dt><dd className="border-t border-border pt-1 text-right font-medium">{d.totals.requiredFuel.toFixed(1)} gal</dd>
-            <dt className="font-sans font-medium">Usable on board</dt><dd className="text-right font-medium">{d.totals.usableFuel.toFixed(1)} gal</dd>
+            ].map(([k, v]) => <div key={k as string} className="contents"><dt className="font-sans text-fg-3">{k}</dt><dd className="text-right">{toF(v as number, u).toFixed(1)} {u.fuel}</dd></div>)}
+            <dt className="border-t border-border pt-1 font-sans font-medium">Required</dt><dd className="border-t border-border pt-1 text-right font-medium">{toF(d.totals.requiredFuel, u).toFixed(1)} {u.fuel}</dd>
+            <dt className="font-sans font-medium">Usable on board</dt><dd className="text-right font-medium">{toF(d.totals.usableFuel, u).toFixed(1)} {u.fuel}</dd>
             <dt className="font-sans text-fg-3">Endurance at cruise</dt><dd className="text-right">{fmtMin(d.totals.enduranceMin)}</dd>
-            <dt className="font-sans text-fg-3">Fuel at destination</dt><dd className="text-right">{(d.totals.usableFuel - d.totals.taxiFuel - d.totals.tripFuel).toFixed(1)} gal</dd>
+            <dt className="font-sans text-fg-3">Fuel at destination</dt><dd className="text-right">{toF(d.totals.usableFuel - d.totals.taxiFuel - d.totals.tripFuel, u).toFixed(1)} {u.fuel}</dd>
           </dl>
         </div>
         <div>
@@ -50,7 +52,7 @@ export function NavlogSection({ plan, set, d, airports, terrainAt, planning, reg
       <div>
         <SubHead>Frequencies</SubHead>
         <div className="grid gap-4 md:grid-cols-2 3xl:grid-cols-4">
-          {[...new Map([...d.legs.flatMap(l => [l.from, l.to]), ...(alt ? [alt] : [])].map(a => [a.id, a])).values()].map(a => (
+          {[...new Map([...d.legs.flatMap(l => [l.from, l.to]).filter(a => !isWaypoint(a)), ...(alt ? [alt] : [])].map(a => [a.id, a])).values()].map(a => (
             <div key={a.id} className="rounded-lg p-3 ring-1 ring-inset ring-border">
               <div className="mb-1.5 flex items-baseline justify-between"><span className="num font-medium">{a.icao || a.id}</span><span className="text-xs text-fg-3">{a.towered ? `TWR ${a.towerHrs ?? ''}` : 'CTAF'}</span></div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
@@ -78,10 +80,10 @@ function FlightPlanText({ plan, d, alt, planning, registry }: { plan: Plan; d: D
     `5 DEPARTURE   ${r[0].icao || r[0].id}`,
     `6 DEP TIME    ${fmtZ(d.departAt)}`,
     `7 ALTITUDE    ${plan.cruiseAlt}`,
-    `8 ROUTE       ${r.slice(1, -1).map(a => a.icao || a.id).join(' ') || 'DCT'}`,
+    `8 ROUTE       ${r.slice(1, -1).map(a => (isWaypoint(a) ? a.id : a.icao || a.id)).join(' ') || 'DCT'}`,
     `9 DESTINATION ${r[r.length - 1].icao || r[r.length - 1].id}`,
     `10 ETE        ${fmtMin(d.totals.eteMin).replace(':', '+')}`,
-    `11 REMARKS    ${plan.route.length > 2 ? 'STOPS ' + plan.route.slice(1, -1).join(' ') : ''}`,
+    `11 REMARKS    ${plan.route.slice(1, -1).some(t => !t.endsWith('*') && !r.find(a => a.id === t && isWaypoint(a))) ? 'STOPS ' + plan.route.slice(1, -1).filter(t => !t.endsWith('*') && !r.find(a => a.id === t && isWaypoint(a))).join(' ') : ''}`,
     `12 FUEL       ${fmtMin(endurance).replace(':', '+')}`,
     `13 ALTERNATE  ${alt ? alt.icao || alt.id : ''}`,
     `15 ON BOARD   ${souls}`,

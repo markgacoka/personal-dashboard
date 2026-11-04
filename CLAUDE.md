@@ -92,7 +92,12 @@ client-side (`web/src/features/planner/calc.ts`, `model.ts`'s `derive()`), with
 (`routes/planner.js`) serves NASR airport records, a weather/risk bundle from
 aviationweather.gov, FAA NAS status and tfr.faa.gov (`services/awc.js`,
 `services/faaStatus.js`, cached in memory), D-ATIS, terrain, and the saved
-`planner_plans` / `planner_aircraft` / `planner_settings` tables.
+`planner_plans` / `planner_aircraft` / `planner_settings` tables. Route tokens
+(airports, navaids, fixes, VFR waypoints, radial/DME, coordinates) resolve via
+`services/waypoints.js` against `nasr_points` (NASR NAV_BASE/FIX_BASE, loaded
+with the airports each cycle). `services/pohCatalog.js` matches a tail's
+make/model/year to a public POH PDF and stores it in `planner_documents` on
+first use.
 
 ## Mail
 

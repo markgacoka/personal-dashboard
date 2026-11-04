@@ -99,3 +99,37 @@ export function useDocuments() {
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/planner/documents/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
   return { ...q, upload, importBriefings, remove }
 }
+
+// Route tokens → points (airports, navaids, fixes, VFR waypoints, radial/DME, coordinates).
+export const useResolve = (tokens: string[]) => useQuery({
+  queryKey: ['planner', 'resolve', tokens.join(' ')], enabled: tokens.length > 0, staleTime: 60 * MIN, placeholderData: keepPreviousData,
+  queryFn: () => post<{ cycle: string | null; points: import('./model').RoutePoint[] }>('/api/planner/resolve', { tokens }),
+})
+
+export interface PohMatch { key: string; title: string; variant: string; years: [number, number]; profile: string | null; url: string; units: string; exact: boolean; sameYears?: boolean }
+// The closest public POH for the aircraft; the server downloads it once and keeps it.
+export const usePohFind = (a: { make?: string | null; model?: string | null; year?: number | null } | null) => {
+  const qc = useQueryClient()
+  return useQuery({
+    queryKey: ['planner', 'poh-find', a?.make, a?.model, a?.year], enabled: !!a?.model, staleTime: Infinity, retry: 1,
+    queryFn: async () => {
+      const r = await post<{ match: PohMatch | null; doc: PlannerDoc | null }>('/api/planner/poh/find', a)
+      if (r.doc) qc.invalidateQueries({ queryKey: ['planner', 'documents'] })
+      return r
+    },
+  })
+}
+
+export const useRadar = () => useQuery({
+  queryKey: ['planner', 'radar'], staleTime: 2 * MIN, refetchInterval: 5 * MIN,
+  queryFn: () => get<{ valid: string | null; fetchedAt: string; tiles: string; error?: string }>('/api/planner/radar'),
+})
+
+export interface PilotInfo { name?: string; phone?: string; address?: string; base?: string; updatedAt?: string }
+export function usePilotInfo() {
+  const qc = useQueryClient()
+  const key = ['planner', 'settings', 'pilot']
+  const q = useQuery({ queryKey: key, staleTime: Infinity, queryFn: () => get<PilotInfo>('/api/planner/settings/pilot') })
+  const save = useMutation({ mutationFn: (p: PilotInfo) => put<PilotInfo>('/api/planner/settings/pilot', p), onSuccess: d => qc.setQueryData(key, d) })
+  return { ...q, save }
+}

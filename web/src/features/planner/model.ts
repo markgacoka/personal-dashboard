@@ -5,7 +5,7 @@ import type { AircraftProfile, ProfileMatch } from './poh'
 import {
   category, ceilingOf, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, distanceNm, fbFor, freezingLevel, hPaToInHg, hemispheric,
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
-  sampleRoute, wbTotal, windAt, windComponents, windTriangle, type Category, type FbProduct, type LatLon, type TafPeriod,
+  sampleRoute, wbTotal, windAt, windComponents, windTriangle, casFromTas, tasFromCas, type Category, type FbProduct, type LatLon, type TafPeriod,
 } from './calc'
 import { AV1ATES, IMSAFE } from './checklists'
 
@@ -27,6 +27,19 @@ export interface Plan {
   phases: Record<string, boolean | undefined>
   night: boolean | null
   actuals?: Record<string, { ata?: string; gs?: string; fuel?: string; dev?: string }>
+  // E6B-style per-row inputs that replace the forecast/POH value for that row.
+  overrides?: Record<string, RowOverride>
+  // Make/model/year when the registry has none (e.g. a non-US tail) or to correct it.
+  aircraft?: { make?: string; model?: string; year?: number | null }
+  timeOff?: string
+  notes?: string
+}
+export interface RowOverride { wdir?: number | null; wspd?: number | null; temp?: number | null; cas?: number | null }
+
+// A route token resolved by /api/planner/resolve.
+export interface RoutePoint {
+  token: string; overfly: boolean; kind: 'airport' | 'navaid' | 'fix' | 'vfr' | 'gps' | 'radial' | 'unknown'
+  id: string; label: string; name?: string; lat?: number; lon?: number; magVar?: number | null; elev?: number | null; freq?: string | null; type?: string; error?: string
 }
 
 export interface Minimums {
@@ -44,6 +57,7 @@ export const DEFAULT_MINIMUMS: Minimums = {
 export interface AircraftPlanning {
   emptyWeight?: number; emptyMoment?: number // lb, lb-in/1000
   tanks?: string
+  color?: string
   equipment?: { transponder?: string; adsbOut?: boolean; gps?: string; equipCode?: string; autopilot?: boolean; notes?: string }
   inspections?: Record<string, string | number | undefined> // ISO dates; 'hundredHoursLeft'
   updatedAt?: string
@@ -58,6 +72,7 @@ export interface Airport {
   frequencies: NasrFreq[]; wx: { id: string; type: string; freq: string | null; phone: string | null; distNm: number } | null
   runways: NasrRunway[]; remarks: string[]; airspace: { B: boolean; C: boolean; D: boolean; E: boolean; hrs: string | null } | null; cycle: string
   approach: { via: string; distNm: number; frequencies: NasrFreq[] } | null
+  kind?: RoutePoint['kind']; navType?: string
   sun: { rise: string; set: string; civilDawn: string; civilDusk: string; date: string } | null
 }
 
@@ -83,6 +98,7 @@ export interface Inputs {
   currency: { key: string; name: string; state: string; detail: string }[]
   airspace: { type: 'Feature'; geometry: { type: string; coordinates: unknown }; properties: { NAME: string; CLASS: string; LOWER_VAL: number | null; UPPER_VAL: number | null } }[] | null
   checkpoints?: Checkpoint[]
+  points?: RoutePoint[]
   now?: number
 }
 
@@ -100,17 +116,42 @@ export interface Leg {
 }
 
 export interface Checkpoint { id: string; icao: string | null; name: string; lat: number; lon: number; elev: number | null; magVar: number | null; freq: string | null; towered: boolean }
-export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod'; freq: string | null }
+export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string }
 export interface NavRow {
   key: string; leg: number; from: string; to: NavFix; phase: 'climb' | 'cruise' | 'descent'; alt: string
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
-  tas: number; tc: number; mc: number; wca: number; th: number; varEast: number; mh: number
+  tas: number; cas: number; altFt: number; tc: number; mc: number; wca: number; th: number; varEast: number; mh: number
+  overridden: (keyof RowOverride)[]
   distNm: number; remNm: number; gs: number; eteMin: number; eta: Date; fuelGal: number; fuelRem: number; terrainMax: number | null
 }
 
 // Route entries: "KSNS" lands; "KCVH*" is flown over.
 export const parseRouteItem = (s: string) => ({ id: s.replace(/\*$/, ''), overfly: s.endsWith('*') })
 const lerpVar = (a: { magVar: number }, b: { magVar: number }, t: number) => a.magVar + (b.magVar - a.magVar) * t
+
+// A navaid, fix or coordinate on the route, shaped like an airport record so the
+// leg maths treats every point alike (no runways: it can't be a stop).
+export function waypointAsAirport(p: RoutePoint): Airport {
+  return {
+    id: p.token.replace(/\*$/, ''), icao: null, name: p.name || p.label, city: '', state: '', lat: p.lat!, lon: p.lon!, elev: p.elev ?? 0, tpaAgl: null, magVar: p.magVar ?? 0,
+    use: '', towered: false, towerCall: null, towerHrs: null, segCircle: false, windIndicator: null, lights: null,
+    frequencies: p.freq ? [{ use: p.type || 'NAV', freq: p.freq, call: null, hrs: null, sector: null }] : [], wx: null, runways: [], remarks: [], airspace: null, cycle: '',
+    approach: null, sun: null, kind: p.kind, navType: p.type,
+  }
+}
+export const isWaypoint = (a: Airport) => !!a.kind && a.kind !== 'airport'
+
+// Route token → airport record or waypoint, using the resolver's answer when there is one
+// (so "SJC" is the VOR, as SkyVector reads it, not San José airport).
+export function makeResolver(airports: Airport[], points?: RoutePoint[]) {
+  const aptById = (id: string) => airports.find(a => a.id === id.replace(/^K(?=[A-Z0-9]{3}$)/, '') || a.icao === id || a.id === id)
+  return (raw: string): Airport | undefined => {
+    const id = raw.replace(/\*$/, '').toUpperCase()
+    const p = points?.find(x => x.token.replace(/\*$/, '') === id)
+    if (p && p.kind !== 'airport' && p.kind !== 'unknown' && p.lat != null) return waypointAsAirport(p)
+    return aptById(p?.kind === 'airport' ? p.id : id)
+  }
+}
 
 export interface WxAt {
   airport: Airport; at: Date; role: 'departure' | 'stop' | 'destination' | 'alternate'
@@ -206,7 +247,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   const add = (section: SectionKey, status: Status, title: string, detail?: string, airport?: string) => checks.push({ section, status, title, detail, airport })
   const profile = inp.match?.profile ?? null
   const departAt = parseLocal(plan.departLocal)
-  const byId = (id: string) => inp.airports.find(a => a.id === id.replace(/^K(?=[A-Z0-9]{3}$)/, '') || a.icao === id || a.id === id)
+  const byId = makeResolver(inp.airports, inp.points)
   const routeItems = plan.route.map(parseRouteItem).filter(x => byId(x.id))
   const route = routeItems.map(x => byId(x.id)) as Airport[]
   const alt = plan.alternate ? byId(plan.alternate) ?? null : null
@@ -215,7 +256,8 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   // ── Trip ──
   if (plan.route.length < 2) add('trip', 'todo', 'Add a departure and a destination')
   const missing = plan.route.map(parseRouteItem).filter(x => !byId(x.id)).map(x => x.id)
-  if (missing.length && inp.airports.length) add('trip', 'nogo', `Not in the FAA airport data: ${missing.join(', ')}`)
+  if (missing.length && (inp.airports.length || inp.points?.length)) add('trip', 'nogo', `Not found in FAA NASR: ${missing.join(', ')}`, 'Use an airport, navaid (SJC), fix or VFR waypoint (VPCOY), radial/distance (SJC090020) or coordinates (3720N12150W, 37.33/-121.83).')
+  if (route.length >= 2 && (isWaypoint(route[0]) || isWaypoint(route[route.length - 1]))) add('trip', 'nogo', 'The route must start and end at an airport')
   if (!departAt) add('trip', 'todo', 'Set the departure time')
   else if (departAt.getTime() < now - 30 * 60_000) add('trip', 'caution', 'Departure time is in the past', 'Weather is matched to the planned times; update it to brief the actual flight.')
   if (!plan.alternate && route.length >= 2) add('trip', 'caution', 'No alternate chosen', 'Pick an alternate near the destination in case it goes below minimums or the runway closes.')
@@ -240,7 +282,8 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   }
   let t: Date | null = departAt ? new Date(departAt) : null
   let fuelUsed = 0, departures = 0
-  const routeOverfly = routeItems.map(x => x.overfly)
+  const routeOverfly = routeItems.map((x, k) => x.overfly || isWaypoint(route[k]))
+  const ov = plan.overrides || {}
   if (profile && t) {
     const wind = (p: LatLon, alt: number) => (fbSel ? windAt(fbSel.product, p, alt) : null)
     for (let i = 1; i < route.length; i++) {
@@ -272,19 +315,19 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const tToc = climbNm / D, tTod = 1 - descNm / D
       // Checkpoints: airports within 5 nm of the line, at least 8 nm apart, clear of the ends.
       const picked: { t: number; a: Checkpoint }[] = []
-      const cands = (inp.checkpoints || []).filter(a => a.id !== from.id && a.id !== to.id).map(a => {
+      const cands = (inp.checkpoints || []).filter(a => !route.some(r => r.id === a.id)).map(a => {
         const along = distanceNm(from, a), back = distanceNm(a, to)
         const off = Math.sqrt(Math.max(0, along ** 2 - ((along ** 2 - back ** 2 + D ** 2) / (2 * D)) ** 2))
         return { a, t: (along ** 2 - back ** 2 + D ** 2) / (2 * D * D), off }
       }).filter(c => c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= 5).sort((x, y) => x.off - y.off)
       for (const c of cands) if (picked.every(p => Math.abs(p.t - c.t) * D >= 8) && picked.length < 8) picked.push(c)
       picked.sort((x, y) => x.t - y.t)
-      const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; pt: LatLon; varEast: number }[] = [
+      const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; pt: LatLon; varEast: number }[] = [
         { t: 0, label: from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
         ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: lerpVar(from, to, tToc) }] : []),
         ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, pt: { lat: p.a.lat, lon: p.a.lon }, varEast: p.a.magVar ?? lerpVar(from, to, p.t) })),
         ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: lerpVar(from, to, tTod) }] : []),
-        { t: 1, label: to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : 'overfly' as const, freq: to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, pt: to, varEast: to.magVar },
+        { t: 1, label: to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
       ]
       const legStart = new Date(t)
       let legMin = 0, legFuel = 0
@@ -293,8 +336,15 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         const phase: NavRow['phase'] = b.t <= tToc + 1e-9 && climbNm > 0.5 ? 'climb' : a.t >= tTod - 1e-9 && descNm > 0.5 ? 'descent' : 'cruise'
         const altFt = phase === 'climb' ? climbMidAlt : phase === 'descent' ? (plan.cruiseAlt + tpa) / 2 : plan.cruiseAlt
         const segMid = intermediate(a.pt, b.pt, 0.5)
-        const w = wind(segMid, altFt)
-        const rowTas = phase === 'climb' ? climbTas : tas
+        const key = `${i}-${k}-${b.id}`
+        const o = ov[key] || {}
+        const fw = wind(segMid, altFt)
+        const overridden = (Object.keys(o) as (keyof RowOverride)[]).filter(x => o[x] != null && !Number.isNaN(o[x]))
+        const w = overridden.some(x => x !== 'cas')
+          ? { dir: o.wdir ?? fw?.dir ?? null, spd: o.wspd ?? fw?.spd ?? 0, temp: o.temp ?? fw?.temp ?? null, stations: fw?.stations ?? [] }
+          : fw
+        const oat = w?.temp ?? isaTemp(altFt)
+        const rowTas = o.cas != null ? Math.round(tasFromCas(o.cas, altFt, oat)) : phase === 'climb' ? climbTas : tas
         const tc = initialCourse(a.pt, b.pt), varEast = (a.varEast + b.varEast) / 2
         const tri = windTriangle(tc, rowTas, w?.dir ?? null, w?.spd ?? 0)
         const dist = distanceNm(a.pt, b.pt)
@@ -303,7 +353,8 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         legMin += ete; legFuel += fuel; fuelUsed += fuel
         t = new Date(t.getTime() + ete * 60_000)
         navlog.push({
-          key: `${i}-${k}-${b.id}`, leg: i, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null }, phase,
+          key, leg: i, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null, navType: b.navType }, phase, altFt, overridden,
+          cas: Math.round(casFromTas(rowTas, altFt, oat)),
           alt: phase === 'climb' ? `↑${plan.cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa / 100) * 100}` : plan.cruiseAlt.toLocaleString(),
           wind: w, tas: rowTas, tc, wca: tri.wca, th: tri.th, varEast, mh: toMagnetic(tri.th, varEast), mc: toMagnetic(tc, varEast),
           distNm: dist, gs: tri.gs, eteMin: ete, eta: new Date(t), fuelGal: fuel, remNm: 0, fuelRem: 0, terrainMax: terrainNear(sampleRoute([a.pt, b.pt], 2)),

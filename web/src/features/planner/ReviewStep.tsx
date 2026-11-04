@@ -10,7 +10,9 @@ import type { ProfileMatch } from './poh'
 import { LoadingSection } from './LoadingSection'
 import { NavlogSection } from './NavlogSection'
 import { PerformanceSection } from './PerformanceSection'
-import { PlannerMap } from './PlannerMap'
+import { PlannerMap, type MapNotams, type MapRadar } from './PlannerMap'
+import { isWaypoint } from './model'
+import type { Units } from './units'
 import { WeatherSection } from './WeatherSection'
 import { freqLabel } from './TripSection'
 import { Cat, CheckRows, KV, StatusBadge, StatusIcon, fmtMin, fmtTime, fmtZ } from './ui'
@@ -20,12 +22,13 @@ const TITLES: Record<SectionKey, string> = {
   performance: '5 · Can it get off and back on the ground?', navlog: '6 · How do I get there?', weather: '7 · Is it safe there and back?',
 }
 
-export function ReviewStep({ plan, d, overall, verdict, airports, weather, airspace, currency, minimums, planning, registry, match, terrainAt, onJump }: {
+export function ReviewStep({ plan, d, overall, verdict, airports, weather, airspace, currency, minimums, planning, registry, match, terrainAt, onJump, route: routeFull, radar, notams, u }: {
+  route: Airport[]; radar?: MapRadar | null; notams?: MapNotams[]; u: Units
   plan: Plan; d: Derived; overall: Status; verdict: { label: string; sub: string }; airports: Airport[]; weather: WeatherBundle | null; airspace: unknown
   currency: CurrencyItem[]; minimums: Minimums; planning: AircraftPlanning; registry: AircraftRegistry | null | undefined; match: ProfileMatch | null; terrainAt?: string
   onJump: (k: SectionKey) => void
 }) {
-  const route = d.legs.length ? [d.legs[0].from, ...d.legs.map(l => l.to)] : []
+  const route = routeFull.length ? routeFull : d.legs.length ? [d.legs[0].from, ...d.legs.map(l => l.to)] : []
   const alt = plan.alternate ? airports.find(a => a.icao === plan.alternate || a.id === plan.alternate) ?? null : null
   const tone = overall === 'nogo' ? 'bg-bad-soft ring-bad/30' : overall === 'caution' ? 'bg-warn-soft ring-warn/30' : overall === 'ok' ? 'bg-good-soft ring-good/30' : 'bg-card ring-border'
   const noop = () => {}
@@ -60,12 +63,12 @@ export function ReviewStep({ plan, d, overall, verdict, airports, weather, airsp
             ['Cruise', <span className="num">{plan.cruiseAlt.toLocaleString()} ft MSL · {plan.rpm} RPM</span>],
             ['Ground time at stops', `${plan.stopMinutes} min`],
           ]} />
-          {route.length > 1 && <PlannerMap className="h-72 lg:col-span-3" route={route} alternate={alt} weather={weather} d={d} airspace={airspace} />}
+          {route.length > 1 && <PlannerMap className="h-80 lg:col-span-3" route={route} alternate={alt} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} />}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[48rem] text-sm">
             <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Airport</th><th className="pb-1.5 font-medium">ETA</th><th className="pb-1.5 font-medium">Control</th><th className="pb-1.5 font-medium">Frequencies</th><th className="pb-1.5 font-medium">Runways</th><th className="pb-1.5 text-right font-medium">Elev / TPA</th></tr></thead>
-            <tbody>{[...new Map([...route, ...(alt ? [alt] : [])].map(a => [a.id, a])).values()].map(a => {
+            <tbody>{[...new Map([...route.filter(a => !isWaypoint(a)), ...(alt ? [alt] : [])].map(a => [a.id, a])).values()].map(a => {
               const w = d.wx.find(x => x.airport.id === a.id)
               return (
                 <tr key={a.id} className="border-t border-border align-top">
@@ -104,9 +107,9 @@ export function ReviewStep({ plan, d, overall, verdict, airports, weather, airsp
         <CheckRows checks={d.checks.filter(c => c.section === 'aircraft' && c.status !== 'ok')} />
       </ReviewBlock>
 
-      <ReviewBlock k="loading" status={d.sections.loading} onEdit={() => onJump('loading')}><LoadingSection plan={plan} set={noop} d={d} profile={d.profile} planning={planning} savePlanning={noop} readOnly /></ReviewBlock>
+      <ReviewBlock k="loading" status={d.sections.loading} onEdit={() => onJump('loading')}><LoadingSection plan={plan} set={noop} d={d} profile={d.profile} planning={planning} savePlanning={noop} readOnly u={u} /></ReviewBlock>
       <ReviewBlock k="performance" status={d.sections.performance} onEdit={() => onJump('performance')}><PerformanceSection d={d} profile={d.profile} /></ReviewBlock>
-      <ReviewBlock k="navlog" status={d.sections.navlog} onEdit={() => onJump('navlog')}><NavlogSection plan={plan} set={noop} d={d} airports={airports} terrainAt={terrainAt} planning={planning} registry={registry} readOnly /></ReviewBlock>
+      <ReviewBlock k="navlog" status={d.sections.navlog} onEdit={() => onJump('navlog')}><NavlogSection plan={plan} set={noop} d={d} airports={airports} terrainAt={terrainAt} planning={planning} registry={registry} readOnly u={u} /></ReviewBlock>
       <ReviewBlock k="weather" status={d.sections.weather} onEdit={() => onJump('weather')}>
         <div className="flex flex-wrap gap-2">{d.wx.map((w, i) => <span key={i} className="inline-flex items-center gap-1.5 text-sm"><span className="num">{w.airport.icao || w.airport.id}</span><Cat cat={w.category} /></span>)}</div>
         <WeatherSection d={d} weather={weather} loading={false} refetch={noop} fetching={false} />

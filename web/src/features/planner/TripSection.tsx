@@ -8,22 +8,25 @@ import { titleCase } from '@/lib/format'
 import { hemispheric } from './calc'
 import { useAirportSearch, useNearby } from './api'
 import type { Airport, Derived, Plan } from './model'
-import { PlannerMap } from './PlannerMap'
+import { isWaypoint } from './model'
+import { PlannerMap, type MapNotams, type MapRadar } from './PlannerMap'
 import { KV, NumField, SubHead, Synced, fmtTime } from './ui'
 
 const FREQ_LABEL: Record<string, string> = { 'LCL/P': 'Tower', 'LCL/S': 'Tower (sec.)', 'GND/P': 'Ground', 'CD/P': 'Clearance', ATIS: 'ATIS', 'D-ATIS': 'D-ATIS', CTAF: 'CTAF', UNICOM: 'UNICOM', 'APCH/P': 'Approach', 'APCH/P DEP/P': 'Approach/Departure', 'APCH/P DEP/P IC': 'Approach/Departure', 'CLASS C': 'Class C', 'CLASS B': 'Class B' }
 export const freqLabel = (u: string) => FREQ_LABEL[u] || u
 
-export function TripSection({ plan, set, airports, d, weather, airspace, cycle }: {
-  plan: Plan; set: (p: Partial<Plan>) => void; airports: Airport[]; d: Derived; weather: import('./model').WeatherBundle | null; airspace: unknown; cycle: string | null
+export function TripSection({ plan, set, resolve, d, weather, airspace, cycle, radar, notams }: {
+  plan: Plan; set: (p: Partial<Plan>) => void; resolve: (token: string) => Airport | undefined; d: Derived; weather: import('./model').WeatherBundle | null; airspace: unknown; cycle: string | null
+  radar?: MapRadar | null; notams?: MapNotams[]
 }) {
-  const byId = (raw: string) => { const id = raw.replace(/\*$/, ''); return airports.find(a => a.icao === id || a.id === id || `K${a.id}` === id) }
+  const byId = resolve
   const route = plan.route.map(byId).filter(Boolean) as Airport[]
+  const airportsOnly = route.filter(a => !isWaypoint(a))
   const dest = route.length >= 2 ? route[route.length - 1] : null
   const alternate = plan.alternate ? byId(plan.alternate) ?? null : null
   const move = (i: number, by: number) => { const r = [...plan.route]; const [x] = r.splice(i, 1); r.splice(i + by, 0, x); set({ route: r }) }
   const firstMc = d.legs[0]?.mc
-  const hemi = firstMc != null ? hemispheric(firstMc, plan.cruiseAlt, Math.max(...route.map(a => a.elev), 0)) : null
+  const hemi = firstMc != null ? hemispheric(firstMc, plan.cruiseAlt, Math.max(...airportsOnly.map(a => a.elev), 0)) : null
 
   return (
     <>
@@ -34,13 +37,15 @@ export function TripSection({ plan, set, airports, d, weather, airspace, cycle }
             <ol className="space-y-1.5">
               {plan.route.map((id, i) => {
                 const a = byId(id)
-                const overfly = id.endsWith('*'), middle = i > 0 && i < plan.route.length - 1
+                const wp = !!a && isWaypoint(a)
+                const overfly = id.endsWith('*') || wp, middle = i > 0 && i < plan.route.length - 1
                 const role = i === 0 ? 'Departure' : i === plan.route.length - 1 ? 'Destination' : overfly ? 'Fly over' : 'Land'
                 return (
                   <li key={`${id}-${i}`} className="flex items-center gap-2 rounded-lg px-3 py-2 ring-1 ring-inset ring-border">
-                    <span className="num w-12 shrink-0 font-medium text-fg">{a?.icao || id.replace(/\*$/, '')}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-fg-3">{a ? titleCase(a.name) : 'Not found'}{!middle && <span className="ml-2 text-xs">{role}</span>}</span>
-                    {middle && <button onClick={() => set({ route: plan.route.map((x, k) => (k === i ? (overfly ? x.replace(/\*$/, '') : `${x}*`) : x)) })} className={cn('h-7 shrink-0 rounded-full px-2.5 text-xs ring-1 ring-inset', overfly ? 'text-fg-2 ring-border' : 'bg-accent-soft text-accent ring-accent/30')} title="Land here, or use it as a checkpoint">{overfly ? 'Fly over' : 'Land'}</button>}
+                    <span className="num w-24 shrink-0 truncate font-medium text-fg">{a?.icao || id.replace(/\*$/, '')}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-fg-3">{a ? (wp ? a.name : titleCase(a.name)) : 'Not found'}{wp && a?.frequencies[0] && <span className="num ml-1">{a.frequencies[0].freq}</span>}{!middle && <span className="ml-2 text-xs">{role}</span>}</span>
+                    {middle && wp && <span className="h-7 shrink-0 rounded-full px-2.5 text-xs leading-7 text-fg-3 ring-1 ring-inset ring-border">{a?.navType === 'VFR-WP' ? 'VFR waypoint' : a?.kind === 'gps' ? 'GPS' : a?.navType || 'Waypoint'}</span>}
+                    {middle && !wp && <button onClick={() => set({ route: plan.route.map((x, k) => (k === i ? (overfly ? x.replace(/\*$/, '') : `${x}*`) : x)) })} className={cn('h-7 shrink-0 rounded-full px-2.5 text-xs ring-1 ring-inset', overfly ? 'text-fg-2 ring-border' : 'bg-accent-soft text-accent ring-accent/30')} title="Land here, or use it as a checkpoint">{overfly ? 'Fly over' : 'Land'}</button>}
                     <Button size="icon-sm" variant="ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><ArrowUp /></Button>
                     <Button size="icon-sm" variant="ghost" disabled={i === plan.route.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><ArrowDown /></Button>
                     <Button size="icon-sm" variant="ghost" onClick={() => set({ route: plan.route.filter((_, k) => k !== i) })} aria-label="Remove"><X /></Button>
@@ -49,7 +54,8 @@ export function TripSection({ plan, set, airports, d, weather, airspace, cycle }
               })}
             </ol>
             <div className="mt-2 flex flex-wrap items-start gap-2">
-              <AirportPicker onPick={id => set({ route: [...plan.route, id] })} placeholder={plan.route.length ? 'Add stop or destination' : 'Departure airport'} />
+              <AirportPicker onPick={id => set({ route: [...plan.route, id] })} onWaypoint={t => set({ route: plan.route.length >= 2 ? [...plan.route.slice(0, -1), t, plan.route.at(-1)!] : [...plan.route, t] })}
+                placeholder={plan.route.length ? 'Add airport, waypoint or coordinates' : 'Departure airport'} />
               {plan.route.length >= 2 && plan.route[0] !== plan.route.at(-1) && (
                 <Button variant="ghost" size="md" onClick={() => set({ route: [...plan.route, plan.route[0]] })}><RotateCcw />Return to {plan.route[0]}</Button>
               )}
@@ -76,14 +82,14 @@ export function TripSection({ plan, set, airports, d, weather, airspace, cycle }
 
           <Alternate dest={dest} value={plan.alternate} onChange={v => set({ alternate: v })} wxCats={new Map(d.wx.map(w => [w.airport.id, w.category]))} />
         </div>
-        <PlannerMap className="h-[26rem] xl:col-span-3 xl:h-auto xl:min-h-[30rem]" route={route} alternate={alternate} weather={weather} d={d} airspace={airspace} />
+        <PlannerMap className="h-[26rem] xl:col-span-3 xl:h-auto xl:min-h-[30rem]" route={route} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} />
       </div>
 
       {(route.length > 0 || alternate) && (
         <div>
           <SubHead right={<Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data" />}>Airports</SubHead>
           <div className="grid gap-4 2xl:grid-cols-2 3xl:grid-cols-3">
-            {[...route.filter((a, i, arr) => arr.findIndex(b => b.id === a.id) === i), ...(alternate && !route.includes(alternate) ? [alternate] : [])].map(a => (
+            {[...airportsOnly.filter((a, i, arr) => arr.findIndex(b => b.id === a.id) === i), ...(alternate && !route.includes(alternate) ? [alternate] : [])].map(a => (
               <AirportCard key={a.id} a={a} role={a === alternate ? 'Alternate' : a === route[0] ? 'Departure' : a === dest ? 'Destination' : 'Stop'} eta={d.wx.find(w => w.airport.id === a.id)?.at} />
             ))}
           </div>
@@ -93,15 +99,25 @@ export function TripSection({ plan, set, airports, d, weather, airspace, cycle }
   )
 }
 
-function AirportPicker({ onPick, placeholder }: { onPick: (id: string) => void; placeholder: string }) {
+function AirportPicker({ onPick, onWaypoint, placeholder }: { onPick: (id: string) => void; onWaypoint: (token: string) => void; placeholder: string }) {
   const [q, setQ] = useState('')
   const { data = [] } = useAirportSearch(q)
   const pick = (id: string) => { onPick(id); setQ('') }
+  // Anything that isn't a search hit (navaid, fix, VP waypoint, radial/DME, coordinates) goes in as a waypoint.
+  const raw = q.trim().toUpperCase()
+  const looksLikePoint = /^[A-Z]{2,5}$|^[A-Z]{2,3}\d{6}$|\/|^\d{2,6}(\.\d+)?[NS]/.test(raw)
   return (
     <div className="relative w-full sm:w-72">
       <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-fg-3" />
       <Input value={q} onChange={e => setQ(e.target.value)} placeholder={placeholder} className="pl-8"
-        onKeyDown={e => { if (e.key === 'Enter' && data[0]) { e.preventDefault(); pick(data[0].icao || data[0].id) } }} />
+        onKeyDown={e => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          const exact = data.find(a => a.icao === raw || a.id === raw)
+          if (exact || (data[0] && !looksLikePoint)) pick((exact ?? data[0]).icao || (exact ?? data[0]).id)
+          else if (raw) { onWaypoint(raw); setQ('') }
+        }} />
+      {looksLikePoint && raw && <button className="mt-1 text-xs text-accent hover:underline" onClick={() => { onWaypoint(raw); setQ('') }}>Add {raw} as a waypoint</button>}
       {q.trim().length >= 2 && data.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg bg-card py-1 shadow-lg ring-1 ring-border">
           {data.slice(0, 10).map(a => (

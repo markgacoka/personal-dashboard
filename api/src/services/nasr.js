@@ -21,6 +21,8 @@ const FILES = {
   AWOS: ['ASOS_AWOS_ID', 'ASOS_AWOS_TYPE', 'LAT_DECIMAL', 'LONG_DECIMAL', 'PHONE_NO'],
   CLS_ARSP: ['ARPT_ID', 'CLASS_B_AIRSPACE', 'CLASS_C_AIRSPACE', 'CLASS_D_AIRSPACE', 'CLASS_E_AIRSPACE', 'AIRSPACE_HRS'],
   ATC_BASE: ['FACILITY_TYPE', 'FACILITY_ID', 'TWR_CALL', 'TWR_HRS'],
+  NAV_BASE: ['NAV_ID', 'NAV_TYPE', 'NAME', 'CITY', 'STATE_CODE', 'NAV_STATUS', 'LAT_DECIMAL', 'LONG_DECIMAL', 'ELEV', 'MAG_VARN', 'MAG_VARN_HEMIS', 'FREQ', 'CHAN'],
+  FIX_BASE: ['FIX_ID', 'STATE_CODE', 'LAT_DECIMAL', 'LONG_DECIMAL', 'FIX_USE_CODE', 'CHARTS'],
 }
 
 export function nasrCycle(now = Date.now()) {
@@ -117,6 +119,40 @@ export function buildAirports(t, cycle) {
   return out
 }
 
+// Navaids (VOR, VORTAC, VOR/DME, TACAN, NDB…) and fixes, VFR waypoints flagged.
+export function buildPoints(t) {
+  const out = []
+  for (const n of t.NAV_BASE || []) {
+    if (!n.LAT_DECIMAL || /DECOMMISSIONED|SHUTDOWN/.test(n.NAV_STATUS || '')) continue
+    out.push({
+      id: n.NAV_ID, type: n.NAV_TYPE, name: [n.NAME, n.CITY].filter(Boolean).join(' · '), state: n.STATE_CODE || null,
+      lat: +n.LAT_DECIMAL, lon: +n.LONG_DECIMAL, elev: num(n.ELEV),
+      magVar: n.MAG_VARN ? (+n.MAG_VARN) * (n.MAG_VARN_HEMIS === 'W' ? -1 : 1) : null,
+      freq: n.FREQ ? String(n.FREQ) : null, vfr: false,
+    })
+  }
+  for (const f of t.FIX_BASE || []) {
+    if (!f.LAT_DECIMAL) continue
+    const vfr = /VFR/.test(f.FIX_USE_CODE || '')
+    out.push({ id: f.FIX_ID, type: vfr ? 'VFR-WP' : 'FIX', name: vfr ? 'VFR waypoint' : null, state: f.STATE_CODE || null, lat: +f.LAT_DECIMAL, lon: +f.LONG_DECIMAL, elev: null, magVar: null, freq: null, vfr })
+  }
+  return out
+}
+
+async function storePoints(client, points) {
+  await client.query('TRUNCATE nasr_points')
+  for (let i = 0; i < points.length; i += 1000) {
+    const chunk = points.slice(i, i + 1000)
+    const vals = [], params = []
+    chunk.forEach((p, j) => {
+      const o = j * 10
+      vals.push(`($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5},$${o + 6},$${o + 7},$${o + 8},$${o + 9},$${o + 10})`)
+      params.push(p.id, p.type, p.name, p.state, p.lat, p.lon, p.elev, p.magVar, p.freq, p.vfr)
+    })
+    await client.query(`INSERT INTO nasr_points (id, type, name, state, lat, lon, elev, mag_var, freq, vfr) VALUES ${vals.join(',')}`, params)
+  }
+}
+
 export async function downloadNasr(cycle, log) {
   const url = nasrUrl(cycle)
   log?.info({ url }, 'NASR download')
@@ -133,9 +169,11 @@ export async function refreshNasr(log, now = Date.now()) {
     const cycle = nasrCycle(now)
     const id = cycleId(cycle)
     const { rows } = await pool.query("SELECT value FROM nasr_meta WHERE key = 'cycle'")
-    const { rows: [{ n }] } = await pool.query('SELECT count(*)::int AS n FROM nasr_airports')
-    if (rows[0]?.value === id && n > 0) return { cycle: id, count: n, fresh: false }
-    const airports = buildAirports(await downloadNasr(cycle, log), id)
+    const { rows: [{ n, p }] } = await pool.query('SELECT (SELECT count(*)::int FROM nasr_airports) AS n, (SELECT count(*)::int FROM nasr_points) AS p')
+    if (rows[0]?.value === id && n > 0 && p > 0) return { cycle: id, count: n, fresh: false }
+    const tables = await downloadNasr(cycle, log)
+    const airports = buildAirports(tables, id)
+    const points = buildPoints(tables)
     if (airports.length < 5000) throw new Error(`NASR parse produced only ${airports.length} airports`)
     const client = await pool.connect()
     try {
@@ -151,12 +189,13 @@ export async function refreshNasr(log, now = Date.now()) {
         })
         await client.query(`INSERT INTO nasr_airports (id, icao, name, city, state, lat, lon, public, towered, suitable, data) VALUES ${vals.join(',')}`, params)
       }
+      if (points.length > 10000) await storePoints(client, points)
       await client.query("INSERT INTO nasr_meta (key, value) VALUES ('cycle', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()", [id])
       await client.query('COMMIT')
     } catch (e) {
       await client.query('ROLLBACK'); throw e
     } finally { client.release() }
-    log?.info({ cycle: id, airports: airports.length }, 'NASR airports refreshed')
+    log?.info({ cycle: id, airports: airports.length, points: points.length }, 'NASR airports refreshed')
     return { cycle: id, count: airports.length, fresh: true }
   })().finally(() => { running = null })
   return running

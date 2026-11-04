@@ -308,3 +308,13 @@ export function freezingLevel(prod: FbProduct, at: LatLon) {
   }
   return null
 }
+
+// ── Airspeed (same density model as the E6BX navlog) ─────────────────────────
+// σ from pressure altitude and OAT via density altitude; TAS = CAS / √σ.
+export function densityRatio(paFt: number, oatC: number) {
+  const tIsa = 288.15 - paFt * 0.0019812
+  const da = paFt + (tIsa / 0.0019812) * (1 - Math.pow(tIsa / (oatC + 273.15), 0.234969))
+  return Math.pow((288.15 - da * 0.0019812) / 288.15, 1 / 0.234969)
+}
+export const tasFromCas = (cas: number, paFt: number, oatC: number) => cas / Math.sqrt(densityRatio(paFt, oatC))
+export const casFromTas = (tas: number, paFt: number, oatC: number) => tas * Math.sqrt(densityRatio(paFt, oatC))

@@ -13,7 +13,7 @@ import type { NotamResponse } from '@/lib/types'
 import { computeCurrency } from '@/lib/flying'
 import { homeAirport } from '@/lib/weather'
 import { cn } from '@/lib/utils'
-import { bboxOf, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, useRadar, useResolve, useTerrain, useWeather } from './api'
+import { bboxOf, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, type SavedPlan, useRadar, useResolve, useTerrain, useWeather } from './api'
 import { AircraftStep } from './AircraftStep'
 import { AirportsStep } from './AirportsStep'
 import { PilotStep } from './PilotStep'
@@ -188,7 +188,7 @@ function Planner() {
     try {
       if (state.id) await plans.update.mutateAsync({ id: state.id, plan })
       else { const r = await plans.create.mutateAsync(plan); setState(s => ({ ...s, id: r.id })) }
-      toast.success('Plan saved')
+      toast.success('Saved to your plans', { description: 'Stored in your planner only; nothing is filed with the FAA.' })
     } catch (e) { toast.error((e as Error).message) }
   }
   const routeText = plan.route.map(r => { const id = parseRouteItem(r).id; return plan.labels?.[id]?.name ?? id }).join(' → ') || 'No route yet'
@@ -215,7 +215,7 @@ function Planner() {
         title={<input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" className="w-full min-w-0 bg-transparent outline-none focus:underline" />}
         description={<span><span className="num">{routeText}</span>{d.departAt && <> · {d.departAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>}{d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)} · {d.totals.tripFuel.toFixed(1)} gal</span></>}</span>}
         actions={<div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-44" aria-label="Saved plans">
+          <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-44 lg:hidden" aria-label="Saved plans">
             <option value="">{plans.data?.length ? 'Saved plans…' : 'No saved plans'}</option>
             {plans.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
@@ -241,7 +241,11 @@ function Planner() {
 
       <LoadingStrip loading={pending.filter(([, v]) => v).map(([n]) => n)} saving={saving} failed={failed} />
 
-      <div className={cn('grid gap-6', refOpen && 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)]')}>
+      <div className={cn('grid gap-6', refOpen ? 'lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)] 2xl:grid-cols-[15rem_minmax(0,1fr)_minmax(26rem,40%)]' : 'lg:grid-cols-[15rem_minmax(0,1fr)]')}>
+        <aside className={cn('hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-6rem)] print:hidden', refOpen && 'xl:hidden 2xl:block')}>
+          <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
+            onOpen={p => setState({ plan: p.data, id: p.id, step: 0 })} onNew={() => setState({ plan: blank(recentTail), id: null, step: 0 })} />
+        </aside>
         <div className="min-w-0 space-y-5">
           <Card className={cn('px-5 py-5 sm:px-6', cur === 'navlog' && 'px-3 sm:px-5')}>
             <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 print:hidden">
@@ -306,6 +310,55 @@ function Planner() {
           </aside>
         )}
       </div>
+    </div>
+  )
+}
+
+const routeOf = (p: Plan) => p.route.map(r => { const id = parseRouteItem(r).id; return p.labels?.[id]?.name ?? id }).join(' → ') || 'No route'
+const whenOf = (p: Plan) => { const d = new Date(p.departLocal); return Number.isNaN(+d) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric', hour: 'numeric', minute: '2-digit' }) }
+
+// Saved plans beside the wizard: upcoming first (soonest on top), then past
+// (most recent on top). Saved in your database only.
+function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
+  plans: SavedPlan[] | undefined; loading: boolean; currentId: number | null; draft: Plan | null; onOpen: (p: SavedPlan) => void; onNew: () => void
+}) {
+  const now = Date.now()
+  const at = (p: SavedPlan) => +new Date(p.data.departLocal) || 0
+  const upcoming = (plans ?? []).filter(p => at(p) >= now - 3 * 3600_000).sort((a, b) => at(a) - at(b))
+  const past = (plans ?? []).filter(p => at(p) < now - 3 * 3600_000).sort((a, b) => at(b) - at(a))
+  const Item = ({ p }: { p: SavedPlan }) => (
+    <li>
+      <button onClick={() => onOpen(p)} aria-current={p.id === currentId ? 'true' : undefined}
+        className={cn('w-full rounded-lg px-3 py-2 text-left ring-1 ring-inset', p.id === currentId ? 'bg-accent-soft ring-accent/40' : 'ring-transparent hover:bg-hover')}>
+        <div className={cn('truncate text-sm', p.id === currentId ? 'font-medium text-accent' : 'text-fg')}>{p.name}</div>
+        <div className="num truncate text-xs text-fg-3">{routeOf(p.data)}</div>
+        <div className="text-xs text-fg-3">{whenOf(p.data)}{p.data.tail ? ` · ${p.data.tail}` : ''}</div>
+      </button>
+    </li>
+  )
+  const Group = ({ title, list }: { title: string; list: SavedPlan[] }) => list.length ? (
+    <div><div className="px-3 pb-1 pt-3 text-xs font-medium text-fg-3">{title}</div><ul className="space-y-0.5">{list.map(p => <Item key={p.id} p={p} />)}</ul></div>
+  ) : null
+  return (
+    <div className="flex max-h-[inherit] flex-col">
+      <div className="flex items-center justify-between gap-2 pb-2">
+        <span className="text-sm font-medium text-fg">Flight plans</span>
+        <Button variant="ghost" size="sm" onClick={onNew}><FilePlus2 />New</Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {draft && (
+          <div className="mb-1 rounded-lg bg-accent-soft px-3 py-2 ring-1 ring-inset ring-accent/40">
+            <div className="truncate text-sm font-medium text-accent">{draft.name}</div>
+            <div className="num truncate text-xs text-fg-3">{routeOf(draft)}</div>
+            <div className="text-xs text-fg-3">Not saved yet</div>
+          </div>
+        )}
+        {loading && <p className="flex items-center gap-2 px-3 py-2 text-sm text-fg-3"><Loader2 className="size-4 animate-spin" />Loading plans…</p>}
+        {!loading && !plans?.length && <p className="px-3 py-2 text-sm text-fg-3">No saved plans yet. Save puts the plan here.</p>}
+        <Group title="Upcoming" list={upcoming} />
+        <Group title="Past" list={past} />
+      </div>
+      <p className="border-t border-border px-3 pt-2 text-xs text-fg-3">Saved in your planner only. Nothing is filed with the FAA; file with 1800wxbrief yourself.</p>
     </div>
   )
 }

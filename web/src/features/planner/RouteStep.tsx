@@ -41,7 +41,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
       {routePts.length > 1 && (
         <div className="space-y-3">
           <RouteChips pts={routePts} edit={edit} />
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
               <PlannerMap className="h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} />
               <p className="mt-2 text-sm text-fg-3">Drag the route line to add a point; drag a point to move it, click it to remove it. Points snap to the dots (airports, VFR waypoints, VORs, fixes, towns, towers 200 ft AGL and up, peaks) and onto highways, rivers, railroads and power lines. Satellite shows terrain, Topo roads and towns, Sectional elevations, parachute areas and VFR waypoints.</p>
@@ -162,7 +162,7 @@ function Suggestions({ sugg, pts, edit, loading, errors, off, setOff }: {
   const shown = sugg.filter(s => !off.has(s.kind))
   const legs = [...new Set(shown.map(s => s.leg))]
   return (
-    <div className="flex min-h-0 flex-col rounded-lg ring-1 ring-inset ring-border xl:h-[34rem]">
+    <div className="flex h-[28rem] min-h-0 flex-col rounded-lg ring-1 ring-inset ring-border 2xl:h-[34rem]">
       <div className="border-b border-border px-3 py-2.5">
         <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium text-fg">Suggested points</span>{loading && <span className="flex items-center gap-1.5 text-xs text-fg-3"><Loader2 className="size-3.5 animate-spin" />Landmarks</span>}</div>
         <div className="mt-2 flex flex-wrap gap-1">

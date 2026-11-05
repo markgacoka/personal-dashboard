@@ -56,7 +56,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 2xl:grid-cols-2">
         <div className="space-y-5">
           <div>
             <SubHead>1 · Aircraft</SubHead>

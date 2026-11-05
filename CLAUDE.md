@@ -97,8 +97,11 @@ aviationweather.gov, FAA NAS status and tfr.faa.gov (`services/awc.js`,
 `services/waypoints.js` against `nasr_points` (NASR NAV_BASE/FIX_BASE, loaded
 with the airports each cycle). `services/pohCatalog.js` matches a tail's
 make/model/year to a public POH PDF and stores it in `planner_documents` on
-first use. One page: five inputs (tail, route, departure,
-RPM, seats) and everything else derived — per-flight automatic altitude,
+first use. A wizard: step 1 takes the inputs (tail, route, engine start,
+RPM, seats, fuel, taxi time); the later steps (aircraft, route, airports,
+weather, weight & performance, pilot, review, NavLog) are derived, with the
+checklists (IMSAFE, maintenance, equipment) stored in the plan — per-flight automatic altitude,
+automatic checkpoints (airports, VFR waypoints, VORs, RNAV fixes from NASR), automatic alternate,
 WMM magnetic variation (`magvar`; NASR values are decades old), and model
 winds aloft (`services/modelWinds.js`, Open-Meteo) when AWC publishes no FB.
 

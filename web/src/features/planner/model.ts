@@ -7,7 +7,7 @@ import {
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
   sampleRoute, wbTotal, windAt, windComponents, windTriangle, casFromTas, tasFromCas, variationAt, vfrAltitude, type Category, type FbProduct, type LatLon, type TafPeriod,
 } from './calc'
-import { AV1ATES } from './checklists'
+import { AV1ATES, EQUIPMENT_DAY, EQUIPMENT_NIGHT, IMSAFE, MX_DOCS } from './checklists'
 
 // ── Inputs ────────────────────────────────────────────────────────────────────
 // What you type: tail, route, departure time, cruise power and who sits where.
@@ -25,6 +25,12 @@ export interface Plan {
   // null: full usable fuel for the tanks.
   fuelGal: number | null
   stopMinutes: number
+  // Engine start to takeoff at the first airport (start, taxi, run-up); unset → 10 min.
+  taxiMin?: number
+  // Checklist answers: imsafe.*, mx.*, eq.* → true (done / fit), false (failed / not fit).
+  checklist?: Record<string, boolean>
+  // Automatic checkpoints you dropped, by id.
+  skipFixes?: string[]
   // Cruise altitude per flight (stop to stop), by flight index; unset → automatic.
   altitudes?: Record<string, number>
   night: boolean | null
@@ -128,8 +134,12 @@ export interface Flight {
 }
 export interface WbStep { label: string; source: string; weight: number; arm: number | null; moment: number; total?: boolean; max?: number; over?: boolean }
 
-export interface Checkpoint { id: string; icao: string | null; name: string; lat: number; lon: number; elev: number | null; magVar: number | null; freq: string | null; towered: boolean }
-export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string }
+export interface Checkpoint { id: string; icao: string | null; name: string; lat: number; lon: number; elev: number | null; magVar: number | null; freq: string | null; towered: boolean; kind?: 'airport' | 'vfr' | 'fix' | 'navaid'; type?: string | null }
+// Which points make good checkpoints: airports and VFR waypoints you can see,
+// then VORs, then RNAV fixes (on the GPS, not on the ground).
+const CP_RANK = { airport: 0, vfr: 0, navaid: 1, fix: 2 } as const
+const CP_OFF = { airport: 5, vfr: 5, navaid: 4, fix: 2 } as const
+export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string; cpKind?: Checkpoint['kind']; lat?: number; lon?: number }
 export interface NavRow {
   key: string; leg: number; flight: number; from: string; to: NavFix; phase: 'climb' | 'cruise' | 'descent'; alt: string
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
@@ -194,6 +204,7 @@ export interface PerfAt {
 export interface Derived {
   profile: AircraftProfile | null
   departAt: Date | null
+  takeoffAt: Date | null
   legs: Leg[]
   flights: Flight[]
   navlog: NavRow[]
@@ -208,6 +219,12 @@ export interface Derived {
   hazards: { sigmets: Advisory[]; gairmets: Advisory[]; cwas: Advisory[]; tfrs: WeatherBundle['tfrs']['data']; pireps: Pirep[] }
   checks: Check[]
   sections: Record<SectionKey, Status>
+}
+
+// Any landing after civil dusk or takeoff before civil dawn (from NASR sun times).
+function wxNight(legs: Leg[]) {
+  const dark = (a: Airport, at: Date) => !!a.sun && (at < new Date(a.sun.civilDawn) || at > new Date(a.sun.civilDusk))
+  return legs.some(l => dark(l.from, l.departAt) || dark(l.to, l.arriveAt))
 }
 
 const STATUS_RANK: Status[] = ['ok', 'todo', 'caution', 'nogo']
@@ -251,7 +268,7 @@ function weatherAt(a: Airport, at: Date, role: WxAt['role'], w: WeatherBundle | 
   }
 }
 
-function bestRunway(a: Airport, wx: WxAt, minWidth: number): RunwayCalc[] {
+export function bestRunway(a: Airport, wx: WxAt, minWidth: number): RunwayCalc[] {
   const out: RunwayCalc[] = []
   for (const r of a.runways) for (const e of r.ends) {
     if (e.trueHdg == null) continue
@@ -309,7 +326,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     }
     return Number.isFinite(max) ? max : null
   }
-  let t: Date | null = departAt ? new Date(departAt) : null
+  const taxiMin = plan.taxiMin ?? 10
+  const takeoffAt = departAt ? new Date(departAt.getTime() + taxiMin * 60_000) : null
+  let t: Date | null = takeoffAt ? new Date(takeoffAt) : null
   let fuelUsed = 0, departures = 0
   const routeOverfly = routeItems.map((x, k) => x.overfly || isWaypoint(route[k]))
   const ov = plan.overrides || {}
@@ -365,19 +384,23 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       let scale = 1
       if (climbNm + descNm > D * 0.98 && climbNm + descNm > 0) { scale = (D * 0.98) / (climbNm + descNm); climbNm *= scale; descNm *= scale }
       const tToc = climbNm / D, tTod = 1 - descNm / D
-      // Checkpoints: airports within 5 nm of the line, at least 8 nm apart, clear of the ends.
+      // Checkpoints on legs over 20 nm: airports and VFR waypoints within 5 nm of
+      // the line, VORs within 4, RNAV fixes within 2; at least 8 nm apart and
+      // clear of the climb and descent.
       const picked: { t: number; a: Checkpoint }[] = []
-      const cands = (inp.checkpoints || []).filter(a => !route.some(r => r.id === a.id)).map(a => {
+      const skip = new Set(plan.skipFixes || [])
+      const cands = (inp.checkpoints || []).filter(a => !skip.has(a.id) && !route.some(r => r.id === a.id)).map(a => {
         const along = distanceNm(from, a), back = distanceNm(a, to)
         const off = Math.sqrt(Math.max(0, along ** 2 - ((along ** 2 - back ** 2 + D ** 2) / (2 * D)) ** 2))
-        return { a, t: (along ** 2 - back ** 2 + D ** 2) / (2 * D * D), off }
-      }).filter(c => D > 20 && c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= 5).sort((x, y) => x.off - y.off)
+        return { a, t: (along ** 2 - back ** 2 + D ** 2) / (2 * D * D), off, k: a.kind ?? 'airport' }
+      }).filter(c => D > 20 && c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= CP_OFF[c.k])
+        .sort((x, y) => CP_RANK[x.k] - CP_RANK[y.k] || x.off - y.off)
       for (const c of cands) if (picked.every(p => Math.abs(p.t - c.t) * D >= 8) && picked.length < 8) picked.push(c)
       picked.sort((x, y) => x.t - y.t)
-      const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; pt: LatLon; varEast: number }[] = [
+      const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; cpKind?: Checkpoint['kind']; pt: LatLon; varEast: number }[] = [
         { t: 0, label: from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
         ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: variationAt(intermediate(from, to, tToc), when) }] : []),
-        ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, pt: { lat: p.a.lat, lon: p.a.lon }, varEast: variationAt(p.a, when) })),
+        ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, navType: p.a.type ?? undefined, cpKind: p.a.kind ?? 'airport', pt: { lat: p.a.lat, lon: p.a.lon }, varEast: variationAt(p.a, when) })),
         ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: variationAt(intermediate(from, to, tTod), when) }] : []),
         { t: 1, label: to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
       ]
@@ -405,7 +428,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         legMin += ete; legFuel += fuel; fuelUsed += fuel
         t = new Date(t.getTime() + ete * 60_000)
         navlog.push({
-          key, leg: i, flight, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null, navType: b.navType }, phase, altFt, overridden,
+          key, leg: i, flight, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null, navType: b.navType, cpKind: b.cpKind, lat: b.pt.lat, lon: b.pt.lon }, phase, altFt, overridden,
           cas: Math.round(casFromTas(rowTas, altFt, oat)),
           alt: phase === 'climb' ? `↑${cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa).toLocaleString()}` : cruiseAlt.toLocaleString(),
           wind: w, tas: rowTas, tc, wca: tri.wca, th: tri.th, varEast, mh: toMagnetic(tri.th, varEast), mc: toMagnetic(tc, varEast),
@@ -550,7 +573,11 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const ceiling = f.properties.UPPER_VAL != null && f.properties.UPPER_VAL > -9000 ? f.properties.UPPER_VAL : null
       crossings.push({ name: f.properties.NAME, cls: f.properties.CLASS, floor, ceiling, atCruise: flightAlt.some(f => f.alt >= (floor ?? 0) && (ceiling == null || f.alt <= ceiling)) })
     }
+    const warned = new Set<string>()
     for (const c of crossings) {
+      // One warning per airspace: Class B/C shelves share a name.
+      if (warned.has(`${c.cls}|${c.name}`) || (c.cls === 'C' && !c.atCruise)) continue
+      warned.add(`${c.cls}|${c.name}`)
       if (c.cls === 'B') add('navlog', 'caution', `Class B ${c.name} (${c.floor ? c.floor.toLocaleString() : 'SFC'}–${c.ceiling?.toLocaleString() ?? ''} ft) on the line`, c.atCruise ? 'Your cruise altitude is inside it: you need a clearance ("cleared into the Class Bravo") or a route around/under it.' : 'You pass under or over it at cruise — mind the climb and descent.')
       else if (c.cls === 'C' && c.atCruise) add('navlog', 'caution', `Class C ${c.name} at your cruise altitude`, 'Establish two-way radio communication before entering.')
     }
@@ -588,6 +615,25 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       }
     }
     if (crossings.some(c => c.cls === 'B' || c.cls === 'C') && inp.planning.equipment?.adsbOut === false) add('aircraft', 'nogo', 'ADS-B Out required in and above Class B/C (§91.225)')
+  }
+
+  // ── Checklists: pilot condition, paperwork and inspections, equipment ──
+  const ck = plan.checklist || {}
+  const answered = (keys: string[]) => ({ yes: keys.filter(k => ck[k] === true), no: keys.filter(k => ck[k] === false), open: keys.filter(k => ck[k] == null) })
+  const ims = answered(IMSAFE.map(i => `imsafe.${i.key}`))
+  if (ims.no.length) add('pilot', 'nogo', `Not fit to fly: ${ims.no.map(k => IMSAFE.find(i => `imsafe.${i.key}` === k)!.label.toLowerCase()).join(', ')}`, 'IMSAFE (AIM 8-1-1).')
+  else if (ims.open.length) add('pilot', 'todo', `IMSAFE: ${ims.open.length} of ${IMSAFE.length} to answer`)
+  else add('pilot', 'ok', 'IMSAFE: fit to fly')
+  if (plan.tail) {
+    const mx = answered(MX_DOCS.map(i => `mx.${i.key}`))
+    if (mx.no.length) add('aircraft', 'nogo', `Not airworthy: ${mx.no.map(k => MX_DOCS.find(i => `mx.${i.key}` === k)!.label).join(', ')}`, '§91.7: don\'t fly an unairworthy aircraft; §91.213 for inoperative equipment.')
+    else if (mx.open.length) add('aircraft', 'todo', `Maintenance and documents: ${mx.open.length} of ${MX_DOCS.length} to check`)
+    else add('aircraft', 'ok', 'Maintenance, inspections and documents checked')
+    const eqList = [...EQUIPMENT_DAY, ...(plan.night || wxNight(legs) ? EQUIPMENT_NIGHT : [])]
+    const eq = answered(eqList.map(i => `eq.${i.key}`))
+    if (eq.no.length) add('aircraft', 'nogo', `Required equipment inoperative: ${eq.no.map(k => eqList.find(i => `eq.${i.key}` === k)!.label).join(', ')}`, '§91.205 / §91.213(d).')
+    else if (eq.open.length) add('aircraft', 'todo', `Required equipment: ${eq.open.length} of ${eqList.length} to check`)
+    else add('aircraft', 'ok', 'Required equipment working')
   }
 
   // ── Weight and balance ──
@@ -696,7 +742,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   })) as Record<SectionKey, Status>
 
   return {
-    profile, departAt, legs, flights, navlog,
+    profile, departAt, takeoffAt, legs, flights, navlog,
     totals: { distNm: distTotal, eteMin: eteTotal, tripFuel: fuelUsed, taxiFuel, reserveFuel, personalReserveFuel, requiredFuel, usableFuel: usable, enduranceMin },
     wx, wb: { items, ramp, takeoff, landing, emptySample, steps }, perf, samples, freezing, fb: fbSel, crossings,
     hazards: { sigmets, gairmets, cwas, tfrs, pireps }, checks, sections,

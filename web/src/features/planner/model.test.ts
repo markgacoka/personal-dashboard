@@ -187,3 +187,30 @@ describe('derive: flights, automatic altitude and the W&B sheet', () => {
     expect(f.flights[0].fuelStart).toBeCloseTo(40, 6)
   })
 })
+
+describe('derive: wizard automation', () => {
+  test('start and taxi time moves takeoff and every ETA', () => {
+    const a = derive(plan({ taxiMin: 0 }), inputs()), b = derive(plan({ taxiMin: 12 }), inputs())
+    expect(b.takeoffAt!.getTime() - b.departAt!.getTime()).toBe(12 * 60_000)
+    expect(b.legs[0].arriveAt.getTime() - a.legs[0].arriveAt.getTime()).toBe(12 * 60_000)
+    expect(derive(plan(), inputs()).takeoffAt!.getTime() - Date.parse('2026-11-04T21:00:00Z')).toBe(10 * 60_000)
+  })
+  test('checkpoints: a VFR waypoint beats an RNAV fix nearby; far fixes and dropped points are left out', () => {
+    const mid = { lat: (RHV.lat + SNS.lat) / 2, lon: (RHV.lon + SNS.lon) / 2 }
+    const cp = (id: string, kind: 'vfr' | 'fix', dLat = 0, dLon = 0) => ({ id, icao: null, name: id, lat: mid.lat + dLat, lon: mid.lon + dLon, elev: null, magVar: null, freq: null, towered: false, kind })
+    const cps = [cp('ANDER', 'fix', 0.01), cp('VPXYZ', 'vfr', 0.02, 0.03), cp('FARFX', 'fix', 0.2, 0.2)]
+    const ids = (p: Plan) => derive(p, inputs({ checkpoints: cps })).navlog.filter(r => r.to.kind === 'checkpoint').map(r => r.to.id)
+    expect(ids(plan())).toEqual(['VPXYZ'])
+    expect(ids(plan({ skipFixes: ['VPXYZ'] }))).toEqual(['ANDER'])
+  })
+  test('checklists: unanswered is to do, a "not fit" is a no-go, all answered passes', () => {
+    const open = derive(plan(), inputs())
+    expect(open.checks.find(c => c.title.startsWith('IMSAFE'))?.status).toBe('todo')
+    expect(open.checks.find(c => c.title.startsWith('Maintenance and documents'))?.status).toBe('todo')
+    const sick = derive(plan({ checklist: { 'imsafe.illness': false } }), inputs())
+    expect(sick.checks.find(c => c.title.startsWith('Not fit to fly'))?.status).toBe('nogo')
+    const keys = ['imsafe.illness', 'imsafe.medication', 'imsafe.stress', 'imsafe.alcohol', 'imsafe.fatigue', 'imsafe.eating']
+    const fit = derive(plan({ checklist: Object.fromEntries(keys.map(k => [k, true])) }), inputs())
+    expect(fit.checks.find(c => c.title === 'IMSAFE: fit to fly')?.status).toBe('ok')
+  })
+})

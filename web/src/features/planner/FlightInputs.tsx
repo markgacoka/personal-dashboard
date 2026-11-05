@@ -1,13 +1,12 @@
 import { useDeferredValue, useEffect, useState } from 'react'
-import { BookOpen, ChevronDown, CircleDashed, Loader2, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
+import { BookOpen, CircleDashed, Loader2, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AircraftRef, AircraftRegistry } from '@/lib/types'
 import { useResolve, type PohMatch } from './api'
-import type { AircraftPlanning, Derived, Minimums, Plan, RoutePoint } from './model'
+import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
-import { MinimumsEditor } from './Minimums'
 import type { AircraftProfile } from './poh'
 import { routeToText, textToRoute, tokenize } from './route'
 import { NumField, SubHead } from './ui'
@@ -16,14 +15,13 @@ import { fromF, fromW, toF, toW, type Units } from './units'
 const KIND_ICON = { airport: Plane, navaid: Radio, fix: Navigation, vfr: MapPin, gps: MapPin, radial: Radio, unknown: XCircle } as const
 const KIND_LABEL: Record<RoutePoint['kind'], string> = { airport: 'Airport', navaid: 'Navaid', fix: 'Fix', vfr: 'VFR waypoint', gps: 'Coordinates', radial: 'Radial/DME', unknown: 'Not found' }
 
-// The five things you type: tail, route, departure time, cruise power and who
-// sits where. Everything else is looked up or computed; the "Automatic values"
-// panel shows what was chosen (altitude, fuel, ground time…) and lets you change it.
-export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohLoading, pohError, u, aircraft, profile, planning, savePlanning, minimums, minimumsSavedAt, saveMinimums, savingMinimums }: {
+// What you type: tail, route, engine-start time, cruise power, who sits where,
+// fuel and taxi time. Everything else is looked up or computed in the later
+// steps, each of which shows its sources and takes an override where one makes sense.
+export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohLoading, pohError, u, aircraft, profile }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; registryLoading: boolean
   poh: PohMatch | null | undefined; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
-  profile: AircraftProfile | null; planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void
-  minimums: Minimums; minimumsSavedAt?: string; saveMinimums: (m: Minimums) => void; savingMinimums: boolean
+  profile: AircraftProfile | null
 }) {
   const [tail, setTail] = useState(plan.tail ?? '')
   useEffect(() => setTail(plan.tail ?? ''), [plan.tail])
@@ -113,7 +111,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <SubHead>3 · Departure (local)</SubHead>
+              <SubHead>3 · Engine start (local)</SubHead>
               <Input type="datetime-local" value={plan.departLocal} onChange={e => set({ departLocal: e.target.value })} className="num" />
             </label>
             <label className="block">
@@ -124,60 +122,37 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
           </div>
           <div>
             <SubHead right={<span className="text-xs text-fg-3">{u.weight}</span>}>5 · Occupants and baggage</SubHead>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <NumField label="Pilot (L)" value={w(seats.pilot)} onChange={setSeat('pilot')} />
               <NumField label="Front (R)" value={w(seats.front)} onChange={setSeat('front')} />
               <NumField label="Rear left" value={w(seats.rearL)} onChange={setSeat('rearL')} />
               <NumField label="Rear right" value={w(seats.rearR)} onChange={setSeat('rearR')} />
-              <NumField label="Baggage" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
+              <NumField label="Baggage area 1" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
+              <NumField label="Baggage area 2" value={w(plan.loads.bag2)} onChange={v => set({ loads: { ...plan.loads, bag2: fromW(v, u) } })} />
+            </div>
+          </div>
+          <div>
+            <SubHead>6 · Fuel and ground time</SubHead>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <label className="block"><span className="mb-1 block text-sm text-fg-2">Fuel on board</span>
+                <OptNum value={plan.fuelGal == null ? null : Math.round(toF(plan.fuelGal, u) * 10) / 10} placeholder={profile ? Math.round(toF(d.totals.usableFuel, u)) : 40} unit={u.fuel} onChange={v => set({ fuelGal: v == null ? null : fromF(v, u) })} label="Fuel on board" />
+                <span className="mt-1 block text-xs text-fg-3">Blank: full usable</span>
+              </label>
+              <label className="block"><span className="mb-1 block text-sm text-fg-2">Start and taxi</span>
+                <OptNum value={plan.taxiMin ?? null} placeholder={10} unit="min" onChange={v => set({ taxiMin: v ?? undefined })} label="Start and taxi minutes" />
+                <span className="num mt-1 block text-xs text-fg-3">{d.takeoffAt ? `Takeoff ${d.takeoffAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Engine start to takeoff'}</span>
+              </label>
+              <NumField label="Ground time per stop" value={plan.stopMinutes} onChange={v => set({ stopMinutes: v })} unit="min" step={5} min={0} />
             </div>
           </div>
         </div>
       </div>
 
-      <details className="group rounded-lg ring-1 ring-inset ring-border">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-fg-2 hover:text-fg">
-          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-          <span className="font-medium">Automatic values</span>
-          <span className="num min-w-0 truncate text-fg-3">· {d.flights.map(f => `${f.alt.toLocaleString()} ft`).join(' / ') || 'altitude'} · fuel {plan.fuelGal == null ? 'full' : `${Math.round(toF(plan.fuelGal, u))} ${u.fuel}`} · {plan.stopMinutes} min per stop{plan.alternate ? ` · alternate ${plan.alternate}` : ''}</span>
-        </summary>
-        <div className="space-y-6 border-t border-border px-4 py-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2">
-              <SubHead>Cruise altitude</SubHead>
-              {d.flights.map(f => (
-                <div key={f.n} className="grid grid-cols-[minmax(0,1fr)_9rem] items-center gap-3 text-sm">
-                  <div className="min-w-0"><span className="num font-medium text-fg">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
-                    <div className="text-xs text-fg-3">{f.altSet ? `Set by you (automatic: ${f.altAuto.toLocaleString()} ft)` : `${f.hemispheric ? `Lowest VFR altitude for ${Math.round(f.mc)}° magnetic (${f.mc < 180 ? 'odd' : 'even'} + 500)` : 'Short hop: below 3,000 ft AGL'}, ≥ 1,000 ft above terrain${f.terrainMax != null ? ` (${Math.round(f.terrainMax).toLocaleString()} ft)` : ''}`}</div>
-                  </div>
-                  <OptNum value={f.altSet ? f.alt : null} placeholder={f.altAuto} unit="ft" step={500} onChange={v => set({ altitudes: { ...plan.altitudes, [f.n]: v ?? 0 } })} label={`Cruise altitude ${f.from.id} to ${f.to.id}`} />
-                </div>
-              ))}
-              {!d.flights.length && <p className="text-sm text-fg-3">Chosen per flight once the route resolves.</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3 self-start">
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Fuel on board</span>
-                <OptNum value={plan.fuelGal == null ? null : Math.round(toF(plan.fuelGal, u) * 10) / 10} placeholder={profile ? Math.round(toF(d.totals.usableFuel, u)) : 40} unit={u.fuel} onChange={v => set({ fuelGal: v == null ? null : fromF(v, u) })} label="Fuel on board" />
-                <span className="mt-1 block text-xs text-fg-3">Blank = full usable fuel</span>
-              </label>
-              <NumField label="Ground time per stop" value={plan.stopMinutes} onChange={v => set({ stopMinutes: v })} unit="min" step={5} min={0} />
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Alternate (optional)</span>
-                <Input value={plan.alternate ?? ''} onChange={e => set({ alternate: e.target.value.toUpperCase().trim() || null })} placeholder="KWVI" className="num uppercase" />
-              </label>
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Rear baggage area 2</span>
-                <Input type="number" value={w(plan.loads.bag2)} onChange={e => set({ loads: { ...plan.loads, bag2: fromW(Number(e.target.value) || 0, u) } })} className="num" />
-              </label>
-            </div>
-          </div>
-          {plan.tail && <EmptyWeight tail={plan.tail} planning={planning} save={savePlanning} u={u} />}
-          <MinimumsEditor minimums={minimums} savedAt={minimumsSavedAt} onSave={saveMinimums} saving={savingMinimums} />
-        </div>
-      </details>
     </div>
   )
 }
 
-function OptNum({ value, placeholder, onChange, unit, step, label }: { value: number | null; placeholder: number; onChange: (v: number | null) => void; unit?: string; step?: number; label: string }) {
+export function OptNum({ value, placeholder, onChange, unit, step, label }: { value: number | null; placeholder: number; onChange: (v: number | null) => void; unit?: string; step?: number; label: string }) {
   return (
     <span className="relative block">
       <Input type="number" inputMode="decimal" aria-label={label} value={value ?? ''} placeholder={String(placeholder)} step={step} onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))} className={cn('num', unit && 'pr-10')} />
@@ -187,7 +162,7 @@ function OptNum({ value, placeholder, onChange, unit, step, label }: { value: nu
 }
 
 // This airplane's basic empty weight and moment (its W&B record), saved per tail.
-function EmptyWeight({ tail, planning, save, u }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void; u: Units }) {
+export function EmptyWeight({ tail, planning, save, u }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void; u: Units }) {
   const [ew, setEw] = useState(planning.emptyWeight ?? null)
   const [em, setEm] = useState(planning.emptyMoment ?? null)
   useEffect(() => { setEw(planning.emptyWeight ?? null); setEm(planning.emptyMoment ?? null) }, [planning.emptyWeight, planning.emptyMoment])
@@ -203,7 +178,7 @@ function EmptyWeight({ tail, planning, save, u }: { tail: string; planning: Airc
   )
 }
 
-function PohStatus({ poh, loading, error, model }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null }) {
+export function PohStatus({ poh, loading, error, model }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null }) {
   if (!model) return null
   return (
     <div className={cn('mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset', poh && poh.exact ? 'ring-border' : 'bg-warn-soft text-warn ring-warn/30')}>

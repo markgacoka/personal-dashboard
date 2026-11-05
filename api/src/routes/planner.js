@@ -156,7 +156,13 @@ export default async function plannerRoutes(fastify) {
       `SELECT id, icao, name, lat, lon, towered, (data->>'elev')::float AS elev, (data->>'magVar')::float AS "magVar",
               (SELECT f->>'freq' FROM jsonb_array_elements(data->'frequencies') f WHERE f->>'use' IN ('CTAF', 'LCL/P') ORDER BY f->>'use' = 'LCL/P' DESC LIMIT 1) AS freq
        FROM nasr_airports WHERE lat BETWEEN $1 AND $3 AND lon BETWEEN $2 AND $4 LIMIT 2000`, b)
-    return rows
+    // VFR waypoints, VORs and named fixes (SkyVector shows all three on the sectional/IFR low chart).
+    const { rows: pts } = await pool.query(
+      `SELECT id, NULL AS icao, COALESCE(name, id) AS name, lat, lon, elev, mag_var AS "magVar", freq, false AS towered, type,
+              CASE WHEN vfr THEN 'vfr' WHEN type IN ('FIX', 'VFR-WP') THEN 'fix' ELSE 'navaid' END AS kind
+       FROM nasr_points WHERE lat BETWEEN $1 AND $3 AND lon BETWEEN $2 AND $4
+         AND (vfr OR type ~ 'VOR' OR (type = 'FIX' AND id ~ '^[A-Z]{5}$' AND id !~ '^CF')) LIMIT 3000`, b)
+    return [...rows.map(r => ({ ...r, kind: 'airport' })), ...pts]
   })
 
   // ── Reference documents (POHs, briefings) ──────────────────────────────────

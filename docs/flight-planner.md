@@ -13,31 +13,31 @@ takeoff distance, which depends on the weight, which depends on the fuel the
 navlog says is needed — but on paper each is worked separately and the
 go/no-go decision is never written down.
 
-## One page, five inputs
+## Wizard: one input step, then everything derived
 
-The page asks for what only the pilot knows and derives the rest from the
-sources a hand-made plan uses (POH, FAA NASR / Chart Supplement, aviationweather.gov,
-FAA NOTAMs and TFRs). Below the inputs, in order: the go/no-go summary, one
-NavLog front per flight (takeoff to landing), Performance (POH), weight and
-balance, the weather brief with the chart, takeoff and landing distances, and
-the NavLog reverse (weather log, flight plan).
+Step 1 asks for what only the pilot knows. Every later step shows what was
+looked up or computed for that flight, with its source, and takes an override
+only where one makes sense. A step chip shows its worst check.
 
-## Inputs
+| Step | Shows | Inputs / overrides |
+|---|---|---|
+| 1 Flight | Registry match, POH match, route tokens resolved | Tail, airports and route points, engine start (local), cruise RPM, seats and baggage areas 1–2, fuel (blank = full usable), start and taxi minutes (10), ground time per stop (30) |
+| 2 Aircraft | FAA registry (make, model, year, engine, serial, Mode S, owner, status), POH V-speeds and limits, Performance (POH) page with climb and cruise at each flight's altitude | Tail's empty weight and moment, tanks, inspection dates (saved per tail); maintenance/documents and §91.205 equipment checklists |
+| 3 Route | Map; per flight the cruise altitude and its reason; every navlog point (TOC, automatic checkpoints, TOD) with position, MC, altitude, leg distance, terrain; airspace and TFRs on the line | Altitude per flight; drop an automatic checkpoint |
+| 4 Airports | Per airport: runways (length × width, surface, pattern side, head/cross wind at ETA), the favored runway (or the D-ATIS runways in use), elevation, TPA, AWOS/ASOS and phone, FSS, sun, density altitude, frequencies, NOTAMs that affect VFR, Chart Supplement remarks; alternate | Alternate (automatic: nearest suitable airport within 40 nm of the destination, off the route, not reporting IFR) |
+| 5 Weather | METAR/TAF at each ETA, hazards (SIGMET, G-AIRMET, CWA, PIREP, TFR, NAS status), winds aloft, NOTAMs, map | — |
+| 6 Weight & performance | W&B sheet from ramp to each landing; takeoff and landing distances | — |
+| 7 Pilot | IMSAFE checklist; personal minimums held against the worst value at any ETA (ceiling, visibility, wind, gust, crosswind, runway length/width, fuel at landing, night); currency from the logbook | Minimums |
+| 8 Review | Go / no-go with every check grouped by step | — |
+| 9 NavLog | The sheet per flight and the reverse, print | E6B cells (wind, temperature, CAS), actuals |
 
-| Input | Notes |
-|---|---|
-| Tail number (free text, any country) | Registry → make/model/year (typed only when the registry has none); prefix → units (lb/kg, gal/L, inHg/hPa); make/model → POH |
-| Airports and route points | SkyVector/ForeFlight tokens: airports, navaids, fixes, VFR waypoints, radial/DME (SJC090020), coordinates (3651N12132W, 36.85/-121.53). Airports are stops; `*` (or the Fly over chip) flies over one |
-| Departure (local) | |
-| Cruise power (RPM) | From the POH cruise table |
-| Occupants and baggage | Pilot, front, rear left, rear right, baggage area 1 |
+Checklist answers live in the plan (`plan.checklist`: `imsafe.*`, `mx.*`,
+`eq.*`); unanswered is "to do", a failed item is a no-go.
 
-Automatic values, shown with their reason and changeable in one panel: cruise
-altitude per flight (lowest VFR cruising altitude for the magnetic course, at
-least 3,500 ft and 1,000 ft above the highest terrain on the line; short hops
-stay below 3,000 ft AGL), fuel on board (full usable), ground time per stop
-(30 min), alternate (none), baggage area 2, the tail's empty weight and moment
-(POH sample airplane until entered), personal minimums.
+Automatic checkpoints, on legs over 20 nm: airports and VFR waypoints within
+5 nm of the line, VORs within 4 nm, five-letter RNAV fixes within 2 nm (NASR
+`nasr_points`), visual points first, at least 8 nm apart and clear of the climb
+and descent. Your own points go in the route text.
 
 In the sheet (optional): per-row wind, temperature and CAS (E6B style, replace
 the forecast for that row), compass deviation, actual times, GS and fuel, block
@@ -121,11 +121,11 @@ POH.
 
 ## Layout
 
-Single page, no steps. A NavLog front per flight follows the hand-filled sheet:
+A NavLog front per flight follows the hand-filled sheet:
 departure and destination with TPA, "Terrain @ … MSL", cruise altitude and
-power, the notes lines, the navlog (departure, TOC, route points, airports
-within 5 nm on legs over 20 nm, TOD, landing) and the airport advisories and
-frequencies panel. Times are 24-hour local HHMM, ETE in decimal minutes, fuel
+power, the notes lines, the navlog (departure, TOC, route points, automatic
+checkpoints, TOD, landing) and the airport advisories and
+frequencies panel. Time off is engine start plus start and taxi time. Times are 24-hour local HHMM, ETE in decimal minutes, fuel
 to 0.01 gal. Print gives the sheets, POH page, W&B and weather in landscape.
 
 Map: FAA VFR sectional tiles, NEXRAD radar (Iowa Environmental Mesonet),

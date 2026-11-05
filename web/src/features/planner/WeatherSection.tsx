@@ -122,12 +122,12 @@ function WindsTable({ d, weather }: { d: Derived; weather: WeatherBundle | null 
   const levels = prod.levels.filter(l => l <= 18000)
   return (
     <div>
-      <SubHead right={<Synced at={weather?.winds.find(w => w.fcst === d.fb?.fcst)?.fetchedAt} source={`FB ${d.fb!.fcst}-hr · based ${prod.basedOn}Z · for use ${prod.forUse.join('–')}Z`} />}>Winds and temperatures aloft</SubHead>
+      <SubHead right={<Synced at={weather?.winds.find(w => w.fcst === d.fb?.fcst)?.fetchedAt} source={prod.source ? `${prod.source} · for use ${prod.forUse.join('–')}Z` : `FB ${d.fb!.fcst}-hr · based ${prod.basedOn}Z · for use ${prod.forUse.join('–')}Z`} />}>Winds and temperatures aloft</SubHead>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-sm">
           <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Station</th>{levels.map(l => <th key={l} className="pb-1.5 text-right font-medium">{l.toLocaleString()}</th>)}</tr></thead>
           <tbody className="num">{stations.map(s => (
-            <tr key={s.id} className="border-t border-border"><td className="py-1.5 font-sans"><span className="num font-medium">{s.id}</span> <span className="text-xs text-fg-3">{Math.round(s.dist)} nm off route</span></td>
+            <tr key={s.id} className="border-t border-border"><td className="py-1.5 font-sans"><span className="num font-medium">{prod.source ? `${s.lat.toFixed(2)}, ${s.lon.toFixed(2)}` : s.id}</span> <span className="text-xs text-fg-3">{Math.round(s.dist)} nm off route</span></td>
               {levels.map(l => { const w = s.winds[l]; return <td key={l} className="text-right">{w ? `${w.dir == null ? 'L&V' : deg3(w.dir)}/${w.spd}` : '—'}{w?.temp != null && <span className="text-fg-3"> {w.temp > 0 ? '+' : ''}{w.temp}</span>}</td> })}
             </tr>
           ))}</tbody>

@@ -10,10 +10,12 @@ import { readZipEntry } from '../lib/zip.js'
 
 const DAY = 86_400_000
 const ANCHOR = Date.UTC(2026, 0, 22) // a NASR effective date; cycles repeat every 28 days
+// Bumped when the stored record shape changes, so the current cycle is re-imported.
+const FORMAT = 2
 const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')
 // The columns buildAirports reads, per file (keeps the import's memory small).
 const FILES = {
-  APT_BASE: ['SITE_TYPE_CODE', 'ARPT_STATUS', 'COUNTRY_CODE', 'ARPT_ID', 'ICAO_ID', 'ARPT_NAME', 'CITY', 'STATE_CODE', 'LAT_DECIMAL', 'LONG_DECIMAL', 'ELEV', 'TPA', 'MAG_VARN', 'MAG_HEMIS', 'FACILITY_USE_CODE', 'TWR_TYPE_CODE', 'SEG_CIRCLE_MKR_FLAG', 'WIND_INDCR_FLAG', 'LGT_SKED'],
+  APT_BASE: ['SITE_TYPE_CODE', 'ARPT_STATUS', 'COUNTRY_CODE', 'ARPT_ID', 'ICAO_ID', 'ARPT_NAME', 'CITY', 'STATE_CODE', 'LAT_DECIMAL', 'LONG_DECIMAL', 'ELEV', 'TPA', 'MAG_VARN', 'MAG_HEMIS', 'FACILITY_USE_CODE', 'TWR_TYPE_CODE', 'SEG_CIRCLE_MKR_FLAG', 'WIND_INDCR_FLAG', 'LGT_SKED', 'FSS_ID', 'FSS_NAME'],
   APT_RWY: ['ARPT_ID', 'RWY_ID', 'RWY_LEN', 'RWY_WIDTH', 'SURFACE_TYPE_CODE', 'COND', 'RWY_LGT_CODE'],
   APT_RWY_END: ['ARPT_ID', 'RWY_ID', 'RWY_END_ID', 'TRUE_ALIGNMENT', 'RIGHT_HAND_TRAFFIC_PAT_FLAG', 'LAT_DECIMAL', 'LONG_DECIMAL', 'RWY_END_ELEV', 'DISPLACED_THR_LEN', 'VGSI_CODE', 'LNDG_DIST_AVBL'],
   APT_RMK: ['ARPT_ID', 'TAB_NAME', 'REF_COL_NAME', 'ELEMENT', 'REMARK'],
@@ -47,7 +49,7 @@ const nmBetween = (a, b) => {
 // trainer's landingNeed() (web/src/features/pattern/generate.ts) on a standard day.
 export const landingNeed = (elev, surface) =>
   Math.round(1335 * (1 + 0.04 * Math.max(0, elev) / 1000) * (/ASPH|CONC|PEM/.test(surface || '') ? 1 : 1.2) * 1.3 / 50) * 50
-const freqUse = u => /^(CTAF|UNICOM|LCL\/P|LCL\/S|GND\/P|ATIS|D-ATIS|CD\/P|APCH\/P|APCH\/P DEP\/P|APCH\/P DEP\/P IC|CLASS C|CLASS B)$/.test(u)
+const freqUse = u => /^(CTAF|UNICOM|LCL\/P|LCL\/S|GND\/P|ATIS|D-ATIS|CD\/P|APCH\/P|APCH\/S|APCH\/P IC|DEP\/P|DEP\/S|APCH\/P DEP\/P|APCH\/P DEP\/P IC|CLASS C|CLASS B)$/.test(u)
 
 // Pure transform from the CSV tables (as row objects) to airport records.
 export function buildAirports(t, cycle) {
@@ -110,7 +112,7 @@ export function buildAirports(t, cycle) {
         elev: num(b.ELEV) ?? 0, tpaAgl: num(b.TPA), magVar: b.MAG_VARN ? (+b.MAG_VARN) * (b.MAG_HEMIS === 'W' ? -1 : 1) : 0,
         use: b.FACILITY_USE_CODE, towered, towerCall: tower?.TWR_CALL || null, towerHrs: tower?.TWR_HRS || null,
         segCircle: b.SEG_CIRCLE_MKR_FLAG === 'Y', windIndicator: b.WIND_INDCR_FLAG || null, lights: b.LGT_SKED || null,
-        frequencies, wx, runways, remarks,
+        frequencies, wx, runways, remarks, fss: b.FSS_ID ? { id: b.FSS_ID, name: b.FSS_NAME || null } : null,
         airspace: sp ? { B: sp.CLASS_B_AIRSPACE === 'Y', C: sp.CLASS_C_AIRSPACE === 'Y', D: sp.CLASS_D_AIRSPACE === 'Y', E: sp.CLASS_E_AIRSPACE === 'Y', hrs: sp.AIRSPACE_HRS || null } : null,
         cycle,
       },
@@ -168,9 +170,10 @@ export async function refreshNasr(log, now = Date.now()) {
   running = (async () => {
     const cycle = nasrCycle(now)
     const id = cycleId(cycle)
-    const { rows } = await pool.query("SELECT value FROM nasr_meta WHERE key = 'cycle'")
+    const { rows } = await pool.query("SELECT key, value FROM nasr_meta WHERE key IN ('cycle', 'format')")
+    const meta = Object.fromEntries(rows.map(r => [r.key, r.value]))
     const { rows: [{ n, p }] } = await pool.query('SELECT (SELECT count(*)::int FROM nasr_airports) AS n, (SELECT count(*)::int FROM nasr_points) AS p')
-    if (rows[0]?.value === id && n > 0 && p > 0) return { cycle: id, count: n, fresh: false }
+    if (meta.cycle === id && meta.format === String(FORMAT) && n > 0 && p > 0) return { cycle: id, count: n, fresh: false }
     const tables = await downloadNasr(cycle, log)
     const airports = buildAirports(tables, id)
     const points = buildPoints(tables)
@@ -191,6 +194,7 @@ export async function refreshNasr(log, now = Date.now()) {
       }
       if (points.length > 10000) await storePoints(client, points)
       await client.query("INSERT INTO nasr_meta (key, value) VALUES ('cycle', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()", [id])
+      await client.query("INSERT INTO nasr_meta (key, value) VALUES ('format', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()", [String(FORMAT)])
       await client.query('COMMIT')
     } catch (e) {
       await client.query('ROLLBACK'); throw e

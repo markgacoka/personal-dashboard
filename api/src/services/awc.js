@@ -36,7 +36,7 @@ export const pireps = b => cached(`pirep:${bboxParam(b)}`, 5 * MIN, () => awc(`p
 export const sigmets = () => cached('airsigmet', 5 * MIN, () => awc('airsigmet?format=json'))
 export const gairmets = () => cached('gairmet', 10 * MIN, () => awc('gairmet?format=json'))
 export const cwas = () => cached('cwa', 5 * MIN, () => awc('cwa?format=json'))
-export const windsAloft = fcst => cached(`fb:${fcst}`, 15 * MIN, async () => parseFB(await awc(`windtemp?region=all&level=low&fcst=${fcst}`, { text: true })))
+export const windsAloft = fcst => cached(`fb:${fcst}`, 15 * MIN, async () => parseFB(await awc(`windtemp?region=us&level=low&fcst=${fcst}`, { text: true })))
 
 // ── FB winds and temperatures aloft ──────────────────────────────────────────
 // Each group is DDff[±TT]: direction in tens of degrees, speed in knots, temp

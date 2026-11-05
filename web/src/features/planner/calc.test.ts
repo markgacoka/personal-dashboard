@@ -167,3 +167,17 @@ test('corridor: a polygon on the line touches; one 30 nm away does not', () => {
   expect(touchesCorridor(s, box(37.0, -121.7), 5)).toBe(true)
   expect(touchesCorridor(s, box(37.0, -121.1), 5)).toBe(false)
 })
+
+describe('vfrAltitude', () => {
+  test('odd + 500 eastbound, even + 500 westbound, never below 3,500', async () => {
+    const { vfrAltitude } = await import('./calc')
+    expect(vfrAltitude(true, 800, 135, 45).alt).toBe(3500)
+    expect(vfrAltitude(false, 800, 135, 45).alt).toBe(4500)
+    expect(vfrAltitude(true, 3482, 135, 45).alt).toBe(5500)
+    expect(vfrAltitude(false, 3482, 135, 45).alt).toBe(4500)
+  })
+  test('a short hop stays low', async () => {
+    const { vfrAltitude } = await import('./calc')
+    expect(vfrAltitude(true, 400, 135, 8)).toEqual({ alt: 2000, hemispheric: false })
+  })
+})

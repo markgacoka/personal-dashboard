@@ -23,10 +23,8 @@ const weather = (over: Partial<WeatherBundle> = {}): WeatherBundle => ({
   nas: ok({ updated: '', total: 0, items: [] }), tfrs: ok([]), ...over,
 })
 const plan = (over: Partial<Plan> = {}): Plan => ({
-  name: 'test', route: ['KRHV', 'KSNS'], alternate: null, departLocal: '2026-11-04T21:00:00Z', cruiseAlt: 4500, rpm: 2400, tail: 'N227AN',
-  loads: { front: 340, rear: 0, bag1: 20, bag2: 0 }, fuelGal: 40, stopMinutes: 15,
-  imsafe: { illness: true, medication: true, stress: true, alcohol: true, fatigue: true, emotion: true },
-  pave: { pilot: 'ok', aircraft: 'ok', environment: 'ok', external: 'ok' }, equipment: { airspeed: true }, phases: {}, night: false, ...over,
+  name: 'test', route: ['KRHV', 'KSNS'], alternate: null, departLocal: '2026-11-04T21:00:00Z', rpm: 2400, tail: 'N227AN',
+  loads: { front: 340, rear: 0, bag1: 20, bag2: 0 }, fuelGal: 40, stopMinutes: 15, night: false, ...over,
 })
 const inputs = (over: Partial<Inputs> = {}): Inputs => ({
   airports: [RHV, SNS], weather: weather(), match: profileFor('172P'), planning: { emptyWeight: 1500, emptyMoment: 58.5, inspections: { annual: '2026-06-01', transponder: '2025-12-01', elt: '2026-03-01', hundredHoursLeft: 40, ad: 'yes' } },
@@ -40,7 +38,8 @@ describe('derive: KRHV → KSNS', () => {
     const l = d.legs[0]
     expect(l.distNm).toBeGreaterThan(40); expect(l.distNm).toBeLessThan(44)
     expect(l.tc).toBeGreaterThan(160); expect(l.tc).toBeLessThan(170)
-    expect(l.mc).toBeCloseTo(l.tc - 13, 5)
+    expect(l.varEast).toBeGreaterThan(12); expect(l.varEast).toBeLessThan(13.2) // WMM 2025, ~12.6°E (NASR still says 16°E for RHV)
+    expect(l.mc).toBeCloseTo(l.tc - l.varEast, 5)
     expect(l.wind?.dir).toBe(300)
     expect(l.gs).toBeGreaterThan(l.tas) // northwesterly wind, southbound leg
     expect(l.eteMin).toBeGreaterThan(15); expect(l.eteMin).toBeLessThan(35)
@@ -62,10 +61,6 @@ describe('derive: KRHV → KSNS', () => {
 })
 
 describe('derive: what turns it into a no-go', () => {
-  test('IMSAFE item failed', () => {
-    const d = derive(plan({ imsafe: { illness: false } }), inputs())
-    expect(d.sections.pilot).toBe('nogo')
-  })
   test('IFR at the destination ETA from the TAF', () => {
     const taf = { icaoId: 'KSNS', rawTAF: '', issueTime: '', lat: SNS.lat, lon: SNS.lon, fcsts: [{ timeFrom: NOW / 1000, timeTo: NOW / 1000 + 86400, fcstChange: null, probability: null, wdir: 280, wspd: 8, wgst: null, visib: '2', vertVis: null, wxString: 'BR', clouds: [{ cover: 'OVC', base: 800 }] }] }
     const d = derive(plan(), inputs({ weather: weather({ tafs: ok([taf]) }) }))
@@ -155,5 +150,40 @@ describe('derive: waypoints and E6B row overrides', () => {
   test('a route that ends at a waypoint is rejected', () => {
     const bad = derive(plan({ route: ['KRHV', 'SNS090010'] }), inputs({ points }))
     expect(bad.checks.some(c => c.status === 'nogo' && /end at an airport/.test(c.title))).toBe(true)
+  })
+})
+
+describe('derive: flights, automatic altitude and the W&B sheet', () => {
+  const d = derive(plan({ route: ['KRHV', 'KSNS', 'KRHV'], seats: { pilot: 150, front: 140, rearL: 155, rearR: 0 } }), inputs())
+  test('a round trip is two flights, each with its own NavLog rows', () => {
+    expect(d.flights.map(f => `${f.from.id}-${f.to.id}`)).toEqual(['RHV-SNS', 'SNS-RHV'])
+    expect(d.flights.every(f => f.rows.length > 2 && f.rows.every(r => r.flight === f.n))).toBe(true)
+  })
+  test('lowest VFR cruising altitude: 3,500 southeast-bound, 4,500 back northwest', () => {
+    expect(d.flights.map(f => f.alt)).toEqual([3500, 4500])
+    expect(d.flights.every(f => !f.altSet && f.hemispheric)).toBe(true)
+    expect(d.checks.some(c => /hemispheric/.test(c.title))).toBe(false)
+  })
+  test('your altitude replaces the automatic one for that flight only', () => {
+    const o = derive(plan({ route: ['KRHV', 'KSNS', 'KRHV'], altitudes: { 0: 5500 } }), inputs())
+    expect(o.flights.map(f => [f.alt, f.altSet])).toEqual([[5500, true], [4500, false]])
+  })
+  test('terrain raises the altitude to 1,000 ft above it', () => {
+    const t = derive(plan(), inputs({ terrain: Array(40).fill(3482) }))
+    expect(t.flights[0].alt).toBe(5500)
+  })
+  test('seats feed the stations; the sheet runs ramp → run-up → takeoff → burn → landing per flight', () => {
+    expect(d.wb.items[2].weight).toBe(290); expect(d.wb.items[3].weight).toBe(155)
+    expect(d.wb.steps.map(s => s.label)).toEqual(['Basic empty weight', 'Fuel 40 gal', 'Pilot and front passenger', 'Rear passengers', 'Baggage area 1', 'Ramp',
+      'Run-up fuel', 'Takeoff KRHV', 'Flight burn', 'Landing KSNS', 'Run-up fuel', 'Takeoff KSNS', 'Flight burn', 'Landing KRHV'])
+    const last = d.wb.steps.at(-1)!
+    expect(last.weight).toBeCloseTo(d.wb.landing.weight, 6)
+    expect(last.weight).toBeCloseTo(d.wb.ramp.weight - 14 - d.totals.tripFuel * 6, 6)
+    expect(d.wb.steps.filter(s => s.total).every(s => !s.over)).toBe(true)
+  })
+  test('fuel left unset means full usable tanks', () => {
+    const f = derive(plan({ fuelGal: null }), inputs())
+    expect(f.totals.usableFuel).toBe(40)
+    expect(f.flights[0].fuelStart).toBeCloseTo(40, 6)
   })
 })

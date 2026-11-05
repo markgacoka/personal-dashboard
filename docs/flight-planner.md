@@ -13,47 +13,46 @@ takeoff distance, which depends on the weight, which depends on the fuel the
 navlog says is needed — but on paper each is worked separately and the
 go/no-go decision is never written down.
 
-## The seven questions
+## One page, five inputs
 
-The page reads top to bottom as seven questions. Each section shows its answer
-in one line and a status (OK / caution / no-go / incomplete). The decision at
-the bottom collects every check with a link back to where it came from.
-
-| # | Question | Section | Answers it with |
-|---|---|---|---|
-| 1 | Where am I going? | Trip | Route (departure, stops, destination), alternate, departure time, cruise altitude; the map; each airport's characteristics |
-| 2 | Am I okay to go? | Pilot | IMSAFE, PAVE, §61.56/§61.57 currency from the logbook, personal minimums |
-| 3 | What am I going with? | Aircraft | Tail number → registry, photo, POH used, V-speeds, limitations, equipment, AV1ATES inspections, ATOMATOFLAMES/FLAPS, POH checklists by phase |
-| 4 | Can it carry the load? | Weight & balance | Stations from the POH, empty weight per tail, CG envelope with takeoff and landing points |
-| 5 | Can it get off and back on the ground? | Performance | POH takeoff/landing distances at each airport for the forecast temperature, pressure altitude, weight and wind; runway margins; crosswind |
-| 6 | How do I get there? | Navlog | Legs, TC/WCA/TH/MH, winds aloft used, TAS/GS, ETE/ETA, fuel; frequencies; airspace and terrain on the route; hemispheric altitude; flight plan |
-| 7 | Is it safe there and back? | Weather & risks | METAR/TAF at ETA per airport, ATIS, PIREPs, SIGMET/G-AIRMET/CWA on the corridor, TFRs, NOTAMs, ATC delays, winds aloft, freezing level, daylight |
-| — | Go or no-go? | Decision | Every check, grouped by question, with the reason |
+The page asks for what only the pilot knows and derives the rest from the
+sources a hand-made plan uses (POH, FAA NASR / Chart Supplement, aviationweather.gov,
+FAA NOTAMs and TFRs). Below the inputs, in order: the go/no-go summary, one
+NavLog front per flight (takeoff to landing), Performance (POH), weight and
+balance, the weather brief with the chart, takeoff and landing distances, and
+the NavLog reverse (weather log, flight plan).
 
 ## Inputs
 
-What the pilot types (step where it's asked):
+| Input | Notes |
+|---|---|
+| Tail number (free text, any country) | Registry → make/model/year (typed only when the registry has none); prefix → units (lb/kg, gal/L, inHg/hPa); make/model → POH |
+| Airports and route points | SkyVector/ForeFlight tokens: airports, navaids, fixes, VFR waypoints, radial/DME (SJC090020), coordinates (3651N12132W, 36.85/-121.53). Airports are stops; `*` (or the Fly over chip) flies over one |
+| Departure (local) | |
+| Cruise power (RPM) | From the POH cruise table |
+| Occupants and baggage | Pilot, front, rear left, rear right, baggage area 1 |
 
-| Input | Step | Notes |
-|---|---|---|
-| Tail number (free text, any country) | Aircraft & route | Registry → make/model/year; prefix → country → units (lb/kg, gal/L, inHg/hPa) |
-| Make, model, year | Aircraft & route | Only when the registry has no record (non-US) or to correct it |
-| Route | Aircraft & route / Trip | SkyVector/ForeFlight tokens: airports, navaids, fixes, VFR waypoints (VP…), radial/DME (SJC090020, SJC/090/20), coordinates (3720N12150W, 372030N1215015W, 37.33/-121.83). Starts and ends at an airport; middle airports are fly-over unless marked Land |
-| Departure date/time, cruise altitude, cruise RPM, ground time per stop | Aircraft & route | |
-| Alternate | Trip | Suggested from suitable airports near the destination |
-| IMSAFE, PAVE, personal minimums | Pilot | |
-| Empty weight and moment, inspections, equipment, aircraft color | Aircraft / NavLog | Saved per tail |
-| Weights by station, fuel on board, tanks | Weight & balance | |
-| Per-row wind, temperature, CAS (optional, E6B style) and compass deviation | Navlog | Replace the forecast/POH value for that row |
-| Pilot name, phone, address, home base | NavLog (flight plan block 14) | Saved once |
-| In flight: time off, ATD/ATA, actual GS, fuel, block times, ATIS code | NavLog | |
+Automatic values, shown with their reason and changeable in one panel: cruise
+altitude per flight (lowest VFR cruising altitude for the magnetic course, at
+least 3,500 ft and 1,000 ft above the highest terrain on the line; short hops
+stay below 3,000 ft AGL), fuel on board (full usable), ground time per stop
+(30 min), alternate (none), baggage area 2, the tail's empty weight and moment
+(POH sample airplane until entered), personal minimums.
 
-Derived: POH (matched by make/model/year from a catalog of public POH PDFs,
-downloaded once into `planner_documents`, viewable and downloadable on every
-step), V-speeds, limits, envelope, fuel capacity, takeoff/climb/cruise/landing
-from the POH tables, TC/distance, magnetic variation (NASR), winds/temps aloft
-(FB), WCA/TH/MH/CH/GS/ETE/ETA/fuel per row, weather at each ETA, hazards,
-runways, frequencies, terrain, airspace, daylight.
+In the sheet (optional): per-row wind, temperature and CAS (E6B style, replace
+the forecast for that row), compass deviation, actual times, GS and fuel, block
+times, flight plan block 14 and aircraft color.
+
+Derived: POH (catalog of public PDFs, downloaded once into `planner_documents`),
+limits, arms, CG range, takeoff/climb/cruise/landing from the POH tables, TC and
+distance, magnetic variation (World Magnetic Model 2025 on the flight date —
+NASR's per-airport values keep their survey epoch, e.g. Reid-Hillview 1975),
+winds and temperatures aloft, WCA/TH/MH/GS/ETE/ETA/fuel per row with TOC and TOD,
+TPA per airport, highest terrain per flight, frequencies (ATIS, ground, tower,
+departure/approach, CTAF, FSS, UNICOM, field elevation), briefing notes (TFR,
+SIGMET, CWA, turbulence, G-AIRMET Sierra/Tango/Zulu, convective SIGMET, freezing
+level, NOTAM highlights for both airports), the W&B sheet line by line (ramp,
+run-up fuel, takeoff, flight burn, landing for each flight).
 
 ## Data sources (free; every block shows when it was fetched or issued)
 
@@ -61,6 +60,8 @@ runways, frequencies, terrain, airspace, daylight.
 |---|---|---|
 | Airports: runways (true heading, length, width, surface, lights, LDA, displaced threshold, VGSI, pattern side), TPA, magnetic variation, tower and hours, frequencies, AWOS/ASOS + phone, airspace class, Chart Supplement remarks | FAA NASR 28-day subscription (already imported into `nasr_airports`) | Each AIRAC cycle; cycle date shown |
 | METAR, TAF, PIREP, SIGMET (incl. convective), G-AIRMET, CWA, FB winds/temps aloft, area forecast discussion | aviationweather.gov Data API (NOAA/AWC) | Cached 5–15 min server-side |
+| Winds/temps aloft when no FB forecast is published (AWC windtemp answering 204 since Nov 2026) | Open-Meteo forecast API, pressure levels (NOAA HRRR/GFS), interpolated to 2,000–12,000 ft on a 3×3 grid over the route; flagged as model winds | 30 min |
+| Magnetic variation | World Magnetic Model 2025 (`magvar` package) | Static model, date-dependent |
 | NOTAMs | FAA NOTAM Search (existing `/api/external/notam`) | 1 h cache |
 | TFRs | tfr.faa.gov list + WFS geometry | 15 min |
 | ATC delays / ground stops / closures | FAA NAS Status (nasstatus.faa.gov) | 5 min |
@@ -118,48 +119,25 @@ on the corridor, PIREP turbulence or icing, ATC delay at an airport, NOTAM
 runway/airport closure keyword, sample (unverified) empty weight, closest-model
 POH.
 
-## Layout (wizard)
+## Layout
 
-Step 1, Aircraft & route, asks for the tail and the route first and lists every
-input (entered vs derived). Steps 2–8 are the seven questions, then Review and
-the NavLog: the NICE AIR / Jeppesen VFR Navigation Log front (navlog, airport &
-ATIS advisories, frequencies, block times) and reverse (weather log, FAA flight
-plan, notes and NOTAMs, position report), filled from the plan and printable.
+Single page, no steps. A NavLog front per flight follows the hand-filled sheet:
+departure and destination with TPA, "Terrain @ … MSL", cruise altitude and
+power, the notes lines, the navlog (departure, TOC, route points, airports
+within 5 nm on legs over 20 nm, TOD, landing) and the airport advisories and
+frequencies panel. Times are 24-hour local HHMM, ETE in decimal minutes, fuel
+to 0.01 gal. Print gives the sheets, POH page, W&B and weather in landscape.
 
-Map: FAA VFR sectional tiles (ArcGIS), NEXRAD radar (Iowa Environmental
-Mesonet, scan time shown), METARs, PIREPs, SIGMET/G-AIRMET, CWA, TFRs, NOTAM
-counts per airport, airspace, the route with every waypoint.
+Map: FAA VFR sectional tiles, NEXRAD radar (Iowa Environmental Mesonet),
+METARs, PIREPs, SIGMET/G-AIRMET, CWA, TFRs, NOTAM counts, airspace, the route.
 
 E6B: per row, TAS = CAS ÷ √σ (density ratio from pressure altitude and OAT,
-as E6BX), wind triangle WCA = asin(Vw·sin(W−TC)/TAS), GS = TAS·cos WCA −
-Vw·cos(W−TC), MH = TH − east variation, CH = MH ± deviation, ETE = dist/GS,
-fuel = ETE × GPH.
+as E6BX), WCA = asin(Vw·sin(W−TC)/TAS), GS = TAS·cos WCA − Vw·cos(W−TC),
+MH = TH − east variation, CH = MH ± deviation, ETE = dist/GS, fuel = ETE × GPH;
+climb rows use the POH climb table, descent is 500 fpm at cruise power to TPA.
 
-The seven questions are steps 1–7 of a wizard (step bar on top, Back/Next at
-the bottom, progress saved in the draft); step 8, Review, shows every step
-read-only with Edit links and the go/no-go decision, and is what Print prints.
-A reference panel (docked right on wide screens, full-screen on phones) keeps
-the POH and the weather briefing open on every step; POH figure links in the
-steps jump to the page. POHs and briefings are PDFs in `planner_documents`:
-uploaded, or briefings imported from the Leidos Flight Service emails
-(DO_NOT_REPLY@afss.com) with "From email".
-
-The navlog has one row per checkpoint: departure, top of climb, airports
-within 5 nm of the line (≥ 8 nm apart), top of descent, each stop or fly-over
-point — with wind, TAS, TC, WCA, TH, variation, MH, deviation/CH, distance
-leg/remaining, GS, ETE, ETA, fuel leg/remaining and terrain, plus actual GS,
-ATA and fuel columns to fill in flight. Route entries ending in `*` are flown
-over (no landing, no ground time).
-
-### Original layout notes
-
-Header: plan name, route chips, departure time, overall verdict.
-Left rail (≥ xl): the seven questions with status, sticky; on smaller screens a
-horizontal step strip. Sections stack in order, full width, one surface layer.
-The map (route, airspace, airports with flight-category dots, PIREPs, SIGMET /
-G-AIRMET / TFR polygons) leads the Trip section and stays in the Weather
-section as the risk overlay. Print view gives a NavLog + W&B + weather log sheet
-in the shape of the NICE AIR NavLog.
+The reference panel keeps the POH and briefings open; POH figure links jump to
+the page.
 
 ## Persistence
 

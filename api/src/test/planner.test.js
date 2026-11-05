@@ -117,3 +117,22 @@ describe('NASR navaids and fixes', async () => {
     assert.equal(pts[1].vfr, true); assert.equal(pts[1].type, 'VFR-WP')
   })
 })
+
+import { toLevels, toProducts } from '../services/modelWinds.js'
+describe('model winds aloft', () => {
+  test('interpolates pressure levels to FB altitudes by height, wrapping direction through north', () => {
+    const w = toLevels([{ zFt: 1000, dir: 350, spd: 10, temp: 14 }, { zFt: 5000, dir: 10, spd: 10, temp: 6 }], [3000])
+    assert.equal(w[3000].dir, 360); assert.equal(w[3000].spd, 10); assert.equal(w[3000].temp, 10)
+  })
+  test('one FB-shaped product per 3-hour window', () => {
+    const hourly = { time: ['2026-11-05T06:00', '2026-11-05T07:00', '2026-11-05T08:00', '2026-11-05T09:00', '2026-11-05T10:00'] }
+    for (const p of [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600]) {
+      const z = { 1000: 100, 975: 330, 950: 550, 925: 780, 900: 1000, 850: 1460, 800: 1950, 750: 2460, 700: 3010, 650: 3590, 600: 4200 }[p]
+      Object.assign(hourly, { [`geopotential_height_${p}hPa`]: Array(5).fill(z), [`wind_direction_${p}hPa`]: Array(5).fill(270), [`wind_speed_${p}hPa`]: Array(5).fill(20), [`temperature_${p}hPa`]: Array(5).fill(5) })
+    }
+    const prods = toProducts([{ latitude: 37, longitude: -121.7, hourly }], Date.parse('2026-11-05T06:30:00Z'))
+    assert.equal(prods.length, 2)
+    assert.deepEqual(prods[0].forUse, ['0600', '0900']); assert.equal(prods[0].valid, '050700')
+    assert.deepEqual(prods[0].stations.M1.winds[4000], { dir: 270, spd: 20, temp: 5 })
+  })
+})

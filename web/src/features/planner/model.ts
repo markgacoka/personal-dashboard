@@ -5,26 +5,28 @@ import type { AircraftProfile, ProfileMatch } from './poh'
 import {
   category, ceilingOf, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, distanceNm, fbFor, freezingLevel, hPaToInHg, hemispheric,
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
-  sampleRoute, wbTotal, windAt, windComponents, windTriangle, casFromTas, tasFromCas, type Category, type FbProduct, type LatLon, type TafPeriod,
+  sampleRoute, wbTotal, windAt, windComponents, windTriangle, casFromTas, tasFromCas, variationAt, vfrAltitude, type Category, type FbProduct, type LatLon, type TafPeriod,
 } from './calc'
-import { AV1ATES, IMSAFE } from './checklists'
+import { AV1ATES } from './checklists'
 
 // ── Inputs ────────────────────────────────────────────────────────────────────
+// What you type: tail, route, departure time, cruise power and who sits where.
+// Everything else has an automatic value (altitude, fuel, ground time) that the
+// optional fields override.
 export interface Plan {
   name: string
   route: string[]
   alternate: string | null
   departLocal: string
-  cruiseAlt: number
   rpm: number
   tail: string | null
+  seats?: { pilot: number; front: number; rearL: number; rearR: number }
   loads: { front: number; rear: number; bag1: number; bag2: number }
-  fuelGal: number
+  // null: full usable fuel for the tanks.
+  fuelGal: number | null
   stopMinutes: number
-  imsafe: Record<string, boolean | undefined>
-  pave: Record<string, string>
-  equipment: Record<string, boolean | undefined>
-  phases: Record<string, boolean | undefined>
+  // Cruise altitude per flight (stop to stop), by flight index; unset → automatic.
+  altitudes?: Record<string, number>
   night: boolean | null
   actuals?: Record<string, { ata?: string; gs?: string; fuel?: string; dev?: string }>
   // E6B-style per-row inputs that replace the forecast/POH value for that row.
@@ -72,6 +74,7 @@ export interface Airport {
   frequencies: NasrFreq[]; wx: { id: string; type: string; freq: string | null; phone: string | null; distNm: number } | null
   runways: NasrRunway[]; remarks: string[]; airspace: { B: boolean; C: boolean; D: boolean; E: boolean; hrs: string | null } | null; cycle: string
   approach: { via: string; distNm: number; frequencies: NasrFreq[] } | null
+  fss?: { id: string; name: string | null } | null
   kind?: RoutePoint['kind']; navType?: string
   sun: { rise: string; set: string; civilDawn: string; civilDusk: string; date: string } | null
 }
@@ -112,13 +115,23 @@ export interface Leg {
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
   tas: number; gph: number; wca: number; th: number; mh: number; gs: number
   climb: { min: number; gal: number; nm: number } | null
-  eteMin: number; fuelGal: number; departAt: Date; arriveAt: Date; terrainMax: number | null; stop: boolean
+  eteMin: number; fuelGal: number; departAt: Date; arriveAt: Date; terrainMax: number | null; stop: boolean; flight: number
 }
+
+// One takeoff to one landing: a NavLog sheet of its own.
+export interface Flight {
+  n: number; from: Airport; to: Airport; legs: Leg[]; rows: NavRow[]
+  alt: number; altAuto: number; altSet: boolean; hemispheric: boolean; mc: number; terrainMax: number | null
+  distNm: number; eteMin: number; fuelGal: number; departAt: Date; arriveAt: Date
+  climb: { min: number; gal: number; nm: number } | null; cruise: { ktas: number; gph: number; bhp: number } | null
+  tpaFrom: number; tpaTo: number; fuelStart: number
+}
+export interface WbStep { label: string; source: string; weight: number; arm: number | null; moment: number; total?: boolean; max?: number; over?: boolean }
 
 export interface Checkpoint { id: string; icao: string | null; name: string; lat: number; lon: number; elev: number | null; magVar: number | null; freq: string | null; towered: boolean }
 export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string }
 export interface NavRow {
-  key: string; leg: number; from: string; to: NavFix; phase: 'climb' | 'cruise' | 'descent'; alt: string
+  key: string; leg: number; flight: number; from: string; to: NavFix; phase: 'climb' | 'cruise' | 'descent'; alt: string
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
   tas: number; cas: number; altFt: number; tc: number; mc: number; wca: number; th: number; varEast: number; mh: number
   overridden: (keyof RowOverride)[]
@@ -127,7 +140,6 @@ export interface NavRow {
 
 // Route entries: "KSNS" lands; "KCVH*" is flown over.
 export const parseRouteItem = (s: string) => ({ id: s.replace(/\*$/, ''), overfly: s.endsWith('*') })
-const lerpVar = (a: { magVar: number }, b: { magVar: number }, t: number) => a.magVar + (b.magVar - a.magVar) * t
 
 // A navaid, fix or coordinate on the route, shaped like an airport record so the
 // leg maths treats every point alike (no runways: it can't be a stop).
@@ -140,6 +152,17 @@ export function waypointAsAirport(p: RoutePoint): Airport {
   }
 }
 export const isWaypoint = (a: Airport) => !!a.kind && a.kind !== 'airport'
+
+// Seat weights → W&B stations (pilot + front passenger share an arm, so do the rear seats).
+export function loadsOf(plan: Plan): Plan['loads'] {
+  const s = plan.seats
+  return s ? { ...plan.loads, front: (s.pilot || 0) + (s.front || 0), rear: (s.rearL || 0) + (s.rearR || 0) } : plan.loads
+}
+export const soulsOf = (plan: Plan) => {
+  const s = plan.seats
+  if (s) return [s.pilot, s.front, s.rearL, s.rearR].filter(w => w > 0).length
+  return (plan.loads.front > 250 ? 2 : plan.loads.front > 0 ? 1 : 0) + (plan.loads.rear > 0 ? Math.max(1, Math.round(plan.loads.rear / 170)) : 0)
+}
 
 // Route token → airport record or waypoint, using the resolver's answer when there is one
 // (so "SJC" is the VOR, as SkyVector reads it, not San José airport).
@@ -172,10 +195,11 @@ export interface Derived {
   profile: AircraftProfile | null
   departAt: Date | null
   legs: Leg[]
+  flights: Flight[]
   navlog: NavRow[]
   totals: { distNm: number; eteMin: number; tripFuel: number; taxiFuel: number; reserveFuel: number; personalReserveFuel: number; requiredFuel: number; usableFuel: number; enduranceMin: number }
   wx: WxAt[]
-  wb: { items: { label: string; weight: number; arm: number; moment: number }[]; ramp: ReturnType<typeof wbTotal>; takeoff: ReturnType<typeof wbTotal>; landing: ReturnType<typeof wbTotal>; emptySample: boolean }
+  wb: { items: { label: string; weight: number; arm: number; moment: number }[]; ramp: ReturnType<typeof wbTotal>; takeoff: ReturnType<typeof wbTotal>; landing: ReturnType<typeof wbTotal>; emptySample: boolean; steps: WbStep[] }
   perf: PerfAt[]
   samples: LatLon[]
   freezing: { altFt: number; approx: boolean } | null
@@ -249,9 +273,15 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   const departAt = parseLocal(plan.departLocal)
   const byId = makeResolver(inp.airports, inp.points)
   const routeItems = plan.route.map(parseRouteItem).filter(x => byId(x.id))
-  const route = routeItems.map(x => byId(x.id)) as Airport[]
-  const alt = plan.alternate ? byId(plan.alternate) ?? null : null
+  const when = departAt ?? new Date(now)
+  const withVar = (a: Airport): Airport => ({ ...a, magVar: Math.round(variationAt(a, when) * 10) / 10 })
+  const route = routeItems.map(x => withVar(byId(x.id)!))
+  const altApt = plan.alternate ? byId(plan.alternate) : undefined
+  const alt = altApt ? withVar(altApt) : null
   const minimums = inp.minimums
+  const loads = loadsOf(plan)
+  const tank = profile?.fuel.find(f => f.key === (inp.planning.tanks || 'standard')) ?? profile?.fuel[0]
+  const usable = Math.min(plan.fuelGal ?? tank?.usable ?? 40, tank?.usable ?? Infinity)
 
   // ── Trip ──
   if (plan.route.length < 2) add('trip', 'todo', 'Add a departure and a destination')
@@ -260,7 +290,6 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   if (route.length >= 2 && (isWaypoint(route[0]) || isWaypoint(route[route.length - 1]))) add('trip', 'nogo', 'The route must start and end at an airport')
   if (!departAt) add('trip', 'todo', 'Set the departure time')
   else if (departAt.getTime() < now - 30 * 60_000) add('trip', 'caution', 'Departure time is in the past', 'Weather is matched to the planned times; update it to brief the actual flight.')
-  if (!plan.alternate && route.length >= 2) add('trip', 'caution', 'No alternate chosen', 'Pick an alternate near the destination in case it goes below minimums or the runway closes.')
 
   // ── Navlog ──
   // Each leg becomes rows: from the field to the top of climb, through
@@ -284,21 +313,44 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   let fuelUsed = 0, departures = 0
   const routeOverfly = routeItems.map((x, k) => x.overfly || isWaypoint(route[k]))
   const ov = plan.overrides || {}
+
+  // Flights (takeoff to landing) and each one's cruise altitude: automatic from
+  // the magnetic course and the terrain under the line unless you set one.
+  const flightOfLeg: number[] = []
+  const flightLegs: number[][] = []
+  for (let i = 1; i < route.length; i++) {
+    const f = flightLegs.length - (i > 1 && routeOverfly[i - 1] ? 1 : 0)
+    if (!flightLegs[f]) flightLegs[f] = []
+    flightLegs[f].push(i); flightOfLeg[i] = f
+  }
+  const flightAlt = flightLegs.map((ls, f) => {
+    const pts = [route[ls[0] - 1], ...ls.map(i => route[i])]
+    const dists = ls.map(i => distanceNm(route[i - 1], route[i]))
+    const east = ls.reduce((s, i, k) => s + (toMagnetic(initialCourse(route[i - 1], route[i]), (route[i - 1].magVar + route[i].magVar) / 2) < 180 ? dists[k] : -dists[k]), 0) >= 0
+    const terrainMax = terrainNear(sampleRoute(pts, 2))
+    const auto = vfrAltitude(east, terrainMax, Math.max(pts[0].elev, pts[pts.length - 1].elev), dists.reduce((a, b) => a + b, 0))
+    const set = Number(plan.altitudes?.[f]) || 0
+    return { alt: set > 0 ? set : auto.alt, altAuto: auto.alt, altSet: set > 0, hemispheric: auto.hemispheric, terrainMax }
+  })
+
+  const altMax = Math.max(0, ...flightAlt.map(f => f.alt))
   if (profile && t) {
     const wind = (p: LatLon, alt: number) => (fbSel ? windAt(fbSel.product, p, alt) : null)
     for (let i = 1; i < route.length; i++) {
       const from = route[i - 1], to = route[i]
+      const flight = flightOfLeg[i]
+      const cruiseAlt = flightAlt[flight].alt
       const startsAtStop = i === 1 || !routeOverfly[i - 1]
       const endsAtStop = i === route.length - 1 || !routeOverfly[i]
       if (startsAtStop) departures++
       const D = distanceNm(from, to), legTc = initialCourse(from, to)
-      const midWind = wind(intermediate(from, to, 0.5), plan.cruiseAlt)
-      const isaDev = midWind?.temp != null ? midWind.temp - isaTemp(plan.cruiseAlt) : 0
-      const cr = cruiseAt(profile, plan.cruiseAlt, isaDev, plan.rpm)
+      const midWind = wind(intermediate(from, to, 0.5), cruiseAlt)
+      const isaDev = midWind?.temp != null ? midWind.temp - isaTemp(cruiseAlt) : 0
+      const cr = cruiseAt(profile, cruiseAlt, isaDev, plan.rpm)
       const tas = cr?.ktas ?? 0, gph = cr?.gph ?? 0
       // Climb: POH time/fuel; ground distance from climb TAS and the wind at mid-climb.
-      const climb = startsAtStop ? climbBetween(profile, pressureAltitude(from.elev, 29.92), plan.cruiseAlt, isaDev) : { min: 0, gal: 0, nm: 0 }
-      const climbMidAlt = (from.elev + plan.cruiseAlt) / 2
+      const climb = startsAtStop ? climbBetween(profile, pressureAltitude(from.elev, 29.92), cruiseAlt, isaDev) : { min: 0, gal: 0, nm: 0 }
+      const climbMidAlt = (from.elev + cruiseAlt) / 2
       const climbKias = profile.climb.find(c => c.pa >= climbMidAlt)?.kias ?? 74
       const climbTas = Math.round(climbKias * (1 + 0.02 * climbMidAlt / 1000))
       const cw = wind(intermediate(from, to, 0.1), climbMidAlt)
@@ -306,8 +358,8 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       let climbNm = (climb.min / 60) * climbGs
       // Descent: 500 fpm from cruise to pattern altitude at cruise speed (planning assumption; the POH has no descent table).
       const tpa = to.elev + (to.tpaAgl || 1000)
-      const descMin = endsAtStop ? Math.max(0, plan.cruiseAlt - tpa) / 500 : 0
-      const dw = wind(intermediate(from, to, 0.9), (plan.cruiseAlt + tpa) / 2)
+      const descMin = endsAtStop ? Math.max(0, cruiseAlt - tpa) / 500 : 0
+      const dw = wind(intermediate(from, to, 0.9), (cruiseAlt + tpa) / 2)
       const descGs = windTriangle(legTc, tas, dw?.dir ?? null, dw?.spd ?? 0).gs || tas
       let descNm = (descMin / 60) * descGs
       let scale = 1
@@ -319,14 +371,14 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         const along = distanceNm(from, a), back = distanceNm(a, to)
         const off = Math.sqrt(Math.max(0, along ** 2 - ((along ** 2 - back ** 2 + D ** 2) / (2 * D)) ** 2))
         return { a, t: (along ** 2 - back ** 2 + D ** 2) / (2 * D * D), off }
-      }).filter(c => c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= 5).sort((x, y) => x.off - y.off)
+      }).filter(c => D > 20 && c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= 5).sort((x, y) => x.off - y.off)
       for (const c of cands) if (picked.every(p => Math.abs(p.t - c.t) * D >= 8) && picked.length < 8) picked.push(c)
       picked.sort((x, y) => x.t - y.t)
       const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; pt: LatLon; varEast: number }[] = [
         { t: 0, label: from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
-        ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: lerpVar(from, to, tToc) }] : []),
-        ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, pt: { lat: p.a.lat, lon: p.a.lon }, varEast: p.a.magVar ?? lerpVar(from, to, p.t) })),
-        ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: lerpVar(from, to, tTod) }] : []),
+        ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: variationAt(intermediate(from, to, tToc), when) }] : []),
+        ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, pt: { lat: p.a.lat, lon: p.a.lon }, varEast: variationAt(p.a, when) })),
+        ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: variationAt(intermediate(from, to, tTod), when) }] : []),
         { t: 1, label: to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
       ]
       const legStart = new Date(t)
@@ -334,7 +386,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       for (let k = 1; k < fixes.length; k++) {
         const a = fixes[k - 1], b = fixes[k]
         const phase: NavRow['phase'] = b.t <= tToc + 1e-9 && climbNm > 0.5 ? 'climb' : a.t >= tTod - 1e-9 && descNm > 0.5 ? 'descent' : 'cruise'
-        const altFt = phase === 'climb' ? climbMidAlt : phase === 'descent' ? (plan.cruiseAlt + tpa) / 2 : plan.cruiseAlt
+        const altFt = phase === 'climb' ? climbMidAlt : phase === 'descent' ? (cruiseAlt + tpa) / 2 : cruiseAlt
         const segMid = intermediate(a.pt, b.pt, 0.5)
         const key = `${i}-${k}-${b.id}`
         const o = ov[key] || {}
@@ -353,9 +405,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         legMin += ete; legFuel += fuel; fuelUsed += fuel
         t = new Date(t.getTime() + ete * 60_000)
         navlog.push({
-          key, leg: i, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null, navType: b.navType }, phase, altFt, overridden,
+          key, leg: i, flight, from: a.label, to: { id: b.id, label: b.label, kind: b.kind, freq: b.freq ?? null, navType: b.navType }, phase, altFt, overridden,
           cas: Math.round(casFromTas(rowTas, altFt, oat)),
-          alt: phase === 'climb' ? `↑${plan.cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa / 100) * 100}` : plan.cruiseAlt.toLocaleString(),
+          alt: phase === 'climb' ? `↑${cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa).toLocaleString()}` : cruiseAlt.toLocaleString(),
           wind: w, tas: rowTas, tc, wca: tri.wca, th: tri.th, varEast, mh: toMagnetic(tri.th, varEast), mc: toMagnetic(tc, varEast),
           distNm: dist, gs: tri.gs, eteMin: ete, eta: new Date(t), fuelGal: fuel, remNm: 0, fuelRem: 0, terrainMax: terrainNear(sampleRoute([a.pt, b.pt], 2)),
         })
@@ -363,11 +415,11 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const mainRow = navlog.filter(r => r.leg === i).find(r => r.phase === 'cruise') ?? navlog.filter(r => r.leg === i)[0]
       legs.push({ from, to, distNm: D, tc: legTc, mc: toMagnetic(legTc, (from.magVar + to.magVar) / 2), varEast: (from.magVar + to.magVar) / 2, wind: midWind, tas, gph,
         wca: mainRow?.wca ?? 0, th: mainRow?.th ?? legTc, mh: mainRow?.mh ?? legTc, gs: mainRow?.gs ?? tas, climb: climb.min ? climb : null, eteMin: legMin, fuelGal: legFuel,
-        departAt: legStart, arriveAt: new Date(t), terrainMax: terrainNear(sampleRoute([from, to], 2)), stop: endsAtStop })
+        departAt: legStart, arriveAt: new Date(t), terrainMax: terrainNear(sampleRoute([from, to], 2)), stop: endsAtStop, flight })
       if (endsAtStop && i < route.length - 1) t = new Date(t.getTime() + plan.stopMinutes * 60_000)
     }
     let remNm = navlog.reduce((x, r) => x + r.distNm, 0)
-    let fuelRem = Math.min(plan.fuelGal, (profile.fuel.find(f => f.key === (inp.planning.tanks || 'standard')) ?? profile.fuel[0]).usable)
+    let fuelRem = usable
     let lastLeg = 0
     for (const r of navlog) {
       if (r.leg !== lastLeg && (r.leg === 1 || legs[r.leg - 2]?.stop)) fuelRem -= profile.climbStartFuelGal
@@ -376,12 +428,27 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       r.remNm = Math.max(0, remNm); r.fuelRem = fuelRem
     }
   }
+  const flights: Flight[] = []
+  flightLegs.forEach((_, f) => {
+    const fl = legs.filter(l => l.flight === f)
+    if (!fl.length) return
+    const rows = navlog.filter(r => r.flight === f)
+    const from = fl[0].from, to = fl[fl.length - 1].to, fa = flightAlt[f]
+    const sum = (k: 'distNm' | 'eteMin' | 'fuelGal') => fl.reduce((x, l) => x + l[k], 0)
+    const isaDev = fl[0].wind?.temp != null ? fl[0].wind.temp - isaTemp(fa.alt) : 0
+    flights.push({
+      n: f, from, to, legs: fl, rows, alt: fa.alt, altAuto: fa.altAuto, altSet: fa.altSet, hemispheric: fa.hemispheric, terrainMax: fa.terrainMax,
+      mc: toMagnetic(initialCourse(from, to), (from.magVar + to.magVar) / 2), distNm: sum('distNm'), eteMin: sum('eteMin'), fuelGal: sum('fuelGal'),
+      departAt: fl[0].departAt, arriveAt: fl[fl.length - 1].arriveAt, climb: fl[0].climb,
+      cruise: profile ? { ktas: fl[0].tas, gph: fl[0].gph, bhp: cruiseAt(profile, fa.alt, isaDev, plan.rpm)?.bhp ?? 0 } : null,
+      tpaFrom: from.elev + (from.tpaAgl || 1000), tpaTo: to.elev + (to.tpaAgl || 1000),
+      fuelStart: rows[0] ? rows[0].fuelRem + rows[0].fuelGal + (profile?.climbStartFuelGal ?? 0) : usable,
+    })
+  })
   const distTotal = legs.reduce((s, l) => s + l.distNm, 0)
   const eteTotal = legs.reduce((s, l) => s + l.eteMin, 0)
-  const cruiseGph = legs[0]?.gph || (profile ? cruiseAt(profile, plan.cruiseAlt, 0, plan.rpm)?.gph ?? 0 : 0)
+  const cruiseGph = legs[0]?.gph || (profile ? cruiseAt(profile, altMax, 0, plan.rpm)?.gph ?? 0 : 0)
   const anyNight = plan.night ?? false
-  const tank = profile?.fuel.find(f => f.key === (inp.planning.tanks || 'standard')) ?? profile?.fuel[0]
-  const usable = Math.min(plan.fuelGal, tank?.usable ?? plan.fuelGal)
   const taxiFuel = (profile?.climbStartFuelGal ?? 1.1) * Math.max(1, departures)
   const reserveFuel = (reserveMinutes(anyNight) / 60) * cruiseGph
   const personalReserveFuel = ((anyNight ? minimums.reserveNight : minimums.reserveDay) / 60) * cruiseGph
@@ -393,15 +460,17 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     else if (usable < requiredFuel) add('navlog', 'caution', 'Fuel below your personal reserve', `Need ${requiredFuel.toFixed(1)} gal with a ${anyNight ? minimums.reserveNight : minimums.reserveDay}-minute reserve; ${usable.toFixed(1)} gal usable.`)
     else add('navlog', 'ok', 'Fuel covers the trip and reserve', `${requiredFuel.toFixed(1)} gal required, ${usable.toFixed(1)} gal usable.`)
     if (!fbSel) add('navlog', 'caution', 'No winds aloft forecast', 'Headings and ground speeds assume calm wind.')
+    else if (fbSel.product.source && !fbSel.outside) add('navlog', 'caution', 'Winds aloft from a weather model', `The NWS FB winds-aloft forecast isn't available from aviationweather.gov, so winds come from ${fbSel.product.source} for ${fbSel.product.forUse.join('–')}Z. Cross-check with your briefing.`)
     else if (fbSel.outside) add('navlog', 'caution', 'No winds-aloft forecast covers the departure time', `Using the FB ${fbSel.fcst}-hour forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 24 hours ahead — re-brief closer to the flight.`)
     for (const l of legs) {
-      const h = hemispheric(l.mc, plan.cruiseAlt, l.terrainMax ?? Math.max(l.from.elev, l.to.elev))
-      if (h.applies && !h.ok) add('navlog', 'caution', `${l.from.id}→${l.to.id}: ${plan.cruiseAlt.toLocaleString()} ft doesn't match the hemispheric rule`, `Magnetic course ${Math.round(l.mc)}° → ${h.suggest?.toLocaleString()} ft (§91.159).`)
-      if (l.terrainMax != null && plan.cruiseAlt - l.terrainMax < 1000) add('navlog', 'nogo', `${l.from.id}→${l.to.id}: cruise is within 1,000 ft of terrain`, `Highest terrain on the line ${l.terrainMax.toLocaleString()} ft MSL.`)
-      else if (l.terrainMax != null && plan.cruiseAlt - l.terrainMax < 2000) add('navlog', 'caution', `${l.from.id}→${l.to.id}: under 2,000 ft above the highest terrain`, `Terrain ${l.terrainMax.toLocaleString()} ft MSL; obstacles (towers) can stand 1,000+ ft above it.`)
-      if (l.climb && l.climb.nm > l.distNm) add('navlog', 'caution', `${l.from.id}→${l.to.id}: the leg is shorter than the climb`, `${Math.round(l.climb.nm)} nm to reach ${plan.cruiseAlt.toLocaleString()} ft; plan a lower altitude.`)
+      const legAlt = flightAlt[l.flight].alt
+      const h = hemispheric(l.mc, legAlt, l.terrainMax ?? Math.max(l.from.elev, l.to.elev))
+      if (h.applies && !h.ok) add('navlog', 'caution', `${l.from.id}→${l.to.id}: ${legAlt.toLocaleString()} ft doesn't match the hemispheric rule`, `Magnetic course ${Math.round(l.mc)}° → ${h.suggest?.toLocaleString()} ft (§91.159).`)
+      if (l.terrainMax != null && legAlt - l.terrainMax < 1000) add('navlog', 'nogo', `${l.from.id}→${l.to.id}: cruise is within 1,000 ft of terrain`, `Highest terrain on the line ${l.terrainMax.toLocaleString()} ft MSL.`)
+      else if (l.terrainMax != null && legAlt - l.terrainMax < 2000) add('navlog', 'caution', `${l.from.id}→${l.to.id}: under 2,000 ft above the highest terrain`, `Terrain ${l.terrainMax.toLocaleString()} ft MSL; obstacles (towers) can stand 1,000+ ft above it.`)
+      if (l.climb && l.climb.nm > l.distNm) add('navlog', 'caution', `${l.from.id}→${l.to.id}: the leg is shorter than the climb`, `${Math.round(l.climb.nm)} nm to reach ${legAlt.toLocaleString()} ft; plan a lower altitude.`)
     }
-    if (plan.cruiseAlt > 12000) add('navlog', 'caution', 'Above 12,500 ft supplemental oxygen rules apply after 30 minutes (§91.211)')
+    if (altMax > 12000) add('navlog', 'caution', 'Above 12,500 ft supplemental oxygen rules apply after 30 minutes (§91.211)')
   }
 
   // ── Weather at each ETA ──
@@ -463,7 +532,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   }
   for (const i of inp.weather?.nas.data?.items || []) add('weather', i.kind === 'Closure' ? 'nogo' : 'caution', `${i.airport}: ${i.kind}`, [i.reason, i.detail].filter(Boolean).join(' — '), i.airport)
   const freezing = fbSel && route[0] ? freezingLevel(fbSel.product, route[0]) : null
-  if (freezing && plan.cruiseAlt >= freezing.altFt - 500) add('weather', 'caution', `Cruise at or above the freezing level (~${freezing.altFt.toLocaleString()} ft)`, 'Flight into known icing is prohibited (POH Section 2). Stay clear of visible moisture.')
+  if (freezing && altMax >= freezing.altFt - 500) add('weather', 'caution', `Cruise at or above the freezing level (~${freezing.altFt.toLocaleString()} ft)`, 'Flight into known icing is prohibited (POH Section 2). Stay clear of visible moisture.')
   if (inp.weather) for (const [k, s] of Object.entries({ METARs: inp.weather.metars, TAFs: inp.weather.tafs, PIREPs: inp.weather.pireps, SIGMETs: inp.weather.sigmets, 'G-AIRMETs': inp.weather.gairmets, 'NAS status': inp.weather.nas, TFRs: inp.weather.tfrs })) {
     if (s.error) add('weather', 'caution', `${k} unavailable`, s.error)
   }
@@ -479,7 +548,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       seen.add(key)
       const floor = f.properties.LOWER_VAL != null && f.properties.LOWER_VAL > -9000 ? f.properties.LOWER_VAL : 0
       const ceiling = f.properties.UPPER_VAL != null && f.properties.UPPER_VAL > -9000 ? f.properties.UPPER_VAL : null
-      crossings.push({ name: f.properties.NAME, cls: f.properties.CLASS, floor, ceiling, atCruise: plan.cruiseAlt >= (floor ?? 0) && (ceiling == null || plan.cruiseAlt <= ceiling) })
+      crossings.push({ name: f.properties.NAME, cls: f.properties.CLASS, floor, ceiling, atCruise: flightAlt.some(f => f.alt >= (floor ?? 0) && (ceiling == null || f.alt <= ceiling)) })
     }
     for (const c of crossings) {
       if (c.cls === 'B') add('navlog', 'caution', `Class B ${c.name} (${c.floor ? c.floor.toLocaleString() : 'SFC'}–${c.ceiling?.toLocaleString() ?? ''} ft) on the line`, c.atCruise ? 'Your cruise altitude is inside it: you need a clearance ("cleared into the Class Bravo") or a route around/under it.' : 'You pass under or over it at cruise — mind the climb and descent.')
@@ -488,12 +557,6 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   }
 
   // ── Pilot ──
-  const fit = IMSAFE.map(i => plan.imsafe[i.key])
-  if (fit.some(v => v === false)) add('pilot', 'nogo', 'IMSAFE: not fit to fly', IMSAFE.filter(i => plan.imsafe[i.key] === false).map(i => i.label).join(', '))
-  else if (fit.some(v => v === undefined)) add('pilot', 'todo', 'Complete the IMSAFE checklist')
-  else add('pilot', 'ok', 'IMSAFE complete')
-  const paveDone = ['pilot', 'aircraft', 'environment', 'external'].filter(k => (plan.pave[k] || '').trim()).length
-  add('pilot', paveDone === 4 ? 'ok' : 'todo', paveDone === 4 ? 'PAVE risks reviewed' : `PAVE: ${4 - paveDone} of 4 not reviewed`)
   // §61.57 recency only binds when carrying passengers (day) or at night; a student
   // pilot flies solo on a CFI's 90-day endorsement instead of a flight review.
   for (const c of inp.currency) {
@@ -513,18 +576,17 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       if (i.ifrOnly) continue
       if (i.months) {
         const d = insp[i.key] ? new Date(String(insp[i.key])) : null
-        if (!d) { add('aircraft', 'todo', `${i.label}: date not recorded`, i.detail); continue }
+        if (!d) continue
         const due = new Date(d); due.setMonth(due.getMonth() + i.months + 1, 0) // end of the calendar month
         if (due.getTime() < (departAt?.getTime() ?? now)) add('aircraft', 'nogo', `${i.label} overdue`, `Due by ${due.toLocaleDateString()}.`)
         else add('aircraft', 'ok', `${i.label} current`, `Until ${due.toLocaleDateString()}.`)
       } else if (i.hours) {
         const left = Number(insp.hundredHoursLeft)
-        if (!Number.isFinite(left) || insp.hundredHoursLeft === '' || insp.hundredHoursLeft == null) add('aircraft', 'todo', '100-hour: hours remaining not recorded', i.detail)
-        else if (left - eteTotal / 60 < 0) add('aircraft', 'nogo', '100-hour inspection would be exceeded', `${left} h left, flight ~${(eteTotal / 60).toFixed(1)} h (10 h overfly only to reach a place to do it).`)
+        if (!Number.isFinite(left) || insp.hundredHoursLeft === '' || insp.hundredHoursLeft == null) continue
+        if (left - eteTotal / 60 < 0) add('aircraft', 'nogo', '100-hour inspection would be exceeded', `${left} h left, flight ~${(eteTotal / 60).toFixed(1)} h (10 h overfly only to reach a place to do it).`)
         else add('aircraft', left < 10 ? 'caution' : 'ok', `100-hour: ${left} h remaining`)
-      } else if (!insp[i.key]) add('aircraft', 'todo', `${i.label}: not confirmed`, i.detail)
+      }
     }
-    if (plan.equipment && Object.values(plan.equipment).filter(Boolean).length === 0) add('aircraft', 'todo', 'Required equipment (ATOMATOFLAMES) not checked')
     if (crossings.some(c => c.cls === 'B' || c.cls === 'C') && inp.planning.equipment?.adsbOut === false) add('aircraft', 'nogo', 'ADS-B Out required in and above Class B/C (§91.225)')
   }
 
@@ -536,29 +598,54 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     emptySample = inp.planning.emptyWeight == null
     const push = (label: string, weight: number, arm: number) => items.push({ label, weight, arm, moment: weight * arm })
     push('Basic empty weight', ew, (em * 1000) / ew)
-    push(`Fuel ${plan.fuelGal} gal`, plan.fuelGal * 6, profile.fuelArm)
+    push(`Fuel ${+usable.toFixed(1)} gal`, usable * 6, profile.fuelArm)
     const st = Object.fromEntries(profile.stations.map(s => [s.key, s]))
-    push(st.front.label, plan.loads.front, st.front.arm)
-    push(st.rear.label, plan.loads.rear, st.rear.arm)
-    push(st.bag1.label, plan.loads.bag1, st.bag1.arm)
-    push(st.bag2.label, plan.loads.bag2, st.bag2.arm)
+    push(st.front.label, loads.front, st.front.arm)
+    push(st.rear.label, loads.rear, st.rear.arm)
+    push(st.bag1.label, loads.bag1, st.bag1.arm)
+    push(st.bag2.label, loads.bag2, st.bag2.arm)
   }
   const ramp = wbTotal(items)
+  // The W&B sheet, line by line: loading, ramp, then for each flight the run-up
+  // fuel, takeoff, the navlog's fuel burn and the landing.
+  const steps: WbStep[] = []
+  if (profile) {
+    const L = profile.limits, arm = profile.fuelArm, code = (a: Airport) => a.icao || a.id
+    const s = plan.seats
+    const src: Record<string, string> = {
+      'Basic empty weight': emptySample ? 'POH sample airplane' : 'Aircraft W&B record',
+      [items[1].label]: `${+usable.toFixed(1)} gal × 6 lb/gal`,
+      [items[2].label]: s ? [s.pilot && `pilot ${s.pilot}`, s.front && `front ${s.front}`].filter(Boolean).join(' + ') : '',
+      [items[3].label]: s ? [s.rearL && `left ${s.rearL}`, s.rearR && `right ${s.rearR}`].filter(Boolean).join(' + ') : '',
+    }
+    items.forEach((it, k) => { if (k < 3 || it.weight) steps.push({ label: it.label, source: src[it.label] ?? '', weight: it.weight, arm: it.arm, moment: it.moment }) })
+    let w = ramp.weight, mo = ramp.moment
+    const total = (label: string, max: number) => {
+      const cg = w ? mo / w : 0
+      steps.push({ label, source: `max ${max.toLocaleString()}`, weight: w, arm: cg, moment: mo, total: true, max, over: w > max + 1e-6 || !inEnvelope(profile.envelope.normal, cg, w) })
+    }
+    const minus = (label: string, source: string, lb: number) => { w -= lb; mo -= lb * arm; steps.push({ label, source, weight: -lb, arm, moment: -lb * arm }) }
+    total('Ramp', L.maxRamp)
+    for (const f of flights) {
+      minus('Run-up fuel', `POH: start, taxi, takeoff (${profile.climbStartFuelGal} gal)`, profile.taxiFuelLb)
+      total(flights.length > 1 ? `Takeoff ${code(f.from)}` : 'Takeoff', L.maxTakeoff)
+      minus('Flight burn', `${f.fuelGal.toFixed(2)} gal × 6 (navlog)`, f.fuelGal * 6)
+      total(`Landing ${code(f.to)}`, L.maxLanding)
+    }
+  }
   const takeoff = profile ? wbTotal([...items, { label: 'Start, taxi, runup', weight: -profile.taxiFuelLb, arm: profile.fuelArm }]) : ramp
-  const landing = profile ? wbTotal([...items, { label: 'Start, taxi, runup', weight: -profile.taxiFuelLb, arm: profile.fuelArm }, { label: 'Trip fuel', weight: -fuelUsed * 6, arm: profile.fuelArm }]) : ramp
+  const landing = profile ? wbTotal([...items, { label: 'Start, taxi, runup', weight: -profile.taxiFuelLb * Math.max(1, departures), arm: profile.fuelArm }, { label: 'Trip fuel', weight: -fuelUsed * 6, arm: profile.fuelArm }]) : ramp
   if (profile && plan.tail) {
     const L = profile.limits
-    if (plan.loads.front <= 0) add('loading', 'todo', 'Enter the pilot and front passenger weight')
+    if (loads.front <= 0) add('loading', 'todo', 'Enter the pilot\'s weight')
     if (emptySample) add('loading', 'caution', 'Empty weight is the POH sample airplane', `Enter ${plan.tail}'s basic empty weight and moment from its W&B record.`)
     if (ramp.weight > L.maxRamp) add('loading', 'nogo', `Ramp weight ${Math.round(ramp.weight)} lb over the ${L.maxRamp} lb maximum`)
     if (takeoff.weight > L.maxTakeoff) add('loading', 'nogo', `Takeoff weight ${Math.round(takeoff.weight)} lb over the ${L.maxTakeoff} lb maximum`, `Remove ${Math.ceil(takeoff.weight - L.maxTakeoff)} lb (≈${Math.ceil((takeoff.weight - L.maxTakeoff) / 6)} gal of fuel).`)
     else add('loading', 'ok', `Takeoff weight ${Math.round(takeoff.weight)} lb`, `${Math.round(L.maxTakeoff - takeoff.weight)} lb under the maximum.`)
     if (landing.weight > L.maxLanding) add('loading', 'nogo', `Landing weight over the ${L.maxLanding} lb maximum`)
-    if (plan.loads.bag1 > 120 || plan.loads.bag2 > 50 || plan.loads.bag1 + plan.loads.bag2 > L.baggageCombined) add('loading', 'nogo', 'Baggage over the limit', 'Area 1 120 lb, area 2 50 lb, 120 lb combined.')
-    for (const [label, w] of [['Takeoff', takeoff], ['Landing', landing]] as const) {
-      if (!inEnvelope(profile.envelope.normal, w.cg, w.weight)) add('loading', 'nogo', `${label} CG ${w.cg.toFixed(1)} in outside the envelope`, `At ${Math.round(w.weight)} lb.`)
-    }
-    if (plan.fuelGal > (tank?.usable ?? 40)) add('loading', 'caution', `More fuel than the ${tank?.label.toLowerCase()} hold`, `${tank?.usable} gal usable.`)
+    if (loads.bag1 > 120 || loads.bag2 > 50 || loads.bag1 + loads.bag2 > L.baggageCombined) add('loading', 'nogo', 'Baggage over the limit', 'Area 1 120 lb, area 2 50 lb, 120 lb combined.')
+    for (const st of steps) if (st.total && st.arm != null && !inEnvelope(profile.envelope.normal, st.arm, st.weight)) add('loading', 'nogo', `${st.label}: CG ${st.arm.toFixed(2)} in outside the envelope`, `At ${Math.round(st.weight)} lb.`)
+    if (plan.fuelGal != null && plan.fuelGal > (tank?.usable ?? 40)) add('loading', 'caution', `More fuel than the ${tank?.label.toLowerCase()} hold`, `${tank?.usable} gal usable.`)
   }
 
   // ── Performance ──
@@ -609,9 +696,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   })) as Record<SectionKey, Status>
 
   return {
-    profile, departAt, legs, navlog,
+    profile, departAt, legs, flights, navlog,
     totals: { distNm: distTotal, eteMin: eteTotal, tripFuel: fuelUsed, taxiFuel, reserveFuel, personalReserveFuel, requiredFuel, usableFuel: usable, enduranceMin },
-    wx, wb: { items, ramp, takeoff, landing, emptySample }, perf, samples, freezing, fb: fbSel, crossings,
+    wx, wb: { items, ramp, takeoff, landing, emptySample, steps }, perf, samples, freezing, fb: fbSel, crossings,
     hazards: { sigmets, gairmets, cwas, tfrs, pireps }, checks, sections,
   }
 }

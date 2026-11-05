@@ -107,6 +107,7 @@ export function Cat({ cat }: { cat: string | null | undefined }) {
 }
 
 export const fmtTime = (d: Date | null | undefined) => (d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—')
+export const hhmm = (d: Date | null | undefined) => (d ? `${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}` : '—')
 export const fmtZ = (d: Date | null | undefined) => (d ? `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}Z` : '—')
 export const fmtMin = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}` : `0:${String(Math.round(m)).padStart(2, '0')}`)
 export const deg3 = (d: number | null | undefined) => (d == null || Number.isNaN(d) ? '—' : String(Math.round(((d % 360) + 360) % 360) || 360).padStart(3, '0'))

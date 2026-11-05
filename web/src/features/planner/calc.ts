@@ -2,6 +2,7 @@
 // components, the wind triangle, weight and balance, fuel, and the geometry
 // that decides which advisories touch the route. Pure functions only.
 import type { AircraftProfile, DistanceTable } from './poh'
+import { magvar } from 'magvar'
 
 // ── Atmosphere ────────────────────────────────────────────────────────────────
 export const pressureAltitude = (elevFt: number, altimInHg: number) => Math.round(elevFt + (29.92 - altimInHg) * 1000)
@@ -85,6 +86,10 @@ export function windTriangle(tc: number, tas: number, windFrom: number | null, w
 
 // Magnetic = true − easterly variation ("east is least"); variation east-positive.
 export const toMagnetic = (trueDeg: number, varEast: number) => norm360(trueDeg - varEast)
+// Magnetic variation (east +) from the World Magnetic Model 2025 on the flight
+// date. NASR's per-airport figures keep their survey epoch (Reid-Hillview's is
+// 1975: 16°E, against about 13°E today), so they aren't used for headings.
+export const variationAt = (p: { lat: number; lon: number }, when: Date) => magvar(p.lat, p.lon, 0, when)
 
 // ── Geodesy ──────────────────────────────────────────────────────────────────
 export interface LatLon { lat: number; lon: number }
@@ -189,6 +194,23 @@ export function hemispheric(magCourse: number, altMsl: number, groundFt: number)
   return { applies: true, ok, suggest }
 }
 
+// Cruise altitude for a flight: the lowest VFR cruising altitude for its
+// magnetic course (§91.159: odd thousands + 500 eastbound, even + 500 westbound),
+// at least 3,500 ft and 1,000 ft above the highest terrain on the line. A hop too
+// short to climb that high and come back down (about 2 nm up and 3.7 nm down per
+// 1,000 ft in a trainer) stays below 3,000 ft AGL, where the rule doesn't apply.
+export function vfrAltitude(eastbound: boolean, terrainFt: number | null, fieldFt: number, distNm: number) {
+  const floor = Math.max((terrainFt ?? fieldFt) + 1000, fieldFt + 1500)
+  let t = Math.max(3, Math.ceil((floor - 500) / 1000))
+  if ((t % 2 === 1) !== eastbound) t++
+  const alt = t * 1000 + 500
+  if (((alt - fieldFt) / 1000) * 5.7 > distNm * 0.6) {
+    const low = Math.ceil(floor / 500) * 500
+    if (low - fieldFt <= 3000 && low < alt) return { alt: low, hemispheric: false }
+  }
+  return { alt, hemispheric: true }
+}
+
 // §91.151 day 30 min / night 45 min at normal cruise.
 export const reserveMinutes = (night: boolean) => (night ? 45 : 30)
 
@@ -236,7 +258,7 @@ export function tafCategory(m: ReturnType<typeof tafAt>): Category | null {
 
 // ── Winds aloft ──────────────────────────────────────────────────────────────
 export interface FbWind { dir: number | null; spd: number; temp: number | null; lv?: boolean }
-export interface FbProduct { basedOn: string; valid: string; forUse: [string, string]; levels: number[]; stations: Record<string, { lat: number; lon: number; winds: Record<string, FbWind> }> }
+export interface FbProduct { source?: string; basedOn: string; valid: string; forUse: [string, string]; levels: number[]; stations: Record<string, { lat: number; lon: number; winds: Record<string, FbWind> }> }
 
 // Absolute "for use" window of an FB product. `valid` is DDHHMM (UTC) in the
 // month of `ref`; the window's start is the last start-time at or before the

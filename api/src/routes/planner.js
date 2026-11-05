@@ -8,6 +8,7 @@ import { sunEvent } from '../services/twilight.js'
 import { importBriefings } from '../services/briefings.js'
 import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
+import { modelWinds } from '../services/modelWinds.js'
 import { fetchWithTimeout } from '../lib/http.js'
 
 const ID = /^[A-Z0-9]{2,4}$/
@@ -119,11 +120,17 @@ export default async function plannerRoutes(fastify) {
         stations: Object.fromEntries(Object.entries(prod.stations).filter(([k]) => coords[k] && inBox(box, 3)(coords[k])).map(([k, v]) => [k, { ...coords[k], winds: v }])),
       }))
     }
+    // No FB forecast (AWC answering 204): model winds aloft, labelled as such.
+    let winds = fb
+    if (!fb.some(p => p.data?.length)) {
+      const m = await settle(modelWinds(box))
+      winds = m.data?.length ? m.data.map(prod => ({ fcst: 'model', data: [prod], fetchedAt: m.fetchedAt })) : fb.map(p => ({ ...p, error: p.error || m.error || 'No FB winds-aloft forecast available' }))
+    }
     const merge = (a, b, key) => { const m = new Map(); for (const x of [...(b.data || []), ...(a.data || [])]) m.set(x[key], x); return [...m.values()] }
     return {
       metars: { data: merge(metars, metarBox, 'icaoId'), fetchedAt: metarBox.fetchedAt, error: metars.error || metarBox.error },
       tafs: { data: merge(tafs, tafBox, 'icaoId'), fetchedAt: tafBox.fetchedAt, error: tafs.error || tafBox.error },
-      pireps, sigmets, gairmets, cwas, winds: fb, nas, tfrs: tfr,
+      pireps, sigmets, gairmets, cwas, winds, nas, tfrs: tfr,
       source: 'aviationweather.gov (NOAA AWC), nasstatus.faa.gov, tfr.faa.gov',
     }
   })

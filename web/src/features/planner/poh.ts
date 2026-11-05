@@ -23,6 +23,7 @@ export interface AircraftProfile {
   stations: { key: string; label: string; arm: number; max?: number; range?: string }[]
   fuel: { key: string; label: string; usable: number; total: number }[]
   fuelArm: number
+  fuelGrade: string
   taxiFuelLb: number
   envelope: { normal: [number, number][]; utility: [number, number][] } // [arm in, weight lb], closed polygon
   speeds: { label: string; kias: string; note?: string }[]
@@ -63,6 +64,7 @@ export const C172P: AircraftProfile = {
     { key: 'integral', label: 'Integral tanks', usable: 62, total: 68 },
   ],
   fuelArm: 48,
+  fuelGrade: '100LL (blue) or 100 (green)',
   taxiFuelLb: 7,
   envelope: {
     normal: [[35.0, 1500], [35.0, 1950], [39.5, 2400], [47.3, 2400], [47.3, 1500]],

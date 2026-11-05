@@ -238,6 +238,43 @@ const nearest = <T extends { lat: number; lon: number }>(list: T[], p: LatLon, m
 
 const ringsOf = (g: { type: string; coordinates: unknown }): [number, number][][] =>
   g.type === 'Polygon' ? [(g.coordinates as [number, number][][])[0]] : g.type === 'MultiPolygon' ? (g.coordinates as [number, number][][][]).map(p => p[0]) : []
+// Bounding box [west, south, east, north] of a polygon, computed once per
+// geometry: the nationwide airspace layer has thousands of detailed polygons,
+// and testing every route sample against each one took seconds per edit.
+const boxes = new WeakMap<object, number[]>()
+function boxOf(g: { type: string; coordinates: unknown }) {
+  let b = boxes.get(g)
+  if (!b) {
+    b = [Infinity, Infinity, -Infinity, -Infinity]
+    for (const r of ringsOf(g)) for (const [x, y] of r) { if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y }
+    boxes.set(g, b)
+  }
+  return b
+}
+// Airspace the line passes through, remembered for the last route so edits
+// that don't move the route (checklists, loading) skip the polygon tests.
+let lastAirspace: { src: unknown; key: string; out: { name: string; cls: string; floor: number | null; ceiling: number | null }[] } | null = null
+function airspaceOnLine(airspace: NonNullable<Inputs['airspace']>, samples: LatLon[]) {
+  const key = samples.map(p => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`).join(';')
+  if (lastAirspace && lastAirspace.src === airspace && lastAirspace.key === key) return lastAirspace.out
+  const out: { name: string; cls: string; floor: number | null; ceiling: number | null }[] = []
+  const seen = new Set<string>()
+  const rb = [Math.min(...samples.map(p => p.lon)), Math.min(...samples.map(p => p.lat)), Math.max(...samples.map(p => p.lon)), Math.max(...samples.map(p => p.lat))]
+  for (const f of airspace) {
+    const k = `${f.properties.NAME}|${f.properties.CLASS}|${f.properties.LOWER_VAL}`
+    if (seen.has(k)) continue
+    const fb = boxOf(f.geometry)
+    if (fb[0] > rb[2] || fb[2] < rb[0] || fb[1] > rb[3] || fb[3] < rb[1]) continue
+    if (!ringsOf(f.geometry).some(r => r.length > 2 && samples.some(s => pointInPolygon(s, r)))) continue
+    seen.add(k)
+    const floor = f.properties.LOWER_VAL != null && f.properties.LOWER_VAL > -9000 ? f.properties.LOWER_VAL : 0
+    const ceiling = f.properties.UPPER_VAL != null && f.properties.UPPER_VAL > -9000 ? f.properties.UPPER_VAL : null
+    out.push({ name: f.properties.NAME, cls: f.properties.CLASS, floor, ceiling })
+  }
+  lastAirspace = { src: airspace, key, out }
+  return out
+}
+
 const advRing = (a: Advisory): [number, number][] => a.coords.map(c => [Number(c.lon), Number(c.lat)])
 
 function weatherAt(a: Airport, at: Date, role: WxAt['role'], w: WeatherBundle | null, now: number): WxAt {
@@ -563,16 +600,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   // ── Airspace crossed ──
   const crossings: Derived['crossings'] = []
   if (inp.airspace && samples.length) {
-    const seen = new Set<string>()
-    for (const f of inp.airspace) {
-      const key = `${f.properties.NAME}|${f.properties.CLASS}|${f.properties.LOWER_VAL}`
-      if (seen.has(key)) continue
-      if (!ringsOf(f.geometry).some(r => r.length > 2 && samples.some(s => pointInPolygon(s, r)))) continue
-      seen.add(key)
-      const floor = f.properties.LOWER_VAL != null && f.properties.LOWER_VAL > -9000 ? f.properties.LOWER_VAL : 0
-      const ceiling = f.properties.UPPER_VAL != null && f.properties.UPPER_VAL > -9000 ? f.properties.UPPER_VAL : null
-      crossings.push({ name: f.properties.NAME, cls: f.properties.CLASS, floor, ceiling, atCruise: flightAlt.some(f => f.alt >= (floor ?? 0) && (ceiling == null || f.alt <= ceiling)) })
-    }
+    for (const c of airspaceOnLine(inp.airspace, samples)) crossings.push({ ...c, atCruise: flightAlt.some(f => f.alt >= (c.floor ?? 0) && (c.ceiling == null || f.alt <= c.ceiling)) })
     const warned = new Set<string>()
     for (const c of crossings) {
       // One warning per airspace: Class B/C shelves share a name.

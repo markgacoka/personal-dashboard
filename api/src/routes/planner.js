@@ -9,6 +9,7 @@ import { importBriefings } from '../services/briefings.js'
 import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
 import { modelWinds } from '../services/modelWinds.js'
+import { airspaceIn } from '../services/faaAirspace.js'
 import { fetchWithTimeout } from '../lib/http.js'
 
 const ID = /^[A-Z0-9]{2,4}$/
@@ -146,6 +147,16 @@ export default async function plannerRoutes(fastify) {
     const pts = (req.body?.points || []).filter(p => Array.isArray(p) && p.every(Number.isFinite)).slice(0, 400)
     if (!pts.length) return { elevations: [] }
     try { return { elevations: await elevations(pts), fetchedAt: new Date().toISOString(), source: 'Open-Meteo elevation (Copernicus GLO-90)' } } catch (e) { return reply.status(502).send({ error: e.message }) }
+  })
+
+  // GET /api/planner/airspace?south=&west=&north=&east= → Class B/C/D polygons touching the box
+  fastify.get('/api/planner/airspace', async (req, reply) => {
+    const [south, west, north, east] = ['south', 'west', 'north', 'east'].map(k => Number(req.query[k]))
+    if (![south, west, north, east].every(Number.isFinite) || north - south > 12 || east - west > 16) return reply.status(400).send({ error: 'bbox (≤ 12° × 16°) required' })
+    try {
+      const body = await airspaceIn({ south, west, north, east }, fastify.log)
+      return reply.header('Content-Type', 'application/json; charset=utf-8').header('Cache-Control', 'private, max-age=3600').send(body)
+    } catch (e) { return reply.status(503).send({ error: 'Airspace data unavailable', detail: e.message }) }
   })
 
   // GET /api/planner/corridor?south=&west=&north=&east= → airports usable as navlog checkpoints

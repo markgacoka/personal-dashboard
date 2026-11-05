@@ -44,9 +44,10 @@ export const useTerrain = (samples: LatLon[]) => useQuery({
   queryFn: () => post<{ elevations: number[]; fetchedAt: string; source: string }>('/api/planner/terrain', { points: samples.map(s => [s.lat, s.lon]) }),
 })
 
-export const useAirspace = () => useQuery({
-  queryKey: ['planner', 'airspace'], staleTime: Infinity,
-  queryFn: () => get<{ features: NonNullable<import('./model').Inputs['airspace']> }>('/api/external/faa-airspace').then(d => d.features).catch(() => null),
+// Class B/C/D polygons around the route only (the nationwide layer is ~90 MB).
+export const useAirspace = (bbox: ReturnType<typeof bboxOf>) => useQuery({
+  queryKey: ['planner', 'airspace', bbox && Object.values(bbox).map(v => v.toFixed(1)).join(',')], enabled: !!bbox, staleTime: Infinity, placeholderData: keepPreviousData,
+  queryFn: () => get<{ features: NonNullable<import('./model').Inputs['airspace']> }>(`/api/planner/airspace?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`).then(d => d.features),
 })
 
 export function usePlanning(tail: string | null) {

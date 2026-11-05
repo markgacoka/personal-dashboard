@@ -67,7 +67,7 @@ run-up fuel, takeoff, flight burn, landing for each flight).
 | ATC delays / ground stops / closures | FAA NAS Status (nasstatus.faa.gov) | 5 min |
 | D-ATIS (towered fields that publish it) | clowd.io D-ATIS mirror of FAA D-ATIS | 2 min; others show ATIS/AWOS frequency + phone |
 | Terrain along the route | Open-Meteo elevation (Copernicus DEM 90 m) | Static |
-| Airspace, US airports layers | FAA ArcGIS (existing map layers) | Each cycle |
+| Airspace, US airports layers | FAA ArcGIS (existing map layers); the planner asks `/api/planner/airspace` for the polygons around the route only (the nationwide layer is ~90 MB) | Each cycle |
 | Registry, photo | FAA registry + photo sources (existing) | On lookup |
 | Performance, limitations, W&B, checklists | Cessna 172P POH (1982, scanned copy on file), Figures 2-x, 4-x, 5-3/5-5/5-7/5-8/5-11, 6-5 | Static; figure numbers shown |
 | Flight Service | 1-800-WX-BRIEF, 122.2 MHz | Static |
@@ -128,7 +128,7 @@ checkpoints, TOD, landing) and the airport advisories and
 frequencies panel. Time off is engine start plus start and taxi time. Times are 24-hour local HHMM, ETE in decimal minutes, fuel
 to 0.01 gal. Print gives the sheets, POH page, W&B and weather in landscape.
 
-Map: FAA VFR sectional tiles, NEXRAD radar (Iowa Environmental Mesonet),
+Map: a base chart picker (FAA sectional, terminal area chart over the sectional, IFR enroute low, Esri satellite, Esri topographic, street; remembered per browser), NEXRAD radar (Iowa Environmental Mesonet),
 METARs, PIREPs, SIGMET/G-AIRMET, CWA, TFRs, NOTAM counts, airspace, the route.
 
 E6B: per row, TAS = CAS ÷ √σ (density ratio from pressure altitude and OAT,

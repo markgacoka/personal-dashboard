@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Printer, Save, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Loader2, Printer, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -113,7 +113,7 @@ function Planner() {
   const notamSets: NotamSet[] = notamIds.flatMap((n, i) => { const r = notamQs[i]?.data; return r ? [{ icao: n.icao, items: r.notams.map(x => x.text || ''), unavailable: r.unavailable }] : [] })
   const samples = useMemo(() => sampleRoute(routePts, 2), [routePts])
   const terrain = useTerrain(samples)
-  const airspace = useAirspace()
+  const airspace = useAirspace(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 1) : null), [routePts]))
   const corridor = useCorridor(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 0.12) : null), [routePts]))
   const registry = useRegistry(plan.tail ?? undefined)
   const planningQ = usePlanning(plan.tail)
@@ -142,6 +142,17 @@ function Planner() {
     const pick = list.find(a => !/IFR/.test(cats.get(a.icao || '') || '')) ?? list[0]
     setAutoAlt(pick ? pick.icao || pick.id : null)
   }, [nearby.data, routePts, wx.data])
+  // Everything still loading (or failed), shown under the steps.
+  const pending: [string, boolean][] = [
+    ['route points', resolved.isFetching], ['airports', apts.isFetching], ['aircraft registry', registry.isLoading], ['POH', pohQ.isLoading],
+    ['weather', wx.isFetching], ['terrain', terrain.isLoading], ['airspace', airspace.isFetching], ['checkpoints', corridor.isFetching],
+    ['NOTAMs', notamQs.some(q => q.isLoading)], ['alternates', nearby.isLoading], ['radar', radar.isLoading],
+  ]
+  const saving = planningQ.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
+  const failed: [string, () => void][] = ([
+    ['route points', resolved.isError, resolved.refetch], ['airports', apts.isError, apts.refetch], ['weather', wx.isError, wx.refetch], ['terrain', terrain.isError, terrain.refetch],
+    ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['POH', pohQ.isError, pohQ.refetch],
+  ] as [string, boolean, () => void][]).filter(([, e]) => e).map(([n, , r]) => [n, r])
   const planEff = useMemo(() => ({ ...plan, alternate: effAlt }), [plan, effAlt])
 
   const d = useMemo(() => derive(planEff, {
@@ -212,6 +223,8 @@ function Planner() {
         })}
       </nav>
 
+      <LoadingStrip loading={pending.filter(([, v]) => v).map(([n]) => n)} saving={saving} failed={failed} />
+
       <div className={cn('grid gap-6', refOpen && 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)]')}>
         <div className="min-w-0 space-y-5">
           <Card className={cn('px-5 py-5 sm:px-6', cur === 'navlog' && 'px-3 sm:px-5')}>
@@ -277,6 +290,16 @@ function Planner() {
           </aside>
         )}
       </div>
+    </div>
+  )
+}
+
+function LoadingStrip({ loading, saving, failed }: { loading: string[]; saving: boolean; failed: [string, () => void][] }) {
+  if (!loading.length && !saving && !failed.length) return null
+  return (
+    <div role="status" aria-live="polite" className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm print:hidden">
+      {(loading.length > 0 || saving) && <span className="inline-flex items-center gap-2 text-fg-2"><Loader2 className="size-4 animate-spin text-accent" />{[saving ? 'Saving' : null, loading.length ? `Loading ${loading.join(', ')}` : null].filter(Boolean).join(' · ')}…</span>}
+      {failed.map(([n, retry]) => <span key={n} className="inline-flex items-center gap-1.5 text-bad">Couldn't load {n}<button className="text-accent hover:underline" onClick={() => retry()}>Retry</button></span>)}
     </div>
   )
 }

@@ -36,6 +36,22 @@ export const pireps = b => cached(`pirep:${bboxParam(b)}`, 5 * MIN, () => awc(`p
 export const sigmets = () => cached('airsigmet', 5 * MIN, () => awc('airsigmet?format=json'))
 export const gairmets = () => cached('gairmet', 10 * MIN, () => awc('gairmet?format=json'))
 export const cwas = () => cached('cwa', 5 * MIN, () => awc('cwa?format=json'))
+// The same FB bulletin from the NWS text-product feed (FD1/FD2/FD3 = 6/12/24 h).
+const NWS = { '06': 'FD1', '12': 'FD2', '24': 'FD3' }
+async function nwsFB(code) {
+  const r = await fetchWithTimeout(`https://api.weather.gov/products/types/${code}/locations/US1/latest`, { ms: 15000, headers: { 'User-Agent': 'gacoka.com flight planner', Accept: 'application/ld+json' } })
+  if (!r.ok) throw new Error(`api.weather.gov ${code} ${r.status}`)
+  const j = await r.json()
+  return { issued: Date.parse(j.issuanceTime), products: parseFB(j.productText || '') }
+}
+// Current NWS FB (issued in the last 9 hours) or null.
+export const nwsWindsAloft = fcst => cached(`nwsfb:${fcst}`, 15 * MIN, async () => {
+  const { issued, products } = await nwsFB(NWS[fcst])
+  return Date.now() - issued < 9 * 3600_000 ? products : null
+})
+// The FB station identifiers (the list barely changes; from the latest bulletin, however old).
+export const fbStationIds = () => cached('fbstations', 24 * 60 * MIN, async () => Object.keys((await nwsFB('FD1')).products[0]?.stations || {}))
+
 export const windsAloft = fcst => cached(`fb:${fcst}`, 15 * MIN, async () => parseFB(await awc(`windtemp?region=us&level=low&fcst=${fcst}`, { text: true })))
 
 // ── FB winds and temperatures aloft ──────────────────────────────────────────

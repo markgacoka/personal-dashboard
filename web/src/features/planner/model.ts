@@ -25,6 +25,8 @@ export interface Plan {
   // null: full usable fuel for the tanks.
   fuelGal: number | null
   stopMinutes: number
+  // Names for coordinate route points picked from landmarks ("37.1234/-121.5678" → Gilroy).
+  labels?: Record<string, { name: string; kind: string }>
   // Engine start to takeoff at the first airport (start, taxi, run-up); unset → 10 min.
   taxiMin?: number
   // Checklist answers: imsafe.*, mx.*, eq.* → true (done / fit), false (failed / not fit).
@@ -82,6 +84,7 @@ export interface Airport {
   approach: { via: string; distNm: number; frequencies: NasrFreq[] } | null
   fss?: { id: string; name: string | null } | null
   kind?: RoutePoint['kind']; navType?: string
+  label?: string
   sun: { rise: string; set: string; civilDawn: string; civilDusk: string; date: string } | null
 }
 
@@ -148,7 +151,7 @@ export interface NavRow {
   distNm: number; remNm: number; gs: number; eteMin: number; eta: Date; fuelGal: number; fuelRem: number; terrainMax: number | null
 }
 
-// Route entries: "KSNS" lands; "KCVH*" is flown over.
+// Route entries: departure, the points flown over, arrival (a legacy "*" suffix is ignored).
 export const parseRouteItem = (s: string) => ({ id: s.replace(/\*$/, ''), overfly: s.endsWith('*') })
 
 // A navaid, fix or coordinate on the route, shaped like an airport record so the
@@ -329,7 +332,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   const routeItems = plan.route.map(parseRouteItem).filter(x => byId(x.id))
   const when = departAt ?? new Date(now)
   const withVar = (a: Airport): Airport => ({ ...a, magVar: Math.round(variationAt(a, when) * 10) / 10 })
-  const route = routeItems.map(x => withVar(byId(x.id)!))
+  const route = routeItems.map(x => { const a = withVar(byId(x.id)!); const l = plan.labels?.[x.id]; return l ? { ...a, label: l.name, name: l.name, navType: l.kind } : a })
   const altApt = plan.alternate ? byId(plan.alternate) : undefined
   const alt = altApt ? withVar(altApt) : null
   const minimums = inp.minimums
@@ -367,7 +370,8 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   const takeoffAt = departAt ? new Date(departAt.getTime() + taxiMin * 60_000) : null
   let t: Date | null = takeoffAt ? new Date(takeoffAt) : null
   let fuelUsed = 0, departures = 0
-  const routeOverfly = routeItems.map((x, k) => x.overfly || isWaypoint(route[k]))
+  // One flight, one navlog: you land only at the last point; everything between is flown over.
+  const routeOverfly = route.map((_, k) => k > 0 && k < route.length - 1)
   const ov = plan.overrides || {}
 
   // Flights (takeoff to landing) and each one's cruise altitude: automatic from
@@ -435,11 +439,11 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       for (const c of cands) if (picked.every(p => Math.abs(p.t - c.t) * D >= 8) && picked.length < 8) picked.push(c)
       picked.sort((x, y) => x.t - y.t)
       const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; cpKind?: Checkpoint['kind']; pt: LatLon; varEast: number }[] = [
-        { t: 0, label: from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
+        { t: 0, label: from.label || from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
         ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: variationAt(intermediate(from, to, tToc), when) }] : []),
         ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, navType: p.a.type ?? undefined, cpKind: p.a.kind ?? 'airport', pt: { lat: p.a.lat, lon: p.a.lon }, varEast: variationAt(p.a, when) })),
         ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: variationAt(intermediate(from, to, tTod), when) }] : []),
-        { t: 1, label: to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
+        { t: 1, label: to.label || to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
       ]
       const legStart = new Date(t)
       let legMin = 0, legFuel = 0

@@ -77,6 +77,15 @@ export function usePlans() {
   return { ...q, create, update, remove }
 }
 
+// Towns, highways, rivers, railroads, power lines, towers and peaks around the route.
+export const useLandmarks = (bbox: ReturnType<typeof bboxOf>) => {
+  const ok = !!bbox && bbox.north - bbox.south <= 3 && bbox.east - bbox.west <= 4
+  return useQuery({
+    queryKey: ['planner', 'landmarks', bbox && Object.values(bbox).map(v => (Math.round(v * 4) / 4).toFixed(2)).join(',')], enabled: ok, staleTime: Infinity, placeholderData: keepPreviousData, retry: 1,
+    queryFn: () => get<import('./suggest').Landmarks>(`/api/planner/landmarks?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
+  })
+}
+
 export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryKey: ['planner', 'corridor', bbox && Object.values(bbox).map(v => v.toFixed(2)).join(',')], enabled: !!bbox, staleTime: Infinity,
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),

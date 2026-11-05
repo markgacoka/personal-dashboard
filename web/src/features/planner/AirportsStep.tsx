@@ -24,10 +24,12 @@ export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlterna
   d: Derived; routePts: Airport[]; alternate: Airport | null; autoAlternate: string | null; setAlternate: (v: string | null) => void
   minimums: Minimums; notams: NotamSet[]; cycle: string | null
 }) {
-  const apts = routePts.filter(a => !isWaypoint(a)).filter((a, i, arr) => arr.findIndex(b => b.id === a.id) === i)
-  const dest = apts.length >= 2 ? routePts[routePts.length - 1] : null
+  // Departure and arrival only: airports between them are route points you fly over.
+  const ends = routePts.length >= 2 ? [routePts[0], routePts[routePts.length - 1]] : routePts.slice(0, 1)
+  const apts = ends.filter(a => !isWaypoint(a)).filter((a, i, arr) => arr.findIndex(b => b.id === a.id) === i)
+  const dest = routePts.length >= 2 && !isWaypoint(routePts[routePts.length - 1]) ? routePts[routePts.length - 1] : null
   const all = [...apts, ...(alternate && !apts.some(a => a.id === alternate.id) ? [alternate] : [])]
-  const roleOf = (a: Airport) => (a.id === alternate?.id && !apts.some(x => x.id === a.id) ? 'Alternate' : a.id === routePts[0]?.id ? (a.id === dest?.id ? 'Departure and destination' : 'Departure') : a.id === dest?.id ? 'Destination' : 'Stop')
+  const roleOf = (a: Airport) => (a.id === alternate?.id && !apts.some(x => x.id === a.id) ? 'Alternate' : a.id === routePts[0]?.id ? (a.id === dest?.id ? 'Departure and destination' : 'Departure') : 'Destination')
   if (!all.length) return <p className="text-sm text-fg-3">Add the airports in step 1.</p>
   return (
     <div className="space-y-6">

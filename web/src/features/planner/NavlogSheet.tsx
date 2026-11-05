@@ -336,9 +336,15 @@ function flightPlan(plan: Plan, d: Derived, alt: Airport | null, planning: Aircr
   const fss = d.legs[0].from.fss
   return {
     ident: plan.tail ?? '', type: `${typeCode}/${equip}`, tas: d.legs[0].tas, departure: pts[0].icao || pts[0].id, depTime: fmtZ(d.legs[0].departAt).replace('Z', ''),
-    altitude: [...new Set(d.flights.map(f => f.alt))].join(' / '), route: pts.slice(1, -1).map(p => (isWaypoint(p) ? p.id : p.icao || p.id)).join(' ') || 'DCT',
+    altitude: [...new Set(d.flights.map(f => f.alt))].join(' / '), route: pts.slice(1, -1).map(p => (p.kind === 'gps' ? icaoCoord(p) : isWaypoint(p) ? p.id : p.icao || p.id)).join(' ') || 'DCT',
     destination: `${dest.icao || dest.id} · ${dest.name}, ${dest.city}`, ete: fmtMin(d.totals.eteMin).replace(':', ' h ') + ' min',
     remarks: stops.length ? `Stops ${stops.join(' ')}` : '', fuel: fmtMin(d.totals.enduranceMin).replace(':', ' h ') + ' min', alternate: alt ? alt.icao || alt.id : '',
     aboard: soulsOf(plan) || '', fss: fss ? `${fss.id} FSS (1-800-WX-BRIEF / 122.2)` : 'FLIGHT SERVICE (1-800-WX-BRIEF / 122.2)',
   }
+}
+
+// A coordinate the way a flight plan takes it: 3658N12128W.
+function icaoCoord(p: { lat: number; lon: number }) {
+  const dm = (v: number, w: number) => { const a = Math.abs(v), d = Math.floor(a), m = Math.round((a - d) * 60); return m === 60 ? `${String(d + 1).padStart(w, '0')}00` : `${String(d).padStart(w, '0')}${String(m).padStart(2, '0')}` }
+  return `${dm(p.lat, 2)}${p.lat >= 0 ? 'N' : 'S'}${dm(p.lon, 3)}${p.lon >= 0 ? 'E' : 'W'}`
 }

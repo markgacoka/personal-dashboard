@@ -127,7 +127,7 @@ function WindsTable({ d, weather }: { d: Derived; weather: WeatherBundle | null 
         <table className="w-full min-w-[36rem] text-sm">
           <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Station</th>{levels.map(l => <th key={l} className="pb-1.5 text-right font-medium">{l.toLocaleString()}</th>)}</tr></thead>
           <tbody className="num">{stations.map(s => (
-            <tr key={s.id} className="border-t border-border"><td className="py-1.5 font-sans"><span className="num font-medium">{prod.source ? `${s.lat.toFixed(2)}, ${s.lon.toFixed(2)}` : s.id}</span> <span className="text-xs text-fg-3">{Math.round(s.dist)} nm off route</span></td>
+            <tr key={s.id} className="border-t border-border"><td className="py-1.5 font-sans"><span className="num font-medium">{/^M\d+$/.test(s.id) ? `${s.lat.toFixed(2)}, ${s.lon.toFixed(2)}` : s.id}</span> <span className="text-xs text-fg-3">{Math.round(s.dist)} nm off route</span></td>
               {levels.map(l => { const w = s.winds[l]; return <td key={l} className="text-right">{w ? `${w.dir == null ? 'L&V' : deg3(w.dir)}/${w.spd}` : '—'}{w?.temp != null && <span className="text-fg-3"> {w.temp > 0 ? '+' : ''}{w.temp}</span>}</td> })}
             </tr>
           ))}</tbody>

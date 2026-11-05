@@ -13,11 +13,13 @@ import type { NotamResponse } from '@/lib/types'
 import { computeCurrency } from '@/lib/flying'
 import { homeAirport } from '@/lib/weather'
 import { cn } from '@/lib/utils'
-import { bboxOf, useAirports, useAirspace, useCorridor, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, useRadar, useResolve, useTerrain, useWeather } from './api'
+import { bboxOf, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, useRadar, useResolve, useTerrain, useWeather } from './api'
 import { AircraftStep } from './AircraftStep'
 import { AirportsStep } from './AirportsStep'
 import { PilotStep } from './PilotStep'
 import { RouteStep } from './RouteStep'
+import { bestInsert, insertAt, removeAt, replaceAt } from './route'
+import type { EditPoint, RouteEdit } from './PlannerMap'
 import { flightNotes, type NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { FlightInputs } from './FlightInputs'
@@ -37,9 +39,9 @@ const DRAFT_KEY = 'planner-draft-v3'
 // The wizard: you type the flight on step 1; every later step shows what was
 // looked up or computed for it, with the source, and the checklists to tick.
 const STEPS: { key: string; label: string; blurb: string; sections: SectionKey[] }[] = [
-  { key: 'flight', label: 'Flight', blurb: 'Tail number, airports and route points, engine start, cruise power, occupants and fuel. Everything after this is filled in for you.', sections: ['trip'] },
+  { key: 'flight', label: 'Flight', blurb: 'Tail number, departure, route and arrival, engine start, cruise power, occupants and fuel. Everything after this is filled in for you.', sections: ['trip'] },
   { key: 'aircraft', label: 'Aircraft', blurb: 'FAA registry, the POH for the model and its numbers, the W&B record, maintenance and equipment.', sections: ['aircraft'] },
-  { key: 'route', label: 'Route', blurb: 'Cruise altitude, TOC, checkpoints and TOD with position, magnetic course, distance and terrain (SkyVector, NASR).', sections: ['navlog'] },
+  { key: 'route', label: 'Route', blurb: 'Build the route on the chart: suggested airports, VFR waypoints, VORs, towns, highways, rivers, power lines and towers; drag the line to add or move points. Then cruise altitude, TOC, checkpoints and TOD with course, distance and terrain.', sections: ['navlog'] },
   { key: 'airports', label: 'Airports', blurb: 'Runways, pattern, favored or in-use runway, frequencies and NOTAMs (AirNav, Chart Supplement), and the alternate.', sections: [] },
   { key: 'weather', label: 'Weather', blurb: 'METAR/TAF at each ETA, winds aloft, AIRMETs, SIGMETs, CWAs, PIREPs, TFRs and NOTAMs (aviationweather.gov, FAA).', sections: ['weather'] },
   { key: 'loading', label: 'Weight & performance', blurb: 'The W&B sheet from ramp to each landing, and takeoff and landing distances from the POH.', sections: ['loading', 'performance'] },
@@ -103,7 +105,12 @@ function Planner() {
   const apts = useAirports(ids, plan.departLocal.slice(0, 10))
   const airports = useMemo(() => apts.data?.airports ?? [], [apts.data])
   const resolve = useMemo(() => makeResolver(airports, points), [airports, points])
-  const routePts = useMemo(() => plan.route.map(resolve).filter(Boolean) as Airport[], [plan.route, resolve])
+  // Resolved route points (named from plan.labels) and, for each, its index in plan.route.
+  const [routePts, routeIdx] = useMemo(() => {
+    const pts: Airport[] = [], idx: number[] = []
+    plan.route.forEach((r, i) => { const a = resolve(r); if (!a) return; const l = plan.labels?.[parseRouteItem(r).id]; pts.push(l ? { ...a, label: l.name, name: l.name } : a); idx.push(i) })
+    return [pts, idx] as const
+  }, [plan.route, plan.labels, resolve])
   const allPts = useMemo(() => [...routePts, ...airports], [routePts, airports])
   const wx = useWeather(airports.map(a => a.icao || a.id), useMemo(() => bboxOf(allPts), [allPts]))
   const radar = useRadar()
@@ -114,7 +121,16 @@ function Planner() {
   const samples = useMemo(() => sampleRoute(routePts, 2), [routePts])
   const terrain = useTerrain(samples)
   const airspace = useAirspace(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 1) : null), [routePts]))
-  const corridor = useCorridor(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 0.12) : null), [routePts]))
+  const corridor = useCorridor(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 0.25) : null), [routePts]))
+  const landmarks = useLandmarks(useMemo(() => (routePts.length > 1 ? bboxOf(routePts, 0.25) : null), [routePts]))
+  // Route edits from the Route step (suggestions and the map): indices are routePts positions.
+  const putLabel = (p: EditPoint) => (p.label ? { ...plan.labels, [p.token]: { name: p.label, kind: p.kind ?? '' } } : plan.labels)
+  const edit: RouteEdit = {
+    insert: (at, p) => set({ route: insertAt(plan.route, routeIdx[at] ?? plan.route.length - 1, p.token), labels: putLabel(p) }),
+    move: (i, p) => set({ route: replaceAt(plan.route, routeIdx[i], p.token), labels: putLabel(p) }),
+    remove: i => set({ route: removeAt(plan.route, routeIdx[i]) }),
+    add: p => edit.insert(bestInsert(routePts, p), p),
+  }
   const registry = useRegistry(plan.tail ?? undefined)
   const planningQ = usePlanning(plan.tail)
   const planning = useMemo(() => planningQ.data ?? {}, [planningQ.data])
@@ -145,13 +161,13 @@ function Planner() {
   // Everything still loading (or failed), shown under the steps.
   const pending: [string, boolean][] = [
     ['route points', resolved.isFetching], ['airports', apts.isFetching], ['aircraft registry', registry.isLoading], ['POH', pohQ.isLoading],
-    ['weather', wx.isFetching], ['terrain', terrain.isLoading], ['airspace', airspace.isFetching], ['checkpoints', corridor.isFetching],
+    ['weather', wx.isFetching], ['terrain', terrain.isLoading], ['airspace', airspace.isFetching], ['checkpoints', corridor.isFetching], ['landmarks', landmarks.isFetching],
     ['NOTAMs', notamQs.some(q => q.isLoading)], ['alternates', nearby.isLoading], ['radar', radar.isLoading],
   ]
   const saving = planningQ.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
   const failed: [string, () => void][] = ([
     ['route points', resolved.isError, resolved.refetch], ['airports', apts.isError, apts.refetch], ['weather', wx.isError, wx.refetch], ['terrain', terrain.isError, terrain.refetch],
-    ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['POH', pohQ.isError, pohQ.refetch],
+    ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['landmarks', landmarks.isError, landmarks.refetch], ['POH', pohQ.isError, pohQ.refetch],
   ] as [string, boolean, () => void][]).filter(([, e]) => e).map(([n, , r]) => [n, r])
   const planEff = useMemo(() => ({ ...plan, alternate: effAlt }), [plan, effAlt])
 
@@ -175,7 +191,7 @@ function Planner() {
       toast.success('Plan saved')
     } catch (e) { toast.error((e as Error).message) }
   }
-  const routeText = plan.route.map(r => parseRouteItem(r).id).join(' → ') || 'No route yet'
+  const routeText = plan.route.map(r => { const id = parseRouteItem(r).id; return plan.labels?.[id]?.name ?? id }).join(' → ') || 'No route yet'
   const refOpen = refs.state.open
   const routeIds = plan.route.map(r => parseRouteItem(r).id).filter((_, i) => !routePts[i] || !isWaypoint(routePts[i]))
   const pohStatus = pohQ.isLoading ? `Downloading the ${aircraft.model} POH…` : pohQ.data?.match && !pohQ.data.match.exact ? `${pohQ.data.match.title} is the closest public POH to the ${aircraft.model}.` : null
@@ -240,7 +256,7 @@ function Planner() {
               <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null}
                 aircraft={aircraft} planning={planning} savePlanning={savePlanning} u={u} />
             )}
-            {cur === 'route' && <RouteStep plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} />}
+            {cur === 'route' && <RouteStep plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />}
             {cur === 'airports' && <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null} />}
             {cur === 'weather' && (
               <div className="space-y-5">

@@ -8,7 +8,8 @@ import { useResolve, type PohMatch } from './api'
 import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
 import type { AircraftProfile } from './poh'
-import { routeToText, textToRoute, tokenize } from './route'
+import { joinRoute, splitRoute, tokenize } from './route'
+import { kindName } from './suggest'
 import { NumField, SubHead } from './ui'
 import { fromF, fromW, toF, toW, type Units } from './units'
 
@@ -27,17 +28,23 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
   useEffect(() => setTail(plan.tail ?? ''), [plan.tail])
   const commitTail = () => { const t = tail.toUpperCase().replace(/\s+/g, '').trim(); if (t !== (plan.tail ?? '')) set({ tail: t || null, aircraft: undefined }) }
 
-  const [text, setText] = useState(routeToText(plan.route))
-  useEffect(() => setText(routeToText(plan.route)), [plan.route])
-  const tokens = tokenize(useDeferredValue(text))
-  const resolved = useResolve(tokens.map(t => t.replace(/\*$/, '')))
+  // Departure, the points flown over, arrival: one flight, one navlog.
+  const parts = splitRoute(plan.route)
+  const [dep, setDep] = useState(parts.dep), [via, setVia] = useState(parts.via.join(' ')), [arr, setArr] = useState(parts.arr)
+  useEffect(() => { const p = splitRoute(plan.route); setDep(p.dep); setArr(p.arr); if (plan.route.length > 1) setVia(p.via.join(' ')) }, [plan.route])
+  const tokens = useDeferredValue([...tokenize(dep).slice(0, 1), ...tokenize(via), ...tokenize(arr).slice(0, 1)].join(' ')).split(' ').filter(Boolean)
+  const resolved = useResolve(tokens)
   const pts = resolved.data?.points ?? []
-  const pointFor = (t: string) => pts.find(x => x.token.replace(/\*$/, '') === t.replace(/\*$/, ''))
+  const pointFor = (t: string) => pts.find(x => x.token.replace(/\*$/, '') === t)
   const commitRoute = () => {
-    const next = textToRoute(text, t => { const p = pointFor(t); return p ? p.kind === 'airport' : undefined })
-    if (next.join(' ') !== plan.route.join(' ')) set({ route: next })
+    // A whole route pasted into Departure ("KRHV E16 VPCOY KSNS") fills all three.
+    const d = tokenize(dep)
+    const next = d.length > 1 ? d : joinRoute(d[0] ?? '', tokenize(via), tokenize(arr)[0] ?? '')
+    if (next.join(' ') === plan.route.join(' ')) return
+    const labels = Object.fromEntries(Object.entries(plan.labels ?? {}).filter(([k]) => next.includes(k)))
+    set({ route: next, labels })
   }
-  const toggleStop = (i: number) => set({ route: plan.route.map((t, k) => (k === i ? (t.endsWith('*') ? t.slice(0, -1) : `${t}*`) : t)) })
+  const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') commitRoute() }
   const noRegistry = !!plan.tail && !registryLoading && !registry?.model
 
   const loads = loadsOf(plan)
@@ -82,28 +89,37 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
           </div>
 
           <div>
-            <SubHead right={<span className="text-xs text-fg-3">SkyVector / ForeFlight format</span>}>2 · Airports and route points</SubHead>
-            <Input value={text} onChange={e => setText(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={e => { if (e.key === 'Enter') commitRoute() }}
-              placeholder="KRHV E16* VPCOY KSNS KRHV" className="num uppercase" spellCheck={false} autoCapitalize="characters" aria-label="Route" />
-            <p className="mt-1 text-xs text-fg-3">Airports are stops; add * to fly over one (E16*). Points: navaids (SJC), fixes and VFR waypoints (VPCOY), radial/distance (SJC090020), coordinates (3651N12131W, 36.85/-121.53).</p>
+            <SubHead right={<span className="text-xs text-fg-3">SkyVector / ForeFlight format</span>}>2 · Departure, route and arrival</SubHead>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_8rem]">
+              <label className="block"><span className="mb-1 block text-sm text-fg-2">Departure</span>
+                <Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KRHV" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
+              <label className="order-last col-span-2 block sm:order-none sm:col-span-1"><span className="mb-1 block text-sm text-fg-2">Route (flown over)</span>
+                <Input value={via} onChange={e => setVia(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="E16 VPCOY SNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
+              <label className="block"><span className="mb-1 block text-sm text-fg-2">Arrival</span>
+                <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KSNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
+            </div>
+            <p className="mt-1 text-xs text-fg-3">You land only at the arrival airport; everything in Route is flown over, airports included. Points: navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W, 36.85/-121.53). The Route step suggests points and lets you drag the line on the chart.</p>
             {tokens.length > 0 && (
               <ol className="mt-3 space-y-1">
                 {tokens.map((t, i) => {
                   const p = pointFor(t)
                   const Icon = p ? KIND_ICON[p.kind] : CircleDashed
-                  const middleAirport = p?.kind === 'airport' && i > 0 && i < tokens.length - 1 && plan.route[i]?.replace(/\*$/, '') === t.replace(/\*$/, '')
-                  const over = plan.route[i]?.endsWith('*')
+                  const role = i === 0 ? 'Depart' : i === tokens.length - 1 && tokenize(arr).length ? 'Land' : 'Fly over'
+                  const end = role !== 'Fly over'
+                  const bad = end && p && p.kind !== 'airport' && p.kind !== 'unknown'
+                  const label = plan.labels?.[t]?.name
                   return (
                     <li key={`${t}-${i}`} className="flex items-center gap-2 text-sm">
-                      <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' ? 'text-bad' : 'text-fg-2')} />
-                      <span className="num w-28 shrink-0 font-medium text-fg">{t.replace(/\*$/, '')}</span>
-                      <span className="min-w-0 flex-1 truncate text-fg-3">{p ? (p.kind === 'unknown' ? p.error : `${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''} · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
-                      {middleAirport && <button onClick={() => toggleStop(i)} className={cn('press h-6 shrink-0 rounded-full px-2.5 text-xs font-medium ring-1 ring-inset', over ? 'text-fg-3 ring-border' : 'bg-accent-soft text-accent ring-accent/30')}>{over ? 'Fly over' : 'Land'}</button>}
+                      <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-2')} />
+                      <span className="num w-28 shrink-0 truncate font-medium text-fg" title={t}>{label ?? t}</span>
+                      <span className={cn('w-16 shrink-0 text-xs', end ? 'text-accent' : 'text-fg-3')}>{role}</span>
+                      <span className={cn('min-w-0 flex-1 truncate', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
                     </li>
                   )
                 })}
               </ol>
             )}
+            {!tokenize(arr).length && tokenize(dep).length > 0 && <p className="mt-2 text-sm text-fg-3">Add the arrival airport (the departure again for a local flight).</p>}
             {resolved.data?.cycle && <p className="mt-2 text-xs text-fg-3">FAA NASR cycle {resolved.data.cycle}</p>}
           </div>
         </div>
@@ -132,8 +148,8 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
             </div>
           </div>
           <div>
-            <SubHead>6 · Fuel and ground time</SubHead>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <SubHead>6 · Fuel and taxi</SubHead>
+            <div className="grid grid-cols-2 gap-3">
               <label className="block"><span className="mb-1 block text-sm text-fg-2">Fuel on board</span>
                 <OptNum value={plan.fuelGal == null ? null : Math.round(toF(plan.fuelGal, u) * 10) / 10} placeholder={profile ? Math.round(toF(d.totals.usableFuel, u)) : 40} unit={u.fuel} onChange={v => set({ fuelGal: v == null ? null : fromF(v, u) })} label="Fuel on board" />
                 <span className="mt-1 block text-xs text-fg-3">Blank: full usable</span>
@@ -142,7 +158,6 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
                 <OptNum value={plan.taxiMin ?? null} placeholder={10} unit="min" onChange={v => set({ taxiMin: v ?? undefined })} label="Start and taxi minutes" />
                 <span className="num mt-1 block text-xs text-fg-3">{d.takeoffAt ? `Takeoff ${d.takeoffAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Engine start to takeoff'}</span>
               </label>
-              <NumField label="Ground time per stop" value={plan.stopMinutes} onChange={v => set({ stopMinutes: v })} unit="min" step={5} min={0} />
             </div>
           </div>
         </div>

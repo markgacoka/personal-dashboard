@@ -10,6 +10,7 @@ import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
 import { modelWinds } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
+import { landmarks } from '../services/landmarks.js'
 import { fetchWithTimeout } from '../lib/http.js'
 
 const ID = /^[A-Z0-9]{2,4}$/
@@ -49,10 +50,21 @@ async function fbStationCoords(ids) {
   fbSites ||= new Map()
   const missing = ids.filter(i => !fbSites.has(i))
   if (missing.length) {
-    const { rows } = await pool.query('SELECT id, lat, lon FROM nasr_airports WHERE id = ANY($1)', [missing])
+    // FB stations are mostly VORs, some airports only.
+    const { rows } = await pool.query(
+      `SELECT id, lat, lon, 0 AS pri FROM nasr_points WHERE id = ANY($1) AND type ~ 'VOR'
+       UNION ALL SELECT id, lat, lon, 1 FROM nasr_airports WHERE id = ANY($1) ORDER BY pri`, [missing])
     for (const i of missing) fbSites.set(i, rows.find(r => r.id === i) || null)
   }
   return Object.fromEntries(ids.map(i => [i, fbSites.get(i)]).filter(([, v]) => v).map(([k, v]) => [k, { lat: v.lat, lon: v.lon }]))
+}
+
+// The FB stations for a route box: every one inside it (1° margin), at least the nearest four, at most ten.
+export function fbStationsFor(coords, box) {
+  const c = { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 }
+  const all = Object.entries(coords).map(([id, p]) => ({ id, ...p, d: nm(c, p) })).sort((a, b) => a.d - b.d)
+  const inside = all.filter(inBox(box, 1))
+  return (inside.length >= 4 ? inside : all.slice(0, 4)).slice(0, 10).map(({ d, ...s }) => s)
 }
 
 const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, size, page_map, source, created_at'
@@ -111,7 +123,13 @@ export default async function plannerRoutes(fastify) {
         return ring.some(([lon, lat]) => inBox(box, 1)({ lat, lon }))
       })),
     ])
-    const fb = [fb06, fb12, fb24].map((p, i) => ({ fcst: ['06', '12', '24'][i], ...p }))
+    // FB winds aloft: aviationweather.gov, else the same bulletin from the NWS
+    // feed; while neither publishes one, model winds sampled at the FB stations.
+    let fb = [fb06, fb12, fb24].map((p, i) => ({ fcst: ['06', '12', '24'][i], ...p }))
+    if (!fb.some(p => p.data?.length)) {
+      const nws = await Promise.all(['06', '12', '24'].map(f => settle(awc.nwsWindsAloft(f))))
+      if (nws.some(p => p.data?.length)) fb = nws.map((p, i) => ({ fcst: ['06', '12', '24'][i], ...p, source: 'api.weather.gov' }))
+    }
     const stationIds = [...new Set(fb.flatMap(p => (p.data || []).flatMap(x => Object.keys(x.stations))))]
     const coords = await fbStationCoords(stationIds).catch(() => ({}))
     for (const p of fb) {
@@ -121,10 +139,9 @@ export default async function plannerRoutes(fastify) {
         stations: Object.fromEntries(Object.entries(prod.stations).filter(([k]) => coords[k] && inBox(box, 3)(coords[k])).map(([k, v]) => [k, { ...coords[k], winds: v }])),
       }))
     }
-    // No FB forecast (AWC answering 204): model winds aloft, labelled as such.
     let winds = fb
     if (!fb.some(p => p.data?.length)) {
-      const m = await settle(modelWinds(box))
+      const m = await settle((async () => modelWinds(fbStationsFor(await fbStationCoords((await awc.fbStationIds()).data), box)))())
       winds = m.data?.length ? m.data.map(prod => ({ fcst: 'model', data: [prod], fetchedAt: m.fetchedAt })) : fb.map(p => ({ ...p, error: p.error || m.error || 'No FB winds-aloft forecast available' }))
     }
     const merge = (a, b, key) => { const m = new Map(); for (const x of [...(b.data || []), ...(a.data || [])]) m.set(x[key], x); return [...m.values()] }
@@ -157,6 +174,15 @@ export default async function plannerRoutes(fastify) {
       const body = await airspaceIn({ south, west, north, east }, fastify.log)
       return reply.header('Content-Type', 'application/json; charset=utf-8').header('Cache-Control', 'private, max-age=3600').send(body)
     } catch (e) { return reply.status(503).send({ error: 'Airspace data unavailable', detail: e.message }) }
+  })
+
+  // GET /api/planner/landmarks?south=&west=&north=&east= → visual checkpoints (towns, roads, rivers, power lines, towers…)
+  fastify.get('/api/planner/landmarks', async (req, reply) => {
+    const [south, west, north, east] = ['south', 'west', 'north', 'east'].map(k => Number(req.query[k]))
+    if (![south, west, north, east].every(Number.isFinite) || north - south > 3 || east - west > 4) return reply.status(400).send({ error: 'bbox (≤ 3° × 4°) required' })
+    try {
+      return reply.header('Cache-Control', 'private, max-age=3600').send(await landmarks({ south, west, north, east }))
+    } catch (e) { return reply.status(e.statusCode || 503).send({ error: 'Landmarks unavailable', detail: e.message }) }
   })
 
   // GET /api/planner/corridor?south=&west=&north=&east= → airports usable as navlog checkpoints

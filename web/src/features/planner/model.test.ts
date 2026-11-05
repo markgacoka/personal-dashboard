@@ -106,15 +106,26 @@ describe('derive: navlog rows', () => {
     expect(d.navlog[0].phase).toBe('climb'); expect(d.navlog.at(-1)!.phase).toBe('descent')
     expect(d.navlog.at(-1)!.remNm).toBe(0)
   })
-  test('a stop adds ground time and taxi fuel; an overfly point does neither and gets no landing', () => {
-    const stop = derive(plan({ route: ['KRHV', 'KSNS', 'KRHV'] }), inputs())
-    const over = derive(plan({ route: ['KRHV', 'KSNS*', 'KRHV'] }), inputs())
-    expect(stop.totals.taxiFuel).toBeCloseTo(2.2, 5)
-    expect(over.totals.taxiFuel).toBeCloseTo(1.1, 5)
-    expect(stop.perf.map(p => `${p.airport.id} ${p.kind}`)).toEqual(['RHV takeoff', 'SNS landing', 'SNS takeoff', 'RHV landing'])
-    expect(over.perf.map(p => `${p.airport.id} ${p.kind}`)).toEqual(['RHV takeoff', 'RHV landing'])
-    expect(over.navlog.filter(r => r.phase === 'climb')).toHaveLength(1)
-    expect(+stop.legs[1].departAt - +stop.legs[0].arriveAt).toBe(15 * 60_000)
+  test('one flight, one navlog: an airport between departure and arrival is flown over, never a stop', () => {
+    for (const route of [['KRHV', 'KSNS', 'KRHV'], ['KRHV', 'KSNS*', 'KRHV']]) {
+      const d = derive(plan({ route }), inputs())
+      expect(d.totals.taxiFuel).toBeCloseTo(1.1, 5)
+      expect(d.perf.map(p => `${p.airport.id} ${p.kind}`)).toEqual(['RHV takeoff', 'RHV landing'])
+      expect(d.navlog.filter(r => r.phase === 'climb')).toHaveLength(1)
+      expect(d.navlog.find(r => r.to.id === 'SNS')?.to.kind).toBe('overfly')
+      expect(d.flights).toHaveLength(1)
+    }
+  })
+  test('a coordinate point picked from a landmark carries its name onto the navlog', () => {
+    const points: Inputs['points'] = [
+      { token: 'KRHV', overfly: false, kind: 'airport', id: 'RHV', label: 'KRHV' },
+      { token: '37.00000/-121.57000', overfly: false, kind: 'gps', id: '37.00000/-121.57000', label: '37.00000/-121.57000', lat: 37, lon: -121.57, magVar: 13 },
+      { token: 'KSNS', overfly: false, kind: 'airport', id: 'SNS', label: 'KSNS' },
+    ]
+    const d = derive(plan({ route: ['KRHV', '37.00000/-121.57000', 'KSNS'], labels: { '37.00000/-121.57000': { name: 'Gilroy', kind: 'town' } } }), inputs({ points }))
+    const row = d.navlog.find(r => r.to.id === '37.00000/-121.57000')!
+    expect(row.to.label).toBe('Gilroy')
+    expect(d.navlog.find(r => r.from === 'Gilroy')).toBeTruthy()
   })
 })
 
@@ -154,19 +165,20 @@ describe('derive: waypoints and E6B row overrides', () => {
 })
 
 describe('derive: flights, automatic altitude and the W&B sheet', () => {
-  const d = derive(plan({ route: ['KRHV', 'KSNS', 'KRHV'], seats: { pilot: 150, front: 140, rearL: 155, rearR: 0 } }), inputs())
-  test('a round trip is two flights, each with its own NavLog rows', () => {
-    expect(d.flights.map(f => `${f.from.id}-${f.to.id}`)).toEqual(['RHV-SNS', 'SNS-RHV'])
+  const d = derive(plan({ route: ['KRHV', 'KSNS'], seats: { pilot: 150, front: 140, rearL: 155, rearR: 0 } }), inputs())
+  test('one flight with its own NavLog rows', () => {
+    expect(d.flights.map(f => `${f.from.id}-${f.to.id}`)).toEqual(['RHV-SNS'])
     expect(d.flights.every(f => f.rows.length > 2 && f.rows.every(r => r.flight === f.n))).toBe(true)
   })
-  test('lowest VFR cruising altitude: 3,500 southeast-bound, 4,500 back northwest', () => {
-    expect(d.flights.map(f => f.alt)).toEqual([3500, 4500])
+  test('lowest VFR cruising altitude: 3,500 southeast-bound, 4,500 northwest-bound', () => {
+    expect(d.flights.map(f => f.alt)).toEqual([3500])
+    expect(derive(plan({ route: ['KSNS', 'KRHV'] }), inputs()).flights.map(f => f.alt)).toEqual([4500])
     expect(d.flights.every(f => !f.altSet && f.hemispheric)).toBe(true)
     expect(d.checks.some(c => /hemispheric/.test(c.title))).toBe(false)
   })
-  test('your altitude replaces the automatic one for that flight only', () => {
-    const o = derive(plan({ route: ['KRHV', 'KSNS', 'KRHV'], altitudes: { 0: 5500 } }), inputs())
-    expect(o.flights.map(f => [f.alt, f.altSet])).toEqual([[5500, true], [4500, false]])
+  test('your altitude replaces the automatic one', () => {
+    const o = derive(plan({ route: ['KRHV', 'KSNS'], altitudes: { 0: 5500 } }), inputs())
+    expect(o.flights.map(f => [f.alt, f.altSet])).toEqual([[5500, true]])
   })
   test('terrain raises the altitude to 1,000 ft above it', () => {
     const t = derive(plan(), inputs({ terrain: Array(40).fill(3482) }))
@@ -175,10 +187,10 @@ describe('derive: flights, automatic altitude and the W&B sheet', () => {
   test('seats feed the stations; the sheet runs ramp → run-up → takeoff → burn → landing per flight', () => {
     expect(d.wb.items[2].weight).toBe(290); expect(d.wb.items[3].weight).toBe(155)
     expect(d.wb.steps.map(s => s.label)).toEqual(['Basic empty weight', 'Fuel 40 gal', 'Pilot and front passenger', 'Rear passengers', 'Baggage area 1', 'Ramp',
-      'Run-up fuel', 'Takeoff KRHV', 'Flight burn', 'Landing KSNS', 'Run-up fuel', 'Takeoff KSNS', 'Flight burn', 'Landing KRHV'])
+      'Run-up fuel', 'Takeoff', 'Flight burn', 'Landing KSNS'])
     const last = d.wb.steps.at(-1)!
     expect(last.weight).toBeCloseTo(d.wb.landing.weight, 6)
-    expect(last.weight).toBeCloseTo(d.wb.ramp.weight - 14 - d.totals.tripFuel * 6, 6)
+    expect(last.weight).toBeCloseTo(d.wb.ramp.weight - 7 - d.totals.tripFuel * 6, 6)
     expect(d.wb.steps.filter(s => s.total).every(s => !s.over)).toBe(true)
   })
   test('fuel left unset means full usable tanks', () => {

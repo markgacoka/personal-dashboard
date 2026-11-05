@@ -133,6 +133,17 @@ describe('model winds aloft', () => {
     const prods = toProducts([{ latitude: 37, longitude: -121.7, hourly }], Date.parse('2026-11-05T06:30:00Z'))
     assert.equal(prods.length, 2)
     assert.deepEqual(prods[0].forUse, ['0600', '0900']); assert.equal(prods[0].valid, '050700')
-    assert.deepEqual(prods[0].stations.M1.winds[4000], { dir: 270, spd: 20, temp: 5 })
+    assert.deepEqual(prods[0].stations.M1.winds[3000], { dir: 270, spd: 20, temp: 5 })
+  })
+})
+
+describe('FB stations for model winds', () => {
+  test('keeps the station ids and coordinates it was sampled for', () => {
+    const hourly = { time: ['2026-11-05T06:00', '2026-11-05T07:00', '2026-11-05T08:00'] }
+    for (const p of [1000, 975, 950, 925, 900, 850, 800, 750, 700, 650, 600]) Object.assign(hourly, { [`geopotential_height_${p}hPa`]: [0, (1100 - p) * 30, 0], [`wind_direction_${p}hPa`]: [0, 250, 0], [`wind_speed_${p}hPa`]: [0, 15, 0], [`temperature_${p}hPa`]: [0, 0, 0] })
+    const prods = toProducts([{ latitude: 37.6, longitude: -122.4, hourly }], Date.parse('2026-11-05T06:30:00Z'), [{ id: 'SFO', lat: 37.62, lon: -122.37 }])
+    assert.deepEqual(Object.keys(prods[0].stations), ['SFO'])
+    assert.equal(prods[0].stations.SFO.lat, 37.62)
+    assert.deepEqual(Object.keys(prods[0].stations.SFO.winds).map(Number), [3000, 6000, 9000, 12000])
   })
 })

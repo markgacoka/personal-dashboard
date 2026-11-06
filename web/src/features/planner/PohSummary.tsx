@@ -72,13 +72,13 @@ export function WbTable({ d, plan, u = US }: { d: Derived; plan: Plan; u?: Units
   const loads = loadsOf(plan)
   return (
     <div className="overflow-x-auto">
-      <table className="num w-full min-w-[36rem] text-sm">
-        <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Item</th><th className="pb-1.5 font-medium">Source</th><th className="pb-1.5 text-right font-medium">Weight ({u.weight})</th><th className="pb-1.5 text-right font-medium">Arm (in)</th><th className="pb-1.5 text-right font-medium">Moment / 1000</th></tr></thead>
+      <table className="num w-full text-sm sm:min-w-[36rem]">
+        <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Item</th><th className="pb-1.5 font-medium max-sm:hidden">Source</th><th className="pb-1.5 pl-2 text-right font-medium">Weight ({u.weight})</th><th className="pb-1.5 pl-2 text-right font-medium">Arm (in)</th><th className="pb-1.5 pl-2 text-right font-medium">Moment / 1000</th></tr></thead>
         <tbody>
           {d.wb.steps.map((s, i) => (
             <tr key={i} className={cn('border-t border-border', s.total && 'border-fg/40 font-semibold', s.over && 'text-bad')}>
-              <td className="py-1.5 font-sans">{s.label}</td>
-              <td className="py-1.5 font-sans text-fg-3">{s.source}{s.over ? ' · over' : ''}</td>
+              <td className="py-1.5 font-sans">{s.label}<div className="text-xs font-normal text-fg-3 sm:hidden">{s.source}{s.over ? ' · over' : ''}</div></td>
+              <td className="py-1.5 font-sans text-fg-3 max-sm:hidden">{s.source}{s.over ? ' · over' : ''}</td>
               <td className="py-1.5 text-right">{W(s.weight)}</td>
               <td className="py-1.5 text-right">{s.arm == null ? '' : s.total ? s.arm.toFixed(2) : +s.arm.toFixed(2)}</td>
               <td className="py-1.5 text-right">{(s.moment / 1000).toFixed(2)}</td>

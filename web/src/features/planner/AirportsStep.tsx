@@ -120,17 +120,18 @@ function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: stri
         {atis && <details className="mt-1"><summary className="cursor-pointer text-xs text-accent">D-ATIS text</summary><p className="num mt-1 text-xs text-fg-2">{atis.text}</p></details>}
       </div>
 
-      <div className="mt-3 overflow-x-auto"><table className="num w-full min-w-[30rem] text-sm">
-        <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1 font-medium">Runway</th><th className="pb-1 font-medium">Size (ft)</th><th className="pb-1 font-medium">Pattern</th><th className="pb-1 text-right font-medium">Head / cross</th><th className="pb-1 pl-3 font-medium">Notes</th></tr></thead>
+      <div className="mt-3 overflow-x-auto"><table className="num w-full text-sm sm:min-w-[30rem] [&_td+td]:whitespace-nowrap [&_td+td]:pl-2 [&_th+th]:pl-2">
+        <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1 font-medium">Runway</th><th className="pb-1 font-medium">Size (ft)</th><th className="pb-1 font-medium">Pattern</th><th className="pb-1 text-right font-medium">Head / cross</th><th className="pb-1 pl-3 font-medium max-sm:hidden">Notes</th></tr></thead>
         <tbody>{ends.map(({ r, e, c, mag }) => {
           const fav = inUse.length ? inUse.includes(e.id) : best?.end.id === e.id
+          const notes = [r.surface, e.displaced ? `thr displaced ${e.displaced}` : null, e.vgsi, r.lights ? `${r.lights} lights` : null].filter(Boolean).join(' · ')
           return (
             <tr key={`${r.id}-${e.id}`} className={cn('border-t border-border align-top', fav && 'font-semibold text-fg')}>
-              <td className="py-1.5">{e.id} <span className="font-normal text-fg-3">{deg3(mag)}°</span></td>
+              <td className="py-1.5">{e.id} <span className="font-normal text-fg-3">{deg3(mag)}°</span>{notes && <div className="font-sans text-xs font-normal text-fg-3 sm:hidden">{notes}</div>}</td>
               <td className="py-1.5">{r.len.toLocaleString()} × {r.wid ?? '—'}</td>
               <td className="py-1.5">{e.right ? 'Right' : 'Left'}</td>
               <td className="py-1.5 text-right">{c ? `${c.head >= 0 ? c.head : `−${-c.head}`} / ${Math.abs(c.cross)}` : '—'}</td>
-              <td className="py-1.5 pl-3 font-sans text-xs font-normal text-fg-3">{[r.surface, e.displaced ? `thr displaced ${e.displaced}` : null, e.vgsi, r.lights ? `${r.lights} lights` : null].filter(Boolean).join(' · ')}</td>
+              <td className="py-1.5 pl-3 font-sans text-xs font-normal text-fg-3 whitespace-normal! max-sm:hidden">{notes}</td>
             </tr>
           )
         })}</tbody>
@@ -139,8 +140,8 @@ function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: stri
       <KV className="mt-3" items={[
         ['Elevation', <span className="num">{Math.round(a.elev).toLocaleString()} ft</span>],
         ['Pattern altitude', <span className="num">{tpa.toLocaleString()} ft MSL{a.tpaAgl ? '' : ' (1,000 AGL, not published)'}</span>],
-        ['Weather', a.wx ? <span>{a.wx.type} {a.wx.id !== a.id ? `at ${a.wx.id} (${a.wx.distNm} nm)` : ''} {a.wx.freq && <span className="num">{a.wx.freq}</span>} {a.wx.phone && <a className="num text-accent hover:underline" href={`tel:${a.wx.phone}`}>{a.wx.phone}</a>}</span> : 'No AWOS/ASOS within 30 nm'],
-        ['Flight service', <span>{a.fss?.id ? `${a.fss.name ? titleCase(a.fss.name) : a.fss.id} FSS · ` : ''}<span className="num">122.2</span> · <a className="num text-accent hover:underline" href="tel:18009927433">1-800-WX-BRIEF</a></span>],
+        ['Weather', a.wx ? <span>{a.wx.type} {a.wx.id !== a.id ? `at ${a.wx.id} (${a.wx.distNm} nm)` : ''} {a.wx.freq && <span className="num">{a.wx.freq}</span>} {a.wx.phone && <a className="num whitespace-nowrap text-accent hover:underline" href={`tel:${a.wx.phone}`}>{a.wx.phone}</a>}</span> : 'No AWOS/ASOS within 30 nm'],
+        ['Flight service', <span>{a.fss?.id ? `${a.fss.name ? titleCase(a.fss.name) : a.fss.id} FSS · ` : ''}<span className="num">122.2</span> · <a className="num whitespace-nowrap text-accent hover:underline" href="tel:18009927433">1-800-WX-BRIEF</a></span>],
         ['Sun', a.sun ? <span className="num">Rise {fmtTime(new Date(a.sun.rise))} · set {fmtTime(new Date(a.sun.set))} · civil dusk {fmtTime(new Date(a.sun.civilDusk))}</span> : null],
         ['Density altitude', wx?.da != null ? <span className="num">{wx.da.toLocaleString()} ft ({wx.tempC} °C, {wx.altimInHg?.toFixed(2)} inHg)</span> : null],
       ]} />

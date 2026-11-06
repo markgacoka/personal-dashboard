@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Loader2, Printer, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -207,27 +207,30 @@ function Planner() {
     return worst(st.sections.map(k => d.sections[k]))
   }
   const cur = STEPS[stepAt].key
+  // Keep the current step's chip in view when the chips scroll sideways (phones).
+  const stepsRef = useRef<HTMLElement>(null)
+  useEffect(() => { const nav = stepsRef.current, el = nav?.querySelector<HTMLElement>('[aria-current]'); if (nav && el) nav.scrollTo({ left: nav.scrollLeft + el.getBoundingClientRect().left - nav.getBoundingClientRect().left - (nav.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' }) }, [stepAt])
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
 
   return (
     <div className="planner">
-      <PageHeader
+      <PageHeader className="[&>div:first-child]:basis-full xl:[&>div:first-child]:basis-0 max-sm:[&>div:nth-child(2)]:w-full"
         title={<input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" className="w-full min-w-0 bg-transparent outline-none focus:underline" />}
         description={<span><span className="num">{routeText}</span>{d.departAt && <> · {d.departAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>}{d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)} · {d.totals.tripFuel.toFixed(1)} gal</span></>}</span>}
-        actions={<div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-44 lg:hidden" aria-label="Saved plans">
+        actions={<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto print:hidden">
+          <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-full sm:w-44 xl:hidden" aria-label="Saved plans">
             <option value="">{plans.data?.length ? 'Saved plans…' : 'No saved plans'}</option>
             {plans.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
           <Button variant="secondary" onClick={() => setState({ plan: blank(recentTail), id: null, step: 0 })}><FilePlus2 />New</Button>
           <Button variant="primary" onClick={save} loading={plans.create.isPending || plans.update.isPending}><Save />Save</Button>
           {state.id && <Button variant="danger-ghost" size="icon" aria-label="Delete plan" onClick={() => { plans.remove.mutate(state.id!); setState({ plan: blank(recentTail), id: null, step: 0 }) }}><Trash2 /></Button>}
-          <Button variant={refOpen ? 'secondary' : 'ghost'} onClick={() => (refOpen ? refs.close() : refs.show(refs.state.tab))} aria-pressed={refOpen}><BookOpen />POH &amp; briefing</Button>
-          <Button variant="ghost" onClick={() => { go(STEPS.length - 1); setTimeout(() => window.print(), 300) }}><Printer />Print NavLog</Button>
+          <Button variant={refOpen ? 'secondary' : 'ghost'} onClick={() => (refOpen ? refs.close() : refs.show(refs.state.tab))} aria-pressed={refOpen}><BookOpen /><span className="sm:hidden">POH</span><span className="max-sm:hidden">POH &amp; briefing</span></Button>
+          <Button variant="ghost" onClick={() => { go(STEPS.length - 1); setTimeout(() => window.print(), 300) }} aria-label="Print NavLog"><Printer /><span className="max-sm:hidden">Print NavLog</span></Button>
         </div>}
       />
 
-      <nav aria-label="Planner steps" className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1 print:hidden">
+      <nav ref={stepsRef} aria-label="Planner steps" className="scrollbar-none -mx-4 mb-5 flex gap-1 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 print:hidden">
         {STEPS.map((st, i) => {
           const s = stepStatus(i)
           return (
@@ -241,13 +244,13 @@ function Planner() {
 
       <LoadingStrip loading={pending.filter(([, v]) => v).map(([n]) => n)} saving={saving} failed={failed} />
 
-      <div className={cn('grid gap-6', refOpen ? 'lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)] 2xl:grid-cols-[15rem_minmax(0,1fr)_minmax(26rem,40%)]' : 'lg:grid-cols-[15rem_minmax(0,1fr)]')}>
-        <aside className={cn('hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-6rem)] print:hidden', refOpen && 'xl:hidden 2xl:block')}>
+      <div className={cn('grid gap-6', refOpen ? 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)] 2xl:grid-cols-[15rem_minmax(0,1fr)_minmax(26rem,40%)]' : 'xl:grid-cols-[15rem_minmax(0,1fr)]')}>
+        <aside className={cn('hidden xl:sticky xl:top-20 xl:block xl:max-h-[calc(100dvh-6rem)] print:hidden', refOpen && 'xl:hidden 2xl:block')}>
           <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
             onOpen={p => setState({ plan: p.data, id: p.id, step: 0 })} onNew={() => setState({ plan: blank(recentTail), id: null, step: 0 })} />
         </aside>
         <div className="min-w-0 space-y-5">
-          <Card className={cn('px-5 py-5 sm:px-6', cur === 'navlog' && 'px-3 sm:px-5')}>
+          <Card className={cn('px-4 py-4 sm:px-6 sm:py-5', cur === 'navlog' && 'px-3 sm:px-5')}>
             <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 print:hidden">
               <h2 className="text-lg font-medium text-fg">{STEPS[stepAt].label}</h2>
               <p className="text-sm text-fg-3">{STEPS[stepAt].blurb}</p>
@@ -278,6 +281,7 @@ function Planner() {
             {cur === 'review' && <Review d={d} status={overall} label={verdict} onJump={key => go(STEPS.findIndex(s => s.key === key))} />}
             {cur === 'navlog' && (
               <div className="space-y-8">
+                {d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways. Print puts it on one landscape page.</p>}
                 {d.flights.map(f => (
                   <div key={f.n} className="break-after-page">
                     <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal · arrive {fmtTime(f.arriveAt)}</span>}>

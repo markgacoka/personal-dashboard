@@ -141,6 +141,13 @@ climb rows use the POH climb table, descent is 500 fpm at cruise power to TPA.
 The reference panel keeps the POH and briefings open; POH figure links jump to
 the page.
 
+Phones and tablets: the step chips scroll sideways and keep the current step in
+view; header actions shorten on phones; the saved-plans list sits beside the
+wizard from 1280 px (a dropdown below); map chart and layer buttons fold behind
+one button when the map is narrower than 576 px; wide tables drop or fold
+secondary columns on phones (takeoff and landing become cards); the NavLog
+sheet stays paper-size and scrolls sideways.
+
 ## Persistence
 
 `planner_plans` (named plans, JSON), `planner_aircraft` (per-tail empty weight,

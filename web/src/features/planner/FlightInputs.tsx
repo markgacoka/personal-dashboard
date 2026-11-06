@@ -109,11 +109,11 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
                   const bad = end && p && p.kind !== 'airport' && p.kind !== 'unknown'
                   const label = plan.labels?.[t]?.name
                   return (
-                    <li key={`${t}-${i}`} className="flex items-center gap-2 text-sm">
+                    <li key={`${t}-${i}`} className="flex flex-wrap items-center gap-x-2 text-sm sm:flex-nowrap">
                       <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-2')} />
                       <span className="num w-28 shrink-0 truncate font-medium text-fg" title={t}>{label ?? t}</span>
                       <span className={cn('w-16 shrink-0 text-xs', end ? 'text-accent' : 'text-fg-3')}>{role}</span>
-                      <span className={cn('min-w-0 flex-1 truncate', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
+                      <span className={cn('min-w-0 truncate max-sm:basis-full max-sm:pl-6 sm:flex-1', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
                     </li>
                   )
                 })}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Layers } from 'lucide-react'
 import { MapView, fitTo, mapColor, maplibregl } from '@/components/data/MapView'
 import { cn } from '@/lib/utils'
 import { category, ceilingOf, parseVisib } from './calc'
@@ -66,6 +67,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
 }) {
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [ready, setReady] = useState(false)
+  const [controls, setControls] = useState(false) // phones: chart and layer buttons behind one toggle
   const [chart, setChart] = useState<ChartKey>(savedChart)
   const [on, setOn] = useState<Record<LayerKey, boolean>>({ radar: true, airspace: false, wx: true, pirep: true, adv: true, cwa: true, tfr: true, notam: true, lm: true })
   const popup = useRef<maplibregl.Popup | null>(null)
@@ -308,24 +310,27 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
   }, [on, chart, ready])
 
   return (
-    <div className={cn('relative overflow-hidden rounded-lg ring-1 ring-inset ring-border', className)}>
+    <div className={cn('@container relative overflow-hidden rounded-lg ring-1 ring-inset ring-border', className)}>
       <MapView className="h-full w-full" onLoad={onLoad} zoom={8} fullscreen />
-      <div className="absolute left-2 top-2 flex max-w-[calc(100%-4rem)] flex-wrap gap-1">
-        <div role="radiogroup" aria-label="Base chart" className="flex flex-wrap gap-0.5 rounded-full bg-card/90 p-0.5 ring-1 ring-border backdrop-blur">
+      <button onClick={() => setControls(v => !v)} aria-expanded={controls} className="absolute left-2 top-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-card/90 px-3 text-sm font-medium text-fg ring-1 ring-border backdrop-blur @xl:hidden">
+        <Layers className="size-4" />{controls ? 'Done' : CHARTS.find(c => c.key === chart)!.label}
+      </button>
+      <div className={cn('absolute left-2 top-12 max-w-[calc(100%-4rem)] flex-wrap gap-1 @xl:top-2 @xl:flex', controls ? 'flex' : 'hidden')}>
+        <div role="radiogroup" aria-label="Base chart" className="flex flex-wrap gap-0.5 rounded-2xl bg-card/90 p-0.5 @xl:rounded-full ring-1 ring-border backdrop-blur">
           {CHARTS.map(c => (
             <button key={c.key} role="radio" aria-checked={chart === c.key} onClick={() => { setChart(c.key); try { localStorage.setItem(CHART_KEY, c.key) } catch { /* private mode */ } }}
-              className={cn('h-6 rounded-full px-2.5 text-xs font-medium', chart === c.key ? 'bg-accent text-bg' : 'text-fg-2 hover:text-fg')}>{c.label}</button>
+              className={cn('h-8 rounded-full px-3 text-sm font-medium @xl:h-6 @xl:px-2.5 @xl:text-xs', chart === c.key ? 'bg-accent text-bg' : 'text-fg-2 hover:text-fg')}>{c.label}</button>
           ))}
         </div>
         {LAYERS.filter(l => l.key !== 'lm' || landmarks || cands?.length).map(l => (
           <button key={l.key} onClick={() => setOn(s => ({ ...s, [l.key]: !s[l.key] }))} aria-pressed={on[l.key]}
-            className={cn('h-7 rounded-full px-2.5 text-xs font-medium backdrop-blur', on[l.key] ? 'bg-card/90 text-fg ring-1 ring-border' : 'bg-card/60 text-fg-3')}>{l.label}</button>
+            className={cn('h-8 rounded-full px-3 text-sm font-medium backdrop-blur @xl:h-7 @xl:px-2.5 @xl:text-xs', on[l.key] ? 'bg-card/90 text-fg ring-1 ring-border' : 'bg-card/60 text-fg-3')}>{l.label}</button>
         ))}
       </div>
       <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-x-2 gap-y-0.5 rounded-md bg-card/85 px-2 py-1 text-xs text-fg-2 backdrop-blur">
         {(['VFR', 'MVFR', 'IFR', 'LIFR'] as const).map(c => <span key={c} className="inline-flex items-center gap-1"><span className="size-2 rounded-full" style={{ background: `var(${catVar(c)})` }} />{c}</span>)}
         {on.radar && radar?.valid && <span>· Radar {fmtTime(new Date(radar.valid))}</span>}
-        <span>· {CHARTS.find(c => c.key === chart)!.note}</span>
+        <span className="hidden @xl:inline">· {CHARTS.find(c => c.key === chart)!.note}</span>
       </div>
     </div>
   )

@@ -54,12 +54,14 @@ export interface ProfileEdits {
   vso?: Num; vs1?: Num; vr?: Num; vx?: Num; vy?: Num; va?: Num; vfe?: string; vno?: Num; vne?: Num; glide?: Num; approach?: string; shortApproach?: Num
   crosswindDemo?: Num; glideNmPer1000?: Num
   cruiseKtas?: Num; cruiseGph?: Num
+  // What the airplane needs of its pilot (§61.31): horsepower, retractable gear / constant-speed prop, tailwheel.
+  hp?: Num; complex?: boolean; tailwheel?: boolean
 }
 
 const has = (v: Num): v is number => v != null && Number.isFinite(v) && v > 0
 const text = (v?: string) => (v && v.trim() ? v.trim() : undefined)
 // Number of fields you set (for "3 of your values" and the Reset button).
-export const editCount = (e?: ProfileEdits | null) => !e ? 0 : Object.entries(e).reduce((n, [k, v]) => n + (k === 'arms' ? Object.values(v as object).filter(x => has(x as Num)).length : typeof v === 'string' ? (v.trim() ? 1 : 0) : has(v as Num) ? 1 : 0), 0)
+export const editCount = (e?: ProfileEdits | null) => !e ? 0 : Object.entries(e).reduce((n, [k, v]) => n + (k === 'arms' ? Object.values(v as object).filter(x => has(x as Num)).length : typeof v === 'string' ? (v.trim() ? 1 : 0) : typeof v === 'boolean' ? (v ? 1 : 0) : has(v as Num) ? 1 : 0), 0)
 
 // The profile to plan with: the matched POH profile with your values on top.
 export function applyEdits(m: ProfileMatch, e?: ProfileEdits | null): ProfileMatch {

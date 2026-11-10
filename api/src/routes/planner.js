@@ -12,6 +12,7 @@ import { modelWinds } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
 import { fetchWithTimeout } from '../lib/http.js'
+import { documentText, imageType, isPdf } from '../services/docText.js'
 
 const ID = /^[A-Z0-9]{2,4}$/
 const TAIL = /^[A-Z0-9][A-Z0-9-]{1,7}$/
@@ -67,12 +68,15 @@ export function fbStationsFor(coords, box) {
   return (inside.length >= 4 ? inside : all.slice(0, 4)).slice(0, 10).map(({ d, ...s }) => s)
 }
 
-const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, size, page_map, source, created_at'
+// Checklist steps as saved from the planner: sections of item/action pairs, bounded.
+const validSteps = s => s === null || (Array.isArray(s) && s.length <= 100 && s.every(x => x && typeof x.title === 'string' && x.title.length <= 120 && Array.isArray(x.items) && x.items.length <= 200
+  && x.items.every(i => i && typeof i.item === 'string' && i.item.length <= 300 && (i.action == null || (typeof i.action === 'string' && i.action.length <= 200)))))
+const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, content_type, size, page_map, steps, source, created_at'
 const DOC_KINDS = ['poh', 'briefing', 'checklist', 'other']
 const MAX_PDF = 80 * 1024 * 1024
 
 export default async function plannerRoutes(fastify) {
-  fastify.addContentTypeParser('application/pdf', { parseAs: 'buffer', bodyLimit: MAX_PDF }, (req, body, done) => done(null, body))
+  for (const t of ['application/pdf', 'image/png', 'image/jpeg']) fastify.addContentTypeParser(t, { parseAs: 'buffer', bodyLimit: MAX_PDF }, (req, body, done) => done(null, body))
 
   // GET /api/planner/airports?ids=RHV,KSNS&date=2026-11-04
   fastify.get('/api/planner/airports', async req => {
@@ -218,23 +222,31 @@ export default async function plannerRoutes(fastify) {
       .header('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${String(d.filename || 'document.pdf').replace(/["\\\r\n]/g, '')}"`)
       .type(d.content_type).send(d.bytes)
   })
-  // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF)
+  // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF; a checklist may be a PNG or JPEG photo)
   fastify.post('/api/planner/documents', async (req, reply) => {
     const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
-    if (!kind || !Buffer.isBuffer(req.body) || req.body.subarray(0, 5).toString() !== '%PDF-') return reply.status(400).send({ error: `Send a PDF with ?kind=${DOC_KINDS.join('|')}` })
+    const type = Buffer.isBuffer(req.body) ? (isPdf(req.body) ? 'application/pdf' : kind === 'checklist' ? imageType(req.body) : null) : null
+    if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${kind === 'checklist' ? ', PNG or JPEG' : ''} with ?kind=${DOC_KINDS.join('|')}` })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
-      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${DOC_COLS}`,
+      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${DOC_COLS}`,
       [kind, title, req.query.model ? String(req.query.model).toUpperCase().slice(0, 20) : null, req.query.tail ? String(req.query.tail).toUpperCase().slice(0, 8) : null,
         String(req.query.filename || `${title}.pdf`).slice(0, 200), req.body, req.body.length,
-        req.query.route ? String(req.query.route).toUpperCase().split(/[\s,]+/).filter(x => ID.test(x)).slice(0, 12) : null])
+        req.query.route ? String(req.query.route).toUpperCase().split(/[\s,]+/).filter(x => ID.test(x)).slice(0, 12) : null, type])
     return rows[0]
   })
+  // The document's text (PDF text layer, or OCR of a scan or photo) for the client to turn into checklist steps.
+  fastify.post('/api/planner/documents/:id/text', async (req, reply) => {
+    const { rows: [d] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [Number(req.params.id)])
+    if (!d) return reply.status(404).send({ error: 'No such document' })
+    try { return await documentText(d.bytes) } catch (e) { return reply.status(e.statusCode || 500).send({ error: e.message }) }
+  })
   fastify.patch('/api/planner/documents/:id', async (req, reply) => {
-    const { title, page_map: pageMap } = req.body || {}
-    const { rows } = await pool.query(`UPDATE planner_documents SET title = COALESCE($2, title), page_map = COALESCE($3, page_map) WHERE id = $1 RETURNING ${DOC_COLS}`,
-      [Number(req.params.id), title ? String(title).slice(0, 200) : null, pageMap && typeof pageMap === 'object' ? pageMap : null])
+    const { title, page_map: pageMap, steps } = req.body || {}
+    if (steps !== undefined && !validSteps(steps)) return reply.status(400).send({ error: 'steps: [{ title, items: [{ item, action? }] }]' })
+    const { rows } = await pool.query(`UPDATE planner_documents SET title = COALESCE($2, title), page_map = COALESCE($3, page_map), steps = CASE WHEN $4::boolean THEN $5::jsonb ELSE steps END WHERE id = $1 RETURNING ${DOC_COLS}`,
+      [Number(req.params.id), title ? String(title).slice(0, 200) : null, pageMap && typeof pageMap === 'object' ? pageMap : null, steps !== undefined, steps === undefined || steps === null ? null : JSON.stringify(steps)])
     if (!rows.length) return reply.status(404).send({ error: 'No such document' })
     return rows[0]
   })

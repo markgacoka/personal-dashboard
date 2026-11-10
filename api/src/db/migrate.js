@@ -1150,6 +1150,11 @@ async function migrateV35() {
   `)
 }
 
+// Planner: a checklist's steps, extracted from its PDF or photo and editable.
+async function migrateV38() {
+  await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS steps JSONB')
+}
+
 // Planner: aircraft checklists as documents (uploaded per tail), and saved
 // airport profiles (your pattern altitude, pattern sides, notes) by airport id.
 async function migrateV37() {
@@ -1194,7 +1199,7 @@ const MIGRATIONS = [
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
-  ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37],
+  ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37], ['038', migrateV38],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

@@ -10,6 +10,8 @@ import { loadsOf } from './model'
 import type { AircraftProfile } from './poh'
 import { joinRoute, splitRoute, tokenize } from './route'
 import { kindName } from './suggest'
+import { CERTIFICATES, roleOf, type PilotCerts } from './pilot'
+import { Segmented } from '@/components/ui/misc'
 import { NumField, SubHead } from './ui'
 import { fromF, fromW, toF, toW, type Units } from './units'
 
@@ -19,10 +21,10 @@ const KIND_LABEL: Record<RoutePoint['kind'], string> = { airport: 'Airport', nav
 // What you type: tail, route, engine-start time, cruise power, who sits where,
 // fuel and taxi time. Everything else is looked up or computed in the later
 // steps, each of which shows its sources and takes an override where one makes sense.
-export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile }: {
+export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile, certs }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; registryLoading: boolean
   poh: PohMatch | null | undefined; pohUploaded?: PlannerDoc | null; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
-  profile: AircraftProfile | null
+  profile: AircraftProfile | null; certs: PilotCerts | null
 }) {
   const [tail, setTail] = useState(plan.tail ?? '')
   useEffect(() => setTail(plan.tail ?? ''), [plan.tail])
@@ -55,17 +57,18 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
   const f0 = d.flights[0]
 
   return (
-    <div className="space-y-6">
+    <div className="@container space-y-6">
       <label className="block max-w-xl">
         <span className="mb-1 block text-sm text-fg-2">Plan name</span>
         <Input value={plan.name === 'New flight' ? '' : plan.name} onChange={e => set({ name: e.target.value || 'New flight' })} placeholder="e.g. Solo XC to Salinas" maxLength={120} />
         <span className="mt-1 block text-xs text-fg-3">Blank: named after the route when you save.</span>
       </label>
-      <div className="grid gap-6 2xl:grid-cols-2">
+      <Crew plan={plan} set={set} d={d} certs={certs} />
+      <div className="grid gap-6 @4xl:grid-cols-2">
         <div className="space-y-5">
           <div>
             <SubHead>1 · Aircraft</SubHead>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr]">
+            <div className="grid gap-3 @md:grid-cols-[minmax(0,12rem)_1fr]">
               <label className="block">
                 <span className="mb-1 block text-sm text-fg-2">Tail number</span>
                 <Input value={tail} onChange={e => setTail(e.target.value.toUpperCase())} onBlur={commitTail} onKeyDown={e => { if (e.key === 'Enter') commitTail() }}
@@ -95,10 +98,10 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
           <div>
             <SubHead right={<span className="text-xs text-fg-3">SkyVector / ForeFlight format</span>}>2 · Departure, route and arrival</SubHead>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_8rem]">
+            <div className="grid grid-cols-2 gap-3 @md:grid-cols-[8rem_minmax(0,1fr)_8rem]">
               <label className="block"><span className="mb-1 block text-sm text-fg-2">Departure</span>
                 <Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KRHV" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
-              <label className="order-last col-span-2 block sm:order-none sm:col-span-1"><span className="mb-1 block text-sm text-fg-2">Route (flown over)</span>
+              <label className="order-last col-span-2 block @md:order-none @md:col-span-1"><span className="mb-1 block text-sm text-fg-2">Route (flown over)</span>
                 <Input value={via} onChange={e => setVia(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="E16 VPCOY SNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
               <label className="block"><span className="mb-1 block text-sm text-fg-2">Arrival</span>
                 <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KSNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
@@ -114,7 +117,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
                   const bad = end && p && p.kind !== 'airport' && p.kind !== 'unknown'
                   const label = plan.labels?.[t]?.name
                   return (
-                    <li key={`${t}-${i}`} className="flex flex-wrap items-center gap-x-2 text-sm sm:flex-nowrap">
+                    <li key={`${t}-${i}`} className="flex flex-wrap items-center gap-x-2 text-sm @md:flex-nowrap">
                       <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-2')} />
                       <span className="num w-28 shrink-0 truncate font-medium text-fg" title={t}>{label ?? t}</span>
                       <span className={cn('w-16 shrink-0 text-xs', end ? 'text-accent' : 'text-fg-3')}>{role}</span>
@@ -130,7 +133,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
         </div>
 
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @md:grid-cols-2">
             <label className="block">
               <SubHead>3 · Engine start (local)</SubHead>
               <Input type="datetime-local" value={plan.departLocal} onChange={e => set({ departLocal: e.target.value })} className="num" />
@@ -143,9 +146,9 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
           </div>
           <div>
             <SubHead right={<span className="text-xs text-fg-3">{u.weight}</span>}>5 · Occupants and baggage</SubHead>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 @md:grid-cols-3">
               <NumField label="Pilot (L)" value={w(seats.pilot)} onChange={setSeat('pilot')} />
-              <NumField label="Front (R)" value={w(seats.front)} onChange={setSeat('front')} />
+              <NumField label={roleOf(plan.crew, certs) === 'dual' ? 'Instructor (R)' : 'Front (R)'} value={w(seats.front)} onChange={setSeat('front')} />
               <NumField label="Rear left" value={w(seats.rearL)} onChange={setSeat('rearL')} />
               <NumField label="Rear right" value={w(seats.rearR)} onChange={setSeat('rearR')} />
               <NumField label="Baggage area 1" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
@@ -215,6 +218,36 @@ export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMa
         {!loading && !poh && !error && <span>No public POH found for the {model}; upload this airplane's POH in step 2 (Aircraft). Numbers use the closest transcribed POH and your aircraft profile.</span>}
         {error && <span>{error}</span>}
       </div>
+    </div>
+  )
+}
+
+// Who flies: you as pilot in command, or dual with an instructor (who is then PIC).
+// The Pilot step and Review apply the FAA rules for that role and your certificate.
+function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; certs: PilotCerts | null }) {
+  const role = roleOf(plan.crew, certs)
+  const cert = certs?.certificate ?? 'student'
+  const certLabel = CERTIFICATES.find(c => c.key === cert)!.label
+  const xc = d.checks.some(c => /Instructor('s)? endorse/.test(c.title))
+  const ck = plan.checklist ?? {}
+  return (
+    <div>
+      <SubHead right={<span className="text-xs text-fg-3">{certs?.certificate ? certLabel : 'Certificate not saved: Pilot step'}</span>}>Who's flying</SubHead>
+      <div className="flex flex-wrap items-end gap-3">
+        <Segmented value={role} onChange={r => set({ crew: { ...plan.crew, role: r } })}
+          options={[{ value: 'pic', label: cert === 'student' ? 'Solo (student PIC)' : 'Me as PIC' }, { value: 'dual', label: 'Dual with an instructor' }]} />
+        {role === 'dual' && (
+          <label className="block w-full max-w-60"><span className="mb-1 block text-sm text-fg-2">Instructor</span>
+            <Input value={plan.crew?.instructor ?? ''} onChange={e => set({ crew: { ...plan.crew, role, instructor: e.target.value } })} placeholder="CFI's name" maxLength={60} /></label>
+        )}
+      </div>
+      <p className="mt-1.5 text-xs text-fg-3">{role === 'dual' ? 'The instructor is pilot in command; put their weight in the right front seat. Your personal minimums become cautions to talk through.' : cert === 'student' ? 'Student solo: no passengers, your solo endorsements and limits apply (§61.87–§61.95).' : `You act as PIC on your ${certLabel.toLowerCase()} certificate; anyone in the other seats counts as a passenger.`}</p>
+      {xc && (
+        <label className="mt-2 flex items-center gap-2 text-sm text-fg-2">
+          <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={ck['crew.xcEndorsed'] === true} onChange={e => set({ checklist: { ...ck, 'crew.xcEndorsed': e.target.checked } })} />
+          My instructor endorsed this cross-country in my logbook (§61.93(c)(2))
+        </label>
+      )}
     </div>
   )
 }

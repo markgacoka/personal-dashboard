@@ -70,6 +70,7 @@ export function CheckRows({ checks, onJump }: { checks: Check[]; onJump?: (c: Ch
           <div className="min-w-0">
             <div className="text-sm text-fg">{c.title}</div>
             {c.detail && <div className="mt-0.5 text-sm text-fg-3">{c.detail}</div>}
+            {c.fix && c.status !== 'ok' && <div className="mt-0.5 text-sm text-fg-2"><span className="font-medium">To fix:</span> {c.fix}</div>}
           </div>
         </li>
       ))}

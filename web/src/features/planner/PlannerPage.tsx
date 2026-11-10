@@ -13,7 +13,7 @@ import type { NotamResponse } from '@/lib/types'
 import { computeCurrency } from '@/lib/flying'
 import { homeAirport } from '@/lib/weather'
 import { cn } from '@/lib/utils'
-import { bboxOf, useAirportProfiles, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, type SavedPlan, useRadar, useResolve, useTerrain, useWeather } from './api'
+import { bboxOf, useAirportProfiles, useCertificates, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, type SavedPlan, useRadar, useResolve, useTerrain, useWeather } from './api'
 import { AircraftStep } from './AircraftStep'
 import { AirportsStep } from './AirportsStep'
 import { PilotStep } from './PilotStep'
@@ -23,16 +23,17 @@ import type { EditPoint, RouteEdit } from './PlannerMap'
 import { flightNotes, type NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { FlightInputs } from './FlightInputs'
-import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, worst, type Airport, type Derived, type Plan, type SectionKey, type Status } from './model'
+import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, worst, type Airport, type Check, type Derived, type Plan, type SectionKey, type Status } from './model'
 import { NavlogFront, NavlogReverse } from './NavlogSheet'
 import { PerformanceSection } from './PerformanceSection'
 import { PlannerMap, type MapNotams } from './PlannerMap'
 import { WbTable } from './PohSummary'
 import { applyEdits, profileFor } from './poh'
+import { roleOf } from './pilot'
 import { RefPanel, RefProvider, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
 import { WeatherSection } from './WeatherSection'
-import { CheckRows, KV, StatusBadge, StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
+import { CheckRows, KV, STATUS_META, StatusBadge, StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
 
 const DRAFT_KEY = 'planner-draft-v3'
 
@@ -146,6 +147,8 @@ function Planner() {
   const planningQ = usePlanning(plan.tail)
   const planning = useMemo(() => planningQ.data ?? {}, [planningQ.data])
   const minQ = useMinimums()
+  const certsQ = useCertificates()
+  const certs = certsQ.isLoading ? undefined : (certsQ.data?.certificate ? certsQ.data : null)
   const minimums = useMemo(() => ({ ...DEFAULT_MINIMUMS, ...(minQ.data || {}) }), [minQ.data])
   const fleetRef = fleet.find(a => a.tail_number === plan.tail)
   // This plan's entry, then the tail's saved profile, then the FAA registry.
@@ -177,7 +180,7 @@ function Planner() {
     ['weather', wx.isFetching], ['terrain', terrain.isLoading], ['airspace', airspace.isFetching], ['checkpoints', corridor.isFetching], ['landmarks', landmarks.isFetching],
     ['NOTAMs', notamQs.some(q => q.isLoading)], ['alternates', nearby.isLoading], ['radar', radar.isLoading],
   ]
-  const saving = planningQ.save.isPending || aptProfiles.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
+  const saving = planningQ.save.isPending || certsQ.save.isPending || aptProfiles.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
   const failed: [string, () => void][] = ([
     ['route points', resolved.isError, resolved.refetch], ['airports', apts.isError, apts.refetch], ['weather', wx.isError, wx.refetch], ['terrain', terrain.isError, terrain.refetch],
     ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['landmarks', landmarks.isError, landmarks.refetch], ['POH', pohQ.isError, pohQ.refetch],
@@ -186,8 +189,8 @@ function Planner() {
 
   const d = useMemo(() => derive(planEff, {
     airports, weather: wx.data ?? null, match, planning, minimums, terrain: terrain.data?.elevations ?? null,
-    currency, airspace: airspace.data ?? null, checkpoints: corridor.data ?? [], points,
-  }), [planEff, airports, wx.data, match, planning, minimums, terrain.data, currency, airspace.data, corridor.data, points])
+    currency, airspace: airspace.data ?? null, checkpoints: corridor.data ?? [], points, certs,
+  }), [planEff, airports, wx.data, match, planning, minimums, terrain.data, currency, airspace.data, corridor.data, points, certs])
 
   const nightAuto = d.wx.some(w => w.night)
   useEffect(() => { if (plan.night === null && nightAuto) set({ night: true }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [nightAuto])
@@ -250,7 +253,7 @@ function Planner() {
         {STEPS.map((st, i) => {
           const s = stepStatus(i)
           return (
-            <button key={st.key} onClick={() => go(i)} aria-current={i === stepAt ? 'step' : undefined}
+            <button key={st.key} onClick={() => go(i)} aria-current={i === stepAt ? 'step' : undefined} title={issueSummary(stepChecks(d, st.key))}
               className={cn('press flex h-9 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm ring-1 ring-inset', i === stepAt ? 'bg-accent-soft font-medium text-accent ring-accent/40' : 'text-fg-2 ring-border hover:bg-hover')}>
               <span className="num text-xs text-fg-3">{i + 1}</span>{st.label}{s && s !== 'ok' && <StatusIcon status={s} className="size-4" />}
             </button>
@@ -271,9 +274,10 @@ function Planner() {
               <h2 className="text-lg font-medium text-fg">{STEPS[stepAt].label}</h2>
               <p className="text-sm text-fg-3">{STEPS[stepAt].blurb}</p>
             </div>
+            {cur !== 'review' && cur !== 'navlog' && <StepIssues checks={stepChecks(d, cur)} />}
             {cur === 'flight' && (
               <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
-                pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} />
+                pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} certs={certs ?? null} />
             )}
             {cur === 'aircraft' && (
               <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohDoc={pohQ.data?.doc} pohUploaded={!!pohQ.data?.uploaded} savingPlanning={planningQ.save.isPending} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null}
@@ -295,7 +299,7 @@ function Planner() {
                 <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
               </div>
             )}
-            {cur === 'pilot' && <PilotStep plan={plan} set={set} d={d} currency={currency} minimums={minimums} savedAt={minQ.data?.updatedAt} saveMinimums={m => minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={minQ.save.isPending} />}
+            {cur === 'pilot' && <PilotStep plan={plan} set={set} d={d} currency={currency} certs={certs ?? null} saveCerts={c => certsQ.save.mutate(c, { onSuccess: () => toast.success('Certificates saved'), onError: e => toast.error(e.message) })} savingCerts={certsQ.save.isPending} minimums={minimums} savedAt={minQ.data?.updatedAt} saveMinimums={m => minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={minQ.save.isPending} />}
             {cur === 'review' && <Review d={d} status={overall} label={verdict} onJump={key => go(STEPS.findIndex(s => s.key === key))} />}
             {cur === 'navlog' && (
               <div className="space-y-8">
@@ -305,7 +309,7 @@ function Planner() {
                     <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal · arrive {fmtTime(f.arriveAt)}</span>}>
                       NavLog {d.flights.length > 1 ? `${f.n + 1} of ${d.flights.length} · ` : ''}<span className="num">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
                     </SubHead>
-                    <NavlogFront plan={planEff} set={set} d={d} flight={f} notes={flightNotes(d, f, acName, notamSets)} u={u} />
+                    <NavlogFront plan={planEff} set={set} d={d} flight={f} notes={flightNotes(d, f, acName, notamSets, roleOf(plan.crew, certs) === 'dual' ? plan.crew?.instructor?.trim() || 'instructor' : null)} u={u} />
                   </div>
                 ))}
                 {!d.flights.length && <p className="text-sm text-fg-3">The NavLog fills in once the route resolves and the aircraft's POH is known.</p>}
@@ -395,6 +399,27 @@ function LoadingStrip({ loading, saving, failed }: { loading: string[]; saving: 
 }
 
 const SECTION_STEP: Record<SectionKey, string> = { trip: 'flight', aircraft: 'aircraft', navlog: 'route', weather: 'weather', loading: 'loading', performance: 'loading', pilot: 'pilot' }
+const RANK: Status[] = ['nogo', 'caution', 'todo', 'ok']
+const stepChecks = (d: Derived, step: string) => d.checks.filter(c => SECTION_STEP[c.section] === step && c.status !== 'ok').sort((a, b) => RANK.indexOf(a.status) - RANK.indexOf(b.status))
+const issueSummary = (cs: Check[]) => cs.length ? cs.map(c => `${STATUS_META[c.status].label}: ${c.title}`).join('\n') : undefined
+
+// What the icon on a step means: each check that isn't OK, why, and what to do.
+function StepIssues({ checks }: { checks: Check[] }) {
+  const [open, setOpen] = useState(true)
+  if (!checks.length) return null
+  const n = (s: Status) => checks.filter(c => c.status === s).length
+  const head = [n('nogo') && `${n('nogo')} no-go`, n('caution') && `${n('caution')} caution${n('caution') > 1 ? 's' : ''}`, n('todo') && `${n('todo')} to do`].filter(Boolean).join(' · ')
+  const tone = n('nogo') ? 'ring-bad/30 bg-bad-soft' : n('caution') ? 'ring-warn/30 bg-warn-soft' : 'ring-border'
+  return (
+    <div className={cn('mb-6 rounded-lg ring-1 ring-inset print:hidden', tone)}>
+      <button className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <StatusIcon status={checks[0].status} /><span className="font-medium text-fg">What to fix on this step</span><span className="text-fg-3">{head}</span>
+        <ChevronRight className={cn('ml-auto size-4 text-fg-3 transition-transform', open && 'rotate-90')} />
+      </button>
+      {open && <div className="px-3 pb-3"><CheckRows checks={checks} /></div>}
+    </div>
+  )
+}
 
 // Go/no-go: every check, grouped by the step that produced it, worst first.
 function Review({ d, status, label, onJump }: { d: Derived; status: Status; label: string; onJump: (step: string) => void }) {

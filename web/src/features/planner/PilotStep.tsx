@@ -3,7 +3,9 @@ import { IMSAFE } from './checklists'
 import { Checklist } from './Checklist'
 import { MinimumsEditor } from './Minimums'
 import type { Derived, Minimums, Plan, Status } from './model'
-import { StatusIcon, SubHead } from './ui'
+import { CheckRows, StatusIcon, SubHead } from './ui'
+import { CertificatesEditor } from './Certificates'
+import { roleOf, type PilotCerts } from './pilot'
 
 interface MinRow { label: string; limit: string; actual: string; status: Status; where?: string }
 
@@ -44,13 +46,22 @@ export function minimumsRows(d: Derived, m: Minimums): MinRow[] {
 }
 
 // Step 7: you — IMSAFE, your minimums against this flight, and recency from the logbook.
-export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving }: {
+export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; currency: CurrencyItem[]; minimums: Minimums; savedAt?: string; saveMinimums: (m: Minimums) => void; saving: boolean
+  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean
 }) {
-  const rows = minimumsRows(d, minimums)
+  const dual = roleOf(plan.crew, certs) === 'dual'
+  const rows = minimumsRows(d, minimums).map(r => (dual && r.status === 'nogo' ? { ...r, status: 'caution' as const } : r))
+  // The privilege checks (pilot.ts) are the pilot-section ones that aren't IMSAFE or minimums.
+  const rules = d.checks.filter(c => c.section === 'pilot' && !/^IMSAFE|^Not fit|ETA is after civil twilight/.test(c.title))
   return (
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="space-y-8">
+        <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} />
+        <div>
+          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role in step 1</span>}>This flight under the FAA rules</SubHead>
+          {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}
+        </div>
         <Checklist title="Pilot condition · IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />
         <div>
           <SubHead right={<span className="text-xs text-fg-3">From your logbook</span>}>Currency and recency</SubHead>
@@ -61,13 +72,13 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
                 <div className="min-w-0"><div className="text-sm text-fg">{c.name} <span className="text-fg-3">· {c.rule}</span></div><div className="text-sm text-fg-3">{c.requirement} — {c.detail}</div></div>
               </li>
             ))}
-            <li className="px-3 py-2.5 text-sm text-fg-3">Solo as a student pilot also needs your CFI's 90-day solo endorsement (§61.87(n)) and, for a cross-country, the §61.93 endorsements for this route.</li>
           </ul>
         </div>
       </div>
       <div className="space-y-8">
         <div>
           <SubHead right={<span className="text-xs text-fg-3">Worst value at any ETA</span>}>Personal minimums for this flight</SubHead>
+          {dual && <p className="mb-2 text-sm text-fg-3">Dual: these are your solo limits. A breach shows as a caution to talk through with your instructor, not a no-go.</p>}
           <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
             {rows.map(r => (
               <li key={r.label} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-sm">

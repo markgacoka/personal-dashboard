@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useDocuments, type PlannerDoc } from './api'
 import { POH_PAGES_172P } from './poh'
 import { Synced } from './ui'
+import { ChecklistSteps } from './ChecklistSteps'
+import { Segmented } from '@/components/ui/misc'
 
 type Tab = 'poh' | 'checklist' | 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
@@ -36,6 +38,7 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
   const r = useRefs()!
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [view, setView] = useState<'steps' | 'original'>('steps')
   const { tab, page, docId } = r.state
   const list = (docs.data || []).filter(d => d.kind === tab)
   // POH: same model first; briefing: same route and newest first.
@@ -45,8 +48,8 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
   const pages = doc?.page_map ?? (doc && doc.source !== 'upload' && doc.model === '172P' ? POH_PAGES_172P : null)
   const pageNo = tab !== 'poh' ? null : typeof page === 'number' ? page : page && pages ? pages[page] ?? null : null
   const src = doc ? `/api/planner/documents/${doc.id}/file#${pageNo ? `page=${pageNo}&` : ''}view=FitH` : null
-  const upload = (f: File) => docs.upload.mutate({ file: f, kind: tab, tail: tab !== 'briefing' ? tail ?? undefined : undefined, model: tab !== 'briefing' ? model ?? undefined : undefined, route: tab === 'briefing' ? route.join(' ') : undefined, title: tab !== 'briefing' && tail ? `${tail} ${tab === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.pdf$/i, '')})` : undefined },
-    { onSuccess: () => toast.success(tab === 'briefing' ? 'Uploaded' : `Uploaded; it's now the ${tab === 'poh' ? 'POH' : 'checklist'} used for ${tail ?? 'this aircraft'}`), onError: e => toast.error(e.message) })
+  const upload = (f: File) => docs.upload.mutate({ file: f, kind: tab, tail: tab !== 'briefing' ? tail ?? undefined : undefined, model: tab !== 'briefing' ? model ?? undefined : undefined, route: tab === 'briefing' ? route.join(' ') : undefined, title: tab !== 'briefing' && tail ? `${tail} ${tab === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.(pdf|png|jpe?g)$/i, '')})` : undefined },
+    { onSuccess: d => { if (tab === 'checklist') { r.set({ docId: { ...docId, checklist: d.id } }); setView('steps'); docs.extract.mutate(d.id) } toast.success(tab === 'briefing' ? 'Uploaded' : `Uploaded; it's now the ${tab === 'poh' ? 'POH' : 'checklist'} used for ${tail ?? 'this aircraft'}`) }, onError: e => toast.error(e.message) })
 
   return (
     <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
@@ -63,7 +66,7 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
           {!ranked.length && <option value="">{tab === 'poh' ? 'No POH uploaded' : tab === 'checklist' ? 'No checklist uploaded' : 'No briefing yet'}</option>}
           {ranked.map(d => <option key={d.id} value={d.id}>{d.title}{d.route?.length ? ` (${d.route.join('–')})` : ''} · {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</option>)}
         </Select>
-        <input ref={fileRef} type="file" accept="application/pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
+        <input ref={fileRef} type="file" accept={tab === 'checklist' ? 'application/pdf,image/png,image/jpeg' : 'application/pdf'} hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
         <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} loading={docs.upload.isPending}><Upload />Upload</Button>
         {tab === 'briefing' && <Button size="sm" variant="ghost" loading={docs.importBriefings.isPending} onClick={() => docs.importBriefings.mutate(undefined, { onSuccess: d => toast.success(d.added ? `${d.added} briefing${d.added > 1 ? 's' : ''} imported` : 'No new briefings in email'), onError: e => toast.error(e.message) })}><Mail />From email</Button>}
         {src && <Button asChild size="sm" variant="ghost"><a href={src} target="_blank" rel="noopener noreferrer"><ExternalLink />Open</a></Button>}
@@ -78,9 +81,10 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
       )}
       {tab === 'poh' && pohStatus && <p className="px-3 pb-2 text-xs text-fg-3">{pohStatus}</p>}
       {tab === 'briefing' && doc && <Synced className="px-3 pb-2" at={doc.created_at} label={doc.source === 'gmail' ? 'Received' : 'Uploaded'} source={doc.source === 'gmail' ? 'Leidos Flight Service (email)' : doc.filename ?? ''} />}
+      {tab === 'checklist' && doc && <div className="px-3 pb-2"><Segmented size="sm" value={view} onChange={setView} options={[{ value: 'steps', label: 'Steps' }, { value: 'original', label: doc.content_type?.startsWith('image/') ? 'Photo' : 'PDF' }]} /></div>}
       <div className="min-h-0 flex-1 px-1 pb-1">
-        {src ? <iframe key={src} title={doc!.title} src={src} className="h-full w-full rounded-lg bg-white" />
-          : <div className="grid h-full place-items-center p-6 text-center text-sm text-fg-3">{tab === 'poh' ? 'Upload this aircraft\'s POH (PDF) to keep it open while you plan.' : tab === 'checklist' ? 'Upload the checklist you fly with (PDF); the newest one for this tail is used.' : 'Get a standard briefing at 1800wxbrief.com with "email the briefing" on, then press From email — or upload the PDF.'}</div>}
+        {tab === 'checklist' && doc && view === 'steps' ? (docs.extract.isPending && docs.extract.variables === doc.id ? <div className="grid h-full place-items-center text-sm text-fg-3">Reading the checklist…</div> : <ChecklistSteps doc={doc} />) : src ? <iframe key={src} title={doc!.title} src={src} className="h-full w-full rounded-lg bg-white" />
+          : <div className="grid h-full place-items-center p-6 text-center text-sm text-fg-3">{tab === 'poh' ? 'Upload this aircraft\'s POH (PDF) to keep it open while you plan.' : tab === 'checklist' ? 'Upload the checklist you fly with (PDF or a photo); the newest one for this tail is used, and its steps are read out so you can tick through them.' : 'Get a standard briefing at 1800wxbrief.com with "email the briefing" on, then press From email — or upload the PDF.'}</div>}
       </div>
     </div>
   )

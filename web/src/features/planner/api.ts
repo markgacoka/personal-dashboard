@@ -1,7 +1,9 @@
 // Data for the planner: queries against /api/planner/* and the existing
 // aviation endpoints, plus the saved plan / per-tail / minimums state.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { get, post, put, del } from '@/lib/api'
+import { get, post, put, patch, del } from '@/lib/api'
+import type { PilotCerts } from './pilot'
+import { parseChecklist, type ChecklistSection } from './checklistParse'
 import type { AircraftPlanning, Airport, AirportProfile, Minimums, Plan, WeatherBundle } from './model'
 import type { LatLon } from './calc'
 
@@ -103,7 +105,7 @@ export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
 })
 
-export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; source: string; created_at: string }
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; content_type?: string; source: string; created_at: string }
 export function useDocuments() {
   const qc = useQueryClient()
   const key = ['planner', 'documents']
@@ -111,7 +113,7 @@ export function useDocuments() {
   const upload = useMutation({
     mutationFn: async ({ file, kind, model, route, tail, title }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string; tail?: string; title?: string }) => {
       const qs = new URLSearchParams({ kind, title: title || file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}), ...(tail ? { tail } : {}) })
-      const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: file, credentials: 'same-origin' })
+      const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': /^image\/(png|jpeg)$/.test(file.type) ? file.type : 'application/pdf' }, body: file, credentials: 'same-origin' })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Upload failed (${r.status})`)
       return r.json() as Promise<PlannerDoc>
     },
@@ -119,7 +121,18 @@ export function useDocuments() {
   })
   const importBriefings = useMutation({ mutationFn: () => post<{ added: number }>('/api/planner/briefings/import'), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/planner/documents/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
-  return { ...q, upload, importBriefings, remove }
+  // A checklist's steps: the server reads the text (PDF text or OCR), this parses it.
+  const extract = useMutation({
+    mutationFn: async (id: number) => {
+      const { text, method } = await post<{ text: string; method: 'text' | 'ocr' }>(`/api/planner/documents/${id}/text`)
+      const steps = parseChecklist(text)
+      const doc = await patch<PlannerDoc>(`/api/planner/documents/${id}`, { steps })
+      return { doc, method }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+  })
+  const saveSteps = useMutation({ mutationFn: ({ id, steps }: { id: number; steps: ChecklistSection[] | null }) => patch<PlannerDoc>(`/api/planner/documents/${id}`, { steps }), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
+  return { ...q, upload, importBriefings, remove, extract, saveSteps }
 }
 
 // Route tokens → points (airports, navaids, fixes, VFR waypoints, radial/DME, coordinates).
@@ -154,5 +167,14 @@ export function usePilotInfo() {
   const key = ['planner', 'settings', 'pilot']
   const q = useQuery({ queryKey: key, staleTime: Infinity, queryFn: () => get<PilotInfo>('/api/planner/settings/pilot') })
   const save = useMutation({ mutationFn: (p: PilotInfo) => put<PilotInfo>('/api/planner/settings/pilot', p), onSuccess: d => qc.setQueryData(key, d) })
+  return { ...q, save }
+}
+
+// Your certificates, ratings, medical and endorsements (one record).
+export function useCertificates() {
+  const qc = useQueryClient()
+  const key = ['planner', 'settings', 'certificates']
+  const q = useQuery({ queryKey: key, staleTime: Infinity, queryFn: () => get<PilotCerts>('/api/planner/settings/certificates') })
+  const save = useMutation({ mutationFn: (c: PilotCerts) => put<PilotCerts>('/api/planner/settings/certificates', c), onSuccess: d => qc.setQueryData(key, d) })
   return { ...q, save }
 }

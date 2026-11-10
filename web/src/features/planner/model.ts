@@ -7,6 +7,8 @@ import {
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
   sampleRoute, wbTotal, windAt, windComponents, windTriangle, casFromTas, tasFromCas, variationAt, vfrAltitude, type Category, type FbProduct, type LatLon, type TafPeriod,
 } from './calc'
+import { pilotChecks, aircraftClass, roleOf, MINIMUMS_CHECK, type Crew, type PilotCerts } from './pilot'
+import { fixFor } from './fixes'
 import { AV1ATES, EQUIPMENT_DAY, EQUIPMENT_NIGHT, IMSAFE, MX_DOCS } from './checklists'
 
 // ── Inputs ────────────────────────────────────────────────────────────────────
@@ -43,6 +45,8 @@ export interface Plan {
   aircraft?: { make?: string; model?: string; year?: number | null }
   timeOff?: string
   notes?: string
+  // Who flies: you as PIC, or dual with an instructor (the instructor is PIC).
+  crew?: Crew
 }
 export interface RowOverride { wdir?: number | null; wspd?: number | null; temp?: number | null; cas?: number | null }
 
@@ -129,13 +133,15 @@ export interface Inputs {
   airspace: { type: 'Feature'; geometry: { type: string; coordinates: unknown }; properties: { NAME: string; CLASS: string; LOWER_VAL: number | null; UPPER_VAL: number | null } }[] | null
   checkpoints?: Checkpoint[]
   points?: RoutePoint[]
+  // Your certificates (null: not saved yet; undefined: skip the pilot-privilege checks).
+  certs?: PilotCerts | null
   now?: number
 }
 
 // ── Outputs ───────────────────────────────────────────────────────────────────
 export type Status = 'ok' | 'caution' | 'nogo' | 'todo'
 export type SectionKey = 'trip' | 'pilot' | 'aircraft' | 'loading' | 'performance' | 'navlog' | 'weather'
-export interface Check { section: SectionKey; status: Status; title: string; detail?: string; airport?: string }
+export interface Check { section: SectionKey; status: Status; title: string; detail?: string; airport?: string; fix?: string }
 
 export interface Leg {
   from: Airport; to: Airport; distNm: number; tc: number; mc: number; varEast: number
@@ -542,7 +548,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     else if (usable < requiredFuel) add('navlog', 'caution', 'Fuel below your personal reserve', `Need ${requiredFuel.toFixed(1)} gal with a ${anyNight ? minimums.reserveNight : minimums.reserveDay}-minute reserve; ${usable.toFixed(1)} gal usable.`)
     else add('navlog', 'ok', 'Fuel covers the trip and reserve', `${requiredFuel.toFixed(1)} gal required, ${usable.toFixed(1)} gal usable.`)
     if (!fbSel) add('navlog', 'caution', 'No winds aloft forecast', 'Headings and ground speeds assume calm wind.')
-    else if (fbSel.product.source && !fbSel.outside) add('navlog', 'caution', 'Winds aloft from a weather model', `The NWS FB winds-aloft forecast isn't available from aviationweather.gov, so winds come from ${fbSel.product.source} for ${fbSel.product.forUse.join('–')}Z. Cross-check with your briefing.`)
+    else if (fbSel.product.source && !fbSel.outside) add('navlog', 'ok', 'Winds aloft from a weather model', `NWS discontinued the FB winds-aloft table on Nov 3, 2026 (NAM retirement, Service Change Notice 26-47), so winds come from ${fbSel.product.source} for ${fbSel.product.forUse.join('–')}Z. Cross-check with your briefing.`)
     else if (fbSel.outside) add('navlog', 'caution', 'No winds-aloft forecast covers the departure time', `Using the FB ${fbSel.fcst}-hour forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 24 hours ahead — re-brief closer to the flight.`)
     for (const l of legs) {
       const legAlt = flightAlt[l.flight].alt
@@ -566,7 +572,6 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       wx.push(weatherAt(alt, new Date(lastArr.getTime() + (leg / Math.max(legs[0]?.gs || 100, 60)) * 3_600_000), 'alternate', inp.weather, now))
     }
   }
-  const nightAny = wx.some(w => w.night) || anyNight
   for (const w of wx) {
     const id = w.airport.icao || w.airport.id, night = !!w.night
     if (!w.metar && !w.taf) { add('weather', 'caution', `${id}: no METAR or TAF within 25 nm`, undefined, id); continue }
@@ -633,15 +638,27 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     }
   }
 
-  // ── Pilot ──
-  // §61.57 recency only binds when carrying passengers (day) or at night; a student
-  // pilot flies solo on a CFI's 90-day endorsement instead of a flight review.
-  for (const c of inp.currency) {
-    if (c.key === 'ifr') continue
-    if (c.key === 'night' && !nightAny) continue
-    if (c.state === 'lapsed') add('pilot', 'caution', `${c.name}: lapsed`, `${c.detail}${c.key === 'day' ? ' — needed to carry passengers.' : c.key === 'review' ? ' — solo flight needs a current CFI endorsement instead.' : ''}`)
-    else if (c.state === 'expiring' || c.state === 'grace') add('pilot', 'caution', `${c.name}: ${c.state}`, c.detail)
-    else if (c.state === 'current') add('pilot', 'ok', `${c.name}: current`, c.detail)
+  // ── Pilot: privileges for this role, passengers, airplane, airspace and distance ──
+  const crew = plan.crew ?? {}
+  const certs = inp.certs
+  const role = roleOf(crew, certs)
+  const seatsP = plan.seats
+  const passengers = seatsP ? (role === 'dual' ? 0 : Number(seatsP.front > 0)) + Number(seatsP.rearL > 0) + Number(seatsP.rearR > 0) : Number(loads.rear > 0)
+  if (certs !== undefined && route.length >= 2) {
+    const homeApt = (certs?.home && byId(certs.home)) || route[0]
+    const stopsUsed = [route[0], ...legs.filter(l => l.stop).map(l => l.to)]
+    const code = (a: Airport) => a.icao || a.id
+    const atCruiseB = crossings.filter(c => c.cls === 'B' && c.atCruise).map(c => c.name)
+    const visibs = wx.filter(w => w.role !== 'alternate' && w.visib != null).map(w => w.visib!)
+    const ceils = wx.filter(w => w.role !== 'alternate' && w.ceiling != null).map(w => w.ceiling!)
+    checks.push(...pilotChecks({
+      certs, crew: { ...crew, role }, passengers, night: wx.some(w => w.night) || (!wx.length && !!plan.night), depart: departAt, aircraft: aircraftClass(profile, inp.planning.profile), model: inp.planning.profile?.model || (profile ? profile.model.replace(/^Cessna\s*/, '') : null),
+      worstVisib: visibs.length ? Math.min(...visibs) : null, lowestCeiling: ceils.length ? Math.min(...ceils) : null, cruiseAlt: altMax,
+      maxFromHomeNm: Math.max(0, ...route.map(p => distanceNm(homeApt, p))), landsAway: route[route.length - 1].id !== route[0].id, home: code(homeApt),
+      classB: [...new Set([...atCruiseB, ...stopsUsed.filter(a => a.airspace?.B).map(code)])],
+      controlled: [...new Set([...crossings.filter(c => /^[BCD]$/.test(c.cls) && c.atCruise).map(c => `Class ${c.cls} ${c.name}`), ...stopsUsed.filter(a => a.towered || a.airspace?.B || a.airspace?.C || a.airspace?.D).map(code)])],
+      airports: stopsUsed.map(code), xcEndorsedForFlight: plan.checklist?.['crew.xcEndorsed'] === true, currency: inp.currency,
+    }))
   }
 
   // ── Aircraft ──
@@ -786,6 +803,13 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     }
   }
 
+  // Same check twice (a round trip's two ETAs at one airport) shows once; with an
+  // instructor on board your personal minimums become cautions; each gets its fix.
+  const seenCk = new Set<string>()
+  const finalChecks = checks.filter(c => { const k = `${c.section}|${c.status}|${c.title.replace(/ at \d{1,2}:\d{2}\s[AP]M/, '')}|${c.detail ?? ''}`; if (seenCk.has(k)) return false; seenCk.add(k); return true })
+    .map(c => (role === 'dual' && certs !== undefined && c.status === 'nogo' && MINIMUMS_CHECK.test(c.title) ? { ...c, status: 'caution' as const, detail: `${c.detail ? `${c.detail} ` : ''}Your solo minimums; with your instructor on board, decide together.` } : c))
+    .map(c => ({ ...c, fix: fixFor(c) }))
+  checks.length = 0; checks.push(...finalChecks)
   const sections = Object.fromEntries((['trip', 'pilot', 'aircraft', 'loading', 'performance', 'navlog', 'weather'] as SectionKey[]).map(k => {
     const own = checks.filter(c => c.section === k).map(c => c.status)
     return [k, own.length ? worst(own) : (k === 'trip' && route.length >= 2 ? 'ok' : 'todo')]

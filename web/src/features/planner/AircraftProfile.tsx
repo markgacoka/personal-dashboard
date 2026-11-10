@@ -8,7 +8,9 @@ import { useDocuments, type PlannerDoc } from './api'
 import { OptNum } from './FlightInputs'
 import type { AircraftPlanning } from './model'
 import { editCount, profileFor, type ProfileEdits } from './poh'
+import { aircraftClass } from './pilot'
 import { useRefs } from './RefPanel'
+import { stepCount } from './checklistParse'
 import { SubHead, Synced } from './ui'
 
 type Ident = { make?: string | null; model?: string | null; year?: number | null }
@@ -55,7 +57,15 @@ export function ProfileEditor({ tail, planning, save, registry, saving }: {
             {T({ k: 'model', label: 'Model', ph: registry.model ?? '172P' })}
             {F({ k: 'year', label: 'Year', ph: registry.year ?? 1982 })}
             {T({ k: 'engine', label: 'Engine', ph: base.engine })}
+            {F({ k: 'hp', label: 'Horsepower', ph: aircraftClass(base).hp ?? '' })}
+            <div className="col-span-full flex flex-wrap gap-x-5 gap-y-2 text-sm text-fg-2">
+              {(['complex', 'tailwheel'] as const).map(k => (
+                <label key={k} className="flex items-center gap-2"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={!!e[k]} onChange={ev => setE(x => ({ ...x, [k]: ev.target.checked }))} />
+                  {k === 'complex' ? 'Complex: retractable gear, flaps and a constant-speed prop' : 'Tailwheel'}</label>
+              ))}
+            </div>
           </Group>
+          <p className="-mt-3 text-xs text-fg-3">Horsepower over 200, complex and tailwheel each need an endorsement to act as PIC (§61.31); the Pilot step checks them.</p>
           <Group title="Weights and fuel">
             {F({ k: 'maxRamp', label: 'Max ramp', ph: base.limits.maxRamp, unit: 'lb' })}
             {F({ k: 'maxTakeoff', label: 'Max takeoff', ph: base.limits.maxTakeoff, unit: 'lb' })}
@@ -113,15 +123,18 @@ export function AircraftDocs({ tail, model, poh, pohUploaded }: { tail: string; 
     .sort((a, b) => Number(b.tail_number === tail) - Number(a.tail_number === tail) || b.created_at.localeCompare(a.created_at))[0]
   const row = (kind: 'poh' | 'checklist', doc: PlannerDoc | null | undefined, note: string) => (
     <DocRow key={kind} kind={kind} doc={doc} note={note} uploading={docs.upload.isPending && docs.upload.variables?.kind === kind}
-      onOpen={() => refs?.show(kind)} onUpload={f => docs.upload.mutate({ file: f, kind, tail, model: model ?? undefined, title: `${tail} ${kind === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.pdf$/i, '')})` },
-        { onSuccess: () => toast.success(`${kind === 'poh' ? 'POH' : 'Checklist'} uploaded; it's now the one used for ${tail}`), onError: e => toast.error(e.message) })} />
+      onOpen={() => refs?.show(kind)} onUpload={f => docs.upload.mutate({ file: f, kind, tail, model: model ?? undefined, title: `${tail} ${kind === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.(pdf|png|jpe?g)$/i, '')})` },
+        { onSuccess: d => {
+          toast.success(`${kind === 'poh' ? 'POH' : 'Checklist'} uploaded; it's now the one used for ${tail}`)
+          if (kind === 'checklist') docs.extract.mutate(d.id, { onSuccess: r => toast.success(`${stepCount(r.doc.steps)} checklist steps read${r.method === 'ocr' ? ' by OCR: check them in the Checklist tab' : ''}`), onError: e => toast.error(`Couldn't read the steps: ${e.message}`) })
+        }, onError: e => toast.error(e.message) })} />
   )
   return (
     <div>
       <SubHead>Documents · <span className="num">{tail}</span></SubHead>
       <div className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
         {row('poh', poh, poh ? (pohUploaded ? 'Your upload, used for this tail' : 'Public copy for the model; upload this airplane\'s own to replace it') : 'None found; upload this airplane\'s POH')}
-        {row('checklist', checklist, checklist ? `Uploaded ${new Date(checklist.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Upload the checklist you fly with (PDF)')}
+        {row('checklist', checklist, checklist ? `Uploaded ${new Date(checklist.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${docs.extract.isPending ? 'reading steps…' : checklist.steps ? `${stepCount(checklist.steps)} steps in ${checklist.steps.length} sections` : 'steps not read yet: Open → Extract steps'}` : 'Upload the checklist you fly with (PDF or photo); its steps are read out automatically')}
       </div>
       <p className="mt-1.5 text-xs text-fg-3">The newest upload is the one used. Uploads open beside the plan; performance numbers still come from the transcribed POH tables and your aircraft profile.</p>
     </div>
@@ -138,7 +151,7 @@ function DocRow({ kind, doc, note, onOpen, onUpload, uploading }: { kind: 'poh' 
         <div className="truncate text-sm text-fg">{kind === 'poh' ? 'POH' : 'Checklist'}{doc ? ` · ${doc.title}` : ''}</div>
         <div className="text-xs text-fg-3">{note}</div>
       </div>
-      <input ref={ref} type="file" accept="application/pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
+      <input ref={ref} type="file" accept={kind === 'checklist' ? 'application/pdf,image/png,image/jpeg' : 'application/pdf'} hidden onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
       {doc && <Button size="sm" variant="ghost" onClick={onOpen}>Open</Button>}
       <Button size="sm" variant="secondary" loading={uploading} onClick={() => ref.current?.click()}><Upload />{doc ? 'Replace' : 'Upload'}</Button>
     </div>

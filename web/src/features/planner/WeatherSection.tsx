@@ -17,7 +17,7 @@ export function WeatherSection({ d, weather, loading, refetch, fetching }: { d: 
     <>
       <Synced at={weather?.metars.fetchedAt} source="aviationweather.gov (NOAA AWC) · nasstatus.faa.gov · tfr.faa.gov · refreshes every 5 min" onRefresh={refetch} refreshing={fetching} />
       <div className="grid gap-4 lg:grid-cols-2 3xl:grid-cols-3">
-        {d.wx.map((w, i) => <AirportWx key={`${w.airport.id}-${i}`} w={w} nas={weather?.nas.data?.items.filter(x => x.airport === w.airport.id) ?? []} />)}
+        {byAirport(d.wx).map(ws => <AirportWx key={ws[0].airport.id + ws[0].role} ws={ws} nas={weather?.nas.data?.items.filter(x => x.airport === ws[0].airport.id) ?? []} />)}
       </div>
       <Hazards d={d} weather={weather} />
       <WindsTable d={d} weather={weather} />
@@ -26,23 +26,47 @@ export function WeatherSection({ d, weather, loading, refetch, fetching }: { d: 
   )
 }
 
-function AirportWx({ w, nas }: { w: WxAt; nas: { kind: string; reason: string; detail: string }[] }) {
+// One card per airport: a round trip's departure and destination share it, with
+// the later ETA shown only where its forecast differs.
+export function byAirport(wx: WxAt[]) {
+  const out: WxAt[][] = []
+  for (const w of wx) { const g = out.find(x => x[0].airport.id === w.airport.id && w.role !== 'alternate' && x[0].role !== 'alternate'); if (g) g.push(w); else out.push([w]) }
+  return out
+}
+const ROLE = { departure: 'Departure', stop: 'Stop', destination: 'Destination', alternate: 'Alternate' }
+const windText = (w: WxAt) => (w.wind.from ? `${w.wind.dir == null ? 'VRB' : deg3(w.wind.dir)}° ${w.wind.spd}${w.wind.gust ? `G${w.wind.gust}` : ''} kt` : '—')
+// The facts that can change between two ETAs at the same airport.
+export function wxFacts(w: WxAt): [string, string][] {
+  return [
+    ['Category', w.category ?? '—'], ['Wind', windText(w)], ['Ceiling', w.ceiling ? `${w.ceiling.toLocaleString()} ft` : 'None'],
+    ['Visibility', w.visib != null ? `${w.visib} SM` : '—'], ['Altimeter', w.altimInHg ? w.altimInHg.toFixed(2) : '—'],
+    ['Temp', w.tempC != null ? `${Math.round(w.tempC)} °C` : '—'], ['Density alt', w.da != null ? `${w.da.toLocaleString()} ft` : '—'],
+    ['Daylight', w.night ? 'Night' : w.night === false ? 'Day' : '—'],
+  ]
+}
+export function wxDiff(a: WxAt, b: WxAt) {
+  const fa = wxFacts(a), fb = wxFacts(b)
+  return fb.map(([k, v], i) => ({ k, from: fa[i][1], to: v })).filter(x => x.from !== x.to)
+}
+const srcText = (w: WxAt) => (w.wind.from === 'taf' ? `the ${w.tafStation} TAF${w.tafMoment?.prevailing?.fcstChange ? ` (${w.tafMoment.prevailing.fcstChange} group)` : ''}` : w.wind.from === 'metar' ? `the latest ${w.metarStation} METAR` : 'no report')
+
+function AirportWx({ ws, nas }: { ws: WxAt[]; nas: { kind: string; reason: string; detail: string }[] }) {
+  const w = ws[0]
   const id = w.airport.icao || w.airport.id
   const datis = useDatis(id, w.airport.towered && w.at.getTime() - Date.now() < 3 * 3_600_000)
   const t = w.tafMoment
-  const role = { departure: 'Departure', stop: 'Stop', destination: 'Destination', alternate: 'Alternate' }[w.role]
   return (
     <div className="rounded-lg p-4 ring-1 ring-inset ring-border">
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="num text-lg font-medium">{id}</span><span className="text-sm text-fg-3">{role} · ETA {fmtTime(w.at)} ({fmtZ(w.at)})</span>
-        <span className="ml-auto flex items-center gap-1.5">{w.night && <Badge tone="warn">Night</Badge>}<Cat cat={w.category} /></span>
+        <span className="num text-lg font-medium">{id}</span><span className="text-sm text-fg-3">{ws.map(x => `${ROLE[x.role]} ${fmtTime(x.at)} (${fmtZ(x.at)})`).join(' · ')}</span>
+        <span className="ml-auto flex items-center gap-1.5">{ws.some(x => x.night) && <Badge tone="warn">Night</Badge>}{[...new Set(ws.map(x => x.category))].map(c => <Cat key={c ?? 'none'} cat={c} />)}</span>
       </div>
       <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
       <WindCompass size={150} wdir={w.wind.dir ?? (w.wind.spd ? 'VRB' : null)} wspd={w.wind.spd} wgst={w.wind.gust}
         best={bestEnd(w)}
         runways={w.airport.runways.filter(r => r.ends.length === 2 && r.ends.every(e => e.trueHdg != null)).map(r => ({ le_ident: r.ends[0].id, le_hdg: r.ends[0].trueHdg!, he_ident: r.ends[1].id, he_hdg: r.ends[1].trueHdg!, length_ft: r.len, surface: r.surface ?? undefined }))} />
       <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <Fact k="Wind" v={w.wind.from ? `${w.wind.dir == null ? 'VRB' : deg3(w.wind.dir)}° ${w.wind.spd}${w.wind.gust ? `G${w.wind.gust}` : ''} kt` : '—'} />
+        <Fact k="Wind" v={windText(w)} />
         <Fact k="Ceiling" v={w.ceiling ? `${w.ceiling.toLocaleString()} ft` : 'None'} />
         <Fact k="Visibility" v={w.visib != null ? `${w.visib} SM` : '—'} />
         <Fact k="Altimeter" v={w.altimInHg ? w.altimInHg.toFixed(2) : '—'} />
@@ -52,7 +76,19 @@ function AirportWx({ w, nas }: { w: WxAt; nas: { kind: string; reason: string; d
         <Fact k="Density alt" v={w.da != null ? `${w.da.toLocaleString()} ft` : '—'} />
       </div>
       </div>
-      <div className="mt-1 text-xs text-fg-3">{w.wind.from === 'taf' ? `Conditions at the ETA from the ${w.tafStation} TAF` : w.wind.from === 'metar' ? `Latest observation (${w.metarStation}${w.metarStation !== id ? ', nearest station' : ''}) — ETA is within the hour or no TAF covers it` : 'No report'}</div>
+      <div className="mt-1 text-xs text-fg-3">{ws.length > 1 ? `At the ${ROLE[w.role].toLowerCase()} ETA, ${fmtTime(w.at)}, from ${srcText(w)}` : w.wind.from === 'taf' ? `Conditions at the ETA from the ${w.tafStation} TAF` : w.wind.from === 'metar' ? `Latest observation (${w.metarStation}${w.metarStation !== id ? ', nearest station' : ''}) — ETA is within the hour or no TAF covers it` : 'No report'}</div>
+      {ws.slice(1).map(x => {
+        const diff = wxDiff(w, x)
+        return (
+          <div key={x.role} className="mt-3 rounded-md px-3 py-2 text-sm ring-1 ring-inset ring-border">
+            <div className="text-fg">{ROLE[x.role]} ETA {fmtTime(x.at)} ({fmtZ(x.at)})</div>
+            {diff.length ? (
+              <ul className="mt-1 space-y-0.5">{diff.map(f => <li key={f.k} className="flex flex-wrap gap-x-2"><span className="w-24 text-fg-3">{f.k}</span><span className="num text-fg-3 line-through">{f.from}</span><span className="num text-fg">{f.to}</span></li>)}</ul>
+            ) : <p className="mt-0.5 text-fg-3">Same as at {ROLE[w.role].toLowerCase()}: {srcText(x)} covers both times.</p>}
+            {diff.length > 0 && <p className="mt-1 text-xs text-fg-3">From {srcText(x)}; everything else as above.</p>}
+          </div>
+        )
+      })}
       {w.metar && (
         <div className="mt-3"><div className="mb-0.5 flex justify-between text-xs text-fg-3"><span>METAR {w.metar.icaoId}</span><span>{w.metarAgeMin} min ago</span></div>
           <code className="block break-words rounded-md bg-sunken px-3 py-2 font-mono text-[13px] text-fg-2">{w.metar.rawOb}</code></div>

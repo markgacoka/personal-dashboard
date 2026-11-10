@@ -62,7 +62,7 @@ export function weatherNotes(d: Derived) {
   return lines
 }
 
-export function flightNotes(d: Derived, f: Flight, aircraft: string, notams: NotamSet[]) {
+export function flightNotes(d: Derived, f: Flight, aircraft: string, notams: NotamSet[], instructor: string | null = null) {
   const dep = f.departAt
   const pre = new Date(dep.getTime() - 30 * 60_000)
   const hhmm = (x: Date) => `${String(x.getHours()).padStart(2, '0')}${String(x.getMinutes()).padStart(2, '0')}`
@@ -75,5 +75,5 @@ export function flightNotes(d: Derived, f: Flight, aircraft: string, notams: Not
     const { shown, more } = notamHighlights(set.items)
     return shown.length ? `${id} ${shown.join('; ')}${more ? ` (+${more} more)` : ''}` : `${id} none that affect VFR`
   })
-  return { day: `${day} (VFR)`, aircraft: `${aircraft} (preflight ${hhmm(pre)} local)`, wx: weatherNotes(d), notams: nt }
+  return { day: `${day} (VFR${instructor ? `, dual with ${instructor}` : ''})`, aircraft: `${aircraft} (preflight ${hhmm(pre)} local)`, wx: weatherNotes(d), notams: nt }
 }

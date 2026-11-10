@@ -68,6 +68,7 @@ export function fbStationsFor(coords, box) {
 }
 
 const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, size, page_map, source, created_at'
+const DOC_KINDS = ['poh', 'briefing', 'checklist', 'other']
 const MAX_PDF = 80 * 1024 * 1024
 
 export default async function plannerRoutes(fastify) {
@@ -204,7 +205,7 @@ export default async function plannerRoutes(fastify) {
 
   // ── Reference documents (POHs, briefings) ──────────────────────────────────
   fastify.get('/api/planner/documents', async req => {
-    const kind = ['poh', 'briefing', 'other'].includes(req.query.kind) ? req.query.kind : null
+    const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
     const { rows } = await pool.query(`SELECT ${DOC_COLS} FROM planner_documents ${kind ? 'WHERE kind = $1' : ''} ORDER BY created_at DESC LIMIT 100`, kind ? [kind] : [])
     return rows
   })
@@ -219,8 +220,8 @@ export default async function plannerRoutes(fastify) {
   })
   // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF)
   fastify.post('/api/planner/documents', async (req, reply) => {
-    const kind = ['poh', 'briefing', 'other'].includes(req.query.kind) ? req.query.kind : null
-    if (!kind || !Buffer.isBuffer(req.body) || req.body.subarray(0, 5).toString() !== '%PDF-') return reply.status(400).send({ error: 'Send a PDF with ?kind=poh|briefing|other' })
+    const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
+    if (!kind || !Buffer.isBuffer(req.body) || req.body.subarray(0, 5).toString() !== '%PDF-') return reply.status(400).send({ error: `Send a PDF with ?kind=${DOC_KINDS.join('|')}` })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
       `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route)
@@ -260,9 +261,19 @@ export default async function plannerRoutes(fastify) {
 
   // POH for an aircraft: the closest publicly posted handbook, stored on first use.
   fastify.get('/api/planner/poh/catalog', async () => CATALOG.map(({ key, make, variant, years, title, profile, url, units }) => ({ key, make, variant, years, title, profile, url, units })))
+  // A POH you uploaded for this tail (or, failing that, for this model) wins
+  // over the catalog's: the newest upload is the one used.
   fastify.post('/api/planner/poh/find', async (req, reply) => {
-    const { make, model, year } = req.body || {}
+    const { make, model, year, tail } = req.body || {}
     const m = matchPoh({ make, model, year: Number(year) || null })
+    const t = tail && TAIL.test(String(tail).toUpperCase()) ? String(tail).toUpperCase() : null
+    const mdl = model ? String(model).toUpperCase().slice(0, 20) : null
+    const { rows: [mine] } = await pool.query(
+      `SELECT ${DOC_COLS} FROM planner_documents WHERE kind = 'poh' AND source = 'upload'
+         AND (tail_number = $1::text OR (tail_number IS NULL AND model = $2::text))
+       ORDER BY (tail_number = $1::text) DESC NULLS LAST, created_at DESC LIMIT 1`, [t, mdl])
+    const info = m && { key: m.entry.key, title: m.entry.title, variant: m.entry.variant, years: m.entry.years, profile: m.entry.profile, url: m.entry.url, units: m.entry.units, exact: m.exact, sameYears: m.sameYears }
+    if (mine) return { match: info, doc: mine, uploaded: true }
     if (!m) return { match: null, doc: null }
     const { url, title, variant, years, profile, units, key } = m.entry
     try {
@@ -302,6 +313,35 @@ export default async function plannerRoutes(fastify) {
        ON CONFLICT (tail_number) DO UPDATE SET data = $2, updated_at = NOW() RETURNING data, updated_at`,
       [tail.startsWith('N') ? tail : `N${tail}`, req.body])
     return { ...rows[0].data, updatedAt: rows[0].updated_at }
+  })
+
+  // Airport profiles: what you know about a field that NASR doesn't say (your
+  // pattern altitude, pattern side per runway, notes), kept for every plan.
+  // GET /api/planner/airport-profiles?ids=KRHV,KSNS → { KRHV: {...}, … }
+  fastify.get('/api/planner/airport-profiles', async req => {
+    const ids = String(req.query.ids || '').toUpperCase().split(',').filter(x => ID.test(x)).slice(0, 20)
+    if (!ids.length) return {}
+    const { rows } = await pool.query('SELECT airport_id, data, updated_at FROM planner_airport_profiles WHERE airport_id = ANY($1)', [ids])
+    return Object.fromEntries(rows.map(r => [r.airport_id, { ...r.data, updatedAt: r.updated_at }]))
+  })
+  fastify.put('/api/planner/airport-profiles/:id', async (req, reply) => {
+    const id = String(req.params.id).toUpperCase()
+    const b = req.body
+    if (!ID.test(id) || !b || typeof b !== 'object' || Array.isArray(b)) return reply.status(400).send({ error: 'Bad request' })
+    const tpa = Number(b.tpaMsl)
+    const pattern = Object.fromEntries(Object.entries(b.pattern && typeof b.pattern === 'object' ? b.pattern : {})
+      .filter(([k, v]) => /^[0-9]{1,2}[LCR]?$|^[NSEW]{1,2}$|^[A-Z0-9]{1,4}$/.test(k) && (v === 'L' || v === 'R')).slice(0, 24))
+    const data = { tpaMsl: Number.isFinite(tpa) && tpa > 0 && tpa < 20000 ? Math.round(tpa) : null, pattern, notes: typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '' }
+    const { rows } = await pool.query(
+      `INSERT INTO planner_airport_profiles (airport_id, data, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (airport_id) DO UPDATE SET data = $2, updated_at = NOW() RETURNING data, updated_at`, [id, data])
+    return { ...rows[0].data, updatedAt: rows[0].updated_at }
+  })
+  fastify.delete('/api/planner/airport-profiles/:id', async (req, reply) => {
+    const id = String(req.params.id).toUpperCase()
+    if (!ID.test(id)) return reply.status(400).send({ error: 'Bad request' })
+    await pool.query('DELETE FROM planner_airport_profiles WHERE airport_id = $1', [id])
+    return reply.status(204).send()
   })
 
   fastify.get('/api/planner/settings/:key', async req => {

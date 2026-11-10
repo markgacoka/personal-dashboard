@@ -2,7 +2,7 @@
 // aviation endpoints, plus the saved plan / per-tail / minimums state.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { get, post, put, del } from '@/lib/api'
-import type { AircraftPlanning, Airport, Minimums, Plan, WeatherBundle } from './model'
+import type { AircraftPlanning, Airport, AirportProfile, Minimums, Plan, WeatherBundle } from './model'
 import type { LatLon } from './calc'
 
 const MIN = 60_000
@@ -77,6 +77,18 @@ export function usePlans() {
   return { ...q, create, update, remove }
 }
 
+// Your airport profiles (pattern altitude, pattern sides, notes) by airport id.
+export function useAirportProfiles(ids: string[]) {
+  const qc = useQueryClient()
+  const key = ['planner', 'airport-profiles', ids.join(',')]
+  const q = useQuery({ queryKey: key, enabled: ids.length > 0, staleTime: Infinity, placeholderData: keepPreviousData, queryFn: () => get<Record<string, AirportProfile>>(`/api/planner/airport-profiles?ids=${ids.join(',')}`) })
+  const save = useMutation({
+    mutationFn: ({ id, profile }: { id: string; profile: AirportProfile | null }) => (profile ? put<AirportProfile>(`/api/planner/airport-profiles/${id}`, profile) : del(`/api/planner/airport-profiles/${id}`).then(() => null)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['planner', 'airport-profiles'] }),
+  })
+  return { ...q, save }
+}
+
 // Towns, highways, rivers, railroads, power lines, towers and peaks around the route.
 export const useLandmarks = (bbox: ReturnType<typeof bboxOf>) => {
   const ok = !!bbox && bbox.north - bbox.south <= 3 && bbox.east - bbox.west <= 4
@@ -91,19 +103,19 @@ export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
 })
 
-export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; source: string; created_at: string }
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; source: string; created_at: string }
 export function useDocuments() {
   const qc = useQueryClient()
   const key = ['planner', 'documents']
   const q = useQuery({ queryKey: key, staleTime: 5 * MIN, queryFn: () => get<PlannerDoc[]>('/api/planner/documents') })
   const upload = useMutation({
-    mutationFn: async ({ file, kind, model, route }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string }) => {
-      const qs = new URLSearchParams({ kind, title: file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}) })
+    mutationFn: async ({ file, kind, model, route, tail, title }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string; tail?: string; title?: string }) => {
+      const qs = new URLSearchParams({ kind, title: title || file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}), ...(tail ? { tail } : {}) })
       const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: file, credentials: 'same-origin' })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Upload failed (${r.status})`)
       return r.json() as Promise<PlannerDoc>
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: key }); if (v.kind === 'poh') qc.invalidateQueries({ queryKey: ['planner', 'poh-find'] }) },
   })
   const importBriefings = useMutation({ mutationFn: () => post<{ added: number }>('/api/planner/briefings/import'), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
   const remove = useMutation({ mutationFn: (id: number) => del(`/api/planner/documents/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: key }) })
@@ -118,12 +130,13 @@ export const useResolve = (tokens: string[]) => useQuery({
 
 export interface PohMatch { key: string; title: string; variant: string; years: [number, number]; profile: string | null; url: string; units: string; exact: boolean; sameYears?: boolean }
 // The closest public POH for the aircraft; the server downloads it once and keeps it.
-export const usePohFind = (a: { make?: string | null; model?: string | null; year?: number | null } | null) => {
+// A POH you uploaded for the tail (or model) comes back first, with uploaded: true.
+export const usePohFind = (a: { make?: string | null; model?: string | null; year?: number | null; tail?: string | null } | null) => {
   const qc = useQueryClient()
   return useQuery({
-    queryKey: ['planner', 'poh-find', a?.make, a?.model, a?.year], enabled: !!a?.model, staleTime: Infinity, retry: 1,
+    queryKey: ['planner', 'poh-find', a?.make, a?.model, a?.year, a?.tail], enabled: !!a?.model || !!a?.tail, staleTime: Infinity, retry: 1,
     queryFn: async () => {
-      const r = await post<{ match: PohMatch | null; doc: PlannerDoc | null }>('/api/planner/poh/find', a)
+      const r = await post<{ match: PohMatch | null; doc: PlannerDoc | null; uploaded?: boolean }>('/api/planner/poh/find', a)
       if (r.doc) qc.invalidateQueries({ queryKey: ['planner', 'documents'] })
       return r
     },

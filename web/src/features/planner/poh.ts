@@ -39,6 +39,55 @@ export interface AircraftProfile {
   climbStartFuelGal: number
   cruise: CruiseRow[]
   figures: Record<string, string>
+  // Your own cruise numbers (from the aircraft profile) in place of the POH table.
+  cruiseFixed?: { ktas?: number | null; gph?: number | null }
+}
+
+// What you changed on a tail's profile (saved per tail in planner_aircraft as
+// data.profile). Blank fields keep the POH / TCDS / registry value.
+type Num = number | null | undefined
+export interface ProfileEdits {
+  make?: string; model?: string; year?: Num; engine?: string; oil?: string
+  maxRamp?: Num; maxTakeoff?: Num; maxLanding?: Num; utilityMax?: Num
+  fuelUsable?: Num; fuelTotal?: Num; fuelArm?: Num
+  arms?: Partial<Record<'front' | 'rear' | 'bag1' | 'bag2', Num>>
+  vso?: Num; vs1?: Num; vr?: Num; vx?: Num; vy?: Num; va?: Num; vfe?: string; vno?: Num; vne?: Num; glide?: Num; approach?: string; shortApproach?: Num
+  crosswindDemo?: Num; glideNmPer1000?: Num
+  cruiseKtas?: Num; cruiseGph?: Num
+}
+
+const has = (v: Num): v is number => v != null && Number.isFinite(v) && v > 0
+const text = (v?: string) => (v && v.trim() ? v.trim() : undefined)
+// Number of fields you set (for "3 of your values" and the Reset button).
+export const editCount = (e?: ProfileEdits | null) => !e ? 0 : Object.entries(e).reduce((n, [k, v]) => n + (k === 'arms' ? Object.values(v as object).filter(x => has(x as Num)).length : typeof v === 'string' ? (v.trim() ? 1 : 0) : has(v as Num) ? 1 : 0), 0)
+
+// The profile to plan with: the matched POH profile with your values on top.
+export function applyEdits(m: ProfileMatch, e?: ProfileEdits | null): ProfileMatch {
+  const n = editCount(e)
+  if (!e || !n) return m
+  const p = m.profile
+  const L = p.limits
+  const arms = e.arms ?? {}
+  const vs = p.vspeeds
+  const profile: AircraftProfile = {
+    ...p,
+    source: `${p.source}, with ${n} value${n > 1 ? 's' : ''} from your aircraft profile`,
+    engine: text(e.engine) ?? p.engine,
+    oil: text(e.oil) ?? p.oil,
+    limits: { ...L, maxRamp: has(e.maxRamp) ? e.maxRamp : L.maxRamp, maxTakeoff: has(e.maxTakeoff) ? e.maxTakeoff : L.maxTakeoff, maxLanding: has(e.maxLanding) ? e.maxLanding : L.maxLanding, utilityMax: has(e.utilityMax) ? e.utilityMax : L.utilityMax },
+    fuel: has(e.fuelUsable) ? [{ key: 'yours', label: 'Your tanks', usable: e.fuelUsable, total: has(e.fuelTotal) ? e.fuelTotal : e.fuelUsable }] : p.fuel,
+    fuelArm: has(e.fuelArm) ? e.fuelArm : p.fuelArm,
+    stations: p.stations.map(s => { const a = arms[s.key as keyof typeof arms]; return has(a) ? { ...s, arm: a } : s }),
+    vspeeds: {
+      ...vs, vso: has(e.vso) ? e.vso : vs.vso, vs1: has(e.vs1) ? e.vs1 : vs.vs1, vr: has(e.vr) ? e.vr : vs.vr, vx: has(e.vx) ? e.vx : vs.vx, vy: has(e.vy) ? e.vy : vs.vy,
+      va: has(e.va) ? [[has(e.maxTakeoff) ? e.maxTakeoff : L.maxTakeoff, e.va]] : vs.va, vfe: text(e.vfe) ?? vs.vfe, vno: has(e.vno) ? e.vno : vs.vno, vne: has(e.vne) ? e.vne : vs.vne,
+      glide: has(e.glide) ? e.glide : vs.glide, approach: text(e.approach) ?? vs.approach, shortApproach: has(e.shortApproach) ? e.shortApproach : vs.shortApproach,
+    },
+    crosswindDemo: has(e.crosswindDemo) ? e.crosswindDemo : p.crosswindDemo,
+    glideNmPer1000: has(e.glideNmPer1000) ? e.glideNmPer1000 : p.glideNmPer1000,
+    cruiseFixed: has(e.cruiseKtas) || has(e.cruiseGph) ? { ktas: has(e.cruiseKtas) ? e.cruiseKtas : null, gph: has(e.cruiseGph) ? e.cruiseGph : null } : undefined,
+  }
+  return { ...m, profile }
 }
 
 const PA = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]

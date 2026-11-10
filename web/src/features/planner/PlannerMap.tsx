@@ -57,6 +57,7 @@ export interface RouteEdit {
   insert: (at: number, p: EditPoint) => void
   move: (i: number, p: EditPoint) => void
   remove: (i: number) => void
+  rename: (i: number, name: string) => void // blank: back to the ident
   add: (p: EditPoint & { lat: number; lon: number }) => void
 }
 export interface EditPoint { token: string; label?: string; kind?: string }
@@ -105,12 +106,25 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     map.addLayer({ id: 'notam-count', type: 'symbol', source: 'notams', layout: { 'text-field': ['to-string', ['get', 'count']], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-allow-overlap': true }, paint: { 'text-color': '#fff', 'text-translate': [14, -14] } })
     map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'wp'], 5, 8], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': ['case', ['get', 'wp'], 2, 2.5] } })
     map.addLayer({ id: 'airport-labels', type: 'symbol', source: 'airports', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 13, 'text-offset': [0, 1.4], 'text-anchor': 'top' }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5 } })
-    // A popup, optionally with one action button (add / remove a route point).
-    const show = (at: maplibregl.LngLatLike, html: string, action?: { label: string; run: () => void }) => {
+    // A popup, optionally with one action button (add / remove a route point)
+    // and, for a point on the route, a field to name it.
+    const show = (at: maplibregl.LngLatLike, html: string, action?: { label: string; run: () => void }, name?: { value: string; ident: string; save: (v: string) => void }) => {
       popup.current?.remove()
       const el = document.createElement('div')
       el.style.cssText = 'font-size:13px;line-height:1.45;white-space:pre-wrap'
       el.innerHTML = html
+      if (name) {
+        const f = document.createElement('form')
+        f.style.cssText = 'display:flex;gap:6px;margin-top:8px;white-space:normal'
+        const i = document.createElement('input')
+        i.value = name.value; i.placeholder = `Name (blank: ${name.ident})`; i.maxLength = 40; i.setAttribute('aria-label', 'Point name')
+        i.style.cssText = 'flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #8886;background:transparent;color:inherit;font-size:13px'
+        const b = document.createElement('button')
+        b.type = 'submit'; b.textContent = 'Name'
+        b.style.cssText = `padding:3px 10px;border-radius:999px;border:1px solid ${accent};color:${accent};font-weight:600;font-size:12px`
+        f.onsubmit = ev => { ev.preventDefault(); name.save(i.value); popup.current?.remove() }
+        f.append(i, b); el.appendChild(f)
+      }
       if (action) {
         const b = document.createElement('button')
         b.textContent = action.label
@@ -126,7 +140,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
         if (!f || dragged) return
         const p = f.properties || {}
         const ed = editRef.current
-        if (layer === 'airports' && p.mid && ed) return show(e.lngLat, String(p.html ?? ''), { label: 'Remove from route', run: () => ed.remove(Number(p.idx)) })
+        if (layer === 'airports' && p.mid && ed) return show(e.lngLat, String(p.html ?? ''), { label: 'Remove from route', run: () => ed.remove(Number(p.idx)) }, { value: String(p.named ?? ''), ident: String(p.ident ?? ''), save: v => ed.rename(Number(p.idx), v) })
         if (layer === 'cands') {
           const html = `<b>${escHtml(String(p.label))}</b>${p.name && p.name !== p.label ? ` · ${escHtml(String(p.name))}` : ''}<br>${escHtml(String(p.detail ?? ''))}`
           const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates
@@ -226,9 +240,9 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       const last = i === arr.length - (alternate ? 2 : 1)
       const mid = a !== alternate && i > 0 && !last
       const role = a === alternate ? 'ALT' : i === 0 ? 'DEP' : last ? 'DEST' : wp ? (a.navType || 'WAYPOINT') : 'FLY OVER'
-      if (wp) return { type: 'Feature', geometry: { type: 'Point', coordinates: [a.lon, a.lat] }, properties: { wp: true, mid, idx: i, label: a.label || a.id, color: mapColor('--fg-2'), html: `<b>${esc(a.label || a.id)}</b> · ${esc(role)}<br>${esc(a.name)}${a.frequencies[0] ? `<br>${esc(a.frequencies[0].freq)}` : ''}<br>${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}` } }
+      if (wp) return { type: 'Feature', geometry: { type: 'Point', coordinates: [a.lon, a.lat] }, properties: { wp: true, mid, idx: i, label: a.label || a.id, named: a.label ?? '', ident: a.id, color: mapColor('--fg-2'), html: `<b>${esc(a.label || a.id)}</b>${a.label && a.label !== a.id ? ` (${esc(a.id)})` : ''} · ${esc(role)}<br>${esc(a.name)}${a.frequencies[0] ? `<br>${esc(a.frequencies[0].freq)}` : ''}<br>${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}` } }
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [a.lon, a.lat] }, properties: {
-        wp: mid, mid, idx: i, label: `${a.icao || a.id}`, color: w?.category ? mapColor(catVar(w.category)) : mapColor('--fg-3'),
+        wp: mid, mid, idx: i, label: (mid && a.label) || a.icao || a.id, named: a.label ?? '', ident: a.icao || a.id, color: w?.category ? mapColor(catVar(w.category)) : mapColor('--fg-3'),
         html: `<b>${esc(a.icao || a.id)}</b> · ${role}<br>${esc(a.name)}<br>${w ? `${w.category ?? 'no report'} at ETA ${w.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${w.metar ? `<br><span style="font-family:monospace">${esc(w.metar.rawOb)}</span>` : ''}` : ''}`,
       } }
     }) })

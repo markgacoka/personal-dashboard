@@ -3,7 +3,8 @@ import { AlertTriangle } from 'lucide-react'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import type { AircraftRegistry } from '@/lib/types'
-import type { PohMatch } from './api'
+import type { PlannerDoc, PohMatch } from './api'
+import { AircraftDocs, ProfileEditor } from './AircraftProfile'
 import { AV1ATES, EQUIPMENT_DAY, EQUIPMENT_NIGHT, MX_DOCS } from './checklists'
 import { Checklist } from './Checklist'
 import { EmptyWeight, PohStatus } from './FlightInputs'
@@ -18,10 +19,10 @@ import type { Units } from './units'
 // registry, the matched POH and its limits, speeds and performance at this
 // flight's altitudes, its W&B record — then the maintenance, documents and
 // equipment checklists.
-export function AircraftStep({ plan, set, d, registry, match, poh, pohLoading, pohError, aircraft, planning, savePlanning, u }: {
+export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUploaded, pohLoading, pohError, aircraft, planning, savePlanning, savingPlanning, u }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; registry: AircraftRegistry | null | undefined; match: ProfileMatch | null
-  poh: PohMatch | null | undefined; pohLoading: boolean; pohError: string | null; aircraft: { make?: string | null; model?: string | null; year?: number | null }
-  planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; u: Units
+  poh: PohMatch | null | undefined; pohDoc: PlannerDoc | null | undefined; pohUploaded: boolean; pohLoading: boolean; pohError: string | null; aircraft: { make?: string | null; model?: string | null; year?: number | null }
+  planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; savingPlanning: boolean; u: Units
 }) {
   const p = d.profile
   if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number in step 1.</p>
@@ -33,12 +34,12 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohLoading, p
           {registry?.photo_url && <img src={registry.photo_url} alt={plan.tail} className="aspect-[16/9] w-full rounded-lg object-cover ring-1 ring-border" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
           <KV items={[
             ['Aircraft', `${titleCase(aircraft.make ?? '')} ${aircraft.model ?? ''}${aircraft.year ? `, ${aircraft.year}` : ''}`],
-            ['Engine', registry?.engine_type ? `${registry.engine_type}${registry.engine_hp ? `, ${registry.engine_hp} hp` : ''}` : p?.engine],
+            ['Engine', planning.profile?.engine ? p?.engine : registry?.engine_type ? `${registry.engine_type}${registry.engine_hp ? `, ${registry.engine_hp} hp` : ''}` : p?.engine],
             ['Seats', registry?.seats], ['Serial', registry?.serial], ['Mode S', registry?.mode_s_hex && <span className="num uppercase">{registry.mode_s_hex}</span>],
             ['Registered owner', registry?.owner ? titleCase(registry.owner) : null], ['Registration status', registry?.status],
           ]} />
           {registry && <Synced label="" source="FAA aircraft registry" />}
-          <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} />
+          <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded ? pohDoc : null} />
         </div>
         <div className="space-y-4 xl:col-span-3">
           {match?.note && <div className="flex gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{match.note}</div>}
@@ -63,6 +64,11 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohLoading, p
             </div>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <ProfileEditor tail={plan.tail} planning={planning} save={savePlanning} saving={savingPlanning} registry={{ make: registry?.make, model: registry?.model, year: registry?.year }} />
+        <AircraftDocs tail={plan.tail} model={aircraft.model ?? null} poh={pohDoc} pohUploaded={pohUploaded} />
       </div>
 
       {p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}

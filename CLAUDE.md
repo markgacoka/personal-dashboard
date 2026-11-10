@@ -97,7 +97,10 @@ aviationweather.gov, FAA NAS status and tfr.faa.gov (`services/awc.js`,
 `services/waypoints.js` against `nasr_points` (NASR NAV_BASE/FIX_BASE, loaded
 with the airports each cycle). `services/pohCatalog.js` matches a tail's
 make/model/year to a public POH PDF and stores it in `planner_documents` on
-first use. A wizard: step 1 takes the inputs (tail, departure / route / arrival — one
+first use, unless you uploaded a POH for that tail (or model), which wins. Per-tail
+aircraft profiles (`planner_aircraft.data.profile`, applied by `poh.ts`'s
+`applyEdits`) and airport profiles (`planner_airport_profiles`) override the
+POH/NASR values. A wizard: step 1 takes the inputs (tail, departure / route / arrival — one
 flight, middle points always flown over — engine start, RPM, seats, fuel, taxi time); the later steps (aircraft, route, airports,
 weather, weight & performance, pilot, review, NavLog) are derived, with the
 checklists (IMSAFE, maintenance, equipment) stored in the plan — per-flight automatic altitude,

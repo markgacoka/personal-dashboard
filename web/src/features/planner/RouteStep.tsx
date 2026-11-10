@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, Loader2, Plus, RotateCcw, X } from 'lucide-react'
+import { ArrowRight, Loader2, Pencil, Plus, RotateCcw, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { OptNum } from './FlightInputs'
 import type { Airport, Checkpoint, Derived, NavFix, Plan, WeatherBundle } from './model'
@@ -41,6 +41,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
       {routePts.length > 1 && (
         <div className="space-y-3">
           <RouteChips pts={routePts} edit={edit} />
+          <p className="-mt-1 text-xs text-fg-3">Tap a point's name to name it (e.g. "Anderson Lake"); the name is used on the navlog.</p>
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
               <PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} />
@@ -131,20 +132,30 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
 
 const ptName = (a: Airport) => a.label || a.icao || a.id
 
-// The route as chips: departure → points flown over (removable) → arrival.
+// The route as chips: departure → points flown over (tap a name to rename it,
+// × to remove it) → arrival. Names carry to the navlog.
 function RouteChips({ pts, edit }: { pts: Airport[]; edit: RouteEdit }) {
+  const [editing, setEditing] = useState<number | null>(null)
   return (
     <ol className="flex flex-wrap items-center gap-1.5 text-sm" aria-label="Route">
       {pts.map((a, i) => {
         const end = i === 0 || i === pts.length - 1
+        const ident = a.icao || a.id
         return (
           <li key={`${a.id}-${i}`} className="flex items-center gap-1.5">
             {i > 0 && <ArrowRight className="size-3.5 text-fg-3" />}
-            <span className={cn('num inline-flex h-7 items-center gap-1 rounded-full pl-2.5 ring-1 ring-inset', end ? 'bg-accent-soft pr-2.5 font-medium text-accent ring-accent/30' : 'pr-1 text-fg ring-border')} title={a.name}>
-              {ptName(a)}
-              {end && <span className="text-xs font-normal opacity-80">{i === 0 ? 'dep' : 'arr'}</span>}
-              {!end && <button className="grid size-5 place-items-center rounded-full text-fg-3 hover:bg-bad-soft hover:text-bad" aria-label={`Remove ${ptName(a)}`} onClick={() => edit.remove(i)}><X className="size-3.5" /></button>}
-            </span>
+            {editing === i ? (
+              <input autoFocus defaultValue={a.label ?? ''} placeholder={`Name (blank: ${ident})`} maxLength={40} aria-label={`Name for ${ident}`}
+                className="h-7 w-44 rounded-full bg-transparent px-2.5 text-sm text-fg ring-1 ring-inset ring-accent/60 outline-none"
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = a.label ?? ''; setEditing(null) } }}
+                onBlur={e => { if ((e.currentTarget.value.trim()) !== (a.label ?? '')) edit.rename(i, e.currentTarget.value); setEditing(null) }} />
+            ) : (
+              <span className={cn('num inline-flex h-7 items-center gap-1 rounded-full pl-2.5 ring-1 ring-inset', end ? 'bg-accent-soft pr-2.5 font-medium text-accent ring-accent/30' : 'pr-1 text-fg ring-border')} title={a.label && a.label !== ident ? `${a.label} (${ident})` : a.name}>
+                {end ? ptName(a) : <button className="inline-flex items-center gap-1 hover:text-accent" onClick={() => setEditing(i)} aria-label={`Rename ${ptName(a)}`}>{ptName(a)}<Pencil className="size-3 text-fg-3" /></button>}
+                {end && <span className="text-xs font-normal opacity-80">{i === 0 ? 'dep' : 'arr'}</span>}
+                {!end && <button className="grid size-5 place-items-center rounded-full text-fg-3 hover:bg-bad-soft hover:text-bad" aria-label={`Remove ${ptName(a)}`} onClick={() => edit.remove(i)}><X className="size-3.5" /></button>}
+              </span>
+            )}
           </li>
         )
       })}

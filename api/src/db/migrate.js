@@ -1150,6 +1150,21 @@ async function migrateV35() {
   `)
 }
 
+// Planner: aircraft checklists as documents (uploaded per tail), and saved
+// airport profiles (your pattern altitude, pattern sides, notes) by airport id.
+async function migrateV37() {
+  await pool.query(`
+    ALTER TABLE planner_documents DROP CONSTRAINT IF EXISTS planner_documents_kind_check;
+    ALTER TABLE planner_documents ADD CONSTRAINT planner_documents_kind_check CHECK (kind IN ('poh', 'briefing', 'checklist', 'other'));
+    CREATE INDEX IF NOT EXISTS planner_documents_tail ON planner_documents (tail_number, kind, created_at DESC) WHERE tail_number IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS planner_airport_profiles (
+      airport_id TEXT PRIMARY KEY,
+      data       JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `)
+}
+
 // Navaids and fixes (incl. VFR waypoints) from the same NASR cycle, so a route
 // can name VORs, NDBs and VP… waypoints the way SkyVector and ForeFlight do.
 async function migrateV36() {
@@ -1179,7 +1194,7 @@ const MIGRATIONS = [
   ['021', migrateV21], ['022', migrateV22], ['023', migrateV23],
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
-  ['034', migrateV34], ['035', migrateV35], ['036', migrateV36],
+  ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

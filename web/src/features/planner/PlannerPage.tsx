@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Loader2, Printer, Save, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Loader2, Pencil, Printer, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -13,7 +13,7 @@ import type { NotamResponse } from '@/lib/types'
 import { computeCurrency } from '@/lib/flying'
 import { homeAirport } from '@/lib/weather'
 import { cn } from '@/lib/utils'
-import { bboxOf, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, type SavedPlan, useRadar, useResolve, useTerrain, useWeather } from './api'
+import { bboxOf, useAirportProfiles, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, type SavedPlan, useRadar, useResolve, useTerrain, useWeather } from './api'
 import { AircraftStep } from './AircraftStep'
 import { AirportsStep } from './AirportsStep'
 import { PilotStep } from './PilotStep'
@@ -23,12 +23,12 @@ import type { EditPoint, RouteEdit } from './PlannerMap'
 import { flightNotes, type NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { FlightInputs } from './FlightInputs'
-import { DEFAULT_MINIMUMS, derive, isWaypoint, makeResolver, parseRouteItem, worst, type Airport, type Derived, type Plan, type SectionKey, type Status } from './model'
+import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, worst, type Airport, type Derived, type Plan, type SectionKey, type Status } from './model'
 import { NavlogFront, NavlogReverse } from './NavlogSheet'
 import { PerformanceSection } from './PerformanceSection'
 import { PlannerMap, type MapNotams } from './PlannerMap'
 import { WbTable } from './PohSummary'
-import { profileFor } from './poh'
+import { applyEdits, profileFor } from './poh'
 import { RefPanel, RefProvider, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
 import { WeatherSection } from './WeatherSection'
@@ -103,7 +103,10 @@ function Planner() {
     return [...new Set([...fromRoute, ...(effAlt ? [effAlt] : [])])]
   }, [tokens, points, effAlt])
   const apts = useAirports(ids, plan.departLocal.slice(0, 10))
-  const airports = useMemo(() => apts.data?.airports ?? [], [apts.data])
+  // Your airport profiles (pattern altitude, pattern sides, notes) on top of NASR.
+  const aptIds = useMemo(() => (apts.data?.airports ?? []).map(a => a.icao || a.id), [apts.data])
+  const aptProfiles = useAirportProfiles(aptIds)
+  const airports = useMemo(() => (apts.data?.airports ?? []).map(a => applyAirportProfile(a, aptProfiles.data?.[a.icao || a.id])), [apts.data, aptProfiles.data])
   const resolve = useMemo(() => makeResolver(airports, points), [airports, points])
   // Resolved route points (named from plan.labels) and, for each, its index in plan.route.
   const [routePts, routeIdx] = useMemo(() => {
@@ -129,6 +132,14 @@ function Planner() {
     insert: (at, p) => set({ route: insertAt(plan.route, routeIdx[at] ?? plan.route.length - 1, p.token), labels: putLabel(p) }),
     move: (i, p) => set({ route: replaceAt(plan.route, routeIdx[i], p.token), labels: putLabel(p) }),
     remove: i => set({ route: removeAt(plan.route, routeIdx[i]) }),
+    // Your name for a point (e.g. "Anderson Lake"); blank goes back to its ident.
+    rename: (i, name) => {
+      const r = plan.route[routeIdx[i]]; if (r == null) return
+      const id = parseRouteItem(r).id, labels = { ...plan.labels }
+      if (name.trim()) labels[id] = { name: name.trim().slice(0, 40), kind: labels[id]?.kind ?? '' }
+      else delete labels[id]
+      set({ labels })
+    },
     add: p => edit.insert(bestInsert(routePts, p), p),
   }
   const registry = useRegistry(plan.tail ?? undefined)
@@ -137,13 +148,15 @@ function Planner() {
   const minQ = useMinimums()
   const minimums = useMemo(() => ({ ...DEFAULT_MINIMUMS, ...(minQ.data || {}) }), [minQ.data])
   const fleetRef = fleet.find(a => a.tail_number === plan.tail)
+  // This plan's entry, then the tail's saved profile, then the FAA registry.
+  const edits = planning.profile
   const aircraft = useMemo(() => ({
-    make: plan.aircraft?.make || registry.data?.make || fleetRef?.make || null,
-    model: plan.aircraft?.model || registry.data?.model || fleetRef?.model || null,
-    year: plan.aircraft?.year ?? registry.data?.year ?? fleetRef?.year ?? null,
-  }), [plan.aircraft, registry.data, fleetRef])
-  const pohQ = usePohFind(plan.tail && aircraft.model ? aircraft : null)
-  const match = useMemo(() => (plan.tail ? profileFor(aircraft.model) : null), [plan.tail, aircraft.model])
+    make: plan.aircraft?.make || edits?.make || registry.data?.make || fleetRef?.make || null,
+    model: plan.aircraft?.model || edits?.model || registry.data?.model || fleetRef?.model || null,
+    year: plan.aircraft?.year ?? edits?.year ?? registry.data?.year ?? fleetRef?.year ?? null,
+  }), [plan.aircraft, edits, registry.data, fleetRef])
+  const pohQ = usePohFind(plan.tail ? { ...aircraft, tail: plan.tail } : null)
+  const match = useMemo(() => (plan.tail ? applyEdits(profileFor(aircraft.model), edits) : null), [plan.tail, aircraft.model, edits])
   const u = useMemo(() => unitsForTail(plan.tail), [plan.tail])
   const pilotQ = usePilotInfo()
   const currency = useMemo(() => computeCurrency(flights), [flights])
@@ -164,7 +177,7 @@ function Planner() {
     ['weather', wx.isFetching], ['terrain', terrain.isLoading], ['airspace', airspace.isFetching], ['checkpoints', corridor.isFetching], ['landmarks', landmarks.isFetching],
     ['NOTAMs', notamQs.some(q => q.isLoading)], ['alternates', nearby.isLoading], ['radar', radar.isLoading],
   ]
-  const saving = planningQ.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
+  const saving = planningQ.save.isPending || aptProfiles.save.isPending || minQ.save.isPending || plans.create.isPending || plans.update.isPending
   const failed: [string, () => void][] = ([
     ['route points', resolved.isError, resolved.refetch], ['airports', apts.isError, apts.refetch], ['weather', wx.isError, wx.refetch], ['terrain', terrain.isError, terrain.refetch],
     ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['landmarks', landmarks.isError, landmarks.refetch], ['POH', pohQ.isError, pohQ.refetch],
@@ -186,15 +199,18 @@ function Planner() {
 
   const save = async () => {
     try {
-      if (state.id) await plans.update.mutateAsync({ id: state.id, plan })
-      else { const r = await plans.create.mutateAsync(plan); setState(s => ({ ...s, id: r.id })) }
-      toast.success('Saved to your plans', { description: 'Stored in your planner only; nothing is filed with the FAA.' })
+      // An unnamed plan is named after its route ("KRHV → KSNS").
+      const named = !plan.name.trim() || plan.name === 'New flight' ? { ...plan, name: plan.route.length > 1 ? `${parseRouteItem(plan.route[0]).id} → ${parseRouteItem(plan.route.at(-1)!).id}` : 'Flight plan' } : plan
+      if (named !== plan) set({ name: named.name })
+      if (state.id) await plans.update.mutateAsync({ id: state.id, plan: named })
+      else { const r = await plans.create.mutateAsync(named); setState(s => ({ ...s, id: r.id })) }
+      toast.success(`Saved "${named.name}"`)
     } catch (e) { toast.error((e as Error).message) }
   }
   const routeText = plan.route.map(r => { const id = parseRouteItem(r).id; return plan.labels?.[id]?.name ?? id }).join(' → ') || 'No route yet'
   const refOpen = refs.state.open
   const routeIds = plan.route.map(r => parseRouteItem(r).id).filter((_, i) => !routePts[i] || !isWaypoint(routePts[i]))
-  const pohStatus = pohQ.isLoading ? `Downloading the ${aircraft.model} POH…` : pohQ.data?.match && !pohQ.data.match.exact ? `${pohQ.data.match.title} is the closest public POH to the ${aircraft.model}.` : null
+  const pohStatus = pohQ.isLoading ? `Downloading the ${aircraft.model} POH…` : pohQ.data?.uploaded ? `Your upload for ${plan.tail}.` : pohQ.data?.match && !pohQ.data.match.exact ? `${pohQ.data.match.title} is the closest public POH to the ${aircraft.model}.` : null
   const acName = [aircraft.make && aircraft.make.replace(/\b\w+/g, w => w[0] + w.slice(1).toLowerCase()), aircraft.model].filter(Boolean).join(' ') || d.profile?.model || 'Aircraft'
   const savePlanning = (p: typeof planning) => planningQ.save.mutate(p, { onSuccess: () => toast.success(`${plan.tail} saved`) })
 
@@ -215,7 +231,7 @@ function Planner() {
   return (
     <div className="planner">
       <PageHeader className="[&>div:first-child]:basis-full xl:[&>div:first-child]:basis-0 max-sm:[&>div:nth-child(2)]:w-full"
-        title={<input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" className="w-full min-w-0 bg-transparent outline-none focus:underline" />}
+        title={<label className="group flex min-w-0 items-center gap-2"><input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" placeholder="Name this flight plan" size={Math.max(10, plan.name.length + 1)} className="field-sizing-content min-w-0 max-w-full bg-transparent outline-none placeholder:text-fg-3 focus:underline" /><Pencil className="size-5 shrink-0 text-fg-3 group-hover:text-fg print:hidden" aria-hidden /></label>}
         description={<span><span className="num">{routeText}</span>{d.departAt && <> · {d.departAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>}{d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)} · {d.totals.tripFuel.toFixed(1)} gal</span></>}</span>}
         actions={<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto print:hidden">
           <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-full sm:w-44 xl:hidden" aria-label="Saved plans">
@@ -256,15 +272,17 @@ function Planner() {
               <p className="text-sm text-fg-3">{STEPS[stepAt].blurb}</p>
             </div>
             {cur === 'flight' && (
-              <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohLoading={pohQ.isLoading}
+              <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
                 pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} />
             )}
             {cur === 'aircraft' && (
-              <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null}
+              <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohDoc={pohQ.data?.doc} pohUploaded={!!pohQ.data?.uploaded} savingPlanning={planningQ.save.isPending} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null}
                 aircraft={aircraft} planning={planning} savePlanning={savePlanning} u={u} />
             )}
             {cur === 'route' && <RouteStep plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />}
-            {cur === 'airports' && <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null} />}
+            {cur === 'airports' && <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
+              nasr={apts.data?.airports ?? []} profiles={aptProfiles.data ?? {}} savingProfile={aptProfiles.save.isPending}
+              saveProfile={(id, p) => aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />}
             {cur === 'weather' && (
               <div className="space-y-5">
                 {routePts.length > 1 && <PlannerMap className="h-[24rem] print:hidden" route={routePts} alternate={altAirport} weather={wx.data ?? null} d={d} airspace={airspace.data} radar={radar.data} notams={notams} />}
@@ -310,7 +328,7 @@ function Planner() {
 
         {refOpen && (
           <aside className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
-            <RefPanel className="h-full" model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus} />
+            <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus} />
           </aside>
         )}
       </div>
@@ -362,7 +380,6 @@ function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
         <Group title="Upcoming" list={upcoming} />
         <Group title="Past" list={past} />
       </div>
-      <p className="border-t border-border px-3 pt-2 text-xs text-fg-3">Saved in your planner only. Nothing is filed with the FAA; file with 1800wxbrief yourself.</p>
     </div>
   )
 }

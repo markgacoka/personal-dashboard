@@ -4,7 +4,7 @@ import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AircraftRef, AircraftRegistry } from '@/lib/types'
-import { useResolve, type PohMatch } from './api'
+import { useResolve, type PlannerDoc, type PohMatch } from './api'
 import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
 import type { AircraftProfile } from './poh'
@@ -19,9 +19,9 @@ const KIND_LABEL: Record<RoutePoint['kind'], string> = { airport: 'Airport', nav
 // What you type: tail, route, engine-start time, cruise power, who sits where,
 // fuel and taxi time. Everything else is looked up or computed in the later
 // steps, each of which shows its sources and takes an override where one makes sense.
-export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohLoading, pohError, u, aircraft, profile }: {
+export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; registryLoading: boolean
-  poh: PohMatch | null | undefined; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
+  poh: PohMatch | null | undefined; pohUploaded?: PlannerDoc | null; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
   profile: AircraftProfile | null
 }) {
   const [tail, setTail] = useState(plan.tail ?? '')
@@ -56,6 +56,11 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
   return (
     <div className="space-y-6">
+      <label className="block max-w-xl">
+        <span className="mb-1 block text-sm text-fg-2">Plan name</span>
+        <Input value={plan.name === 'New flight' ? '' : plan.name} onChange={e => set({ name: e.target.value || 'New flight' })} placeholder="e.g. Solo XC to Salinas" maxLength={120} />
+        <span className="mt-1 block text-xs text-fg-3">Blank: named after the route when you save.</span>
+      </label>
       <div className="grid gap-6 2xl:grid-cols-2">
         <div className="space-y-5">
           <div>
@@ -85,7 +90,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
                 <NumField label="Year" value={plan.aircraft?.year ?? aircraft.year ?? ''} onChange={v => set({ aircraft: { ...plan.aircraft, year: v || null } })} />
               </div>
             )}
-            <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} />
+            <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} />
           </div>
 
           <div>
@@ -113,7 +118,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
                       <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-2')} />
                       <span className="num w-28 shrink-0 truncate font-medium text-fg" title={t}>{label ?? t}</span>
                       <span className={cn('w-16 shrink-0 text-xs', end ? 'text-accent' : 'text-fg-3')}>{role}</span>
-                      <span className={cn('min-w-0 truncate max-sm:basis-full max-sm:pl-6 sm:flex-1', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
+                      <span className={cn('min-w-0 truncate max-sm:basis-full max-sm:pl-6 sm:flex-1', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label && plan.labels![t].kind ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
                     </li>
                   )
                 })}
@@ -167,7 +172,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
   )
 }
 
-export function OptNum({ value, placeholder, onChange, unit, step, label }: { value: number | null; placeholder: number; onChange: (v: number | null) => void; unit?: string; step?: number; label: string }) {
+export function OptNum({ value, placeholder, onChange, unit, step, label }: { value: number | null; placeholder: number | string; onChange: (v: number | null) => void; unit?: string; step?: number; label: string }) {
   return (
     <span className="relative block">
       <Input type="number" inputMode="decimal" aria-label={label} value={value ?? ''} placeholder={String(placeholder)} step={step} onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))} className={cn('num', unit && 'pr-10')} />
@@ -193,7 +198,13 @@ export function EmptyWeight({ tail, planning, save, u }: { tail: string; plannin
   )
 }
 
-export function PohStatus({ poh, loading, error, model }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null }) {
+export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null; uploaded?: PlannerDoc | null }) {
+  if (uploaded) return (
+    <div className="mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset ring-border">
+      <BookOpen className="mt-0.5 size-4 shrink-0" />
+      <span className="min-w-0 text-fg">{uploaded.title}: your upload, the POH used for this airplane. <span className="text-fg-3">Open it with "POH &amp; briefing".</span></span>
+    </div>
+  )
   if (!model) return null
   return (
     <div className={cn('mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset', poh && poh.exact ? 'ring-border' : 'bg-warn-soft text-warn ring-warn/30')}>
@@ -201,7 +212,7 @@ export function PohStatus({ poh, loading, error, model }: { poh: PohMatch | null
       <div className="min-w-0">
         {loading && <span>Finding and downloading the {model} POH…</span>}
         {!loading && poh && <span className={poh.exact ? 'text-fg' : ''}>{poh.title}{poh.exact ? '' : ` — closest public POH to the ${model}`}. {poh.profile ? 'Its tables drive every number below.' : 'Reference only; numbers use the closest transcribed POH.'} <span className="opacity-80">Open it with "POH &amp; briefing".</span></span>}
-        {!loading && !poh && !error && <span>No public POH found for the {model}; upload one in "POH &amp; briefing". Numbers use the closest transcribed POH.</span>}
+        {!loading && !poh && !error && <span>No public POH found for the {model}; upload this airplane's POH in step 2 (Aircraft). Numbers use the closest transcribed POH and your aircraft profile.</span>}
         {error && <span>{error}</span>}
       </div>
     </div>

@@ -147,7 +147,8 @@ export function cruiseAt(p: AircraftProfile, pa: number, isaDev: number, rpm: nu
   const [i0, i1, f] = bracket(pas, pa)
   const a = col(rows[i0]), b = col(rows[i1])
   if (!a || !b) return null
-  return { rpm: use, bhp: Math.round(lerp(a[0], b[0], f)), ktas: Math.round(lerp(a[1], b[1], f)), gph: Math.round(lerp(a[2], b[2], f) * 10) / 10, belowTable: pa < pas[0] }
+  const fx = p.cruiseFixed
+  return { rpm: use, bhp: Math.round(lerp(a[0], b[0], f)), ktas: fx?.ktas ?? Math.round(lerp(a[1], b[1], f)), gph: fx?.gph ?? Math.round(lerp(a[2], b[2], f) * 10) / 10, belowTable: pa < pas[0] }
 }
 
 // Fig. 5-7 is from sea level: climb from A to B is (B − A); +10 % per 10 °C above standard.

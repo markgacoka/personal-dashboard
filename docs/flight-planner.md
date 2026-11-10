@@ -21,10 +21,10 @@ only where one makes sense. A step chip shows its worst check.
 
 | Step | Shows | Inputs / overrides |
 |---|---|---|
-| 1 Flight | Registry match, POH match, route tokens resolved | Tail; departure, route (points flown over) and arrival — one flight, one navlog, so an airport in the route is flown over, never a stop; engine start (local), cruise RPM, seats and baggage areas 1–2, fuel (blank = full usable), start and taxi minutes (10) |
-| 2 Aircraft | FAA registry (make, model, year, engine, serial, Mode S, owner, status), POH V-speeds and limits, Performance (POH) page with climb and cruise at each flight's altitude | Tail's empty weight and moment, tanks, inspection dates (saved per tail); maintenance/documents and §91.205 equipment checklists |
-| 3 Route | The route as chips; the chart with suggested points; per leg the points you could fly over within 5 nm (NASR airports, VFR waypoints, VORs, fixes; towns, peaks, lakes, towers ≥ 200 ft AGL) and where the line crosses highways, rivers, railroads and power lines; cruise altitude and its reason; every navlog point (TOC, automatic checkpoints, TOD) with position, MC, altitude, leg distance, terrain; airspace and TFRs on the line | Add a suggested point (it goes into the step-1 route); drag the line to add a point, drag a point to move it, click it to remove it (drops snap to a nearby point, or onto a highway/river/railroad/power line, else a coordinate); altitude; drop an automatic checkpoint |
-| 4 Airports | Per airport: runways (length × width, surface, pattern side, head/cross wind at ETA), the favored runway (or the D-ATIS runways in use), elevation, TPA, AWOS/ASOS and phone, FSS, sun, density altitude, frequencies, NOTAMs that affect VFR, Chart Supplement remarks; alternate | Alternate (automatic: nearest suitable airport within 40 nm of the destination, off the route, not reporting IFR) |
+| 1 Flight | Registry match, POH match, route tokens resolved | Plan name (blank: named after the route on save); tail; departure, route (points flown over) and arrival — one flight, one navlog, so an airport in the route is flown over, never a stop; engine start (local), cruise RPM, seats and baggage areas 1–2, fuel (blank = full usable), start and taxi minutes (10) |
+| 2 Aircraft | FAA registry (make, model, year, engine, serial, Mode S, owner, status), POH V-speeds and limits, Performance (POH) page with climb and cruise at each flight's altitude | Tail's empty weight and moment, tanks, inspection dates; the aircraft profile (make, model, year, engine, max weights, fuel, arms, V-speeds, crosswind, cruise TAS/GPH over the POH table), all saved per tail; upload the tail's POH and checklist PDFs (the newest upload is the one used, ahead of the catalog POH); maintenance/documents and §91.205 equipment checklists |
+| 3 Route | The route as chips; the chart with suggested points; per leg the points you could fly over within 5 nm (NASR airports, VFR waypoints, VORs, fixes; towns, peaks, lakes, towers ≥ 200 ft AGL) and where the line crosses highways, rivers, railroads and power lines; cruise altitude and its reason; every navlog point (TOC, automatic checkpoints, TOD) with position, MC, altitude, leg distance, terrain; airspace and TFRs on the line | Add a suggested point (it goes into the step-1 route); name any point flown over (route chip or map popup; the name is the navlog checkpoint); drag the line to add a point, drag a point to move it, click it to remove it (drops snap to a nearby point, or onto a highway/river/railroad/power line, else a coordinate); altitude; drop an automatic checkpoint |
+| 4 Airports | Per airport: runways (length × width, surface, pattern side, head/cross wind at ETA), the favored runway (or the D-ATIS runways in use), elevation, TPA, AWOS/ASOS and phone, FSS, sun, density altitude, frequencies, NOTAMs that affect VFR, Chart Supplement remarks; alternate | Alternate (automatic: nearest suitable airport within 40 nm of the destination, off the route, not reporting IFR); airport profile per field: pattern altitude, pattern side per runway end, notes (on the NavLog), saved for every plan |
 | 5 Weather | METAR/TAF at each ETA, hazards (SIGMET, G-AIRMET, CWA, PIREP, TFR, NAS status), winds aloft, NOTAMs, map | — |
 | 6 Weight & performance | W&B sheet from ramp to each landing; takeoff and landing distances | — |
 | 7 Pilot | IMSAFE checklist; personal minimums held against the worst value at any ETA (ceiling, visibility, wind, gust, crosswind, runway length/width, fuel at landing, night); currency from the logbook | Minimums |
@@ -151,8 +151,11 @@ sheet stays paper-size and scrolls sideways.
 ## Persistence
 
 `planner_plans` (named plans, JSON), `planner_aircraft` (per-tail empty weight,
-moment, fuel capacity, equipment, inspection dates), `planner_settings`
-(personal minimums). Writes only from explicit user edits.
+moment, tanks, equipment, inspection dates, and `profile`: your values over the
+POH/TCDS/registry ones), `planner_airport_profiles` (per airport: pattern
+altitude MSL, pattern sides, notes), `planner_documents` (POH, checklist and
+briefing PDFs; uploads carry the tail), `planner_settings` (personal minimums).
+Writes only from explicit user edits.
 
 ## Out of scope (v1)
 

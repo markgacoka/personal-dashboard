@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Pencil } from 'lucide-react'
+import { Textarea } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { titleCase } from '@/lib/format'
@@ -7,7 +8,8 @@ import { cn } from '@/lib/utils'
 import { useDatis, useNearby } from './api'
 import { notamHighlights, type NotamSet } from './brief'
 import { toMagnetic, windComponents } from './calc'
-import { bestRunway, isWaypoint, type Airport, type Derived, type Minimums, type WxAt } from './model'
+import { OptNum } from './FlightInputs'
+import { bestRunway, isWaypoint, type Airport, type AirportProfile, type Derived, type Minimums, type WxAt } from './model'
 import { Cat, KV, SubHead, Synced, deg3, fmtTime } from './ui'
 
 const FREQ_LABEL: Record<string, string> = {
@@ -20,9 +22,10 @@ const ORDER = ['ATIS', 'D-ATIS', 'CD/P', 'GND/P', 'GND/S', 'LCL/P', 'LCL/S', 'CT
 // elevation, pattern altitude, runways with length, width, surface and pattern
 // side, frequencies — plus the runway the wind favours at your ETA (or the one
 // D-ATIS says is in use), NOTAMs that matter, and the alternate.
-export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlternate, minimums, notams, cycle }: {
+export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlternate, minimums, notams, cycle, nasr, profiles, saveProfile, savingProfile }: {
   d: Derived; routePts: Airport[]; alternate: Airport | null; autoAlternate: string | null; setAlternate: (v: string | null) => void
   minimums: Minimums; notams: NotamSet[]; cycle: string | null
+  nasr: Airport[]; profiles: Record<string, AirportProfile>; saveProfile: (id: string, p: AirportProfile | null) => void; savingProfile: boolean
 }) {
   // Departure and arrival only: airports between them are route points you fly over.
   const ends = routePts.length >= 2 ? [routePts[0], routePts[routePts.length - 1]] : routePts.slice(0, 1)
@@ -32,10 +35,11 @@ export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlterna
   const roleOf = (a: Airport) => (a.id === alternate?.id && !apts.some(x => x.id === a.id) ? 'Alternate' : a.id === routePts[0]?.id ? (a.id === dest?.id ? 'Departure and destination' : 'Departure') : 'Destination')
   if (!all.length) return <p className="text-sm text-fg-3">Add the airports in step 1.</p>
   return (
-    <div className="space-y-6">
+    <div className="@container space-y-6">
       <Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data · wind from METAR/TAF at your ETA · NOTAMs from the FAA" />
-      <div className="grid gap-5 2xl:grid-cols-2">
-        {all.map(a => <AirportCard key={a.id} a={a} role={roleOf(a)} wx={d.wx.find(w => w.airport.id === a.id) ?? null} minimums={minimums} notams={notams.find(n => n.icao === (a.icao || a.id)) ?? null} />)}
+      <div className="grid gap-5 @5xl:grid-cols-2">
+        {all.map(a => <AirportCard key={a.id} a={a} role={roleOf(a)} wx={d.wx.find(w => w.airport.id === a.id) ?? null} minimums={minimums} notams={notams.find(n => n.icao === (a.icao || a.id)) ?? null}
+          nasr={nasr.find(x => x.id === a.id) ?? a} profile={profiles[a.icao || a.id] ?? null} save={p => saveProfile(a.icao || a.id, p)} saving={savingProfile} />)}
       </div>
       {dest && <Alternate dest={dest} value={alternate ? (alternate.icao || alternate.id) : null} auto={autoAlternate} onChange={setAlternate} exclude={apts.map(a => a.id)} wx={d.wx} />}
     </div>
@@ -67,6 +71,52 @@ function Alternate({ dest, value, auto, onChange, exclude, wx }: { dest: Airport
   )
 }
 
+// Your airport profile: what NASR doesn't say or says wrong. Kept for every
+// plan; pattern altitude and sides feed the navlog (TPA, descent) and the
+// favored runway; notes go on the NavLog sheet.
+function AirportProfileForm({ a, profile, saving, onSave, onCancel }: { a: Airport; profile: AirportProfile | null; saving: boolean; onSave: (p: AirportProfile | null) => void; onCancel: () => void }) {
+  const id = a.icao || a.id
+  const [tpa, setTpa] = useState<number | null>(profile?.tpaMsl ?? null)
+  const [pattern, setPattern] = useState<Record<string, 'L' | 'R'>>(profile?.pattern ?? {})
+  const [notes, setNotes] = useState(profile?.notes ?? '')
+  const nasrTpa = Math.round((a.elev + (a.tpaAgl || 1000)) / 10) * 10
+  const ends = a.runways.flatMap(r => r.ends)
+  const side = (e: (typeof ends)[number]) => pattern[e.id] ?? (e.right ? 'R' : 'L')
+  const flip = (e: (typeof ends)[number], v: 'L' | 'R') => setPattern(p => { const n = { ...p }; if (v === (e.right ? 'R' : 'L')) delete n[e.id]; else n[e.id] = v; return n })
+  return (
+    <div className="mt-3 space-y-3 rounded-lg px-3 py-3 ring-1 ring-inset ring-border">
+      <div className="text-sm font-medium text-fg">Your <span className="num">{id}</span> profile</div>
+      <label className="block max-w-xs"><span className="mb-1 block text-sm text-fg-2">Pattern altitude (MSL)</span>
+        <OptNum value={tpa} placeholder={nasrTpa} unit="ft" step={10} onChange={setTpa} label={`${id} pattern altitude`} />
+        <span className="mt-0.5 block text-xs text-fg-3">Blank: {nasrTpa.toLocaleString()} ft {a.tpaAgl ? '(Chart Supplement)' : '(1,000 AGL; none published)'}</span>
+      </label>
+      {ends.length > 0 && (
+        <div>
+          <span className="mb-1 block text-sm text-fg-2">Traffic pattern</span>
+          <div className="flex flex-wrap gap-2">
+            {ends.map(e => (
+              <div key={e.id} className="inline-flex items-center gap-1 rounded-full py-0.5 pl-2.5 pr-0.5 text-sm ring-1 ring-inset ring-border">
+                <span className="num mr-1 font-medium">{e.id}</span>
+                {(['L', 'R'] as const).map(v => (
+                  <button key={v} onClick={() => flip(e, v)} aria-pressed={side(e) === v} className={cn('h-6 rounded-full px-2 text-xs font-medium', side(e) === v ? 'bg-accent text-bg' : 'text-fg-3 hover:text-fg')}>{v === 'L' ? 'Left' : 'Right'}</button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <label className="block"><span className="mb-1 block text-sm text-fg-2">Notes (shown on the NavLog)</span>
+        <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} maxLength={2000} placeholder="e.g. Call tower over Lexington Reservoir; fuel at the self-serve island; noise abatement on 31R" />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" loading={saving} onClick={() => onSave({ tpaMsl: tpa, pattern, notes: notes.trim() })}>Save {id} profile</Button>
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        {profile && <Button variant="danger-ghost" className="ml-auto" onClick={() => onSave(null)}>Delete profile</Button>}
+      </div>
+    </div>
+  )
+}
+
 // "LANDING AND DEPARTING RWY 31R" → ['31R']; the runways ATIS says are in use.
 export function atisRunways(text: string) {
   const out = new Set<string>()
@@ -75,8 +125,9 @@ export function atisRunways(text: string) {
   return [...out]
 }
 
-function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: string; wx: WxAt | null; minimums: Minimums; notams: NotamSet | null }) {
+function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, saving }: { a: Airport; role: string; wx: WxAt | null; minimums: Minimums; notams: NotamSet | null; nasr: Airport; profile: AirportProfile | null; save: (p: AirportProfile | null) => void; saving: boolean }) {
   const [more, setMore] = useState(false)
+  const [editing, setEditing] = useState(false)
   const id = a.icao || a.id
   const datis = useDatis(a.icao, a.towered)
   const atis = datis.data?.data?.[0]
@@ -91,7 +142,7 @@ function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: stri
   }))
   const nh = notams && !notams.unavailable ? notamHighlights(notams.items, 8) : null
   return (
-    <div className="rounded-lg p-3 ring-1 ring-inset ring-border sm:p-4">
+    <div className="@container rounded-lg p-3 ring-1 ring-inset ring-border sm:p-4">
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-[14rem] flex-1">
           <div className="flex items-baseline gap-2"><span className="num text-lg font-medium text-fg">{id}</span><span className="text-sm text-fg-3">{role}</span></div>
@@ -139,14 +190,14 @@ function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: stri
 
       <KV className="mt-3" items={[
         ['Elevation', <span className="num">{Math.round(a.elev).toLocaleString()} ft</span>],
-        ['Pattern altitude', <span className="num">{tpa.toLocaleString()} ft MSL{a.tpaAgl ? '' : ' (1,000 AGL, not published)'}</span>],
+        ['Pattern altitude', <span className="num">{tpa.toLocaleString()} ft MSL{profile?.tpaMsl ? <span className="font-sans text-fg-3"> (your profile)</span> : a.tpaAgl ? '' : ' (1,000 AGL, not published)'}</span>],
         ['Weather', a.wx ? <span>{a.wx.type} {a.wx.id !== a.id ? `at ${a.wx.id} (${a.wx.distNm} nm)` : ''} {a.wx.freq && <span className="num">{a.wx.freq}</span>} {a.wx.phone && <a className="num whitespace-nowrap text-accent hover:underline" href={`tel:${a.wx.phone}`}>{a.wx.phone}</a>}</span> : 'No AWOS/ASOS within 30 nm'],
         ['Flight service', <span>{a.fss?.id ? `${a.fss.name ? titleCase(a.fss.name) : a.fss.id} FSS · ` : ''}<span className="num">122.2</span> · <a className="num whitespace-nowrap text-accent hover:underline" href="tel:18009927433">1-800-WX-BRIEF</a></span>],
         ['Sun', a.sun ? <span className="num">Rise {fmtTime(new Date(a.sun.rise))} · set {fmtTime(new Date(a.sun.set))} · civil dusk {fmtTime(new Date(a.sun.civilDusk))}</span> : null],
         ['Density altitude', wx?.da != null ? <span className="num">{wx.da.toLocaleString()} ft ({wx.tempC} °C, {wx.altimInHg?.toFixed(2)} inHg)</span> : null],
       ]} />
 
-      <div className="mt-3 grid gap-x-6 text-sm sm:grid-cols-2">
+      <div className="mt-3 grid gap-x-6 text-sm @lg:grid-cols-2">
         {sorted.map((f, i) => (
           <div key={i} className="flex min-w-0 items-baseline gap-2 border-b border-border py-1"><span className="shrink-0 text-fg-3">{FREQ_LABEL[f.use] || f.use}</span><span className="num ml-auto text-fg">{f.freq}</span>{f.sector && <span className="w-28 shrink-0 truncate text-right text-xs text-fg-3" title={f.sector}>{f.sector}</span>}</div>
         ))}
@@ -158,6 +209,10 @@ function AirportCard({ a, role, wx, minimums, notams }: { a: Airport; role: stri
           : nh!.shown.length ? <ul className="list-disc space-y-0.5 pl-5 text-fg-2">{nh!.shown.map((n, i) => <li key={i}>{n}</li>)}{nh!.more > 0 && <li className="text-fg-3">+{nh!.more} more in the weather step</li>}</ul>
             : <span className="text-fg-3">None ({notams.items.length} total, all IFR procedures, obstacles or charts).</span>}
       </div>
+
+      {a.notes && !editing && <div className="mt-3 rounded-lg bg-accent-soft/40 px-3 py-2 text-sm ring-1 ring-inset ring-accent/20"><span className="font-medium text-fg">Your notes</span><p className="whitespace-pre-wrap text-fg-2">{a.notes}</p></div>}
+      {editing ? <AirportProfileForm a={nasr} profile={profile} saving={saving} onCancel={() => setEditing(false)} onSave={p => { save(p); setEditing(false) }} />
+        : <button className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:underline" onClick={() => setEditing(true)}><Pencil className="size-3.5" />{profile ? `Edit your ${id} profile` : `Save a ${id} profile (pattern altitude, pattern sides, notes)`}</button>}
 
       {a.remarks.length > 0 && (
         <div className="mt-3">

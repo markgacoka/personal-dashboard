@@ -1,7 +1,7 @@
 // The planning engine: plan inputs + fetched data → navlog, weights, takeoff and
 // landing performance at every airport, weather at each ETA, and the list of
 // go/no-go checks. Pure; the page renders what this returns.
-import type { AircraftProfile, ProfileMatch } from './poh'
+import type { AircraftProfile, ProfileEdits, ProfileMatch } from './poh'
 import {
   category, ceilingOf, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, distanceNm, fbFor, freezingLevel, hPaToInHg, hemispheric,
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
@@ -70,6 +70,7 @@ export interface AircraftPlanning {
   color?: string
   equipment?: { transponder?: string; adsbOut?: boolean; gps?: string; equipCode?: string; autopilot?: boolean; notes?: string }
   inspections?: Record<string, string | number | undefined> // ISO dates; 'hundredHoursLeft'
+  profile?: ProfileEdits // your values over the POH / registry ones
   updatedAt?: string
 }
 
@@ -85,7 +86,24 @@ export interface Airport {
   fss?: { id: string; name: string | null } | null
   kind?: RoutePoint['kind']; navType?: string
   label?: string
+  notes?: string // from your airport profile
+  profiled?: boolean // your airport profile changed something
   sun: { rise: string; set: string; civilDawn: string; civilDusk: string; date: string } | null
+}
+
+// Your airport profile: pattern altitude (MSL), pattern side per runway end, notes.
+export interface AirportProfile { tpaMsl?: number | null; pattern?: Record<string, 'L' | 'R'>; notes?: string; updatedAt?: string }
+export function applyAirportProfile(a: Airport, p?: AirportProfile | null): Airport {
+  if (!p) return a
+  const pat = p.pattern ?? {}
+  const tpa = p.tpaMsl != null && p.tpaMsl > a.elev ? p.tpaMsl - a.elev : null
+  return {
+    ...a,
+    tpaAgl: tpa ?? a.tpaAgl,
+    runways: a.runways.map(r => ({ ...r, ends: r.ends.map(e => (pat[e.id] ? { ...e, right: pat[e.id] === 'R' } : e)) })),
+    notes: p.notes?.trim() || undefined,
+    profiled: tpa != null || Object.keys(pat).length > 0 || !!p.notes?.trim(),
+  }
 }
 
 export interface Metar { icaoId: string; obsTime: number; temp: number | null; dewp: number | null; wdir: number | string | null; wspd: number | null; wgst: number | null; visib: string | number | null; altim: number | null; clouds: { cover: string; base: number | null }[]; fltCat?: string; rawOb: string; lat: number; lon: number; elev: number; name?: string }
@@ -332,7 +350,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   const routeItems = plan.route.map(parseRouteItem).filter(x => byId(x.id))
   const when = departAt ?? new Date(now)
   const withVar = (a: Airport): Airport => ({ ...a, magVar: Math.round(variationAt(a, when) * 10) / 10 })
-  const route = routeItems.map(x => { const a = withVar(byId(x.id)!); const l = plan.labels?.[x.id]; return l ? { ...a, label: l.name, name: l.name, navType: l.kind } : a })
+  const route = routeItems.map(x => { const a = withVar(byId(x.id)!); const l = plan.labels?.[x.id]; return l ? { ...a, label: l.name, name: l.name, navType: l.kind || a.navType } : a })
   const altApt = plan.alternate ? byId(plan.alternate) : undefined
   const alt = altApt ? withVar(altApt) : null
   const minimums = inp.minimums

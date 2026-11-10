@@ -46,7 +46,8 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
     set({ overrides: { ...ov, [key]: { ...ov[key], [f]: n != null && Number.isFinite(n) ? n : null } } })
   }
   const code = (a: Airport) => a.icao || a.id
-  const notesLines = [notes.day, notes.aircraft, `WX: ${notes.wx[0]}`, ...notes.wx.slice(1), `NOTAMs: ${notes.notams.join(' · ')}`]
+  const notesLines = [notes.day, notes.aircraft, `WX: ${notes.wx[0]}`, ...notes.wx.slice(1), `NOTAMs: ${notes.notams.join(' · ')}`,
+    ...[dep, dest].filter((a, i, arr) => a.notes && arr.indexOf(a) === i).map(a => `${code(a)}: ${a.notes!.replace(/\s*\n\s*/g, ' · ')}`)]
 
   return (
     <section className="navlog-front overflow-x-auto">
@@ -157,7 +158,7 @@ function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly }: {
     <Fragment>
       <tr>
         <td className={cn(C, 'text-left text-sm font-semibold')} rowSpan={2}>{label}{r.to.kind === 'toc' || r.to.kind === 'tod' ? <div className="text-[10px] font-normal text-fg-3">{r.to.kind === 'toc' ? 'top of climb' : 'top of descent'}</div> : null}</td>
-        <td className={C}>{r.to.kind === 'waypoint' && /VOR|NDB|TACAN|DME/.test(r.to.navType ?? '') ? r.to.label.replace(/\d{6}$/, '') : ''}</td>
+        <td className={C}>{r.to.kind === 'waypoint' && /VOR|NDB|TACAN|DME/.test(r.to.navType ?? '') ? r.to.id.replace(/\d{6}$/, '') : ''}</td>
         <td className={C} rowSpan={2}>{r.from}→{label}</td>
         <td className={C} rowSpan={2}>{r.alt}</td>
         <td className={C}>{e6b('wdir', r.wind?.dir == null ? (r.wind ? 'VRB' : '') : deg3(r.wind.dir))}</td><td className={C}>{e6b('wspd', r.wind ? String(r.wind.spd) : '')}</td>

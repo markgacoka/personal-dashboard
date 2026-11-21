@@ -47,17 +47,20 @@ export function WorkingsLink({ children }: { children: React.ReactNode }) {
   return <button type="button" onClick={() => r?.show('workings')} className="text-accent hover:underline">{children}</button>
 }
 
-export function RefPanel({ tail, model, route, date, className, pohDocId, pohStatus, panes, fixCount }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number }) {
+export function RefPanel({ tail, model, route, date, className, pohDocId, pohStatus, panes, fixCount, fixTone = 'neutral' }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number; fixTone?: 'bad' | 'warn' | 'neutral' }) {
   const r = useRefs()!
   return (
     <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
       <div className="flex items-center gap-1 border-b border-border px-2 py-2">
         <div role="tablist" aria-label="Sidebar" className="scrollbar-none flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
         {TABS.map(t => (
-          <button key={t.key} role="tab" aria-selected={r.state.tab === t.key} onClick={() => r.set({ tab: t.key, page: null })}
+          <span key={t.key} className="contents">
+          {t.key === 'poh' && <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-border" />}
+          <button role="tab" aria-selected={r.state.tab === t.key} onClick={() => r.set({ tab: t.key, page: null })}
             className={cn('press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm', r.state.tab === t.key ? 'bg-pill font-medium text-fg' : 'text-fg-3 hover:text-fg')}>
-            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className="num rounded-full bg-hover px-1.5 text-xs text-fg-2">{fixCount}</span>}
+            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className={cn('num rounded-full px-1.5 text-xs font-medium', { bad: 'bg-bad-soft text-bad', warn: 'bg-warn-soft text-warn', neutral: 'bg-hover text-fg-2' }[fixTone])}>{fixCount}</span>}
           </button>
+          </span>
         ))}
         </div>
         <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="xl:hidden" /><PanelRightClose className="max-xl:hidden" /></Button>

@@ -35,7 +35,7 @@ import { unitsForTail } from './units'
 import { WeatherSection } from './WeatherSection'
 import { StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
 import { Brief, domainStatus } from './BriefView'
-import { DOMAIN_OF, FixesPane, WorkingsPane, type DomainKey } from './Sidebar'
+import { DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from './Sidebar'
 import { assumptions, calculations, sources } from './workings'
 
 const DRAFT_KEY = 'planner-draft-v3'
@@ -221,6 +221,7 @@ function Planner() {
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
   const role = roleOf(plan.crew, certs)
   const issues = d.checks.filter(c => c.status !== 'ok').length
+  const worst = worstStatus(d.checks)
   const planIssues = d.checks.filter(c => DOMAIN_OF[c.section] === 'plan' && c.status !== 'ok')
 
   // The sidebar's workings, from the same derive() output the brief shows.
@@ -356,7 +357,7 @@ function Planner() {
         {refOpen && (
           <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
             <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus}
-              fixCount={issues} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} /> }} />
+              fixCount={issues} fixTone={worst === 'nogo' ? 'bad' : worst === 'caution' ? 'warn' : 'neutral'} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} onJump={jump} /> }} />
           </aside>
         )}
       </div>

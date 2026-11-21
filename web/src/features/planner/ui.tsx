@@ -63,14 +63,13 @@ export function SubHead({ children, right }: { children: React.ReactNode; right?
 export function CheckRows({ checks, onJump }: { checks: Check[]; onJump?: (c: Check) => void }) {
   if (!checks.length) return null
   return (
-    <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
+    <ul className="space-y-3">
       {checks.map((c, i) => (
-        <li key={i} className={cn('flex gap-3 px-3 py-2.5', onJump && 'cursor-pointer hover:bg-hover')} onClick={() => onJump?.(c)}>
+        <li key={i} className={cn('flex gap-3', onJump && 'cursor-pointer')} onClick={() => onJump?.(c)}>
           <StatusIcon status={c.status} className="mt-0.5" />
           <div className="min-w-0">
-            <div className="text-sm text-fg">{c.title}</div>
-            {c.detail && <div className="mt-0.5 text-sm text-fg-3">{c.detail}</div>}
-            {c.fix && c.status !== 'ok' && <div className="mt-0.5 text-sm text-fg-2"><span className="font-medium">To fix:</span> {c.fix}</div>}
+            <div className={cn('text-sm', c.status === 'nogo' ? 'text-fg' : 'text-fg-2')}>{c.title}</div>
+            {(c.status !== 'ok' && c.fix ? c.fix : c.detail) && <div className="mt-0.5 text-[13px] leading-snug text-fg-3">{c.status !== 'ok' && c.fix ? c.fix : c.detail}</div>}
           </div>
         </li>
       ))}
@@ -81,12 +80,12 @@ export function CheckRows({ checks, onJump }: { checks: Check[]; onJump?: (c: Ch
 export function NumField({ label, value, onChange, unit, min, max, step, hint, className }: { label: string; value: number | ''; onChange: (v: number) => void; unit?: string; min?: number; max?: number; step?: number; hint?: React.ReactNode; className?: string }) {
   return (
     <label className={cn('block', className)}>
-      <span className="mb-1 block text-sm text-fg-2">{label}</span>
+      <span className="mb-1.5 block text-[13px] text-fg-3">{label}</span>
       <span className="relative block">
         <Input type="number" inputMode="decimal" value={value} min={min} max={max} step={step} onChange={e => onChange(e.target.value === '' ? 0 : Number(e.target.value))} className={cn('num', unit && 'pr-12')} />
         {unit && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-fg-3">{unit}</span>}
       </span>
-      {hint && <span className="mt-1 block text-xs text-fg-3">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-[13px] text-fg-3">{hint}</span>}
     </label>
   )
 }

@@ -313,12 +313,12 @@ function Planner() {
         <div className="min-w-0 space-y-5">
           {stage === 'plan' && (
             <>
-              <Card className="px-4 py-4 sm:px-6 sm:py-5">
+              <Card className="px-4 py-5 sm:px-7 sm:py-6">
                 <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
                   pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} certs={certs ?? null} />
               </Card>
-              <Card className="px-4 py-4 sm:px-6 sm:py-5">
-                <SubHead right={<span className="text-xs text-fg-3">Optional: drag the line to add points between departure and arrival</span>}>Route on the chart</SubHead>
+              <Card className="space-y-4 px-4 py-5 sm:px-7 sm:py-6">
+                <div><h3 className="text-[15px] font-medium text-fg">Route on the chart</h3><p className="mt-1 text-[13px] text-fg-3">Optional. Name a point by tapping it; the name goes on the NavLog.</p></div>
                 <RouteStep part="chart" plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
               </Card>
             </>

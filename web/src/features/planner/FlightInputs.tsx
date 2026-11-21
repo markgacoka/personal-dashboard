@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useState } from 'react'
-import { BookOpen, CircleDashed, Loader2, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
+import { BookOpen, CircleDashed, Info, Loader2, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -9,9 +9,9 @@ import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
 import type { AircraftProfile } from './poh'
 import { joinRoute, splitRoute, tokenize } from './route'
-import { kindName } from './suggest'
 import { CERTIFICATES, roleOf, type PilotCerts } from './pilot'
-import { Segmented } from '@/components/ui/misc'
+import { Segmented, Tooltip } from '@/components/ui/misc'
+import { useRefs } from './RefPanel'
 import { NumField, SubHead } from './ui'
 import { fromF, fromW, toF, toW, type Units } from './units'
 
@@ -57,116 +57,117 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
   const f0 = d.flights[0]
 
   return (
-    <div className="@container space-y-6">
-      <Crew plan={plan} set={set} d={d} certs={certs} />
-      <div className="grid gap-6 @4xl:grid-cols-2">
-        <div className="space-y-5">
-          <div>
-            <SubHead>1 · Aircraft</SubHead>
-            <div className="grid gap-3 @md:grid-cols-[minmax(0,12rem)_1fr]">
-              <label className="block">
-                <span className="mb-1 block text-sm text-fg-2">Tail number</span>
-                <Input value={tail} onChange={e => setTail(e.target.value.toUpperCase())} onBlur={commitTail} onKeyDown={e => { if (e.key === 'Enter') commitTail() }}
-                  placeholder="N227AN" list="planner-fleet" className="num uppercase" autoCapitalize="characters" spellCheck={false} />
-                <datalist id="planner-fleet">{fleet.map(a => <option key={a.id} value={a.tail_number}>{a.make} {a.model}{a.year ? ` (${a.year})` : ''}</option>)}</datalist>
-              </label>
-              <div className="min-w-0 self-end text-sm">
-                {registryLoading && plan.tail && <p className="flex items-center gap-2 text-fg-3"><Loader2 className="size-4 animate-spin" />Looking up {plan.tail}…</p>}
-                {registry?.model && (
-                  <div className="flex items-center gap-3">
-                    {registry.photo_url && <img src={registry.photo_url} alt="" className="h-12 w-18 shrink-0 rounded-md object-cover ring-1 ring-border" onError={e => { e.currentTarget.style.display = 'none' }} />}
-                    <div className="min-w-0"><div className="font-medium text-fg">{titleCase(registry.make ?? '')} {registry.model}{registry.year ? ` · ${registry.year}` : ''}</div><div className="text-xs text-fg-3">FAA registry · {u.weight} / {u.fuel} / {u.pressure}</div></div>
-                  </div>
-                )}
-                {noRegistry && <p className="text-fg-3">Not in the FAA registry — enter the make, model and year.</p>}
-              </div>
-            </div>
-            {(noRegistry || plan.aircraft) && (
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <label className="block"><span className="mb-1 block text-sm text-fg-2">Make</span><Input value={plan.aircraft?.make ?? aircraft.make ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, make: e.target.value } })} placeholder="Cessna" /></label>
-                <label className="block"><span className="mb-1 block text-sm text-fg-2">Model</span><Input value={plan.aircraft?.model ?? aircraft.model ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, model: e.target.value.toUpperCase() } })} placeholder="172P" className="uppercase" /></label>
-                <NumField label="Year" value={plan.aircraft?.year ?? aircraft.year ?? ''} onChange={v => set({ aircraft: { ...plan.aircraft, year: v || null } })} />
+    <div className="@container divide-y divide-border">
+      <Group title="Who's flying" hint={certs?.certificate ? CERTIFICATES.find(c => c.key === certs.certificate)!.label : <>Certificate not saved · student assumed</>}>
+        <Crew plan={plan} set={set} d={d} certs={certs} />
+      </Group>
+
+      <Group title="Aircraft" hint="Tail number; the registry and POH are looked up.">
+        <div className="grid gap-4 @md:grid-cols-[minmax(0,11rem)_1fr] @md:items-end">
+          <Field label="Tail number">
+            <Input value={tail} onChange={e => setTail(e.target.value.toUpperCase())} onBlur={commitTail} onKeyDown={e => { if (e.key === 'Enter') commitTail() }}
+              placeholder="N227AN" list="planner-fleet" className="num uppercase" autoCapitalize="characters" spellCheck={false} />
+            <datalist id="planner-fleet">{fleet.map(a => <option key={a.id} value={a.tail_number}>{a.make} {a.model}{a.year ? ` (${a.year})` : ''}</option>)}</datalist>
+          </Field>
+          <div className="min-w-0 text-sm">
+            {registryLoading && plan.tail && <p className="flex h-10 items-center gap-2 text-fg-3"><Loader2 className="size-4 animate-spin" />Looking up {plan.tail}…</p>}
+            {registry?.model && (
+              <div className="flex items-center gap-3">
+                {registry.photo_url && <img src={registry.photo_url} alt="" className="h-10 w-16 shrink-0 rounded-md object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
+                <div className="min-w-0"><div className="truncate text-fg-2">{titleCase(registry.make ?? '')} {registry.model}{registry.year ? ` · ${registry.year}` : ''}</div><div className="text-[13px] text-fg-3">FAA registry</div></div>
               </div>
             )}
-            <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} />
-          </div>
-
-          <div>
-            <SubHead right={<span className="text-xs text-fg-3">SkyVector / ForeFlight format</span>}>2 · Departure, route and arrival</SubHead>
-            <div className="grid grid-cols-2 gap-3 @md:grid-cols-[8rem_minmax(0,1fr)_8rem]">
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Departure</span>
-                <Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KRHV" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
-              <label className="order-last col-span-2 block @md:order-none @md:col-span-1"><span className="mb-1 block text-sm text-fg-2">Route (flown over)</span>
-                <Input value={via} onChange={e => setVia(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="E16 VPCOY SNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Arrival</span>
-                <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KSNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
-            </div>
-            <p className="mt-1 text-xs text-fg-3">You land only at the arrival airport; everything in Route is flown over, airports included. Points: navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W, 36.85/-121.53). The chart below suggests points and lets you drag the line.</p>
-            {tokens.length > 0 && (
-              <ol className="mt-3 space-y-1">
-                {tokens.map((t, i) => {
-                  const p = pointFor(t)
-                  const Icon = p ? KIND_ICON[p.kind] : CircleDashed
-                  const role = i === 0 ? 'Depart' : i === tokens.length - 1 && tokenize(arr).length ? 'Land' : 'Fly over'
-                  const end = role !== 'Fly over'
-                  const bad = end && p && p.kind !== 'airport' && p.kind !== 'unknown'
-                  const label = plan.labels?.[t]?.name
-                  return (
-                    <li key={`${t}-${i}`} className="flex flex-wrap items-center gap-x-2 text-sm @md:flex-nowrap">
-                      <Icon className={cn('size-4 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-2')} />
-                      <span className="num w-28 shrink-0 truncate font-medium text-fg" title={t}>{label ?? t}</span>
-                      <span className={cn('w-16 shrink-0 text-xs', end ? 'text-accent' : 'text-fg-3')}>{role}</span>
-                      <span className={cn('min-w-0 truncate max-sm:basis-full max-sm:pl-6 sm:flex-1', bad ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: the flight starts and ends at airports' : p ? (p.kind === 'unknown' ? p.error : `${label && plan.labels![t].kind ? `${kindName(plan.labels![t].kind)} · ` : ''}${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
-            {!tokenize(arr).length && tokenize(dep).length > 0 && <p className="mt-2 text-sm text-fg-3">Add the arrival airport (the departure again for a local flight).</p>}
-            {resolved.data?.cycle && <p className="mt-2 text-xs text-fg-3">FAA NASR cycle {resolved.data.cycle}</p>}
+            {noRegistry && <p className="text-[13px] text-fg-3">Not in the FAA registry: enter make, model and year.</p>}
           </div>
         </div>
+        {(noRegistry || plan.aircraft) && (
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <Field label="Make"><Input value={plan.aircraft?.make ?? aircraft.make ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, make: e.target.value } })} placeholder="Cessna" /></Field>
+            <Field label="Model"><Input value={plan.aircraft?.model ?? aircraft.model ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, model: e.target.value.toUpperCase() } })} placeholder="172P" className="uppercase" /></Field>
+            <NumField label="Year" value={plan.aircraft?.year ?? aircraft.year ?? ''} onChange={v => set({ aircraft: { ...plan.aircraft, year: v || null } })} />
+          </div>
+        )}
+        <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} />
+      </Group>
 
-        <div className="space-y-5">
-          <div className="grid gap-3 @md:grid-cols-2">
-            <label className="block">
-              <SubHead>3 · Engine start (local)</SubHead>
-              <Input type="datetime-local" value={plan.departLocal} onChange={e => set({ departLocal: e.target.value })} className="num" />
-            </label>
-            <label className="block">
-              <SubHead>4 · Cruise power</SubHead>
-              <Select value={plan.rpm} onChange={e => set({ rpm: Number(e.target.value) })} className="num">{rpms.map(r => <option key={r} value={r}>{r} RPM</option>)}</Select>
-              {f0?.cruise && <span className="num mt-1 block text-xs text-fg-3">{f0.cruise.bhp}% BHP · {f0.cruise.ktas} KTAS · {f0.cruise.gph} GPH at {f0.alt.toLocaleString()} ft</span>}
-            </label>
-          </div>
-          <div>
-            <SubHead right={<span className="text-xs text-fg-3">{u.weight}</span>}>5 · Occupants and baggage</SubHead>
-            <div className="grid grid-cols-2 gap-3 @md:grid-cols-3">
-              <NumField label="Pilot (L)" value={w(seats.pilot)} onChange={setSeat('pilot')} />
-              <NumField label={roleOf(plan.crew, certs) === 'dual' ? 'Instructor (R)' : 'Front (R)'} value={w(seats.front)} onChange={setSeat('front')} />
-              <NumField label="Rear left" value={w(seats.rearL)} onChange={setSeat('rearL')} />
-              <NumField label="Rear right" value={w(seats.rearR)} onChange={setSeat('rearR')} />
-              <NumField label="Baggage area 1" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
-              <NumField label="Baggage area 2" value={w(plan.loads.bag2)} onChange={v => set({ loads: { ...plan.loads, bag2: fromW(v, u) } })} />
-            </div>
-          </div>
-          <div>
-            <SubHead>6 · Fuel and taxi</SubHead>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Fuel on board</span>
-                <OptNum value={plan.fuelGal == null ? null : Math.round(toF(plan.fuelGal, u) * 10) / 10} placeholder={profile ? Math.round(toF(d.totals.usableFuel, u)) : 40} unit={u.fuel} onChange={v => set({ fuelGal: v == null ? null : fromF(v, u) })} label="Fuel on board" />
-                <span className="mt-1 block text-xs text-fg-3">Blank: full usable</span>
-              </label>
-              <label className="block"><span className="mb-1 block text-sm text-fg-2">Start and taxi</span>
-                <OptNum value={plan.taxiMin ?? null} placeholder={10} unit="min" onChange={v => set({ taxiMin: v ?? undefined })} label="Start and taxi minutes" />
-                <span className="num mt-1 block text-xs text-fg-3">{d.takeoffAt ? `Takeoff ${d.takeoffAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Engine start to takeoff'}</span>
-              </label>
-            </div>
-          </div>
+      <Group title="Route" hint="Start and end at airports; everything between is flown over."
+        aside={<Tooltip content="Navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W or 36.85/-121.53). SkyVector and ForeFlight route strings paste in whole."><span className="mt-2 inline-flex cursor-help items-center gap-1 text-[13px] text-fg-3 hover:text-fg-2"><Info className="size-3.5" />Formats</span></Tooltip>}>
+        <div className="grid grid-cols-2 gap-4 @md:grid-cols-[7rem_minmax(0,1fr)_7rem]">
+          <Field label="From"><Input value={dep} onChange={e => setDep(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KRHV" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></Field>
+          <Field label="Via (optional)" className="order-last col-span-2 @md:order-none @md:col-span-1"><Input value={via} onChange={e => setVia(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="E16 VPCOY" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></Field>
+          <Field label="To"><Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KSNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></Field>
         </div>
-      </div>
+        {tokens.length > 0 && (
+          <ol className="mt-4 space-y-1.5">
+            {tokens.map((t, i) => {
+              const p = pointFor(t)
+              const Icon = p ? KIND_ICON[p.kind] : CircleDashed
+              const end = i === 0 || (i === tokens.length - 1 && tokenize(arr).length > 0)
+              const bad = end && p && p.kind !== 'airport' && p.kind !== 'unknown'
+              const label = plan.labels?.[t]?.name
+              return (
+                <li key={`${t}-${i}`} className="flex items-center gap-2.5 text-[13px]">
+                  <Icon className={cn('size-3.5 shrink-0', !p ? 'text-fg-3' : p.kind === 'unknown' || bad ? 'text-bad' : 'text-fg-3')} />
+                  <span className="num w-24 shrink-0 truncate text-fg-2" title={t}>{label ?? t}</span>
+                  <span className={cn('min-w-0 flex-1 truncate', bad || p?.kind === 'unknown' ? 'text-bad' : 'text-fg-3')}>{bad ? 'Not an airport: flights start and end at airports' : p ? (p.kind === 'unknown' ? p.error : `${KIND_LABEL[p.kind]}${p.type && p.kind === 'navaid' ? ` (${p.type})` : ''}${p.kind === 'gps' ? '' : ` · ${p.kind === 'airport' ? titleCase(p.name ?? '') : p.name ?? ''}`}${p.freq ? ` · ${p.freq}` : ''}`) : resolved.isFetching ? 'Looking up…' : ''}</span>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+        {!tokenize(arr).length && tokenize(dep).length > 0 && <p className="mt-3 text-[13px] text-fg-3">Add the arrival airport (the departure again for a local flight).</p>}
+      </Group>
 
+      <Group title="Time and power" hint="Local engine-start time and cruise RPM.">
+        <div className="grid gap-4 @md:grid-cols-2">
+          <Field label="Engine start"><Input type="datetime-local" value={plan.departLocal} onChange={e => set({ departLocal: e.target.value })} className="num" /></Field>
+          <Field label="Cruise power" note={f0?.cruise ? `${f0.cruise.ktas} KTAS · ${f0.cruise.gph} GPH · ${f0.cruise.bhp}% at ${f0.alt.toLocaleString()} ft` : undefined}>
+            <Select value={plan.rpm} onChange={e => set({ rpm: Number(e.target.value) })} className="num">{rpms.map(r => <option key={r} value={r}>{r} RPM</option>)}</Select>
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Load" hint={`People and bags in ${u.weight}, fuel and taxi time.`}>
+        <div className="grid grid-cols-2 gap-4 @md:grid-cols-4">
+          <NumField label="Pilot" value={w(seats.pilot)} onChange={setSeat('pilot')} />
+          <NumField label={roleOf(plan.crew, certs) === 'dual' ? 'Instructor' : 'Front right'} value={w(seats.front)} onChange={setSeat('front')} />
+          <NumField label="Rear left" value={w(seats.rearL)} onChange={setSeat('rearL')} />
+          <NumField label="Rear right" value={w(seats.rearR)} onChange={setSeat('rearR')} />
+          <NumField label="Baggage 1" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
+          <NumField label="Baggage 2" value={w(plan.loads.bag2)} onChange={v => set({ loads: { ...plan.loads, bag2: fromW(v, u) } })} />
+          <Field label="Fuel" note="Blank: full usable">
+            <OptNum value={plan.fuelGal == null ? null : Math.round(toF(plan.fuelGal, u) * 10) / 10} placeholder={profile ? Math.round(toF(d.totals.usableFuel, u)) : 40} unit={u.fuel} onChange={v => set({ fuelGal: v == null ? null : fromF(v, u) })} label="Fuel on board" />
+          </Field>
+          <Field label="Start and taxi" note={d.takeoffAt ? `Takeoff ${d.takeoffAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}` : undefined}>
+            <OptNum value={plan.taxiMin ?? null} placeholder={10} unit="min" onChange={v => set({ taxiMin: v ?? undefined })} label="Start and taxi minutes" />
+          </Field>
+        </div>
+      </Group>
     </div>
+  )
+}
+
+// One input group: what it is on the left, its fields on the right (stacked when narrow).
+function Group({ title, hint, aside, children }: { title: string; hint?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-4 py-7 first:pt-1 last:pb-1 @3xl:grid-cols-[12rem_minmax(0,1fr)] @3xl:gap-10">
+      <div>
+        <h3 className="text-[15px] font-medium text-fg">{title}</h3>
+        {hint && <p className="mt-1 text-[13px] leading-snug text-fg-3">{hint}</p>}
+        {aside}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  )
+}
+
+function Field({ label, note, className, children }: { label: string; note?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={cn('block min-w-0', className)}>
+      <span className="mb-1.5 block text-[13px] text-fg-3">{label}</span>
+      {children}
+      {note && <span className="num mt-1.5 block text-[13px] text-fg-3">{note}</span>}
+    </label>
   )
 }
 
@@ -197,23 +198,19 @@ export function EmptyWeight({ tail, planning, save, u }: { tail: string; plannin
 }
 
 export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null; uploaded?: PlannerDoc | null }) {
-  if (uploaded) return (
-    <div className="mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset ring-border">
-      <BookOpen className="mt-0.5 size-4 shrink-0" />
-      <span className="min-w-0 text-fg">{uploaded.title}: your upload, the POH used for this airplane. <span className="text-fg-3">Open it from the sidebar's POH tab.</span></span>
-    </div>
-  )
+  const refs = useRefs()
+  const open = <button type="button" onClick={() => refs?.show('poh')} className="shrink-0 text-accent hover:underline">Open</button>
+  if (uploaded) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{uploaded.title}</span> · your upload</span>{open}</p>
   if (!model) return null
+  if (loading) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><Loader2 className="size-3.5 animate-spin" />Finding the {model} POH…</p>
+  if (error) return <p className="mt-4 text-[13px] text-bad">{error}</p>
+  if (poh?.exact && poh.profile) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · drives the numbers</span>{open}</p>
   return (
-    <div className={cn('mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset', poh && poh.exact ? 'ring-border' : 'bg-warn-soft text-warn ring-warn/30')}>
-      {loading ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" /> : <BookOpen className="mt-0.5 size-4 shrink-0" />}
-      <div className="min-w-0">
-        {loading && <span>Finding and downloading the {model} POH…</span>}
-        {!loading && poh && <span className={poh.exact ? 'text-fg' : ''}>{poh.title}{poh.exact ? '' : ` — closest public POH to the ${model}`}. {poh.profile ? 'Its tables drive every number below.' : 'Reference only; numbers use the closest transcribed POH.'} <span className="opacity-80">Open it from the sidebar's POH tab.</span></span>}
-        {!loading && !poh && !error && <span>No public POH found for the {model}; upload this airplane's POH from the sidebar's POH tab. Numbers use the closest transcribed POH and your aircraft profile.</span>}
-        {error && <span>{error}</span>}
-      </div>
-    </div>
+    <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
+      <BookOpen className="mt-0.5 size-3.5 shrink-0" />
+      <span className="min-w-0 flex-1">{poh ? `${poh.title}: closest public POH to the ${model}.` : `No public POH for the ${model}; upload it in the POH tab.`}{poh && !poh.profile && ' Numbers use the closest transcribed one.'}</span>
+      {poh && open}
+    </p>
   )
 }
 
@@ -222,23 +219,21 @@ export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMa
 function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; certs: PilotCerts | null }) {
   const role = roleOf(plan.crew, certs)
   const cert = certs?.certificate ?? 'student'
-  const certLabel = CERTIFICATES.find(c => c.key === cert)!.label
   const xc = d.checks.some(c => /Instructor('s)? endorse/.test(c.title))
   const ck = plan.checklist ?? {}
   return (
     <div>
-      <SubHead right={<span className="text-xs text-fg-3">{certs?.certificate ? certLabel : 'Certificate not saved: Brief → Pilot'}</span>}>Who's flying</SubHead>
       <div className="flex flex-wrap items-end gap-3">
         <Segmented value={role} onChange={r => set({ crew: { ...plan.crew, role: r } })}
           options={[{ value: 'pic', label: cert === 'student' ? 'Solo' : 'Me as PIC' }, { value: 'dual', label: 'Dual with a CFI' }]} />
         {role === 'dual' && (
-          <label className="block w-full max-w-60"><span className="mb-1 block text-sm text-fg-2">Instructor</span>
+          <label className="block w-full max-w-60"><span className="mb-1.5 block text-[13px] text-fg-3">Instructor</span>
             <Input value={plan.crew?.instructor ?? ''} onChange={e => set({ crew: { ...plan.crew, role, instructor: e.target.value } })} placeholder="CFI's name" maxLength={60} /></label>
         )}
       </div>
-      <p className="mt-1.5 text-xs text-fg-3">{role === 'dual' ? 'The instructor is pilot in command; put their weight in the right front seat. Your personal minimums become cautions to talk through.' : cert === 'student' ? 'Student solo: no passengers, your solo endorsements and limits apply (§61.87–§61.95).' : `You act as PIC on your ${certLabel.toLowerCase()} certificate; anyone in the other seats counts as a passenger.`}</p>
+      <p className="mt-2.5 text-[13px] text-fg-3">{role === 'dual' ? 'Your instructor is pilot in command; seat them front right.' : cert === 'student' ? 'Student solo: no passengers (§61.89).' : 'You are pilot in command; other seats are passengers.'}</p>
       {xc && (
-        <label className="mt-2 flex items-center gap-2 text-sm text-fg-2">
+        <label className="mt-3 flex items-center gap-2 text-[13px] text-fg-2">
           <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={ck['crew.xcEndorsed'] === true} onChange={e => set({ checklist: { ...ck, 'crew.xcEndorsed': e.target.checked } })} />
           My instructor endorsed this cross-country in my logbook (§61.93(c)(2))
         </label>

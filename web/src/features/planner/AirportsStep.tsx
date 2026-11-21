@@ -171,7 +171,7 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
         {atis && <details className="mt-1"><summary className="cursor-pointer text-xs text-accent">D-ATIS text</summary><p className="num mt-1 text-xs text-fg-2">{atis.text}</p></details>}
       </div>
 
-      <div className="mt-3 overflow-x-auto"><table className="num w-full text-sm sm:min-w-[30rem] [&_td+td]:whitespace-nowrap [&_td+td]:pl-2 [&_th+th]:pl-2">
+      <div className="mt-3 overflow-x-auto"><table className="num w-full text-sm text-fg-2 sm:min-w-[30rem] [&_td+td]:whitespace-nowrap [&_td+td]:pl-2 [&_th+th]:pl-2">
         <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1 font-medium">Runway</th><th className="pb-1 font-medium">Size (ft)</th><th className="pb-1 font-medium">Pattern</th><th className="pb-1 text-right font-medium">Head / cross</th><th className="pb-1 pl-3 font-medium max-sm:hidden">Notes</th></tr></thead>
         <tbody>{ends.map(({ r, e, c, mag }) => {
           const fav = inUse.length ? inUse.includes(e.id) : best?.end.id === e.id

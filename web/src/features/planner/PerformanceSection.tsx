@@ -32,7 +32,7 @@ export function PerformanceSection({ d, profile }: { d: Derived; profile: Aircra
         })}
       </ul>
       <div className="overflow-x-auto max-md:hidden">
-        <table className="w-full min-w-[56rem] text-sm">
+        <table className="w-full min-w-[56rem] text-sm text-fg-2">
           <thead>
             <tr className="text-left text-xs text-fg-3">
               <th className="pb-2 font-medium">Airport</th><th className="pb-2 font-medium">Runway</th><th className="pb-2 font-medium">Wind (head / cross)</th>

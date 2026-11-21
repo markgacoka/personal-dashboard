@@ -54,7 +54,7 @@ export function FixesPane({ checks, onJump }: { checks: Check[]; onJump: (k: Dom
   return (
     <div className="pb-4">
       {/* Summary: the whole picture in one line, each count a filter. */}
-      <div className="space-y-3 border-b border-border px-3 py-4">
+      <div className="space-y-4 border-b border-border px-4 py-5">
         <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
           {RANK.map(s => count(s) > 0 && <span key={s} className={cn(BAR[s], 'h-full', s === 'todo' && 'opacity-60')} style={{ width: `${(count(s) / total) * 100}%` }} />)}
         </div>
@@ -89,15 +89,15 @@ export function FixesPane({ checks, onJump }: { checks: Check[]; onJump: (k: Dom
       {groups.filter(g => g.items.length).map(g => {
         const worst = worstStatus(g.items)
         return (
-          <section key={g.key} className="mt-4">
-            <header className="flex items-baseline gap-2 px-3 pb-1.5">
+          <section key={g.key} className="mt-6">
+            <header className="flex items-baseline gap-2 px-4 pb-1">
               {groupBy === 'area' && filter !== 'ok' ? <StatusIcon status={worst} className="size-3.5 translate-y-0.5" /> : null}
               <h3 className={cn('text-sm font-medium', groupBy === 'severity' && g.key !== 'ok' ? STATUS_META[g.key as Status].text : 'text-fg')}>{g.head}</h3>
               <span className="num text-[13px] text-fg-3">{g.items.length}</span>
-              {g.hint && <span className="text-[13px] text-fg-3">· {g.hint}</span>}
+
               {g.domain && <button onClick={() => onJump(g.domain!)} className="ml-auto inline-flex items-center gap-0.5 text-[13px] text-fg-3 hover:text-accent">Open<ArrowUpRight className="size-3.5" /></button>}
             </header>
-            <ul className="mx-3 divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
+            <ul className="mx-2">
               {g.items.sort(byRank).map((c, i) => <FixRow key={`${c.section}-${c.title}-${i}`} c={c} showArea={groupBy === 'severity' || filter === 'ok'} onJump={onJump} />)}
             </ul>
           </section>
@@ -108,7 +108,7 @@ export function FixesPane({ checks, onJump }: { checks: Check[]; onJump: (k: Dom
 }
 
 function FixRow({ c, showArea, onJump }: { c: Check; showArea: boolean; onJump: (k: DomainKey) => void }) {
-  const [open, setOpen] = useState(c.status === 'nogo')
+  const [open, setOpen] = useState(false)
   const { rule, why } = splitRule(c.detail)
   const domain = DOMAIN_OF[c.section]
   const ok = c.status === 'ok'
@@ -116,28 +116,19 @@ function FixRow({ c, showArea, onJump }: { c: Check; showArea: boolean; onJump: 
   return (
     <li>
       <button onClick={() => hasBody && setOpen(o => !o)} aria-expanded={hasBody ? open : undefined}
-        className={cn('flex w-full items-start gap-2.5 px-3 py-2.5 text-left', hasBody && 'hover:bg-hover')}>
+        className={cn('flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left', hasBody && 'hover:bg-hover')}>
         <StatusIcon status={c.status} className="mt-0.5" />
-        <span className={cn('min-w-0 flex-1 text-sm leading-snug', ok ? 'text-fg-2' : 'font-medium text-fg')}>{c.title}</span>
+        <span className={cn('min-w-0 flex-1 text-sm leading-snug', c.status === 'nogo' ? 'text-fg' : 'text-fg-2')}>{c.title}</span>
         {showArea && <span className="mt-px shrink-0 text-[13px] text-fg-3">{DOMAIN_LABEL[domain].split(' ')[0]}</span>}
         {hasBody && <ChevronDown className={cn('mt-0.5 size-4 shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />}
       </button>
       {open && hasBody && (
-        <div className="space-y-2.5 pb-3 pl-[2.375rem] pr-3">
-          {(rule || why) && (
-            <p className="text-[13px] leading-relaxed text-fg-3">
-              {rule && <span className="mr-1.5 rounded bg-pill px-1.5 py-px font-mono text-xs text-fg-2">{rule}</span>}
-              {why}
-            </p>
-          )}
-          {c.fix && !ok && (
-            <div className="flex gap-2 border-l-2 border-accent pl-2.5 text-[13px] leading-snug text-fg">
-              <span className="sr-only">Fix: </span>{c.fix}
-            </div>
-          )}
+        <div className="space-y-2 pb-3 pl-9 pr-2">
+          {c.fix && !ok && <p className="text-[13px] leading-snug text-fg-2">{c.fix}</p>}
+          {(rule || why) && <p className="text-[13px] leading-snug text-fg-3">{why}{rule && <span className="num"> {why ? '· ' : ''}{rule}</span>}</p>}
           {!ok && (
             <button onClick={() => onJump(domain)} className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline">
-              Go to {DOMAIN_LABEL[domain]}<ArrowRight className="size-3.5" />
+              {DOMAIN_LABEL[domain]}<ArrowRight className="size-3.5" />
             </button>
           )}
         </div>

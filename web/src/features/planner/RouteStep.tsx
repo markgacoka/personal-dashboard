@@ -38,15 +38,14 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
   const lm = useMemo(() => landmarks && { ...landmarks, lines: landmarks.lines.filter(l => !off.has(l.kind)) }, [landmarks, off])
   return (
     <div className="space-y-8">
-      {part === 'chart' && routePts.length < 2 && <p className="text-sm text-fg-3">Type a departure and an arrival above; the chart opens here to add points between them.</p>}
+      {part === 'chart' && routePts.length < 2 && <p className="text-[13px] text-fg-3">Enter a departure and arrival to open the chart.</p>}
       {part === 'chart' && routePts.length > 1 && (
         <div className="space-y-3">
           <RouteChips pts={routePts} edit={edit} />
-          <p className="-mt-1 text-xs text-fg-3">Tap a point's name to name it (e.g. "Anderson Lake"); the name is used on the navlog.</p>
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
               <PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} />
-              <p className="mt-2 text-sm text-fg-3">Drag the route line to add a point; drag a point to move it, click it to remove it. Points snap to the dots (airports, VFR waypoints, VORs, fixes, towns, towers 200 ft AGL and up, peaks) and onto highways, rivers, railroads and power lines. Satellite shows terrain, Topo roads and towns, Sectional elevations, parachute areas and VFR waypoints.</p>
+              <p className="mt-2 text-[13px] text-fg-3">Drag the line to add a point, drag a point to move it, click it to remove it. Points snap to nearby landmarks.</p>
             </div>
             <Suggestions sugg={sugg} pts={routePts} edit={edit} loading={landmarksLoading} errors={landmarks?.errors ?? []} off={off} setOff={setOff} />
           </div>
@@ -69,7 +68,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
               <OptNum value={f.altSet ? f.alt : null} placeholder={f.altAuto} unit="ft" step={500} onChange={v => set({ altitudes: { ...plan.altitudes, [f.n]: v ?? 0 } })} label={`Cruise altitude ${f.from.id} to ${f.to.id}`} />
             </div>
             <div className="overflow-x-auto">
-              <table className="num w-full text-sm md:min-w-[46rem] [&_td+td]:pl-2 [&_th]:whitespace-nowrap [&_th+th]:pl-2">
+              <table className="num w-full text-sm text-fg-2 md:min-w-[46rem] [&_td+td]:pl-2 [&_th]:whitespace-nowrap [&_th+th]:pl-2">
                 <thead><tr className="text-left text-xs text-fg-3">
                   <th className="pb-1.5 font-medium">Point</th><th className="pb-1.5 font-medium max-sm:hidden">Type</th><th className="pb-1.5 font-medium max-md:hidden">Position</th>
                   <th className="pb-1.5 text-right font-medium">MC</th><th className="pb-1.5 text-right font-medium">Altitude</th><th className="pb-1.5 text-right font-medium">Leg nm</th>

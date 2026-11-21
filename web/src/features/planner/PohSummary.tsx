@@ -45,7 +45,7 @@ export function PohSummary({ d, profile, plan, planning, u = US }: { d: Derived;
       </div>
       <div>
         <SubHead right={<PohLink fig="cruise">Fig. 5-7, 5-8</PohLink>}>Climb, cruise and descent</SubHead>
-        <table className="num w-full text-sm">
+        <table className="num w-full text-sm text-fg-2">
           <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1 font-medium">Flight</th><th className="pb-1 font-medium">Climb to cruise</th><th className="pb-1 font-medium">Cruise at {plan.rpm} RPM</th><th className="pb-1 text-right font-medium">%BHP</th></tr></thead>
           <tbody>
             {alts.map(f => (
@@ -72,11 +72,11 @@ export function WbTable({ d, plan, u = US }: { d: Derived; plan: Plan; u?: Units
   const loads = loadsOf(plan)
   return (
     <div className="overflow-x-auto">
-      <table className="num w-full text-sm sm:min-w-[36rem]">
+      <table className="num w-full text-sm text-fg-2 sm:min-w-[36rem]">
         <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Item</th><th className="pb-1.5 font-medium max-sm:hidden">Source</th><th className="pb-1.5 pl-2 text-right font-medium">Weight ({u.weight})</th><th className="pb-1.5 pl-2 text-right font-medium">Arm (in)</th><th className="pb-1.5 pl-2 text-right font-medium">Moment / 1000</th></tr></thead>
         <tbody>
           {d.wb.steps.map((s, i) => (
-            <tr key={i} className={cn('border-t border-border', s.total && 'border-fg/40 font-semibold', s.over && 'text-bad')}>
+            <tr key={i} className={cn('border-t border-border', s.total && 'border-border-strong font-medium text-fg', s.over && 'text-bad')}>
               <td className="py-1.5 font-sans">{s.label}<div className="text-xs font-normal text-fg-3 sm:hidden">{s.source}{s.over ? ' · over' : ''}</div></td>
               <td className="py-1.5 font-sans text-fg-3 max-sm:hidden">{s.source}{s.over ? ' · over' : ''}</td>
               <td className="py-1.5 text-right">{W(s.weight)}</td>

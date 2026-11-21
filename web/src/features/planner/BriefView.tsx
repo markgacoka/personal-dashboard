@@ -37,16 +37,16 @@ export function Brief({ d, status, label, open, setOpen, summary, detail }: {
   ] : []
 
   return (
-    <div className="space-y-4">
-      <div className={cn('rounded-xl px-4 py-4 sm:px-5', tone)}>
+    <div className="space-y-6">
+      <div className={cn('rounded-xl px-4 py-5 sm:px-6', tone)}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <StatusIcon status={status} className="size-6" />
           <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{label}</h2>
           <span className="text-sm text-fg-2">{counts.map(([s, n]) => `${n} ${WORD[s]}`).join(' · ') || 'every check passed'}</span>
         </div>
         {facts.length > 0 && (
-          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
-            {facts.map(([k, v]) => <div key={k} className="min-w-0"><dt className="text-xs text-fg-3">{k}</dt><dd className="num mt-0.5 truncate text-sm text-fg">{v}</dd></div>)}
+          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+            {facts.map(([k, v]) => <div key={k} className="min-w-0"><dt className="text-[13px] text-fg-3">{k}</dt><dd className="num mt-1 truncate text-[15px] text-fg-2">{v}</dd></div>)}
           </dl>
         )}
       </div>
@@ -58,7 +58,7 @@ export function Brief({ d, status, label, open, setOpen, summary, detail }: {
           const tl = tally(cs)
           return (
             <li key={k} ref={el => { refs.current[k] = el }} className="scroll-mt-20">
-              <button onClick={() => setOpen(isOpen ? null : k)} aria-expanded={isOpen} className={cn('flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-hover sm:px-5', isOpen && 'bg-hover')}>
+              <button onClick={() => setOpen(isOpen ? null : k)} aria-expanded={isOpen} className={cn('flex w-full items-center gap-4 px-4 py-4 text-left hover:bg-hover sm:px-6', isOpen && 'bg-hover')}>
                 {st ? <StatusIcon status={st} className="size-5" /> : <Circle className="size-5 shrink-0 text-fg-3" aria-hidden />}
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-baseline gap-x-3">
@@ -70,7 +70,7 @@ export function Brief({ d, status, label, open, setOpen, summary, detail }: {
                 <ChevronRight className={cn('size-4 shrink-0 text-fg-3 transition-transform duration-200', isOpen && 'rotate-90')} />
               </button>
               {isOpen && (
-                <div className="space-y-6 border-t border-border px-4 py-5 sm:px-5">
+                <div className="space-y-8 border-t border-border px-4 py-6 sm:px-6">
                   {issues.length > 0 && <CheckRows checks={issues} />}
                   {detail(k)}
                 </div>

@@ -208,7 +208,7 @@ export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMa
   return (
     <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
       <BookOpen className="mt-0.5 size-3.5 shrink-0" />
-      <span className="min-w-0 flex-1">{!poh ? `No public POH for the ${model}; upload it in the POH tab.` : poh.exact ? `${poh.title}. Its tables aren't transcribed yet, so the numbers use the 172P's.` : `${poh.title}: closest public POH to the ${model}.${poh.profile ? '' : ' Numbers use the closest transcribed one.'}`}</span>
+      <span className="min-w-0 flex-1">{!poh ? `No public POH for the ${model}; upload it in the POH tab.` : poh.exact ? `${poh.title}. Its tables aren't transcribed yet, so the numbers ${/^172/.test(model) ? 'use the 172P\'s' : 'are the 172P\'s and don\'t apply to this airplane'}.` : `${poh.title}: closest public POH to the ${model}.${poh.profile ? '' : ' Numbers use the closest transcribed one.'}`}</span>
       {poh && open}
     </p>
   )

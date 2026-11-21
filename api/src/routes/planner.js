@@ -8,6 +8,8 @@ import { sunEvent } from '../services/twilight.js'
 import { importBriefings } from '../services/briefings.js'
 import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
+import { mapScanLater, pohPageMap } from '../services/pohPages.js'
+import { findLibraryPoh, savePageMap } from '../services/pohFinder.js'
 import { modelWinds } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
@@ -229,11 +231,14 @@ export default async function plannerRoutes(fastify) {
     if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${kind === 'checklist' ? ', PNG or JPEG' : ''} with ?kind=${DOC_KINDS.join('|')}` })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
-      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${DOC_COLS}`,
+      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type, page_map)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${DOC_COLS}`,
       [kind, title, req.query.model ? String(req.query.model).toUpperCase().slice(0, 20) : null, req.query.tail ? String(req.query.tail).toUpperCase().slice(0, 8) : null,
         String(req.query.filename || `${title}.pdf`).slice(0, 200), req.body, req.body.length,
-        req.query.route ? String(req.query.route).toUpperCase().split(/[\s,]+/).filter(x => ID.test(x)).slice(0, 12) : null, type])
+        req.query.route ? String(req.query.route).toUpperCase().split(/[\s,]+/).filter(x => ID.test(x)).slice(0, 12) : null, type,
+        // An uploaded POH gets the same figure links as the catalog's, read from its headings.
+        kind === 'poh' && type === 'application/pdf' ? JSON.stringify(await pohPageMap(req.body)) : null])
+    if (kind === 'poh' && type === 'application/pdf' && !Object.keys(rows[0].page_map ?? {}).length) mapScanLater(rows[0].id, req.body, savePageMap, req.log)
     return rows[0]
   })
   // The document's text (PDF text layer, or OCR of a scan or photo) for the client to turn into checklist steps.
@@ -286,6 +291,11 @@ export default async function plannerRoutes(fastify) {
        ORDER BY (tail_number = $1::text) DESC NULLS LAST, created_at DESC LIMIT 1`, [t, mdl])
     const info = m && { key: m.entry.key, title: m.entry.title, variant: m.entry.variant, years: m.entry.years, profile: m.entry.profile, url: m.entry.url, units: m.entry.units, exact: m.exact, sameYears: m.sameYears }
     if (mine) return { match: info, doc: mine, uploaded: true }
+    // Not in the curated catalog: this model's own POH from the public manual library.
+    if (!m?.exact && model) {
+      const found = await findLibraryPoh({ make, model, year: Number(year) || null }, fastify.log)
+      if (found) return { match: { key: `library:${found.id}`, title: found.title, variant: found.model, years: null, profile: null, url: found.source_ref, units: 'US', exact: true, sameYears: false, source: 'library' }, doc: found }
+    }
     if (!m) return { match: null, doc: null }
     const { url, title, variant, years, profile, units, key } = m.entry
     try {

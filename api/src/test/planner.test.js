@@ -153,3 +153,48 @@ describe('FB stations for model winds', () => {
     assert.deepEqual(Object.keys(prods[0].stations.SFO.winds).map(Number), [3000, 6000, 9000, 12000])
   })
 })
+
+describe('POH page map from headings', async () => {
+  const { pageMapFromText } = await import('../services/pohPages.js')
+  const pages = [
+    'TABLE OF CONTENTS\nLIMITATIONS . . . . . . . . 2\nPERFORMANCE . . . . . . . 5',
+    'SECTION 2 LIMITATIONS\nAIRSPEED LIMITATIONS . . . . 2-4\nWEIGHT LIMITS 2-7',
+    'MODEL 172P              SECTION 2 LIMITATIONS\n         AIRSPEED LIMITATIONS\nThe airspeeds listed in the Airspeed Limitations chart',
+    'Refer to the takeoff distance chart (Figure 5-5) for the sample problem.',
+    "'f'             TAKEOFF DISTANCE\nCONDITIONS: Flaps 10°\nFigure 5-5. Ta.keoff Distance (Sheet 1 of 2)",
+    'TAKEOFF DISTANCE\nFigure 5-5. Takeoff Distance (Sheet 2 of 2)',
+    '2.11 WEIGHT LIMITS\n(a) Maximum Weight 2440 LBS',
+  ]
+  test('captions and standalone headings, not contents lines or running text', () => {
+    const m = pageMapFromText(pages)
+    assert.equal(m.airspeed, 3) // not the contents line on page 2, not the sentence on page 3
+    assert.equal(m.takeoff, 5) // sheet 1, OCR's "Ta.keoff", not the reference on page 4
+    assert.equal(m.weights, 7) // Piper-style numbered heading
+    assert.equal(m.limits, 2)
+    assert.equal(m.landing, undefined)
+  })
+})
+
+describe('POH library search', async () => {
+  const { slugHasModel, makeSlugs, modelPaths, pohListings, rankListings } = await import('../services/pohFinder.js')
+  test('model in a slug as whole tokens', () => {
+    assert.ok(slugHasModel('cessna-172m-skyhawk', '172M'))
+    assert.ok(!slugHasModel('cessna-172-skyhawk', '172M'))
+    assert.ok(slugHasModel('piper-pa-28-161', 'PA-28-161'))
+    assert.ok(!slugHasModel('piper-pa-28-1610', 'PA-28-161'))
+  })
+  test('make and model pages', () => {
+    assert.deepEqual(makeSlugs('<a href="/aircraft/manuals/beechcraft"></a><a href="/aircraft/manuals/cessna"></a>', 'BEECH AIRCRAFT CORP'), ['beechcraft'])
+    const make = ['cessna-1/cessna-172m-426', 'cessna-1/cessna-172m-skyhawk-333', 'cessna-1/cessna-172-skyhawk-18', 'piper-12/piper-pa-28-warrior-ii-142', 'piper-12/piper-pa-28-archer-ii-145']
+      .map(p => `<a href="/aircraft/manuals/${p}">`).join('')
+    assert.deepEqual(modelPaths(make, '172M'), ['/aircraft/manuals/cessna-1/cessna-172m-426', '/aircraft/manuals/cessna-1/cessna-172m-skyhawk-333'])
+    assert.deepEqual(modelPaths(make, 'PA-28-161'), ['/aircraft/manuals/piper-12/piper-pa-28-warrior-ii-142'])
+  })
+  test('listings parsed and ranked: this model, near the year, a whole book', () => {
+    const html = '<div><span>1976</span><span>PDF · 144 pages · 16 MB</span><span>of</span><span>PILOT&#x27;S OPERATING HANDBOOK CESSNA MODEL 172M</span><a href="https://cdn.sprinkle.com/library/pdfs/aaaa-1.pdf">x</a></div>'
+      + '<div><span>PDF · 12 pages · 1 MB</span><span>of</span><span>172M supplement</span><a href="https://cdn.sprinkle.com/library/pdfs/bbbb-2.pdf">x</a></div>'
+    const l = pohListings(html)
+    assert.deepEqual(l[0], { url: 'https://cdn.sprinkle.com/library/pdfs/aaaa-1.pdf', year: 1976, pages: 144, mb: 16, title: "PILOT'S OPERATING HANDBOOK CESSNA MODEL 172M" })
+    assert.equal(rankListings(l, '172M', 1975)[0].url, l[0].url)
+  })
+})

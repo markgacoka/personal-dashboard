@@ -63,7 +63,12 @@ In the sheet (optional): per-row wind, temperature and CAS (E6B style, replace
 the forecast for that row), compass deviation, actual times, GS and fuel, block
 times, flight plan block 14 and aircraft color.
 
-Derived: POH (catalog of public PDFs, downloaded once into `planner_documents`),
+Derived: POH (a curated catalog of public PDFs; for a model it doesn't cover, the
+public Sprinkle manual library is searched by make and model and a book is kept
+only if its own first pages name the model; downloaded once into
+`planner_documents`; every POH's page map — limits, checklists, takeoff, climb,
+cruise, landing, W&B pages — is read from its figure captions and headings, with
+OCR in the background for scans),
 limits, arms, CG range, takeoff/climb/cruise/landing from the POH tables, TC and
 distance, magnetic variation (World Magnetic Model 2025 on the flight date —
 NASR's per-airport values keep their survey epoch, e.g. Reid-Hillview 1975),

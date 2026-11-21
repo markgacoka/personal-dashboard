@@ -25,7 +25,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
   planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; savingPlanning: boolean; u: Units
 }) {
   const p = d.profile
-  if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number in step 1.</p>
+  if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number under Plan.</p>
   const night = !!plan.night || d.wx.some(w => w.night)
   return (
     <div className="space-y-8">

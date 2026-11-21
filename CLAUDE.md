@@ -100,14 +100,14 @@ make/model/year to a public POH PDF and stores it in `planner_documents` on
 first use, unless you uploaded a POH for that tail (or model), which wins. Per-tail
 aircraft profiles (`planner_aircraft.data.profile`, applied by `poh.ts`'s
 `applyEdits`) and airport profiles (`planner_airport_profiles`) override the
-POH/NASR values. Your certificates (`planner_settings` key `certificates`) and the flight's role (PIC or dual, `plan.crew`) drive the Part 61 checks in `pilot.ts`. Checklist uploads (PDF or photo) are read into steps (`services/docText.js`: poppler / Tesseract in the image; `checklistParse.ts`). A wizard: step 1 takes the inputs (tail, departure / route / arrival — one
-flight, middle points always flown over — engine start, RPM, seats, fuel, taxi time); the later steps (aircraft, route, airports,
-weather, weight & performance, pilot, review, NavLog) are derived, with the
+POH/NASR values. Your certificates (`planner_settings` key `certificates`) and the flight's role (PIC or dual, `plan.crew`) drive the Part 61 checks in `pilot.ts`. Checklist uploads (PDF or photo) are read into steps (`services/docText.js`: poppler / Tesseract in the image; `checklistParse.ts`). Three stages: Plan takes the inputs (tail, departure / route / arrival — one
+flight, middle points always flown over — engine start, RPM, seats, fuel, taxi time) and the route chart; Brief shows the verdict and one line per area (pilot, aircraft, weather, route and fuel,
+airports, weight & performance) that opens to its detail; NavLog prints. A sidebar holds Fixes, Workings (`workings.ts`: calculations, assumptions, sources) and the POH/checklist/briefing documents. All derived, with the
 checklists (IMSAFE, maintenance, equipment) stored in the plan — per-flight automatic altitude,
 automatic checkpoints (airports, VFR waypoints, VORs, RNAV fixes from NASR), automatic alternate,
 WMM magnetic variation (`magvar`; NASR values are decades old), and model
 winds aloft (`services/modelWinds.js`, Open-Meteo sampled at the AWC FB
-stations) when neither AWC nor api.weather.gov publishes an FB. The Route step
+stations) when neither AWC nor api.weather.gov publishes an FB. The route chart
 suggests points and lets you drag the line (`suggest.ts`, `services/landmarks.js`:
 OpenFreeMap/OSM, HIFLD power lines, FAA obstacles).
 

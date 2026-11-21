@@ -65,7 +65,7 @@ export function ProfileEditor({ tail, planning, save, registry, saving }: {
               ))}
             </div>
           </Group>
-          <p className="-mt-3 text-xs text-fg-3">Horsepower over 200, complex and tailwheel each need an endorsement to act as PIC (§61.31); the Pilot step checks them.</p>
+          <p className="-mt-3 text-xs text-fg-3">Horsepower over 200, complex and tailwheel each need an endorsement to act as PIC (§61.31); Brief → Pilot checks them.</p>
           <Group title="Weights and fuel">
             {F({ k: 'maxRamp', label: 'Max ramp', ph: base.limits.maxRamp, unit: 'lb' })}
             {F({ k: 'maxTakeoff', label: 'Max takeoff', ph: base.limits.maxTakeoff, unit: 'lb' })}

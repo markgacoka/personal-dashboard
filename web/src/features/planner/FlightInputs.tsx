@@ -58,11 +58,6 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
   return (
     <div className="@container space-y-6">
-      <label className="block max-w-xl">
-        <span className="mb-1 block text-sm text-fg-2">Plan name</span>
-        <Input value={plan.name === 'New flight' ? '' : plan.name} onChange={e => set({ name: e.target.value || 'New flight' })} placeholder="e.g. Solo XC to Salinas" maxLength={120} />
-        <span className="mt-1 block text-xs text-fg-3">Blank: named after the route when you save.</span>
-      </label>
       <Crew plan={plan} set={set} d={d} certs={certs} />
       <div className="grid gap-6 @4xl:grid-cols-2">
         <div className="space-y-5">
@@ -106,7 +101,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
               <label className="block"><span className="mb-1 block text-sm text-fg-2">Arrival</span>
                 <Input value={arr} onChange={e => setArr(e.target.value.toUpperCase())} onBlur={commitRoute} onKeyDown={enter} placeholder="KSNS" className="num uppercase" spellCheck={false} autoCapitalize="characters" /></label>
             </div>
-            <p className="mt-1 text-xs text-fg-3">You land only at the arrival airport; everything in Route is flown over, airports included. Points: navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W, 36.85/-121.53). The Route step suggests points and lets you drag the line on the chart.</p>
+            <p className="mt-1 text-xs text-fg-3">You land only at the arrival airport; everything in Route is flown over, airports included. Points: navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W, 36.85/-121.53). The chart below suggests points and lets you drag the line.</p>
             {tokens.length > 0 && (
               <ol className="mt-3 space-y-1">
                 {tokens.map((t, i) => {
@@ -205,7 +200,7 @@ export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMa
   if (uploaded) return (
     <div className="mt-3 flex gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-inset ring-border">
       <BookOpen className="mt-0.5 size-4 shrink-0" />
-      <span className="min-w-0 text-fg">{uploaded.title}: your upload, the POH used for this airplane. <span className="text-fg-3">Open it with "POH &amp; briefing".</span></span>
+      <span className="min-w-0 text-fg">{uploaded.title}: your upload, the POH used for this airplane. <span className="text-fg-3">Open it from the sidebar's POH tab.</span></span>
     </div>
   )
   if (!model) return null
@@ -214,8 +209,8 @@ export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMa
       {loading ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" /> : <BookOpen className="mt-0.5 size-4 shrink-0" />}
       <div className="min-w-0">
         {loading && <span>Finding and downloading the {model} POH…</span>}
-        {!loading && poh && <span className={poh.exact ? 'text-fg' : ''}>{poh.title}{poh.exact ? '' : ` — closest public POH to the ${model}`}. {poh.profile ? 'Its tables drive every number below.' : 'Reference only; numbers use the closest transcribed POH.'} <span className="opacity-80">Open it with "POH &amp; briefing".</span></span>}
-        {!loading && !poh && !error && <span>No public POH found for the {model}; upload this airplane's POH in step 2 (Aircraft). Numbers use the closest transcribed POH and your aircraft profile.</span>}
+        {!loading && poh && <span className={poh.exact ? 'text-fg' : ''}>{poh.title}{poh.exact ? '' : ` — closest public POH to the ${model}`}. {poh.profile ? 'Its tables drive every number below.' : 'Reference only; numbers use the closest transcribed POH.'} <span className="opacity-80">Open it from the sidebar's POH tab.</span></span>}
+        {!loading && !poh && !error && <span>No public POH found for the {model}; upload this airplane's POH from the sidebar's POH tab. Numbers use the closest transcribed POH and your aircraft profile.</span>}
         {error && <span>{error}</span>}
       </div>
     </div>
@@ -232,10 +227,10 @@ function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => 
   const ck = plan.checklist ?? {}
   return (
     <div>
-      <SubHead right={<span className="text-xs text-fg-3">{certs?.certificate ? certLabel : 'Certificate not saved: Pilot step'}</span>}>Who's flying</SubHead>
+      <SubHead right={<span className="text-xs text-fg-3">{certs?.certificate ? certLabel : 'Certificate not saved: Brief → Pilot'}</span>}>Who's flying</SubHead>
       <div className="flex flex-wrap items-end gap-3">
         <Segmented value={role} onChange={r => set({ crew: { ...plan.crew, role: r } })}
-          options={[{ value: 'pic', label: cert === 'student' ? 'Solo (student PIC)' : 'Me as PIC' }, { value: 'dual', label: 'Dual with an instructor' }]} />
+          options={[{ value: 'pic', label: cert === 'student' ? 'Solo' : 'Me as PIC' }, { value: 'dual', label: 'Dual with a CFI' }]} />
         {role === 'dual' && (
           <label className="block w-full max-w-60"><span className="mb-1 block text-sm text-fg-2">Instructor</span>
             <Input value={plan.crew?.instructor ?? ''} onChange={e => set({ crew: { ...plan.crew, role, instructor: e.target.value } })} placeholder="CFI's name" maxLength={60} /></label>

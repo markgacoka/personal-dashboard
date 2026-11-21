@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, CloudSun, Download, ExternalLink, Mail, Upload, X } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, Mail, PanelRightClose, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
@@ -10,15 +10,20 @@ import { Synced } from './ui'
 import { ChecklistSteps } from './ChecklistSteps'
 import { Segmented } from '@/components/ui/misc'
 
-type Tab = 'poh' | 'checklist' | 'briefing'
+type DocTab = 'poh' | 'checklist' | 'briefing'
+export type Tab = 'fixes' | 'workings' | DocTab
+const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Fixes' }, { key: 'workings', label: 'Workings' }, { key: 'poh', label: 'POH' }, { key: 'checklist', label: 'Checklist' }, { key: 'briefing', label: 'Briefing' }]
+export const isDocTab = (t: Tab): t is DocTab => t === 'poh' || t === 'checklist' || t === 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
-interface RefState { open: boolean; tab: Tab; page: number | string | null; docId: Record<Tab, number | null> }
+interface RefState { open: boolean; tab: Tab; page: number | string | null; docId: Record<DocTab, number | null> }
 interface RefApi { state: RefState; show: (tab: Tab, page?: string | number | null) => void; close: () => void; set: (s: Partial<RefState>) => void }
 const Ctx = createContext<RefApi | null>(null)
 export const useRefs = () => useContext(Ctx)
 
 export function RefProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<RefState>({ open: false, tab: 'poh', page: null, docId: { poh: null, checklist: null, briefing: null } })
+  // Open beside the plan on wide screens; a full-screen sheet on demand elsewhere.
+  const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 80rem)').matches
+  const [state, setState] = useState<RefState>({ open: !!wide, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null } })
   const api = useMemo<RefApi>(() => ({
     state,
     show: (tab, page) => setState(s => ({ ...s, open: true, tab, page: page ?? null })),
@@ -34,12 +39,42 @@ export function PohLink({ fig, children }: { fig: keyof typeof POH_PAGES_172P | 
   return <button type="button" onClick={() => r?.show('poh', fig)} className="inline-flex items-center gap-1 text-accent hover:underline"><BookOpen className="size-3.5" />{children}</button>
 }
 
-export function RefPanel({ tail, model, route, date, className, pohDocId, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null }) {
+// The plan's sidebar: what to fix, the workings (assumptions, calculations,
+// sources), and the documents (POH, checklist, weather briefing).
+// Opens the sidebar's workings (the arithmetic behind the numbers).
+export function WorkingsLink({ children }: { children: React.ReactNode }) {
+  const r = useRefs()
+  return <button type="button" onClick={() => r?.show('workings')} className="text-accent hover:underline">{children}</button>
+}
+
+export function RefPanel({ tail, model, route, date, className, pohDocId, pohStatus, panes, fixCount }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number }) {
+  const r = useRefs()!
+  return (
+    <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
+      <div className="flex items-center gap-1 border-b border-border px-2 py-2">
+        <div role="tablist" aria-label="Sidebar" className="scrollbar-none flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
+        {TABS.map(t => (
+          <button key={t.key} role="tab" aria-selected={r.state.tab === t.key} onClick={() => r.set({ tab: t.key, page: null })}
+            className={cn('press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm', r.state.tab === t.key ? 'bg-pill font-medium text-fg' : 'text-fg-3 hover:text-fg')}>
+            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className="num rounded-full bg-hover px-1.5 text-xs text-fg-2">{fixCount}</span>}
+          </button>
+        ))}
+        </div>
+        <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="xl:hidden" /><PanelRightClose className="max-xl:hidden" /></Button>
+      </div>
+      {isDocTab(r.state.tab) ? <DocPane tail={tail} model={model} route={route} date={date} pohDocId={pohDocId} pohStatus={pohStatus} />
+        : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panes[r.state.tab]}</div>}
+    </div>
+  )
+}
+
+function DocPane({ tail, model, route, date, pohDocId, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; pohDocId?: number | null; pohStatus?: string | null }) {
   const r = useRefs()!
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<'steps' | 'original'>('steps')
-  const { tab, page, docId } = r.state
+  const { page, docId } = r.state
+  const tab = r.state.tab as DocTab
   const list = (docs.data || []).filter(d => d.kind === tab)
   // POH: same model first; briefing: same route and newest first.
   const ranked = useMemo(() => [...list].sort((a, b) => (tab === 'poh' && pohDocId ? Number(b.id === pohDocId) - Number(a.id === pohDocId) : 0) || score(b, tab, model, route, date, tail) - score(a, tab, model, route, date, tail)), [list, tab, model, route, date, pohDocId, tail])
@@ -52,15 +87,7 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
     { onSuccess: d => { if (tab === 'checklist') { r.set({ docId: { ...docId, checklist: d.id } }); setView('steps'); docs.extract.mutate(d.id) } toast.success(tab === 'briefing' ? 'Uploaded' : `Uploaded; it's now the ${tab === 'poh' ? 'POH' : 'checklist'} used for ${tail ?? 'this aircraft'}`) }, onError: e => toast.error(e.message) })
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-        {(['poh', 'checklist', 'briefing'] as Tab[]).map(t => (
-          <button key={t} onClick={() => r.set({ tab: t, page: null })} className={cn('press inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm', tab === t ? 'bg-pill text-fg' : 'text-fg-3 hover:text-fg')}>
-            {t === 'poh' ? <BookOpen className="size-4" /> : t === 'checklist' ? <ClipboardList className="size-4" /> : <CloudSun className="size-4" />}{t === 'poh' ? 'POH' : t === 'checklist' ? 'Checklist' : 'Weather briefing'}
-          </button>
-        ))}
-        <Button size="icon-sm" variant="ghost" className="ml-auto" onClick={r.close} aria-label="Close references"><X /></Button>
-      </div>
+    <>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
         <Select value={doc?.id ?? ''} onChange={e => r.set({ docId: { ...docId, [tab]: Number(e.target.value) || null } })} className="min-w-0 flex-1" aria-label="Document">
           {!ranked.length && <option value="">{tab === 'poh' ? 'No POH uploaded' : tab === 'checklist' ? 'No checklist uploaded' : 'No briefing yet'}</option>}
@@ -86,12 +113,12 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
         {tab === 'checklist' && doc && view === 'steps' ? (docs.extract.isPending && docs.extract.variables === doc.id ? <div className="grid h-full place-items-center text-sm text-fg-3">Reading the checklist…</div> : <ChecklistSteps doc={doc} />) : src ? <iframe key={src} title={doc!.title} src={src} className="h-full w-full rounded-lg bg-white" />
           : <div className="grid h-full place-items-center p-6 text-center text-sm text-fg-3">{tab === 'poh' ? 'Upload this aircraft\'s POH (PDF) to keep it open while you plan.' : tab === 'checklist' ? 'Upload the checklist you fly with (PDF or a photo); the newest one for this tail is used, and its steps are read out so you can tick through them.' : 'Get a standard briefing at 1800wxbrief.com with "email the briefing" on, then press From email — or upload the PDF.'}</div>}
       </div>
-    </div>
+    </>
   )
 }
 
 // POH and checklist: this tail's newest upload, then this model's; briefing: same route, same day, newest.
-function score(d: PlannerDoc, tab: Tab, model: string | null, route: string[], date: string, tail: string | null) {
+function score(d: PlannerDoc, tab: DocTab, model: string | null, route: string[], date: string, tail: string | null) {
   const newer = Date.parse(d.created_at) / 1e13
   if (tab !== 'briefing') return (tail && d.tail_number === tail ? 20 : 0) + (model && d.model && model.toUpperCase().includes(d.model) ? 10 : 0) + newer
   const r = d.route || []

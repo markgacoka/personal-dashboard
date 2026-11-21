@@ -59,7 +59,7 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
       <div className="space-y-8">
         <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} />
         <div>
-          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role in step 1</span>}>This flight under the FAA rules</SubHead>
+          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Plan</span>}>This flight under the FAA rules</SubHead>
           {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}
         </div>
         <Checklist title="Pilot condition · IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />

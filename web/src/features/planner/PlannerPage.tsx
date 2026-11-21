@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { BookOpen, ChevronLeft, ChevronRight, FilePlus2, Loader2, Pencil, Printer, Save, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, FilePlus2, Loader2, MoreHorizontal, PanelRightOpen, Pencil, Printer, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Select } from '@/components/ui/input'
+import { Menu, MenuContent, MenuItem, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { PageHeader } from '@/components/data/stat'
 import { useAircraftList, useFlights, useRegistry } from '@/lib/queries'
 import { get } from '@/lib/api'
@@ -23,46 +23,43 @@ import type { EditPoint, RouteEdit } from './PlannerMap'
 import { flightNotes, type NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { FlightInputs } from './FlightInputs'
-import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, worst, type Airport, type Check, type Derived, type Plan, type SectionKey, type Status } from './model'
+import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, type Airport, type Plan, type Status } from './model'
 import { NavlogFront, NavlogReverse } from './NavlogSheet'
 import { PerformanceSection } from './PerformanceSection'
 import { PlannerMap, type MapNotams } from './PlannerMap'
 import { WbTable } from './PohSummary'
 import { applyEdits, profileFor } from './poh'
-import { roleOf } from './pilot'
-import { RefPanel, RefProvider, useRefs } from './RefPanel'
+import { CERTIFICATES, roleOf } from './pilot'
+import { RefPanel, RefProvider, isDocTab, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
 import { WeatherSection } from './WeatherSection'
-import { CheckRows, KV, STATUS_META, StatusBadge, StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
+import { StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
+import { Brief, domainStatus } from './BriefView'
+import { DOMAIN_OF, FixesPane, WorkingsPane, type DomainKey } from './Sidebar'
+import { assumptions, calculations, sources } from './workings'
 
 const DRAFT_KEY = 'planner-draft-v3'
 
-// The wizard: you type the flight on step 1; every later step shows what was
-// looked up or computed for it, with the source, and the checklists to tick.
-const STEPS: { key: string; label: string; blurb: string; sections: SectionKey[] }[] = [
-  { key: 'flight', label: 'Flight', blurb: 'Tail number, departure, route and arrival, engine start, cruise power, occupants and fuel. Everything after this is filled in for you.', sections: ['trip'] },
-  { key: 'aircraft', label: 'Aircraft', blurb: 'FAA registry, the POH for the model and its numbers, the W&B record, maintenance and equipment.', sections: ['aircraft'] },
-  { key: 'route', label: 'Route', blurb: 'Build the route on the chart: suggested airports, VFR waypoints, VORs, towns, highways, rivers, power lines and towers; drag the line to add or move points. Then cruise altitude, TOC, checkpoints and TOD with course, distance and terrain.', sections: ['navlog'] },
-  { key: 'airports', label: 'Airports', blurb: 'Runways, pattern, favored or in-use runway, frequencies and NOTAMs (AirNav, Chart Supplement), and the alternate.', sections: [] },
-  { key: 'weather', label: 'Weather', blurb: 'METAR/TAF at each ETA, winds aloft, AIRMETs, SIGMETs, CWAs, PIREPs, TFRs and NOTAMs (aviationweather.gov, FAA).', sections: ['weather'] },
-  { key: 'loading', label: 'Weight & performance', blurb: 'The W&B sheet from ramp to each landing, and takeoff and landing distances from the POH.', sections: ['loading', 'performance'] },
-  { key: 'pilot', label: 'Pilot', blurb: 'IMSAFE, your personal minimums against this flight, and currency from the logbook.', sections: ['pilot'] },
-  { key: 'review', label: 'Review', blurb: 'Every check, go or no-go.', sections: [] },
-  { key: 'navlog', label: 'NavLog', blurb: 'The sheet per flight, filled in; E6B cells take your own numbers. Print it for the kneeboard.', sections: [] },
-]
+// Three stages: Plan (what you type and the route on the chart), Brief (the
+// verdict, then one line per area with the detail behind it) and NavLog. The
+// sidebar holds what to fix, the workings and the documents.
+type Stage = 'plan' | 'brief' | 'navlog'
+const STAGES: { key: Stage; label: string }[] = [{ key: 'plan', label: 'Plan' }, { key: 'brief', label: 'Brief' }, { key: 'navlog', label: 'NavLog' }]
 const pad = (n: number) => String(n).padStart(2, '0')
 const nextHourLocal = () => { const d = new Date(Date.now() + 60 * 60_000); d.setMinutes(0, 0, 0); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00` }
 const blank = (tail: string | null): Plan => ({
   name: 'New flight', route: [homeAirport()], alternate: null, departLocal: nextHourLocal(), rpm: 2400, tail,
   seats: { pilot: 0, front: 0, rearL: 0, rearR: 0 }, loads: { front: 0, rear: 0, bag1: 0, bag2: 0 }, fuelGal: null, stopMinutes: 30, night: null, actuals: {},
 })
-interface Draft { plan: Plan; id: number | null; step?: number }
+interface Draft { plan: Plan; id: number | null; stage?: Stage; open?: DomainKey | null }
 function readDraft(): Draft | null {
   try {
     const s = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem('planner-draft-v2')
     if (!s) return null
-    const d = JSON.parse(s) as Draft
-    return { plan: d.plan, id: d.id ?? null, step: d.step ?? 0 }
+    const d = JSON.parse(s) as Draft & { step?: number }
+    // Drafts from the nine-step wizard: step 0 was the inputs, 8 the NavLog.
+    const stage = d.stage ?? (d.step == null || d.step === 0 ? 'plan' : d.step === 8 ? 'navlog' : 'brief')
+    return { plan: d.plan, id: d.id ?? null, stage, open: d.open ?? null }
   } catch { return null }
 }
 
@@ -85,7 +82,7 @@ function Planner() {
     return [...fleetRaw].sort((a, b) => (used.get(b.tail_number) ?? '').localeCompare(used.get(a.tail_number) ?? '') || a.tail_number.localeCompare(b.tail_number))
   }, [fleetRaw, flights])
 
-  const [state, setState] = useState<Draft>(() => readDraft() ?? { plan: blank(null), id: null, step: 0 })
+  const [state, setState] = useState<Draft>(() => readDraft() ?? { plan: blank(null), id: null, stage: 'plan' })
   const plan = state.plan
   const set = (p: Partial<Plan>) => setState(s => ({ ...s, plan: { ...s.plan, ...p } }))
   useEffect(() => { if (!plan.tail && recentTail) set({ tail: recentTail }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [recentTail])
@@ -217,19 +214,57 @@ function Planner() {
   const acName = [aircraft.make && aircraft.make.replace(/\b\w+/g, w => w[0] + w.slice(1).toLowerCase()), aircraft.model].filter(Boolean).join(' ') || d.profile?.model || 'Aircraft'
   const savePlanning = (p: typeof planning) => planningQ.save.mutate(p, { onSuccess: () => toast.success(`${plan.tail} saved`) })
 
-  const stepAt = Math.min(state.step ?? 0, STEPS.length - 1)
-  const go = (i: number) => { setState(s => ({ ...s, step: i })); window.scrollTo({ top: 0 }) }
-  const stepStatus = (i: number): Status | null => {
-    const st = STEPS[i]
-    if (st.key === 'review') return overall
-    if (!st.sections.length) return null
-    return worst(st.sections.map(k => d.sections[k]))
-  }
-  const cur = STEPS[stepAt].key
-  // Keep the current step's chip in view when the chips scroll sideways (phones).
-  const stepsRef = useRef<HTMLElement>(null)
-  useEffect(() => { const nav = stepsRef.current, el = nav?.querySelector<HTMLElement>('[aria-current]'); if (nav && el) nav.scrollTo({ left: nav.scrollLeft + el.getBoundingClientRect().left - nav.getBoundingClientRect().left - (nav.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' }) }, [stepAt])
+  const stage: Stage = state.stage ?? 'plan'
+  const openDomain = state.open ?? null
+  const go = (st: Stage, open?: DomainKey | null) => { setState(s => ({ ...s, stage: st, ...(open !== undefined ? { open } : {}) })); if (open === undefined) window.scrollTo({ top: 0 }) }
+  const jump = (k: DomainKey) => { if (k === 'plan') go('plan'); else go('brief', k); if (!window.matchMedia('(min-width: 80rem)').matches) refs.close() }
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
+  const role = roleOf(plan.crew, certs)
+  const issues = d.checks.filter(c => c.status !== 'ok').length
+  const planIssues = d.checks.filter(c => DOMAIN_OF[c.section] === 'plan' && c.status !== 'ok')
+
+  // The sidebar's workings, from the same derive() output the brief shows.
+  const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null }
+  const topics = useMemo(() => calculations(wIn), [d, planEff, minimums]) // eslint-disable-line react-hooks/exhaustive-deps
+  const assumed = useMemo(() => assumptions(wIn), [d, planEff, minimums, certs]) // eslint-disable-line react-hooks/exhaustive-deps
+  const srcs = useMemo(() => sources(wIn), [d, wx.data, apts.data, pohStatus, terrain.data]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One line per area of the brief: the answer when it's fine.
+  const code = (a: Airport) => a.icao || a.id
+  const dep = d.perf.find(p => p.kind === 'takeoff'), arr = [...d.perf].reverse().find(p => p.kind === 'landing' && p.wx.role !== 'alternate')
+  const imsafeLeft = d.checks.find(c => c.title.startsWith('IMSAFE:'))
+  const summary: Record<DomainKey, React.ReactNode> = {
+    plan: routeText,
+    pilot: [role === 'dual' ? `Dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : `You as PIC`, certs?.certificate ? CERTIFICATES.find(c => c.key === certs.certificate)?.label : 'certificate not saved', imsafeLeft?.title].filter(Boolean).join(' · '),
+    aircraft: plan.tail ? `${plan.tail} · ${acName}${d.profile ? ` · ${d.profile.engine.split(',')[0]}` : ''}` : 'No aircraft chosen',
+    weather: d.wx.length ? d.wx.filter(w => w.role !== 'alternate').map(w => `${code(w.airport)} ${w.category ?? 'no report'} ${fmtTime(w.at)}`).join(' · ') : 'Weather at each ETA, advisories, PIREPs, TFRs and NOTAMs',
+    route: d.legs.length ? `${d.flights.map(f => `${f.alt.toLocaleString()} ft`).join(' / ')} · ${Math.round(d.totals.distNm)} nm · ${fmtMin(d.totals.eteMin)} · ${d.totals.requiredFuel.toFixed(1)} of ${d.totals.usableFuel.toFixed(1)} gal${d.crossings.length ? ` · ${d.crossings.length} airspace` : ''}` : 'Altitudes, checkpoints, airspace and fuel',
+    airports: [dep?.runway && `${code(dep.airport)} RWY ${dep.runway.end.id}`, arr?.runway && `${code(arr.airport)} RWY ${arr.runway.end.id}`, effAlt && `alternate ${effAlt}`].filter(Boolean).join(' · ') || 'Runways, pattern, frequencies, NOTAMs and the alternate',
+    loading: d.wb.steps.length ? `Takeoff ${Math.round(d.wb.takeoff.weight).toLocaleString()} lb, CG ${d.wb.takeoff.cg.toFixed(1)} in${dep?.dist && dep.runway ? ` · ${dep.dist.total.toLocaleString()} of ${dep.runway.toraFt.toLocaleString()} ft to 50 ft` : ''}` : 'Weight and balance, takeoff and landing distances',
+  }
+  const detail = (k: DomainKey) => {
+    if (k === 'pilot') return <PilotStep plan={plan} set={set} d={d} currency={currency} certs={certs ?? null} saveCerts={c => certsQ.save.mutate(c, { onSuccess: () => toast.success('Certificates saved'), onError: e => toast.error(e.message) })} savingCerts={certsQ.save.isPending} minimums={minimums} savedAt={minQ.data?.updatedAt} saveMinimums={m => minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={minQ.save.isPending} />
+    if (k === 'aircraft') return <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohDoc={pohQ.data?.doc} pohUploaded={!!pohQ.data?.uploaded} savingPlanning={planningQ.save.isPending} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null} aircraft={aircraft} planning={planning} savePlanning={savePlanning} u={u} />
+    if (k === 'weather') return (
+      <div className="space-y-6">
+        {routePts.length > 1 && <PlannerMap className="h-[22rem] print:hidden" route={routePts} alternate={altAirport} weather={wx.data ?? null} d={d} airspace={airspace.data} radar={radar.data} notams={notams} />}
+        <WeatherSection d={d} weather={wx.data ?? null} loading={wx.isLoading} refetch={() => wx.refetch()} fetching={wx.isFetching} />
+      </div>
+    )
+    if (k === 'route') return <RouteStep part="table" plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
+    if (k === 'airports') return <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
+      nasr={apts.data?.airports ?? []} profiles={aptProfiles.data ?? {}} savingProfile={aptProfiles.save.isPending}
+      saveProfile={(id, p) => aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />
+    if (k === 'loading') return (
+      <div className="space-y-8">
+        <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} /></div>
+        <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
+      </div>
+    )
+    return null
+  }
+  const stageStatus = (st: Stage): Status | null => st === 'plan' ? (planIssues.length ? domainStatus({ ...d, checks: planIssues }, 'plan') : null) : st === 'brief' ? overall : null
+  const tone = (s: Status | null) => (s === 'nogo' ? 'text-bad' : s === 'caution' ? 'text-warn' : s === 'ok' ? 'text-good' : 'text-fg-3')
 
   return (
     <div className="planner">
@@ -237,25 +272,35 @@ function Planner() {
         title={<label className="group flex min-w-0 items-center gap-2"><input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" placeholder="Name this flight plan" size={Math.max(10, plan.name.length + 1)} className="field-sizing-content min-w-0 max-w-full bg-transparent outline-none placeholder:text-fg-3 focus:underline" /><Pencil className="size-5 shrink-0 text-fg-3 group-hover:text-fg print:hidden" aria-hidden /></label>}
         description={<span><span className="num">{routeText}</span>{d.departAt && <> · {d.departAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>}{d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)} · {d.totals.tripFuel.toFixed(1)} gal</span></>}</span>}
         actions={<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto print:hidden">
-          <Select value={state.id ?? ''} onChange={e => { const p = plans.data?.find(x => x.id === Number(e.target.value)); if (p) setState({ plan: p.data, id: p.id, step: 0 }) }} className="w-full sm:w-44 xl:hidden" aria-label="Saved plans">
-            <option value="">{plans.data?.length ? 'Saved plans…' : 'No saved plans'}</option>
-            {plans.data?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-          <Button variant="secondary" onClick={() => setState({ plan: blank(recentTail), id: null, step: 0 })}><FilePlus2 />New</Button>
+          <Popover>
+            <PopoverTrigger asChild><Button variant="ghost">Plans<ChevronDown /></Button></PopoverTrigger>
+            <PopoverContent align="end" className="max-h-[70dvh] w-80 overflow-hidden p-2">
+              <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
+                onOpen={p => setState({ plan: p.data, id: p.id, stage: 'brief' })} onNew={() => setState({ plan: blank(recentTail), id: null, stage: 'plan' })} />
+            </PopoverContent>
+          </Popover>
+          <Button variant="secondary" onClick={() => setState({ plan: blank(recentTail), id: null, stage: 'plan' })}><FilePlus2 />New</Button>
           <Button variant="primary" onClick={save} loading={plans.create.isPending || plans.update.isPending}><Save />Save</Button>
-          {state.id && <Button variant="danger-ghost" size="icon" aria-label="Delete plan" onClick={() => { plans.remove.mutate(state.id!); setState({ plan: blank(recentTail), id: null, step: 0 }) }}><Trash2 /></Button>}
-          <Button variant={refOpen ? 'secondary' : 'ghost'} onClick={() => (refOpen ? refs.close() : refs.show(refs.state.tab))} aria-pressed={refOpen}><BookOpen /><span className="sm:hidden">POH</span><span className="max-sm:hidden">POH &amp; briefing</span></Button>
-          <Button variant="ghost" onClick={() => { go(STEPS.length - 1); setTimeout(() => window.print(), 300) }} aria-label="Print NavLog"><Printer /><span className="max-sm:hidden">Print NavLog</span></Button>
+          <Menu>
+            <MenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><MoreHorizontal /></Button></MenuTrigger>
+            <MenuContent>
+              <MenuItem onSelect={() => { go('navlog'); setTimeout(() => window.print(), 300) }}><Printer />Print NavLog</MenuItem>
+              {state.id && <MenuItem danger onSelect={() => { plans.remove.mutate(state.id!); setState({ plan: blank(recentTail), id: null, stage: 'plan' }) }}><Trash2 />Delete plan</MenuItem>}
+            </MenuContent>
+          </Menu>
+          {!refOpen && <Button variant="ghost" onClick={() => refs.show(refs.state.tab)}><PanelRightOpen />{issues ? <span className="num">{issues} to fix</span> : 'Workings'}</Button>}
         </div>}
       />
 
-      <nav ref={stepsRef} aria-label="Planner steps" className="scrollbar-none -mx-4 mb-5 flex gap-1 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 print:hidden">
-        {STEPS.map((st, i) => {
-          const s = stepStatus(i)
+      <nav aria-label="Planner stages" className="mb-4 flex items-center gap-1 border-b border-border print:hidden">
+        {STAGES.map(st => {
+          const s = stageStatus(st.key), on = stage === st.key
           return (
-            <button key={st.key} onClick={() => go(i)} aria-current={i === stepAt ? 'step' : undefined} title={issueSummary(stepChecks(d, st.key))}
-              className={cn('press flex h-9 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm ring-1 ring-inset', i === stepAt ? 'bg-accent-soft font-medium text-accent ring-accent/40' : 'text-fg-2 ring-border hover:bg-hover')}>
-              <span className="num text-xs text-fg-3">{i + 1}</span>{st.label}{s && s !== 'ok' && <StatusIcon status={s} className="size-4" />}
+            <button key={st.key} onClick={() => go(st.key)} aria-current={on ? 'page' : undefined}
+              className={cn('-mb-px flex h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-[15px] transition-colors', on ? 'border-accent font-medium text-fg' : 'border-transparent text-fg-3 hover:text-fg')}>
+              {st.label}
+              {st.key === 'brief' && s && <span className={cn('inline-flex items-center gap-1 text-[13px] font-normal', tone(s))}><StatusIcon status={s} className="size-3.5" /><span className="max-sm:hidden">{verdict}</span></span>}
+              {st.key === 'plan' && s && <StatusIcon status={s} className="size-3.5" />}
             </button>
           )
         })}
@@ -263,76 +308,55 @@ function Planner() {
 
       <LoadingStrip loading={pending.filter(([, v]) => v).map(([n]) => n)} saving={saving} failed={failed} />
 
-      <div className={cn('grid gap-6', refOpen ? 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,44%)] 2xl:grid-cols-[15rem_minmax(0,1fr)_minmax(26rem,40%)]' : 'xl:grid-cols-[15rem_minmax(0,1fr)]')}>
-        <aside className={cn('hidden xl:sticky xl:top-20 xl:block xl:max-h-[calc(100dvh-6rem)] print:hidden', refOpen && 'xl:hidden 2xl:block')}>
-          <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
-            onOpen={p => setState({ plan: p.data, id: p.id, step: 0 })} onNew={() => setState({ plan: blank(recentTail), id: null, step: 0 })} />
-        </aside>
+      <div className={cn('grid gap-5', refOpen && (isDocTab(refs.state.tab) ? 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,42%)]' : 'xl:grid-cols-[minmax(0,1fr)_25rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]'))}>
         <div className="min-w-0 space-y-5">
-          <Card className={cn('px-4 py-4 sm:px-6 sm:py-5', cur === 'navlog' && 'px-3 sm:px-5')}>
-            <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 print:hidden">
-              <h2 className="text-lg font-medium text-fg">{STEPS[stepAt].label}</h2>
-              <p className="text-sm text-fg-3">{STEPS[stepAt].blurb}</p>
-            </div>
-            {cur !== 'review' && cur !== 'navlog' && <StepIssues checks={stepChecks(d, cur)} />}
-            {cur === 'flight' && (
-              <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
-                pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} certs={certs ?? null} />
-            )}
-            {cur === 'aircraft' && (
-              <AircraftStep plan={plan} set={set} d={d} registry={registry.data} match={match} poh={pohQ.data?.match} pohDoc={pohQ.data?.doc} pohUploaded={!!pohQ.data?.uploaded} savingPlanning={planningQ.save.isPending} pohLoading={pohQ.isLoading} pohError={pohQ.error ? (pohQ.error as Error).message : null}
-                aircraft={aircraft} planning={planning} savePlanning={savePlanning} u={u} />
-            )}
-            {cur === 'route' && <RouteStep plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />}
-            {cur === 'airports' && <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
-              nasr={apts.data?.airports ?? []} profiles={aptProfiles.data ?? {}} savingProfile={aptProfiles.save.isPending}
-              saveProfile={(id, p) => aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />}
-            {cur === 'weather' && (
-              <div className="space-y-5">
-                {routePts.length > 1 && <PlannerMap className="h-[24rem] print:hidden" route={routePts} alternate={altAirport} weather={wx.data ?? null} d={d} airspace={airspace.data} radar={radar.data} notams={notams} />}
-                <WeatherSection d={d} weather={wx.data ?? null} loading={wx.isLoading} refetch={() => wx.refetch()} fetching={wx.isFetching} />
-              </div>
-            )}
-            {cur === 'loading' && (
-              <div className="space-y-8">
-                <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} /></div>
-                <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
-              </div>
-            )}
-            {cur === 'pilot' && <PilotStep plan={plan} set={set} d={d} currency={currency} certs={certs ?? null} saveCerts={c => certsQ.save.mutate(c, { onSuccess: () => toast.success('Certificates saved'), onError: e => toast.error(e.message) })} savingCerts={certsQ.save.isPending} minimums={minimums} savedAt={minQ.data?.updatedAt} saveMinimums={m => minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={minQ.save.isPending} />}
-            {cur === 'review' && <Review d={d} status={overall} label={verdict} onJump={key => go(STEPS.findIndex(s => s.key === key))} />}
-            {cur === 'navlog' && (
-              <div className="space-y-8">
-                {d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways. Print puts it on one landscape page.</p>}
-                {d.flights.map(f => (
-                  <div key={f.n} className="break-after-page">
-                    <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal · arrive {fmtTime(f.arriveAt)}</span>}>
-                      NavLog {d.flights.length > 1 ? `${f.n + 1} of ${d.flights.length} · ` : ''}<span className="num">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
-                    </SubHead>
-                    <NavlogFront plan={planEff} set={set} d={d} flight={f} notes={flightNotes(d, f, acName, notamSets, roleOf(plan.crew, certs) === 'dual' ? plan.crew?.instructor?.trim() || 'instructor' : null)} u={u} />
-                  </div>
-                ))}
-                {!d.flights.length && <p className="text-sm text-fg-3">The NavLog fills in once the route resolves and the aircraft's POH is known.</p>}
-                {d.flights.length > 0 && (
-                  <div className="break-before-page">
-                    <SubHead>Reverse · weather log and flight plan</SubHead>
-                    <NavlogReverse plan={planEff} set={set} d={d} airports={airports} planning={planning} savePlanning={p => planningQ.save.mutate(p)} registry={registry.data} pilot={pilotQ.data} savePilot={p => pilotQ.save.mutate(p)} />
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="mt-8 flex items-center gap-2 border-t border-border pt-4 print:hidden">
-              {stepAt > 0 && <Button variant="ghost" onClick={() => go(stepAt - 1)}><ChevronLeft />{STEPS[stepAt - 1].label}</Button>}
-              {stepAt < STEPS.length - 1 && <Button variant="primary" className="ml-auto" onClick={() => go(stepAt + 1)}>{STEPS[stepAt + 1].label}<ChevronRight /></Button>}
-              {cur === 'navlog' && <Button variant="primary" className="ml-auto" onClick={() => window.print()}><Printer />Print</Button>}
-            </div>
-          </Card>
+          {stage === 'plan' && (
+            <>
+              <Card className="px-4 py-4 sm:px-6 sm:py-5">
+                <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
+                  pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} certs={certs ?? null} />
+              </Card>
+              <Card className="px-4 py-4 sm:px-6 sm:py-5">
+                <SubHead right={<span className="text-xs text-fg-3">Optional: drag the line to add points between departure and arrival</span>}>Route on the chart</SubHead>
+                <RouteStep part="chart" plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
+              </Card>
+            </>
+          )}
+          {stage === 'brief' && <Brief d={d} status={overall} label={verdict} open={openDomain} setOpen={k => setState(s => ({ ...s, open: k }))} summary={summary} detail={detail} />}
+          {stage === 'navlog' && (
+            <Card className="space-y-8 px-3 py-4 sm:px-5 sm:py-5">
+              {d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways. Print puts it on one landscape page.</p>}
+              {d.flights.map(f => (
+                <div key={f.n} className="break-after-page">
+                  <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal · arrive {fmtTime(f.arriveAt)}</span>}>
+                    NavLog {d.flights.length > 1 ? `${f.n + 1} of ${d.flights.length} · ` : ''}<span className="num">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
+                  </SubHead>
+                  <NavlogFront plan={planEff} set={set} d={d} flight={f} notes={flightNotes(d, f, acName, notamSets, role === 'dual' ? plan.crew?.instructor?.trim() || 'instructor' : null)} u={u} />
+                </div>
+              ))}
+              {!d.flights.length && <p className="text-sm text-fg-3">The NavLog fills in once the route resolves and the aircraft's POH is known.</p>}
+              {d.flights.length > 0 && (
+                <div className="break-before-page">
+                  <SubHead>Reverse · weather log and flight plan</SubHead>
+                  <NavlogReverse plan={planEff} set={set} d={d} airports={airports} planning={planning} savePlanning={p => planningQ.save.mutate(p)} registry={registry.data} pilot={pilotQ.data} savePilot={p => pilotQ.save.mutate(p)} />
+                </div>
+              )}
+            </Card>
+          )}
+          <div className="flex items-center gap-2 print:hidden">
+            {stage === 'brief' && <Button variant="ghost" onClick={() => go('plan')}><ChevronLeft />Plan</Button>}
+            {stage === 'navlog' && <Button variant="ghost" onClick={() => go('brief')}><ChevronLeft />Brief</Button>}
+            {stage === 'plan' && <Button variant="primary" className="ml-auto" onClick={() => go('brief')}>Brief this flight<ChevronRight /></Button>}
+            {stage === 'brief' && <Button variant="primary" className="ml-auto" onClick={() => go('navlog')}>NavLog<ChevronRight /></Button>}
+            {stage === 'navlog' && <Button variant="primary" className="ml-auto" onClick={() => window.print()}><Printer />Print</Button>}
+          </div>
           <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.74 } }'}</style>
         </div>
 
         {refOpen && (
-          <aside className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
-            <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus} />
+          <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
+            <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus}
+              fixCount={issues} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} /> }} />
           </aside>
         )}
       </div>
@@ -394,67 +418,6 @@ function LoadingStrip({ loading, saving, failed }: { loading: string[]; saving: 
     <div role="status" aria-live="polite" className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm print:hidden">
       {(loading.length > 0 || saving) && <span className="inline-flex items-center gap-2 text-fg-2"><Loader2 className="size-4 animate-spin text-accent" />{[saving ? 'Saving' : null, loading.length ? `Loading ${loading.join(', ')}` : null].filter(Boolean).join(' · ')}…</span>}
       {failed.map(([n, retry]) => <span key={n} className="inline-flex items-center gap-1.5 text-bad">Couldn't load {n}<button className="text-accent hover:underline" onClick={() => retry()}>Retry</button></span>)}
-    </div>
-  )
-}
-
-const SECTION_STEP: Record<SectionKey, string> = { trip: 'flight', aircraft: 'aircraft', navlog: 'route', weather: 'weather', loading: 'loading', performance: 'loading', pilot: 'pilot' }
-const RANK: Status[] = ['nogo', 'caution', 'todo', 'ok']
-const stepChecks = (d: Derived, step: string) => d.checks.filter(c => SECTION_STEP[c.section] === step && c.status !== 'ok').sort((a, b) => RANK.indexOf(a.status) - RANK.indexOf(b.status))
-const issueSummary = (cs: Check[]) => cs.length ? cs.map(c => `${STATUS_META[c.status].label}: ${c.title}`).join('\n') : undefined
-
-// What the icon on a step means: each check that isn't OK, why, and what to do.
-function StepIssues({ checks }: { checks: Check[] }) {
-  const [open, setOpen] = useState(true)
-  if (!checks.length) return null
-  const n = (s: Status) => checks.filter(c => c.status === s).length
-  const head = [n('nogo') && `${n('nogo')} no-go`, n('caution') && `${n('caution')} caution${n('caution') > 1 ? 's' : ''}`, n('todo') && `${n('todo')} to do`].filter(Boolean).join(' · ')
-  const tone = n('nogo') ? 'ring-bad/30 bg-bad-soft' : n('caution') ? 'ring-warn/30 bg-warn-soft' : 'ring-border'
-  return (
-    <div className={cn('mb-6 rounded-lg ring-1 ring-inset print:hidden', tone)}>
-      <button className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <StatusIcon status={checks[0].status} /><span className="font-medium text-fg">What to fix on this step</span><span className="text-fg-3">{head}</span>
-        <ChevronRight className={cn('ml-auto size-4 text-fg-3 transition-transform', open && 'rotate-90')} />
-      </button>
-      {open && <div className="px-3 pb-3"><CheckRows checks={checks} /></div>}
-    </div>
-  )
-}
-
-// Go/no-go: every check, grouped by the step that produced it, worst first.
-function Review({ d, status, label, onJump }: { d: Derived; status: Status; label: string; onJump: (step: string) => void }) {
-  const tone = status === 'nogo' ? 'bg-bad-soft ring-bad/30' : status === 'caution' ? 'bg-warn-soft ring-warn/30' : status === 'ok' ? 'bg-good-soft ring-good/30' : 'bg-card ring-border'
-  const rank = (s: Status) => ['nogo', 'caution', 'todo', 'ok'].indexOf(s)
-  const groups = STEPS.filter(s => s.sections.length).map(s => ({ s, checks: d.checks.filter(c => SECTION_STEP[c.section] === s.key).sort((a, b) => rank(a.status) - rank(b.status)) })).filter(g => g.checks.length)
-  const t = d.totals
-  const to = d.wb.steps.find(x => x.total && x.label.startsWith('Takeoff'))
-  return (
-    <div className="space-y-6">
-      <div className={cn('flex flex-wrap items-center gap-3 rounded-xl px-5 py-4 ring-1 ring-inset', tone)}>
-        <StatusIcon status={status} className="size-5" />
-        <span className="text-lg font-medium text-fg">{label}</span>
-        <StatusBadge status={status} />
-        <span className="text-sm text-fg-3">{(['nogo', 'caution', 'todo'] as Status[]).map(s => { const n = d.checks.filter(c => c.status === s).length; return n ? `${n} ${{ nogo: 'no-go', caution: 'caution', todo: 'to do', ok: '' }[s]}` : null }).filter(Boolean).join(' · ') || 'every check passed'} · {d.checks.filter(c => c.status === 'ok').length} passed</span>
-      </div>
-      {d.legs.length > 0 && (
-        <KV items={[
-          ['Engine start / takeoff', <span className="num">{fmtTime(d.departAt)} / {fmtTime(d.takeoffAt)}</span>],
-          ['Arrive', <span className="num">{fmtTime(d.legs.at(-1)!.arriveAt)}</span>],
-          ['Distance / time', <span className="num">{t.distNm.toFixed(1)} nm · {fmtMin(t.eteMin)}</span>],
-          ['Fuel', <span className="num">{t.tripFuel.toFixed(1)} trip + {t.taxiFuel.toFixed(1)} taxi of {t.usableFuel.toFixed(1)} gal usable · {Math.round(t.enduranceMin)} min endurance</span>],
-          ['Takeoff weight', to ? <span className="num">{Math.round(to.weight).toLocaleString()} lb · CG {to.arm?.toFixed(2)} in</span> : null],
-          ['Cruise', <span className="num">{d.flights.map(f => `${f.alt.toLocaleString()} ft`).join(' / ')}{d.flights[0]?.cruise ? ` · ${d.flights[0].cruise.ktas} KTAS · ${d.flights[0].cruise.gph} GPH` : ''}</span>],
-        ]} />
-      )}
-      <div className="grid gap-6 xl:grid-cols-2">
-        {groups.map(g => (
-          <div key={g.s.key}>
-            <SubHead right={<button className="text-sm text-accent hover:underline" onClick={() => onJump(g.s.key)}>Open {g.s.label.toLowerCase()}</button>}>{g.s.label}</SubHead>
-            <CheckRows checks={g.checks} />
-          </div>
-        ))}
-      </div>
-      <p className="text-sm text-fg-3">Not a substitute for a standard briefing (1800wxbrief.com, or 1-800-WX-BRIEF), your CFI's judgment or the POH in the airplane.</p>
     </div>
   )
 }

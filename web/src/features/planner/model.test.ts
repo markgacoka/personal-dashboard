@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { derive, DEFAULT_MINIMUMS, type Airport, type Inputs, type Plan, type WeatherBundle } from './model'
 import { profileFor } from './poh'
+import { assumptions, calculations, sources } from './workings'
 
 const NOW = Date.parse('2026-11-04T20:00:00Z')
 const rwy = (id: string, len: number, a: [string, number], b: [string, number]) => ({
@@ -224,5 +225,28 @@ describe('derive: wizard automation', () => {
     const keys = ['imsafe.illness', 'imsafe.medication', 'imsafe.stress', 'imsafe.alcohol', 'imsafe.fatigue', 'imsafe.eating']
     const fit = derive(plan({ checklist: Object.fromEntries(keys.map(k => [k, true])) }), inputs())
     expect(fit.checks.find(c => c.title === 'IMSAFE: fit to fly')?.status).toBe('ok')
+  })
+})
+
+describe('workings: the arithmetic behind the brief', () => {
+  const d = derive(plan(), inputs())
+  const x = { d, plan: plan(), minimums: DEFAULT_MINIMUMS, weather: weather(), cycle: '2026-10-29', pohNote: null, altAuto: true, certsSaved: false }
+  const topics = calculations(x)
+  const line = (key: string, k: string) => topics.find(t => t.key === key)!.items[0].lines.find(l => l.k.startsWith(k))!.v
+  test('fuel lines add up to the required fuel derive() checks against', () => {
+    expect(line('fuel', 'Required')).toContain(`= ${d.totals.requiredFuel.toFixed(2)} gal`)
+  })
+  test('density altitude shows the pressure altitude and ISA steps', () => {
+    const w = d.wx[0]
+    expect(line('da', 'Pressure altitude')).toBe(`135 + (29.92 − ${w.altimInHg!.toFixed(2)}) × 1,000 = ${w.pa.toLocaleString()} ft`)
+    expect(line('da', 'Density altitude')).toContain(`= ${w.da!.toLocaleString()} ft`)
+  })
+  test('takeoff distance: chart, wind factor and the corrected figure match the brief', () => {
+    const p = d.perf[0]
+    expect(line('runway', 'Corrected')).toBe(`ground ${p.dist!.ground.toLocaleString()} ft, over 50 ft ${p.dist!.total.toLocaleString()} ft`)
+  })
+  test('lists the student-pilot assumption until certificates are saved, and the sources', () => {
+    expect(assumptions(x).some(a => a.label === 'Pilot certificate')).toBe(true)
+    expect(sources(x).map(s => s.what)).toContain('METARs and TAFs')
   })
 })

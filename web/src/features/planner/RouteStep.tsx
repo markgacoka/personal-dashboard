@@ -25,8 +25,8 @@ export function fmtLatLon(lat?: number, lon?: number) {
 // and why, every navlog point (TOC, checkpoints, TOD) with position, magnetic
 // course, altitude, distance and terrain; airspace and TFRs on the line.
 // Automatic checkpoints can be dropped.
-export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace, radar, notams, checkpoints, landmarks, landmarksLoading, edit }: {
-  plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; routePts: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; airspace: unknown; radar?: MapRadar | null; notams: MapNotams[]
+export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace, radar, notams, checkpoints, landmarks, landmarksLoading, edit, part }: {
+  part: 'chart' | 'table'; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; routePts: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; airspace: unknown; radar?: MapRadar | null; notams: MapNotams[]
   checkpoints: Checkpoint[]; landmarks: Landmarks | null; landmarksLoading: boolean; edit: RouteEdit
 }) {
   const skip = plan.skipFixes || []
@@ -38,7 +38,8 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
   const lm = useMemo(() => landmarks && { ...landmarks, lines: landmarks.lines.filter(l => !off.has(l.kind)) }, [landmarks, off])
   return (
     <div className="space-y-8">
-      {routePts.length > 1 && (
+      {part === 'chart' && routePts.length < 2 && <p className="text-sm text-fg-3">Type a departure and an arrival above; the chart opens here to add points between them.</p>}
+      {part === 'chart' && routePts.length > 1 && (
         <div className="space-y-3">
           <RouteChips pts={routePts} edit={edit} />
           <p className="-mt-1 text-xs text-fg-3">Tap a point's name to name it (e.g. "Anderson Lake"); the name is used on the navlog.</p>
@@ -51,6 +52,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
           </div>
         </div>
       )}
+      {part === 'table' && <>
       {!d.flights.length && <p className="text-sm text-fg-3">The route fills in once the airports resolve and the aircraft's POH is known.</p>}
       {d.flights.map(f => {
         const start = f.rows[0]
@@ -96,12 +98,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
           </div>
         )
       })}
-      {d.flights.length > 0 && (
-        <p className="text-sm text-fg-3">
-          Courses are great-circle from FAA NASR coordinates, magnetic with the WMM 2025 variation for the flight date. TOC from the POH climb table (+10 % per 10 °C above standard), TOD at 500 fpm to pattern altitude. Checkpoints on legs over 20 nm: airports and VFR waypoints within 5 nm, VORs within 4, RNAV fixes within 2, 8 nm apart. Terrain: Copernicus GLO-90 along the line. Add your own with the route text (e.g. <span className="num">KRHV ANDER E16* KSNS</span>).
-          {skip.length > 0 && <> Dropped: <span className="num">{skip.join(', ')}</span> <button className="inline-flex items-center gap-1 text-accent hover:underline" onClick={() => set({ skipFixes: [] })}><RotateCcw className="size-3.5" />restore</button></>}
-        </p>
-      )}
+      {skip.length > 0 && <p className="text-sm text-fg-3">Dropped checkpoints: <span className="num">{skip.join(', ')}</span> <button className="inline-flex items-center gap-1 text-accent hover:underline" onClick={() => set({ skipFixes: [] })}><RotateCcw className="size-3.5" />Restore</button></p>}
 
       {(d.crossings.length > 0 || (d.hazards.tfrs?.length ?? 0) > 0) && (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -126,6 +123,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
           )}
         </div>
       )}
+      </>}
     </div>
   )
 }

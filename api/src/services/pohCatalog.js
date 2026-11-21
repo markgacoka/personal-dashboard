@@ -4,14 +4,22 @@
 import { pool } from '../db/client.js'
 import { fetchWithTimeout } from '../lib/http.js'
 
+// near: other variants this book is the closest stand-in for (same engine and airframe family).
 // profile: the transcribed performance profile in web/src/features/planner/poh.ts
 // that uses this document's tables (null when only the PDF is available).
 export const CATALOG = [
   {
-    key: 'C172P-1982', make: 'CESSNA', family: '172', variant: '172P', years: [1981, 1986], units: 'US',
+    key: 'C172P-1982', make: 'CESSNA', family: '172', variant: '172P', years: [1981, 1986], units: 'US', near: ['172N', '172Q'],
     title: 'Cessna 172P Skyhawk POH (1982, N54829 copy)', profile: 'C172P',
     url: 'https://www.glasscockpitaviation.com/wp-content/uploads/2022/07/cessna-n54829-poh.pdf',
     pageMap: { limits: 18, airspeed: 19, weights: 21, cg: 22, fuel: 24, emergency: 31, glide: 38, speeds: 48, checklist: 50, beforeTakeoff: 53, landingChecklist: 54, stall: 80, takeoff: 82, climb: 85, cruise: 86, landing: 94, wb: 102 },
+  },
+  {
+    // Covers 1973–76 172Ms (the 1976 book is the first in knots; the airframe and engine are unchanged).
+    key: 'C172M-1976', make: 'CESSNA', family: '172', variant: '172M', years: [1973, 1976], units: 'US', near: ['172K', '172L'],
+    title: 'Cessna 172M Skyhawk POH (1976)', profile: null,
+    url: 'https://cdn.sprinkle.com/library/pdfs/37999752-f543-4a13-b940-a72f5ae67bc6.pdf',
+    pageMap: { limits: 14, airspeed: 16, weights: 19, emergency: 27, speeds: 42, checklist: 44, beforeTakeoff: 46, landingChecklist: 48, stall: 71, takeoff: 72, climb: 75, cruise: 76, landing: 81, wb: 90, cg: 92 },
   },
   {
     key: 'C172S-NAVIII', make: 'CESSNA', family: '172', variant: '172S', years: [1998, 2030], units: 'US',
@@ -33,6 +41,7 @@ export function matchPoh({ make, model, year }) {
     let s = 0
     if (e.family === fam) s += 10
     if (e.variant === variant) s += 20
+    if (e.near?.includes(variant)) s += 3
     if (year && year >= e.years[0] && year <= e.years[1]) s += 5
     else if (year) s -= Math.min(Math.abs(year - e.years[0]), Math.abs(year - e.years[1])) / 10
     return { e, s }

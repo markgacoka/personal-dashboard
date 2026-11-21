@@ -100,6 +100,12 @@ describe('POH catalog matching', async () => {
     const m = matchPoh({ make: 'CESSNA', model: '172N', year: 1978 })
     assert.equal(m.entry.family, '172'); assert.equal(m.exact, false)
     assert.equal(matchPoh({ make: 'CESSNA', model: '172S', year: 2005 }).entry.key, 'C172S-NAVIII')
+    assert.equal(m.entry.key, 'C172P-1982')
+    assert.equal(matchPoh({ make: 'CESSNA', model: '172L', year: 1972 }).entry.key, 'C172M-1976')
+  })
+  test('172M gets its own POH', () => {
+    const m = matchPoh({ make: 'CESSNA', model: '172M', year: 1975 })
+    assert.equal(m.entry.key, 'C172M-1976'); assert.equal(m.exact, true); assert.equal(m.sameYears, true)
   })
   test('no match for other types', () => {
     assert.equal(matchPoh({ make: 'PIPER', model: 'PA-28-161', year: 1979 }), null)

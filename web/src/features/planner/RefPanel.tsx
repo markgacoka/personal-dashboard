@@ -116,7 +116,7 @@ function DocPane({ tail, model, route, date, pohDoc, pohLoading, pohStatus }: { 
       </div>
       {tab === 'poh' && doc && pages && (
         <div className="flex flex-wrap gap-1 px-3 pb-2">
-          {[['Limits', 'limits'], ['Speeds', 'speeds'], ['Checklists', 'checklist'], ['Emergency', 'emergency'], ['Takeoff 5-5', 'takeoff'], ['Climb 5-7', 'climb'], ['Cruise 5-8', 'cruise'], ['Landing 5-11', 'landing'], ['W&B 6-5', 'wb']].map(([l, k]) => (
+          {[['Limits', 'limits'], ['Speeds', 'speeds'], ['Checklists', 'checklist'], ['Emergency', 'emergency'], ['Takeoff', 'takeoff'], ['Climb', 'climb'], ['Cruise', 'cruise'], ['Landing', 'landing'], ['W&B', 'wb']].filter(([, k]) => pages[k] != null).map(([l, k]) => (
             <button key={k} onClick={() => r.show('poh', k)} className={cn('h-7 rounded-full px-2.5 text-xs ring-1 ring-inset ring-border', pageNo === pages[k] ? 'bg-pill text-fg' : 'text-fg-3 hover:text-fg')}>{l}</button>
           ))}
         </div>

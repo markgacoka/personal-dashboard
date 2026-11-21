@@ -15,7 +15,8 @@ export type Tab = 'fixes' | 'workings' | DocTab
 const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Fixes' }, { key: 'workings', label: 'Workings' }, { key: 'poh', label: 'POH' }, { key: 'checklist', label: 'Checklist' }, { key: 'briefing', label: 'Briefing' }]
 export const isDocTab = (t: Tab): t is DocTab => t === 'poh' || t === 'checklist' || t === 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
-interface RefState { open: boolean; tab: Tab; page: number | string | null; docId: Record<DocTab, number | null> }
+// docTail: the tail the POH/checklist were picked for; a different tail goes back to its own documents.
+interface RefState { open: boolean; tab: Tab; page: number | string | null; docId: Record<DocTab, number | null>; docTail: string | null }
 interface RefApi { state: RefState; show: (tab: Tab, page?: string | number | null) => void; close: () => void; set: (s: Partial<RefState>) => void }
 const Ctx = createContext<RefApi | null>(null)
 export const useRefs = () => useContext(Ctx)
@@ -23,7 +24,7 @@ export const useRefs = () => useContext(Ctx)
 export function RefProvider({ children }: { children: React.ReactNode }) {
   // Open beside the plan on wide screens; a full-screen sheet on demand elsewhere.
   const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 80rem)').matches
-  const [state, setState] = useState<RefState>({ open: !!wide, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null } })
+  const [state, setState] = useState<RefState>({ open: !!wide, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null }, docTail: null })
   const api = useMemo<RefApi>(() => ({
     state,
     show: (tab, page) => setState(s => ({ ...s, open: true, tab, page: page ?? null })),
@@ -47,7 +48,7 @@ export function WorkingsLink({ children }: { children: React.ReactNode }) {
   return <button type="button" onClick={() => r?.show('workings')} className="text-accent hover:underline">{children}</button>
 }
 
-export function RefPanel({ tail, model, route, date, className, pohDocId, pohStatus, panes, fixCount, fixTone = 'neutral' }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDocId?: number | null; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number; fixTone?: 'bad' | 'warn' | 'neutral' }) {
+export function RefPanel({ tail, model, route, date, className, pohDoc, pohLoading, pohStatus, panes, fixCount, fixTone = 'neutral' }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDoc?: PlannerDoc | null; pohLoading?: boolean; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number; fixTone?: 'bad' | 'warn' | 'neutral' }) {
   const r = useRefs()!
   return (
     <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
@@ -65,36 +66,47 @@ export function RefPanel({ tail, model, route, date, className, pohDocId, pohSta
         </div>
         <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="xl:hidden" /><PanelRightClose className="max-xl:hidden" /></Button>
       </div>
-      {isDocTab(r.state.tab) ? <DocPane tail={tail} model={model} route={route} date={date} pohDocId={pohDocId} pohStatus={pohStatus} />
+      {isDocTab(r.state.tab) ? <DocPane tail={tail} model={model} route={route} date={date} pohDoc={pohDoc} pohLoading={pohLoading} pohStatus={pohStatus} />
         : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panes[r.state.tab]}</div>}
     </div>
   )
 }
 
-function DocPane({ tail, model, route, date, pohDocId, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; pohDocId?: number | null; pohStatus?: string | null }) {
+function DocPane({ tail, model, route, date, pohDoc, pohLoading, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; pohDoc?: PlannerDoc | null; pohLoading?: boolean; pohStatus?: string | null }) {
   const r = useRefs()!
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<'steps' | 'original'>('steps')
   const { page, docId } = r.state
   const tab = r.state.tab as DocTab
-  const list = (docs.data || []).filter(d => d.kind === tab)
-  // POH: same model first; briefing: same route and newest first.
-  const ranked = useMemo(() => [...list].sort((a, b) => (tab === 'poh' && pohDocId ? Number(b.id === pohDocId) - Number(a.id === pohDocId) : 0) || score(b, tab, model, route, date, tail) - score(a, tab, model, route, date, tail)), [list, tab, model, route, date, pohDocId, tail])
-  const doc = ranked.find(d => d.id === docId[tab]) ?? ranked[0] ?? null
+  const pohDocId = pohDoc?.id ?? null
+  const ranked = useMemo(() => {
+    let list = (docs.data || []).filter(d => d.kind === tab)
+    // The POH the server found for this tail may be newer than the documents list.
+    if (tab === 'poh' && pohDoc && !list.some(d => d.id === pohDoc.id)) list = [pohDoc, ...list]
+    // POH and checklist: only this tail's or this model's; another airplane's is never shown by default.
+    const mine = tab !== 'briefing' && (tail || model) ? list.filter(d => d.id === pohDocId || (tail && d.tail_number === tail) || modelMatch(d, model)) : list
+    // POH: the one found for this tail first; then same tail, same model; briefing: same route, newest.
+    return [...mine].sort((a, b) => (tab === 'poh' && pohDocId ? Number(b.id === pohDocId) - Number(a.id === pohDocId) : 0) || score(b, tab, model, route, date, tail) - score(a, tab, model, route, date, tail))
+  }, [docs.data, tab, pohDoc, pohDocId, model, route, date, tail])
+  const others = (docs.data || []).filter(d => d.kind === tab && !ranked.includes(d))
+  // A document you picked sticks only for the tail you picked it for.
+  const picked = tab === 'briefing' || r.state.docTail === tail ? docId[tab] : null
+  const doc = ranked.find(d => d.id === picked) ?? others.find(d => d.id === picked) ?? (tab === 'poh' && pohLoading ? null : ranked[0] ?? null)
   // Figure → page from this document's own map (an upload has none; the 172P copies do).
   const pages = doc?.page_map ?? (doc && doc.source !== 'upload' && doc.model === '172P' ? POH_PAGES_172P : null)
   const pageNo = tab !== 'poh' ? null : typeof page === 'number' ? page : page && pages ? pages[page] ?? null : null
   const src = doc ? `/api/planner/documents/${doc.id}/file#${pageNo ? `page=${pageNo}&` : ''}view=FitH` : null
   const upload = (f: File) => docs.upload.mutate({ file: f, kind: tab, tail: tab !== 'briefing' ? tail ?? undefined : undefined, model: tab !== 'briefing' ? model ?? undefined : undefined, route: tab === 'briefing' ? route.join(' ') : undefined, title: tab !== 'briefing' && tail ? `${tail} ${tab === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.(pdf|png|jpe?g)$/i, '')})` : undefined },
-    { onSuccess: d => { if (tab === 'checklist') { r.set({ docId: { ...docId, checklist: d.id } }); setView('steps'); docs.extract.mutate(d.id) } toast.success(tab === 'briefing' ? 'Uploaded' : `Uploaded; it's now the ${tab === 'poh' ? 'POH' : 'checklist'} used for ${tail ?? 'this aircraft'}`) }, onError: e => toast.error(e.message) })
+    { onSuccess: d => { if (tab === 'checklist') { r.set({ docId: { ...docId, checklist: d.id }, docTail: tail }); setView('steps'); docs.extract.mutate(d.id) } toast.success(tab === 'briefing' ? 'Uploaded' : `Uploaded; it's now the ${tab === 'poh' ? 'POH' : 'checklist'} used for ${tail ?? 'this aircraft'}`) }, onError: e => toast.error(e.message) })
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-        <Select value={doc?.id ?? ''} onChange={e => r.set({ docId: { ...docId, [tab]: Number(e.target.value) || null } })} className="min-w-0 flex-1" aria-label="Document">
-          {!ranked.length && <option value="">{tab === 'poh' ? 'No POH uploaded' : tab === 'checklist' ? 'No checklist uploaded' : 'No briefing yet'}</option>}
-          {ranked.map(d => <option key={d.id} value={d.id}>{d.title}{d.route?.length ? ` (${d.route.join('–')})` : ''} · {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</option>)}
+        <Select value={doc?.id ?? ''} onChange={e => r.set({ docId: { ...docId, [tab]: Number(e.target.value) || null }, docTail: tab === 'briefing' ? r.state.docTail : tail })} className="min-w-0 flex-1" aria-label="Document">
+          {!doc && <option value="">{tab === 'poh' && pohLoading ? `Finding the POH for ${tail ?? 'this aircraft'}…` : tab === 'poh' ? `No POH for ${tail ?? 'this aircraft'}` : tab === 'checklist' ? `No checklist for ${tail ?? 'this aircraft'}` : 'No briefing yet'}</option>}
+          {ranked.map(d => <option key={d.id} value={d.id}>{label(d)}</option>)}
+          {others.length > 0 && <optgroup label={tab === 'briefing' ? 'Other' : 'Other aircraft'}>{others.map(d => <option key={d.id} value={d.id}>{label(d)}</option>)}</optgroup>}
         </Select>
         <input ref={fileRef} type="file" accept={tab === 'checklist' ? 'application/pdf,image/png,image/jpeg' : 'application/pdf'} hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
         <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} loading={docs.upload.isPending}><Upload />Upload</Button>
@@ -114,11 +126,14 @@ function DocPane({ tail, model, route, date, pohDocId, pohStatus }: { tail: stri
       {tab === 'checklist' && doc && <div className="px-3 pb-2"><Segmented size="sm" value={view} onChange={setView} options={[{ value: 'steps', label: 'Steps' }, { value: 'original', label: doc.content_type?.startsWith('image/') ? 'Photo' : 'PDF' }]} /></div>}
       <div className="min-h-0 flex-1 px-1 pb-1">
         {tab === 'checklist' && doc && view === 'steps' ? (docs.extract.isPending && docs.extract.variables === doc.id ? <div className="grid h-full place-items-center text-sm text-fg-3">Reading the checklist…</div> : <ChecklistSteps doc={doc} />) : src ? <iframe key={src} title={doc!.title} src={src} className="h-full w-full rounded-lg bg-white" />
-          : <div className="grid h-full place-items-center p-6 text-center text-sm text-fg-3">{tab === 'poh' ? 'Upload this aircraft\'s POH (PDF) to keep it open while you plan.' : tab === 'checklist' ? 'Upload the checklist you fly with (PDF or a photo); the newest one for this tail is used, and its steps are read out so you can tick through them.' : 'Get a standard briefing at 1800wxbrief.com with "email the briefing" on, then press From email — or upload the PDF.'}</div>}
+          : <div className="grid h-full place-items-center p-6 text-center text-sm text-fg-3">{tab === 'poh' ? (pohLoading ? `Finding the POH for ${tail ?? 'this aircraft'}…` : `No POH found for ${tail ?? 'this aircraft'}${model ? ` (${model})` : ''}. Upload one (PDF) to keep it open while you plan.`) : tab === 'checklist' ? 'Upload the checklist you fly with (PDF or a photo); the newest one for this tail is used, and its steps are read out so you can tick through them.' : 'Get a standard briefing at 1800wxbrief.com with "email the briefing" on, then press From email — or upload the PDF.'}</div>}
       </div>
     </>
   )
 }
+
+const label = (d: PlannerDoc) => `${d.title}${d.route?.length ? ` (${d.route.join('–')})` : ''} · ${new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+const modelMatch = (d: PlannerDoc, model: string | null) => !!(model && d.model && model.toUpperCase().includes(d.model.toUpperCase()))
 
 // POH and checklist: this tail's newest upload, then this model's; briefing: same route, same day, newest.
 function score(d: PlannerDoc, tab: DocTab, model: string | null, route: string[], date: string, tail: string | null) {

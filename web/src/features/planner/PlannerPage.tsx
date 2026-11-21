@@ -356,7 +356,7 @@ function Planner() {
 
         {refOpen && (
           <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
-            <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDocId={pohQ.data?.doc?.id ?? null} pohStatus={pohStatus}
+            <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDoc={pohQ.data?.doc ?? null} pohLoading={pohQ.isFetching || registry.isLoading} pohStatus={pohStatus}
               fixCount={issues} fixTone={worst === 'nogo' ? 'bad' : worst === 'caution' ? 'warn' : 'neutral'} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} onJump={jump} /> }} />
           </aside>
         )}

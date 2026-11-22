@@ -22,8 +22,8 @@ const ORDER = ['ATIS', 'D-ATIS', 'CD/P', 'GND/P', 'GND/S', 'LCL/P', 'LCL/S', 'CT
 // elevation, pattern altitude, runways with length, width, surface and pattern
 // side, frequencies — plus the runway the wind favours at your ETA (or the one
 // D-ATIS says is in use), NOTAMs that matter, and the alternate.
-export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlternate, minimums, notams, cycle, nasr, profiles, saveProfile, savingProfile }: {
-  d: Derived; routePts: Airport[]; alternate: Airport | null; autoAlternate: string | null; setAlternate: (v: string | null) => void
+export function AirportsStep({ d, routePts, alternate, noAlternate = false, autoAlternate, setAlternate, minimums, notams, cycle, nasr, profiles, saveProfile, savingProfile }: {
+  d: Derived; routePts: Airport[]; alternate: Airport | null; noAlternate?: boolean; autoAlternate: string | null; setAlternate: (v: string | false | null) => void
   minimums: Minimums; notams: NotamSet[]; cycle: string | null
   nasr: Airport[]; profiles: Record<string, AirportProfile>; saveProfile: (id: string, p: AirportProfile | null) => void; savingProfile: boolean
 }) {
@@ -41,20 +41,22 @@ export function AirportsStep({ d, routePts, alternate, autoAlternate, setAlterna
         {all.map(a => <AirportCard key={a.id} a={a} role={roleOf(a)} wx={d.wx.find(w => w.airport.id === a.id) ?? null} minimums={minimums} notams={notams.find(n => n.icao === (a.icao || a.id)) ?? null}
           nasr={nasr.find(x => x.id === a.id) ?? a} profile={profiles[a.icao || a.id] ?? null} save={p => saveProfile(a.icao || a.id, p)} saving={savingProfile} />)}
       </div>
-      {dest && <Alternate dest={dest} value={alternate ? (alternate.icao || alternate.id) : null} auto={autoAlternate} onChange={setAlternate} exclude={apts.map(a => a.id)} wx={d.wx} />}
+      {dest && <Alternate dest={dest} value={noAlternate ? false : alternate ? (alternate.icao || alternate.id) : null} auto={autoAlternate} onChange={setAlternate} exclude={apts.map(a => a.id)} wx={d.wx} />}
     </div>
   )
 }
 
-function Alternate({ dest, value, auto, onChange, exclude, wx }: { dest: Airport; value: string | null; auto: string | null; onChange: (v: string | null) => void; exclude: string[]; wx: WxAt[] }) {
+function Alternate({ dest, value, auto, onChange, exclude, wx }: { dest: Airport; value: string | false | null; auto: string | null; onChange: (v: string | false | null) => void; exclude: string[]; wx: WxAt[] }) {
   const { data = [] } = useNearby({ lat: dest.lat, lon: dest.lon })
   const list = data.filter(a => !exclude.includes(a.id)).slice(0, 8)
   const w = wx.find(x => x.role === 'alternate')
   return (
     <div>
       <SubHead right={<span className="text-xs text-fg-3">Public, runway long enough for a 172, within 40 nm of {dest.icao || dest.id}</span>}>Alternate</SubHead>
-      <p className="mb-2 text-sm text-fg-3">{value ? <>{value === auto ? 'Chosen automatically: the nearest suitable airport not forecast IFR.' : 'Chosen by you.'}{w && <> At ETA <span className="num">{fmtTime(w.at)}</span>: <Cat cat={w.category} /></>}</> : 'No alternate.'}</p>
+      <p className="mb-2 text-sm text-fg-3">{value === false ? 'None: no alternate weather, landing check or flight-plan entry. Keep a diversion airport in mind.' : value ? <>{value === auto ? 'Chosen automatically: the nearest suitable airport not forecast IFR.' : 'Chosen by you.'}{w && <> At ETA <span className="num">{fmtTime(w.at)}</span>: <Cat cat={w.category} /></>}</> : 'No suitable airport found nearby.'}</p>
       <div className="flex flex-wrap gap-1.5">
+        <button onClick={() => onChange(false)} aria-pressed={value === false}
+          className={cn('press inline-flex h-8 items-center rounded-full px-3 text-sm ring-1 ring-inset', value === false ? 'bg-accent-soft text-accent ring-accent/40' : 'text-fg-2 ring-border hover:bg-hover')}>None</button>
         {list.map(a => {
           const id = a.icao || a.id, sel = value === id
           return (

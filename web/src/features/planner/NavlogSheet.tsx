@@ -204,7 +204,7 @@ export function NavlogReverse({ plan, set, d, airports, planning, savePlanning, 
             <tr><th className={H}>Reported</th><th className={H}>Forecast</th></tr>
           </thead>
           <tbody className="align-top text-xs">
-            {weatherLog(d, wxDep, wxDest, wxAlt, d.flights[0].alt).map(r => (
+            {weatherLog(d, wxDep, wxDest, wxAlt, d.flights[0].alt, plan.alternate === false).map(r => (
               <tr key={r.label}>
                 <th className={cn(H, 'w-24 align-middle')}>{r.label}</th>
                 {[r.reported, r.forecast, r.winds, r.icing, r.turb].map((v, i) => <td key={i} className={cn(B, 'h-16 p-1')}><span className={i === 0 ? 'num' : ''}>{v}</span></td>)}
@@ -299,7 +299,7 @@ function FreqGrid({ dep, dest }: { dep: Airport; dest: Airport }) {
   )
 }
 
-function weatherLog(d: Derived, dep?: WxAt, dest?: WxAt, alt?: WxAt, cruiseAlt = 4500) {
+function weatherLog(d: Derived, dep?: WxAt, dest?: WxAt, alt?: WxAt, cruiseAlt = 4500, none = false) {
   const rep = (w?: WxAt) => w?.metar?.rawOb ?? (w ? 'No METAR nearby' : '')
   const fc = (w?: WxAt) => {
     if (!w) return ''
@@ -324,7 +324,7 @@ function weatherLog(d: Derived, dep?: WxAt, dest?: WxAt, alt?: WxAt, cruiseAlt =
     { label: 'Departure', reported: rep(dep), forecast: fc(dep), winds: winds(dep), icing: fz, turb },
     { label: 'Enroute', reported: [stops, d.hazards.pireps.length ? `${d.hazards.pireps.length} PIREPs near the route` : ''].filter(Boolean).join(' · ') || 'See PIREPs', forecast: enrouteAdv || 'No SIGMET, IFR or mountain-obscuration advisories on the route', winds: winds(mid), icing: ice, turb },
     { label: 'Destination', reported: rep(dest), forecast: fc(dest), winds: winds(dest), icing: fz, turb: '' },
-    { label: 'Alternate', reported: rep(alt), forecast: fc(alt), winds: winds(alt), icing: '', turb: '' },
+    { label: 'Alternate', reported: alt ? rep(alt) : none ? 'None planned' : rep(alt), forecast: fc(alt), winds: winds(alt), icing: '', turb: '' },
   ]
 }
 
@@ -339,7 +339,7 @@ function flightPlan(plan: Plan, d: Derived, alt: Airport | null, planning: Aircr
     ident: plan.tail ?? '', type: `${typeCode}/${equip}`, tas: d.legs[0].tas, departure: pts[0].icao || pts[0].id, depTime: fmtZ(d.legs[0].departAt).replace('Z', ''),
     altitude: [...new Set(d.flights.map(f => f.alt))].join(' / '), route: pts.slice(1, -1).map(p => (p.kind === 'gps' ? icaoCoord(p) : isWaypoint(p) ? p.id : p.icao || p.id)).join(' ') || 'DCT',
     destination: `${dest.icao || dest.id} · ${dest.name}, ${dest.city}`, ete: fmtMin(d.totals.eteMin).replace(':', ' h ') + ' min',
-    remarks: stops.length ? `Stops ${stops.join(' ')}` : '', fuel: fmtMin(d.totals.enduranceMin).replace(':', ' h ') + ' min', alternate: alt ? alt.icao || alt.id : '',
+    remarks: stops.length ? `Stops ${stops.join(' ')}` : '', fuel: fmtMin(d.totals.enduranceMin).replace(':', ' h ') + ' min', alternate: alt ? alt.icao || alt.id : plan.alternate === false ? 'None' : '',
     aboard: soulsOf(plan) || '', fss: fss ? `${fss.id} FSS (1-800-WX-BRIEF / 122.2)` : 'FLIGHT SERVICE (1-800-WX-BRIEF / 122.2)',
   }
 }

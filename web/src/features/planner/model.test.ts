@@ -279,3 +279,13 @@ describe('wind source per row', () => {
     expect(d.checks.some(c => c.status === 'caution' && c.title.startsWith('Winds aloft are from a forecast fetched'))).toBe(true)
   })
 })
+
+describe('no alternate', () => {
+  test('an alternate of false adds no alternate weather or landing', () => {
+    const withAlt = derive(plan({ alternate: 'KSNS' }), inputs())
+    const none = derive(plan({ alternate: false }), inputs())
+    expect(none.wx.some(w => w.role === 'alternate')).toBe(false)
+    expect(none.perf.some(p => p.wx.role === 'alternate')).toBe(false)
+    expect(none.legs).toHaveLength(withAlt.legs.length)
+  })
+})

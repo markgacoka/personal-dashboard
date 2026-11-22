@@ -18,7 +18,8 @@ import { AV1ATES, EQUIPMENT_DAY, EQUIPMENT_NIGHT, IMSAFE, MX_DOCS } from './chec
 export interface Plan {
   name: string
   route: string[]
-  alternate: string | null
+  // An airport id, null for the automatic pick, false for no alternate.
+  alternate: string | false | null
   departLocal: string
   rpm: number
   tail: string | null

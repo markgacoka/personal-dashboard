@@ -13,7 +13,7 @@ export interface Source { what: string; from: string; at?: string | null; href?:
 
 export interface WorkingsInput {
   d: Derived; plan: Plan; minimums: Minimums; weather: WeatherBundle | null
-  cycle: string | null; pohNote: string | null; altAuto: boolean; certsSaved: boolean; terrainAt?: string | null
+  cycle: string | null; pohNote: string | null; altAuto: boolean; altMode?: 'auto' | 'yours' | 'none'; certsSaved: boolean; terrainAt?: string | null
 }
 
 const n0 = (x: number) => Math.round(x).toLocaleString()
@@ -49,7 +49,9 @@ export function assumptions(x: WorkingsInput): Assumption[] {
     { label: 'Runway margin', value: '+50 % on the 50-ft distance', basis: 'The ASI safety margin; under it is a caution, a ground roll over the runway is a no-go.' },
     { label: 'Magnetic variation', value: 'WMM 2025 on the flight date', basis: 'NASR\'s per-airport values are decades old.' },
     { label: 'Empty weight', value: d.wb.emptySample ? 'POH sample airplane' : 'Aircraft W&B record', basis: d.wb.emptySample ? 'Enter this tail\'s basic empty weight and moment for real numbers.' : 'Saved for this tail.', change: 'Brief → Aircraft' },
-    { label: 'Alternate', value: plan.alternate ? 'Yours' : 'Automatic', basis: 'Nearest public airport within 40 nm of the destination, long enough for the airplane, not on the route and not reporting IFR.', change: 'Brief → Airports' },
+    x.altMode === 'none'
+      ? { label: 'Alternate', value: 'None', basis: 'You chose not to plan one: no alternate weather, landing distance or flight-plan entry. Not required for VFR, but keep a diversion airport in mind.', change: 'Brief → Airports' }
+      : { label: 'Alternate', value: x.altMode === 'yours' ? 'Yours' : 'Automatic', basis: 'Nearest public airport within 40 nm of the destination, long enough for the airplane, not on the route and not reporting IFR.', change: 'Brief → Airports' },
     { label: 'Checkpoints', value: 'Automatic', basis: 'On legs over 20 nm: airports and VFR waypoints within 5 nm of the line, VORs within 4, RNAV fixes within 2; at least 8 nm apart and clear of the climb and descent.' },
   )
   if (!x.certsSaved) out.push({ label: 'Pilot certificate', value: 'Student pilot', basis: 'Your certificates aren\'t saved, so the Part 61 checks assume the most restrictive case.', change: 'Brief → Pilot' })

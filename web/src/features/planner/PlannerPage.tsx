@@ -97,7 +97,7 @@ function Planner() {
   // Alternate: yours, or the nearest suitable airport to the destination that
   // isn't on the route and isn't reporting IFR (worked out below, once known).
   const [autoAlt, setAutoAlt] = useState<string | null>(null)
-  const effAlt = plan.alternate ?? autoAlt
+  const effAlt = plan.alternate === false ? null : plan.alternate ?? autoAlt
   const resolved = useResolve(tokens)
   const points = useMemo(() => resolved.data?.points ?? [], [resolved.data])
   const ids = useMemo(() => {
@@ -188,7 +188,7 @@ function Planner() {
     ['route points', resolved.isError, resolved.refetch], ['airports', apts.isError, apts.refetch], ['weather', wx.isError, wx.refetch], ['terrain', terrain.isError, terrain.refetch],
     ['airspace', airspace.isError, airspace.refetch], ['checkpoints', corridor.isError, corridor.refetch], ['landmarks', landmarks.isError, landmarks.refetch], ['POH', pohQ.isError, pohQ.refetch],
   ] as [string, boolean, () => void][]).filter(([, e]) => e).map(([n, , r]) => [n, r])
-  const planEff = useMemo(() => ({ ...plan, alternate: effAlt }), [plan, effAlt])
+  const planEff = useMemo(() => ({ ...plan, alternate: plan.alternate === false ? false as const : effAlt }), [plan, effAlt])
 
   const d = useMemo(() => derive(planEff, {
     airports, weather: wx.data ?? null, match, planning, minimums, terrain: terrain.data?.elevations ?? null,
@@ -231,7 +231,7 @@ function Planner() {
   const planIssues = d.checks.filter(c => DOMAIN_OF[c.section] === 'plan' && c.status !== 'ok')
 
   // The sidebar's workings, from the same derive() output the brief shows.
-  const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null }
+  const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), altMode: plan.alternate === false ? 'none' as const : plan.alternate ? 'yours' as const : 'auto' as const, certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null }
   const topics = useMemo(() => calculations(wIn), [d, planEff, minimums]) // eslint-disable-line react-hooks/exhaustive-deps
   const assumed = useMemo(() => assumptions(wIn), [d, planEff, minimums, certs]) // eslint-disable-line react-hooks/exhaustive-deps
   const srcs = useMemo(() => sources(wIn), [d, wx.data, apts.data, pohStatus, terrain.data]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -267,7 +267,7 @@ function Planner() {
     aircraft: plan.tail ? `${plan.tail} · ${acName}${d.profile ? ` · ${d.profile.engine.split(',')[0]}` : ''}` : 'No aircraft chosen',
     weather: d.wx.length ? d.wx.filter(w => w.role !== 'alternate').map(w => `${code(w.airport)} ${w.category ?? 'no report'} ${fmtTime(w.at)}`).join(' · ') : 'Weather at each ETA, advisories, PIREPs, TFRs and NOTAMs',
     route: d.legs.length ? `${d.flights.map(f => `${f.alt.toLocaleString()} ft`).join(' / ')} · ${Math.round(d.totals.distNm)} nm · ${fmtMin(d.totals.eteMin)} · ${d.totals.requiredFuel.toFixed(1)} of ${d.totals.usableFuel.toFixed(1)} gal${d.crossings.length ? ` · ${d.crossings.length} airspace` : ''}` : 'Altitudes, checkpoints, airspace and fuel',
-    airports: [dep?.runway && `${code(dep.airport)} RWY ${dep.runway.end.id}`, arr?.runway && `${code(arr.airport)} RWY ${arr.runway.end.id}`, effAlt && `alternate ${effAlt}`].filter(Boolean).join(' · ') || 'Runways, pattern, frequencies, NOTAMs and the alternate',
+    airports: [dep?.runway && `${code(dep.airport)} RWY ${dep.runway.end.id}`, arr?.runway && `${code(arr.airport)} RWY ${arr.runway.end.id}`, effAlt ? `alternate ${effAlt}` : plan.alternate === false && 'no alternate'].filter(Boolean).join(' · ') || 'Runways, pattern, frequencies, NOTAMs and the alternate',
     loading: d.wb.steps.length ? `Takeoff ${Math.round(d.wb.takeoff.weight).toLocaleString()} lb, CG ${d.wb.takeoff.cg.toFixed(1)} in${dep?.dist && dep.runway ? ` · ${dep.dist.total.toLocaleString()} of ${dep.runway.toraFt.toLocaleString()} ft to 50 ft` : ''}` : 'Weight and balance, takeoff and landing distances',
   }
   const detail = (k: DomainKey) => {
@@ -280,7 +280,7 @@ function Planner() {
       </div>
     )
     if (k === 'route') return <RouteStep part="table" sources={inputs} focusKey={sel?.kind === 'nav' ? sel.key : null} onFocus={key => pick({ kind: 'nav', key })} plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
-    if (k === 'airports') return <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
+    if (k === 'airports') return <AirportsStep d={d} routePts={routePts} alternate={altAirport} noAlternate={plan.alternate === false} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
       nasr={apts.data?.airports ?? []} profiles={aptProfiles.data ?? {}} savingProfile={aptProfiles.save.isPending}
       saveProfile={(id, p) => aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />
     if (k === 'loading') return (

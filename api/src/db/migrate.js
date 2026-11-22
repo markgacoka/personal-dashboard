@@ -1150,6 +1150,19 @@ async function migrateV35() {
   `)
 }
 
+// Planner: pilot records (certificates, medical, ID, endorsements, logbook) and
+// aircraft records (airworthiness, registration, radio licence, W&B, equipment
+// list, airframe and engine logs) stored as documents.
+async function migrateV40() {
+  await pool.query(`
+    ALTER TABLE planner_documents DROP CONSTRAINT IF EXISTS planner_documents_kind_check;
+    ALTER TABLE planner_documents ADD CONSTRAINT planner_documents_kind_check CHECK (kind IN (
+      'poh', 'briefing', 'checklist', 'other',
+      'student-cert', 'pilot-cert', 'medical', 'id', 'endorsement', 'logbook',
+      'airworthiness', 'registration', 'radio-license', 'wb', 'equipment-list', 'airframe-log', 'engine-log'));
+  `)
+}
+
 // Planner: a POH's performance tables read from its PDF (pohTables.js), versioned.
 async function migrateV39() {
   await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS tables JSONB')
@@ -1205,7 +1218,7 @@ const MIGRATIONS = [
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
   ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37], ['038', migrateV38],
-  ['039', migrateV39],
+  ['039', migrateV39], ['040', migrateV40],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

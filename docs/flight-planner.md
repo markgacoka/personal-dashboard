@@ -109,6 +109,29 @@ Per-model max weights and CG limits come from TCDS 3A12 where the POH is
 missing. Per-tail empty weight/moment start from the POH sample airplane and are
 marked "sample" until replaced with the tail's own W&B record.
 
+The 172M profile flies its own 1976 POH's tanks (38/48 gal usable), V-speeds
+and oil limits; only the CG envelope and stations come from TCDS / the 172P.
+Each model with a transcribed spec sheet (`specs.ts`: 172M, 172P) shows, under
+Brief → Aircraft: an airspeed-indicator strip (arcs and V-speeds), engine and
+propeller, oil (sump, dipstick minimum, pressure, grades), fuel system (tanks,
+usable/unusable, grades and dye colours, planned burn and endurance), gear,
+tire and strut pressures, brakes and parking brake, electrical (volts,
+alternator amps, battery), pitot heat (optional in the book; yours to mark per
+tail), load factors, icing, the Fig. 5-3 stall table and the Sec. 1 published
+performance. The FAA registry line adds registration issue and expiry (expired
+is flagged) and the airworthiness classification and date.
+
+Records: the Pilot step keeps your certificate(s), medical, photo ID,
+endorsements and logbook (§61.3, §61.51); the Aircraft step keeps each tail's
+airworthiness and registration certificates, radio station licence, W&B,
+equipment list and airframe and engine logbooks (§91.203, §91.417). PDF, PNG or
+JPEG, stored as `planner_documents` kinds.
+
+Brief → Weight & performance shows every limit as a bar (allowed range shaded,
+this flight's value marked, margin in words): each total weight against its
+maximum, each CG against the envelope's range at that weight, baggage areas and
+fuel. The CG chart adds the utility-category envelope.
+
 ## Calculations (all client-side, pure functions, unit-tested)
 
 - Pressure altitude = field elevation + (29.92 − altimeter) × 1000; ISA temp;

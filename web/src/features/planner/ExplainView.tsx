@@ -127,6 +127,10 @@ export function CgChart({ d, focus, onFocus }: { d: Derived; focus: number | nul
         {yt.map(v => <g key={v}><line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="var(--border)" strokeWidth={1} /><text x={L - 6} y={sy(v)} dy="0.32em" textAnchor="end" className="num fill-fg-3 text-[11px]">{v.toLocaleString()}</text></g>)}
         {xt.map(v => <text key={v} x={sx(v)} y={H - 10} textAnchor="middle" className="num fill-fg-3 text-[11px]">{v}</text>)}
         <polygon points={env.map(([a, w]) => `${sx(a)},${sy(w)}`).join(' ')} fill="var(--fg)" fillOpacity={0.06} stroke="var(--border-strong)" strokeWidth={1.5} />
+        <polygon points={p.envelope.utility.map(([a, w]) => `${sx(a)},${sy(w)}`).join(' ')} fill="none" stroke="var(--fg-3)" strokeDasharray="4 3" strokeWidth={1} />
+        {([[p.limits.maxTakeoff, p.limits.maxLanding === p.limits.maxTakeoff ? 'takeoff and landing' : 'takeoff'], ...(Math.abs(p.limits.maxLanding - p.limits.maxTakeoff) > 40 ? [[p.limits.maxLanding, 'landing']] : [])] as [number, string][]).map(([w, l]) => (
+          <text key={String(l)} x={W - R - 2} y={sy(Number(w)) - 4} textAnchor="end" className="num fill-fg-3 text-[11px]">max {l} {Number(w).toLocaleString()}</text>
+        ))}
         <polyline points={pts.map(q => `${sx(q.cg)},${sy(q.s.weight)}`).join(' ')} fill="none" stroke="var(--fg-3)" strokeWidth={2} strokeLinejoin="round" />
         {pts.map(q => {
           const out = q.s.over || !inEnvelope(env, q.cg, q.s.weight), on = focus === q.i
@@ -140,7 +144,7 @@ export function CgChart({ d, focus, onFocus }: { d: Derived; focus: number | nul
         })}
       </svg>
       <figcaption className="mt-1 flex flex-wrap justify-between gap-2 text-[13px] text-fg-3">
-        <span>Weight (lb) against CG (in aft of datum). Shaded: normal category envelope.</span>
+        <span>Weight (lb) against CG (in aft of datum). Shaded: normal category; dashed: utility category.</span>
         <span className="num">{pts.map(q => `${q.s.label.replace(/^Takeoff$/, 'T/O')} ${q.cg.toFixed(1)}`).join(' · ')}</span>
       </figcaption>
     </figure>

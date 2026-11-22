@@ -182,6 +182,19 @@ export function inEnvelope(env: [number, number][], cg: number, weight: number) 
   })
 }
 
+// The forward and aft CG limits at a weight: where that weight's line crosses
+// the envelope. Null when the weight is above or below it.
+export function cgRangeAt(env: [number, number][], weight: number): { fwd: number; aft: number } | null {
+  const xs: number[] = []
+  env.forEach(([x1, y1], i) => {
+    const [x2, y2] = env[(i + 1) % env.length]
+    if (weight < Math.min(y1, y2) - 1e-9 || weight > Math.max(y1, y2) + 1e-9) return
+    if (Math.abs(y2 - y1) < 1e-9) xs.push(x1, x2)
+    else xs.push(x1 + ((weight - y1) / (y2 - y1)) * (x2 - x1))
+  })
+  return xs.length ? { fwd: Math.min(...xs), aft: Math.max(...xs) } : null
+}
+
 // ── VFR rules ────────────────────────────────────────────────────────────────
 // §91.159: more than 3,000 ft AGL, magnetic course 0–179° → odd thousands + 500; 180–359° → even + 500.
 export function hemispheric(magCourse: number, altMsl: number, groundFt: number) {

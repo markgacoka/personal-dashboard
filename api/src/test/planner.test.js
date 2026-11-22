@@ -275,3 +275,12 @@ describe('POH performance tables from the text layer', async () => {
     assert.deepEqual(corrections('2. Decrease distances 10% for each 9 knots head wind . For operation with tailwinds up to 10 knots, increase distances by 10% for each 2 knot s. 3. For operati on on a dry, grass runway, increase distances by 45% of the "ground roll" figure.'), { headwindPer9kt: 0.1, tailwindPer2kt: 0.1, grassGroundRoll: 0.45 })
   })
 })
+
+test('FAA registry record: registration and airworthiness lines', async () => {
+  const { registrationOf } = await import('../services/faa-registry.js')
+  const row = (label, v) => `<td data-label="">${label}</td><td data-label="${label}">${v}</td>`
+  const html = [row('Certificate Issue Date', '03/04/2002'), row('Expiration Date', '03/31/2030'), row('Type Registration', 'Corporation'),
+    row('City', 'SAN JOSE'), row('State', 'CALIFORNIA'), row('Engine Manufacturer', 'LYCOMING'), row('Engine Model', '0-320 SERIES'),
+    row('Classification', 'Standard'), row('Category', 'Normal'), row('A/W Date', '04/25/2002'), row('Expiration Date', '07/26/2026')].join('')
+  assert.deepEqual(registrationOf(html), { issued: '2002-03-04', expires: '2030-03-31', type: 'Corporation', city: 'SAN JOSE', state: 'CALIFORNIA', engine_make: 'LYCOMING', engine_model: '0-320 SERIES', aw_class: 'Standard', aw_category: 'Normal', aw_date: '2002-04-25' })
+})

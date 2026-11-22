@@ -219,7 +219,9 @@ export interface AircraftRegistry {
   tail_number?: string; make?: string; model?: string; year?: number; serial?: string
   engine_type?: string; engine_hp?: number; category?: string; aircraft_class?: string
   gear_type?: string; seats?: number; is_complex?: boolean; status?: string; mode_s_hex?: string
-  owner?: string; photo_url?: string | null; photo_credit?: string | null; photo_link?: string | null; photo_source?: string | null
+  owner?: string
+  registration?: { issued: string | null; expires: string | null; type: string | null; city: string | null; state: string | null; engine_make: string | null; engine_model: string | null; aw_class: string | null; aw_category: string | null; aw_date: string | null } | null
+  photo_url?: string | null; photo_credit?: string | null; photo_link?: string | null; photo_source?: string | null
   performance?: {
     mtow_lbs?: number; cruise_ktas?: number; service_ceiling_ft?: number; range_nm?: number
     fuel_gal?: number; fuel_burn_gph?: number; vne_kts?: number; vno_kts?: number; vx_kts?: number

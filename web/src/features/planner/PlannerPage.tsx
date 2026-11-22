@@ -39,6 +39,7 @@ import { DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from 
 import { assumptions, calculations, sources } from './workings'
 import { explainRow, explainWb, inputSources } from './explain'
 import { CgChart } from './ExplainView'
+import { WbLimits } from './WbLimits'
 import type { Focus } from './Sidebar'
 
 const DRAFT_KEY = 'planner-draft-v3'
@@ -286,6 +287,7 @@ function Planner() {
     if (k === 'loading') return (
       <div className="space-y-8">
         <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>
+        {d.wb.steps.length > 0 && d.profile && <div><SubHead right={<span className="text-[13px] text-fg-3">This flight against every weight, CG and loading limit</span>}>Limits</SubHead><WbLimits d={d} plan={plan} u={u} tank={d.profile.fuel.find(f => f.key === (planning.tanks || 'standard')) ?? d.profile.fuel[0]} /></div>}
         {d.wb.steps.length > 0 && <div><SubHead right={<span className="text-xs text-fg-3">Select a point for its workings</span>}>Center of gravity</SubHead><CgChart d={d} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>}
         <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
       </div>

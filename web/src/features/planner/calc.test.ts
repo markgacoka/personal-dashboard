@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { C172P, profileFor } from './poh'
 import {
-  category, ceilingOf, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, fbFor, freezingLevel, hemispheric, inEnvelope,
+  category, ceilingOf, cgRangeAt, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, fbFor, freezingLevel, hemispheric, inEnvelope,
   parseVisib, pressureAltitude, tableAt, tafAt, tafCategory, touchesCorridor, sampleRoute, windAt, windComponents, windTriangle, wbTotal,
   type FbProduct, type TafPeriod,
 } from './calc'
@@ -180,4 +180,12 @@ describe('vfrAltitude', () => {
     const { vfrAltitude } = await import('./calc')
     expect(vfrAltitude(true, 400, 135, 8)).toEqual({ alt: 2000, hemispheric: false })
   })
+})
+
+describe('cgRangeAt', () => {
+  const env: [number, number][] = [[35.0, 1500], [35.0, 1950], [39.5, 2400], [47.3, 2400], [47.3, 1500]]
+  test('below the knee the forward limit is 35 in', () => expect(cgRangeAt(env, 1800)).toEqual({ fwd: 35, aft: 47.3 }))
+  test('above the knee it moves aft along the line to 39.5 in at 2,400 lb', () => expect(cgRangeAt(env, 2175)!.fwd).toBeCloseTo(37.25, 2))
+  test('at the maximum weight', () => expect(cgRangeAt(env, 2400)).toEqual({ fwd: 39.5, aft: 47.3 }))
+  test('over the maximum there is no range', () => expect(cgRangeAt(env, 2450)).toBeNull())
 })

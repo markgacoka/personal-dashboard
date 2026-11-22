@@ -268,7 +268,7 @@ export const C172P: AircraftProfile = {
 
 // Models without a POH on file use the 172P tables with the model's own
 // weight and CG limits from FAA Type Certificate Data Sheet 3A12.
-const TCDS: Record<string, Pick<AircraftProfile, 'limits' | 'envelope'> & { engine: string }> = {
+const TCDS: Record<string, Pick<AircraftProfile, 'limits' | 'envelope'> & { engine: string; book?: Partial<AircraftProfile> }> = {
   '172N': {
     engine: 'Lycoming O-320-H2AD, 160 hp (per TCDS; STC conversions differ)',
     limits: { maxRamp: 2307, maxTakeoff: 2300, maxLanding: 2300, utilityMax: 2000, baggageCombined: 120 },
@@ -278,6 +278,27 @@ const TCDS: Record<string, Pick<AircraftProfile, 'limits' | 'envelope'> & { engi
     engine: 'Lycoming O-320-E2D, 150 hp (per TCDS; STC conversions differ)',
     limits: { maxRamp: 2307, maxTakeoff: 2300, maxLanding: 2300, utilityMax: 2000, baggageCombined: 120 },
     envelope: { normal: [[35.0, 1500], [35.0, 1950], [38.5, 2300], [47.3, 2300], [47.3, 1500]], utility: [[35.0, 1500], [35.0, 1950], [35.5, 2000], [40.5, 2000], [40.5, 1500]] },
+    // The 1976 172M POH (Sec. 1, 2, 3, 4): its tanks, speeds and oil, not the 172P's.
+    book: {
+      fuel: [
+        { key: 'standard', label: 'Standard tanks', usable: 38, total: 42 },
+        { key: 'long', label: 'Long-range tanks', usable: 48, total: 52 },
+      ],
+      fuelGrade: '80/87 (red) minimum; 100LL (blue) or 100 (green)',
+      speeds: [
+        { label: 'Normal climb', kias: '70–80' },
+        { label: 'Maximum performance takeoff, at 50 ft', kias: '59' },
+        { label: 'Best rate (Vy), sea level / 10,000 ft', kias: '78 / 68' },
+        { label: 'Best angle (Vx), sea level / 10,000 ft', kias: '64 / 62' },
+        { label: 'Normal approach, flaps up / 40°', kias: '60–70 / 55–65' },
+        { label: 'Short-field approach, flaps 40°', kias: '60' },
+        { label: 'Balked landing, flaps 20°', kias: '55' },
+        { label: 'Best glide, flaps up', kias: '65' },
+      ],
+      vspeeds: { vso: 41, vs1: 47, vr: 52, vx: 64, vy: 78, va: [[2300, 97], [1950, 89], [1600, 80]], vfe: '85 (10–40°)', vno: 128, vne: 160, glide: 65, approach: '55–65', shortApproach: 60 },
+      crosswindDemo: 15,
+      oil: 'Not less than 6 qt; 8 qt for extended flight',
+    },
   },
 }
 
@@ -291,9 +312,9 @@ export function profileFor(model?: string | null): ProfileMatch {
   const t = TCDS[variant]
   if (t) {
     return {
-      profile: { ...C172P, key: `C${variant}`, model: `Cessna ${variant}`, engine: t.engine, limits: t.limits, envelope: t.envelope },
+      profile: { ...C172P, key: `C${variant}`, model: `Cessna ${variant}`, engine: t.engine, limits: t.limits, envelope: t.envelope, ...t.book },
       exact: false,
-      note: `No ${variant} POH on file. Distances, climb and cruise come from the 1982 172P POH (a 160 hp, 2,400 lb airplane); weight and CG limits are the ${variant}'s from TCDS 3A12. Check this airplane's own POH and any engine STC supplement.`,
+      note: `No ${variant} POH on file. Distances, climb and cruise come from the 1982 172P POH (a 160 hp, 2,400 lb airplane); weight and CG limits are the ${variant}'s from TCDS 3A12${t.book ? `, and its tanks, speeds and oil from the ${variant} POH` : ''}. Check this airplane's own POH and any engine STC supplement.`,
     }
   }
   return {

@@ -245,9 +245,24 @@ export async function lookupFaaHtml(nNumber) {
       mode_s_hex:     (extractDataLabel(html, 'Mode S Code (Base 16 / Hex)') || '').toLowerCase() || null,
       status:         extractDataLabel(html, 'Status'),
       owner:          extractDataLabel(html, 'Name'),
+      registration:   registrationOf(html),
       source:         'faa_html',
     }
   } catch { return null }
+}
+
+// The certificate of registration and airworthiness lines of the record
+// ("Expiration Date" first appears for the registration).
+const usDate = v => { const m = String(v || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m ? `${m[3]}-${m[1]}-${m[2]}` : null }
+const orNull = v => (v && !/^None$/i.test(v) ? v : null)
+export function registrationOf(html) {
+  const f = label => orNull(extractDataLabel(html, label))
+  return {
+    issued: usDate(f('Certificate Issue Date')), expires: usDate(f('Expiration Date')),
+    type: f('Type Registration'), city: f('City'), state: f('State'),
+    engine_make: f('Engine Manufacturer'), engine_model: f('Engine Model'),
+    aw_class: f('Classification'), aw_category: f('Category'), aw_date: usDate(f('A/W Date')),
+  }
 }
 
 // ─── adsbdb lookup ────────────────────────────────────────────────────────────
@@ -363,6 +378,7 @@ export async function lookupAircraft(nNumber) {
     mode_s_hex:     modeS,
     status:         faa?.status || null,
     owner:          faa?.owner || ads?.owner || null,
+    registration:   faa?.registration || null,
     photo_url:      ads?.photo_url || null,
     photo_thumbnail: ads?.photo_url
       ? ads.photo_url.replace('image.airport-data.com/aircraft/', 'airport-data.com/images/aircraft/thumbnails/').replace(/(\.\w+)$/, (_, ext) => {

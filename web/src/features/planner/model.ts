@@ -83,7 +83,7 @@ export interface AircraftPlanning {
   emptyWeight?: number; emptyMoment?: number // lb, lb-in/1000
   tanks?: string
   color?: string
-  equipment?: { transponder?: string; adsbOut?: boolean; gps?: string; equipCode?: string; autopilot?: boolean; notes?: string }
+  equipment?: { transponder?: string; adsbOut?: boolean; gps?: string; equipCode?: string; autopilot?: boolean; pitotHeat?: boolean; notes?: string }
   inspections?: Record<string, string | number | undefined> // ISO dates; 'hundredHoursLeft'
   profile?: ProfileEdits // your values over the POH / registry ones
   updatedAt?: string

@@ -105,7 +105,14 @@ background for scans). For a model without a hand-transcribed profile, the
 takeoff, landing, climb and cruise tables and their wind/grass notes are read
 from the book's text layer (`services/pohTables.js`, stored versioned in
 `planner_documents.tables`) and replace the 172P's (`poh.ts` `withTables`);
-whatever can't be read stays the 172P's and is named. Per-tail
+whatever can't be read stays the 172P's and is named. The 172M and 172P spec sheets (engine,
+propeller, oil, fuel system, gear and tires, brakes, electrical, airspeed
+markings, stall speeds, load factors, published performance) are transcribed in
+`specs.ts`; the FAA registry adds registration and airworthiness dates
+(`faa-registry.js` `registrationOf`). Pilot records (certificates, medical, ID,
+endorsements, logbook) and per-tail aircraft records (airworthiness,
+registration, radio licence, W&B, equipment list, airframe and engine logs) are
+`planner_documents` kinds (`records.ts`, `RecordsList.tsx`). Per-tail
 aircraft profiles (`planner_aircraft.data.profile`, applied by `poh.ts`'s
 `applyEdits`) and airport profiles (`planner_airport_profiles`) override the
 POH/NASR values. Your certificates (`planner_settings` key `certificates`) and the flight's role (PIC or dual, `plan.crew`) drive the Part 61 checks in `pilot.ts`. Checklist uploads (PDF or photo) are read into steps (`services/docText.js`: poppler / Tesseract in the image; `checklistParse.ts`). Three stages: Plan takes the inputs (tail, departure / route / arrival — one

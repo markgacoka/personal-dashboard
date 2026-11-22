@@ -67,7 +67,12 @@ async function fbStationCoords(ids) {
 const validSteps = s => s === null || (Array.isArray(s) && s.length <= 100 && s.every(x => x && typeof x.title === 'string' && x.title.length <= 120 && Array.isArray(x.items) && x.items.length <= 200
   && x.items.every(i => i && typeof i.item === 'string' && i.item.length <= 300 && (i.action == null || (typeof i.action === 'string' && i.action.length <= 200)))))
 const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, content_type, size, page_map, steps, source, created_at'
-const DOC_KINDS = ['poh', 'briefing', 'checklist', 'other']
+// Pilot records (kept once, no tail) and aircraft records (per tail) sit beside the POHs and briefings.
+export const PILOT_DOCS = ['student-cert', 'pilot-cert', 'medical', 'id', 'endorsement', 'logbook']
+export const AIRCRAFT_DOCS = ['airworthiness', 'registration', 'radio-license', 'wb', 'equipment-list', 'airframe-log', 'engine-log']
+const DOC_KINDS = ['poh', 'briefing', 'checklist', 'other', ...PILOT_DOCS, ...AIRCRAFT_DOCS]
+// Kinds a photo (PNG or JPEG) is accepted for, besides a PDF.
+const PHOTO_OK = new Set(['checklist', ...PILOT_DOCS, ...AIRCRAFT_DOCS])
 const MAX_PDF = 80 * 1024 * 1024
 
 export default async function plannerRoutes(fastify) {
@@ -210,7 +215,7 @@ export default async function plannerRoutes(fastify) {
   // ── Reference documents (POHs, briefings) ──────────────────────────────────
   fastify.get('/api/planner/documents', async req => {
     const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
-    const { rows } = await pool.query(`SELECT ${DOC_COLS} FROM planner_documents ${kind ? 'WHERE kind = $1' : ''} ORDER BY created_at DESC LIMIT 100`, kind ? [kind] : [])
+    const { rows } = await pool.query(`SELECT ${DOC_COLS} FROM planner_documents ${kind ? 'WHERE kind = $1' : ''} ORDER BY created_at DESC LIMIT 500`, kind ? [kind] : [])
     return rows
   })
   fastify.get('/api/planner/documents/:id/file', async (req, reply) => {
@@ -225,8 +230,9 @@ export default async function plannerRoutes(fastify) {
   // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF; a checklist may be a PNG or JPEG photo)
   fastify.post('/api/planner/documents', async (req, reply) => {
     const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
-    const type = Buffer.isBuffer(req.body) ? (isPdf(req.body) ? 'application/pdf' : kind === 'checklist' ? imageType(req.body) : null) : null
-    if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${kind === 'checklist' ? ', PNG or JPEG' : ''} with ?kind=${DOC_KINDS.join('|')}` })
+    const type = Buffer.isBuffer(req.body) ? (isPdf(req.body) ? 'application/pdf' : PHOTO_OK.has(kind) ? imageType(req.body) : null) : null
+    if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${PHOTO_OK.has(kind) ? ', PNG or JPEG' : ''} with ?kind=${DOC_KINDS.join('|')}` })
+    if (AIRCRAFT_DOCS.includes(kind) && !req.query.tail) return reply.status(400).send({ error: 'An aircraft document needs ?tail=' })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
       `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type, page_map)

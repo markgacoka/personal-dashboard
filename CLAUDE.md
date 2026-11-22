@@ -110,8 +110,11 @@ airports, weight & performance) that opens to its detail; NavLog prints. A sideb
 checklists (IMSAFE, maintenance, equipment) stored in the plan — per-flight automatic altitude,
 automatic checkpoints (airports, VFR waypoints, VORs, RNAV fixes from NASR), automatic alternate,
 WMM magnetic variation (`magvar`; NASR values are decades old), and model
-winds aloft (`services/modelWinds.js`, Open-Meteo sampled at the AWC FB
-stations) when neither AWC nor api.weather.gov publishes an FB. The route chart
+winds aloft (`services/modelWinds.js`, Open-Meteo HRRR/GFS on a grid over the
+route; the NWS FB ended 2026-11-03), with your briefing winds per flight as the
+manual backup. Every NavLog row and W&B line can be selected to show its
+workings, source tier and expected range (`explain.ts`; method in
+`docs/navlog-method.md`). The route chart
 suggests points and lets you drag the line (`suggest.ts`, `services/landmarks.js`:
 OpenFreeMap/OSM, HIFLD power lines, FAA obstacles).
 

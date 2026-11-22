@@ -37,6 +37,9 @@ import { StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
 import { Brief, domainStatus } from './BriefView'
 import { DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from './Sidebar'
 import { assumptions, calculations, sources } from './workings'
+import { explainRow, explainWb, inputSources } from './explain'
+import { CgChart } from './ExplainView'
+import type { Focus } from './Sidebar'
 
 const DRAFT_KEY = 'planner-draft-v3'
 
@@ -73,6 +76,7 @@ export default function PlannerPage() {
 // from the FAA, aviationweather.gov and the POH.
 function Planner() {
   const refs = useRefs()!
+  const [sel, setSel] = useState<{ kind: 'nav'; key: string } | { kind: 'wb'; i: number } | null>(null)
   const { data: flights = [] } = useFlights()
   const { data: fleetRaw = [] } = useAircraftList()
   const recentTail = useMemo(() => [...flights].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]?.aircraft?.tail_number ?? null, [flights])
@@ -230,6 +234,27 @@ function Planner() {
   const assumed = useMemo(() => assumptions(wIn), [d, planEff, minimums, certs]) // eslint-disable-line react-hooks/exhaustive-deps
   const srcs = useMemo(() => sources(wIn), [d, wx.data, apts.data, pohStatus, terrain.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A NavLog row or W&B line selected in the brief: its workings fill the sidebar.
+  const xIn = { d, plan: planEff, weather: wx.data ?? null, pohClosest: !!match && !match.exact }
+  const inputs = useMemo(() => inputSources(xIn), [d, wx.data, match]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = (f: typeof sel) => { setSel(f); if (f) refs.show('workings') }
+  const focus: Focus | null = useMemo(() => {
+    if (!sel || !d.profile) return null
+    const clear = () => setSel(null)
+    if (sel.kind === 'nav') {
+      const r = d.navlog.find(x => x.key === sel.key)
+      if (!r) return null
+      const ov = plan.overrides?.[r.key] ?? {}
+      return {
+        title: `${r.from} → ${r.to.label}`, subtitle: `${r.phase === 'climb' ? 'Climb' : r.phase === 'descent' ? 'Descent' : 'Cruise'} at ${r.alt} ft · ${r.distNm.toFixed(1)} nm · ETA ${fmtTime(r.eta)}`,
+        items: explainRow(xIn, r), ov, onClear: clear,
+        onEdit: (f, v) => set({ overrides: { ...plan.overrides, [r.key]: { ...ov, [f]: v != null && Number.isFinite(v) ? v : null } } }),
+      }
+    }
+    const st = d.wb.steps[sel.i]
+    return st ? { title: st.label, subtitle: 'Weight and balance', items: [explainWb(xIn, st, sel.i)], onClear: clear } : null
+  }, [sel, d, plan.overrides, wx.data, match]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // One line per area of the brief: the answer when it's fine.
   const code = (a: Airport) => a.icao || a.id
   const dep = d.perf.find(p => p.kind === 'takeoff'), arr = [...d.perf].reverse().find(p => p.kind === 'landing' && p.wx.role !== 'alternate')
@@ -252,13 +277,14 @@ function Planner() {
         <WeatherSection d={d} weather={wx.data ?? null} loading={wx.isLoading} refetch={() => wx.refetch()} fetching={wx.isFetching} />
       </div>
     )
-    if (k === 'route') return <RouteStep part="table" plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
+    if (k === 'route') return <RouteStep part="table" sources={inputs} focusKey={sel?.kind === 'nav' ? sel.key : null} onFocus={key => pick({ kind: 'nav', key })} plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} />
     if (k === 'airports') return <AirportsStep d={d} routePts={routePts} alternate={altAirport} autoAlternate={autoAlt} setAlternate={v => set({ alternate: v })} minimums={minimums} notams={notamSets} cycle={apts.data?.cycle ?? null}
       nasr={apts.data?.airports ?? []} profiles={aptProfiles.data ?? {}} savingProfile={aptProfiles.save.isPending}
       saveProfile={(id, p) => aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />
     if (k === 'loading') return (
       <div className="space-y-8">
-        <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} /></div>
+        <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>
+        {d.wb.steps.length > 0 && <div><SubHead right={<span className="text-xs text-fg-3">Select a point for its workings</span>}>Center of gravity</SubHead><CgChart d={d} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>}
         <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
       </div>
     )
@@ -357,7 +383,7 @@ function Planner() {
         {refOpen && (
           <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
             <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDoc={pohQ.data?.doc ?? null} pohLoading={pohQ.isFetching || registry.isLoading} pohStatus={pohStatus}
-              fixCount={issues} fixTone={worst === 'nogo' ? 'bad' : worst === 'caution' ? 'warn' : 'neutral'} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} onJump={jump} /> }} />
+              fixCount={issues} fixTone={worst === 'nogo' ? 'bad' : worst === 'caution' ? 'warn' : 'neutral'} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} onJump={jump} focus={focus} /> }} />
           </aside>
         )}
       </div>

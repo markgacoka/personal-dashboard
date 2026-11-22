@@ -41,6 +41,9 @@ export interface Plan {
   actuals?: Record<string, { ata?: string; gs?: string; fuel?: string; dev?: string }>
   // E6B-style per-row inputs that replace the forecast/POH value for that row.
   overrides?: Record<string, RowOverride>
+  // Winds and temperature at cruise from your briefing, per flight (index); they
+  // replace the forecast for that flight's rows (a row's own override still wins).
+  flightWinds?: Record<string, RowOverride>
   // Make/model/year when the registry has none (e.g. a non-US tail) or to correct it.
   aircraft?: { make?: string; model?: string; year?: number | null }
   timeOff?: string
@@ -49,6 +52,13 @@ export interface Plan {
   crew?: Crew
 }
 export interface RowOverride { wdir?: number | null; wspd?: number | null; temp?: number | null; cas?: number | null }
+// Typed values outside these ranges are ignored (a half-typed "-" or a slip).
+const OV_RANGE: Record<keyof RowOverride, [number, number]> = { wdir: [0, 360], wspd: [0, 150], temp: [-60, 50], cas: [40, 250] }
+export function validOv(o: RowOverride | undefined): RowOverride {
+  const out: RowOverride = {}
+  for (const k of Object.keys(OV_RANGE) as (keyof RowOverride)[]) { const v = o?.[k]; if (v != null && Number.isFinite(v) && v >= OV_RANGE[k][0] && v <= OV_RANGE[k][1]) out[k] = v }
+  return out
+}
 
 // A route token resolved by /api/planner/resolve.
 export interface RoutePoint {
@@ -117,7 +127,7 @@ export interface Advisory { hazard: string; rawAirSigmet?: string; airSigmetType
 export interface Section<T> { data: T | null; fetchedAt: string; error?: string }
 export interface WeatherBundle {
   metars: Section<Metar[]>; tafs: Section<Taf[]>; pireps: Section<Pirep[]>; sigmets: Section<Advisory[]>; gairmets: Section<Advisory[]>; cwas: Section<Advisory[]>
-  winds: { fcst: string; data: FbProduct[] | null; fetchedAt: string; error?: string }[]
+  winds: { fcst: string; data: FbProduct[] | null; fetchedAt: string; error?: string; stale?: boolean }[]
   nas: Section<{ updated: string; total: number; items: { airport: string; kind: string; reason: string; detail: string }[] }>
   tfrs: Section<{ type: 'Feature'; geometry: { type: string; coordinates: unknown }; properties: { id: string; kind: string; title: string; description: string } }[]>
 }
@@ -167,11 +177,15 @@ export interface Checkpoint { id: string; icao: string | null; name: string; lat
 const CP_RANK = { airport: 0, vfr: 0, navaid: 1, fix: 2 } as const
 const CP_OFF = { airport: 5, vfr: 5, navaid: 4, fix: 2 } as const
 export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string; cpKind?: Checkpoint['kind']; lat?: number; lon?: number }
+export type WindSrc = 'forecast' | 'stale' | 'yours' | 'row' | 'calm'
 export interface NavRow {
   key: string; leg: number; flight: number; from: string; to: NavFix; phase: 'climb' | 'cruise' | 'descent'; alt: string
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
   tas: number; cas: number; altFt: number; tc: number; mc: number; wca: number; th: number; varEast: number; mh: number
   overridden: (keyof RowOverride)[]
+  // Where the row's wind came from: the forecast for the row's time, an old copy
+  // of it, your briefing winds for the flight, a number typed into the row, or none.
+  windSrc: WindSrc; windWindow: string | null; gph: number; oat: number
   distNm: number; remNm: number; gs: number; eteMin: number; eta: Date; fuelGal: number; fuelRem: number; terrainMax: number | null
 }
 
@@ -419,7 +433,11 @@ export function derive(plan: Plan, inp: Inputs): Derived {
 
   const altMax = Math.max(0, ...flightAlt.map(f => f.alt))
   if (profile && t) {
-    const wind = (p: LatLon, alt: number) => (fbSel ? windAt(fbSel.product, p, alt) : null)
+    const winds = inp.weather?.winds ?? []
+    const stale = winds.some(w => w.stale)
+    // The forecast window that covers the moment the point is flown.
+    const sel = (at: Date | null) => (winds.length && at ? fbFor(winds, at) : fbSel)
+    const wind = (p: LatLon, alt: number, at: Date | null = t) => { const s = sel(at); return s ? windAt(s.product, p, alt) : null }
     for (let i = 1; i < route.length; i++) {
       const from = route[i - 1], to = route[i]
       const flight = flightOfLeg[i]
@@ -428,7 +446,10 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const endsAtStop = i === route.length - 1 || !routeOverfly[i]
       if (startsAtStop) departures++
       const D = distanceNm(from, to), legTc = initialCourse(from, to)
-      const midWind = wind(intermediate(from, to, 0.5), cruiseAlt)
+      const fwOv = validOv(plan.flightWinds?.[flight])
+      const fwSet = fwOv.wdir != null || fwOv.wspd != null || fwOv.temp != null
+      const mine = (fw: ReturnType<typeof wind>) => fwSet ? { dir: fwOv.wdir ?? fw?.dir ?? null, spd: fwOv.wspd ?? fw?.spd ?? 0, temp: fwOv.temp ?? fw?.temp ?? null, stations: fw?.stations ?? [] } : fw
+      const midWind = mine(wind(intermediate(from, to, 0.5), cruiseAlt))
       const isaDev = midWind?.temp != null ? midWind.temp - isaTemp(cruiseAlt) : 0
       const cr = cruiseAt(profile, cruiseAlt, isaDev, plan.rpm)
       const tas = cr?.ktas ?? 0, gph = cr?.gph ?? 0
@@ -437,13 +458,13 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const climbMidAlt = (from.elev + cruiseAlt) / 2
       const climbKias = profile.climb.find(c => c.pa >= climbMidAlt)?.kias ?? 74
       const climbTas = Math.round(climbKias * (1 + 0.02 * climbMidAlt / 1000))
-      const cw = wind(intermediate(from, to, 0.1), climbMidAlt)
+      const cw = mine(wind(intermediate(from, to, 0.1), climbMidAlt))
       const climbGs = windTriangle(legTc, climbTas, cw?.dir ?? null, cw?.spd ?? 0).gs || climbTas
       let climbNm = (climb.min / 60) * climbGs
       // Descent: 500 fpm from cruise to pattern altitude at cruise speed (planning assumption; the POH has no descent table).
       const tpa = to.elev + (to.tpaAgl || 1000)
       const descMin = endsAtStop ? Math.max(0, cruiseAlt - tpa) / 500 : 0
-      const dw = wind(intermediate(from, to, 0.9), (cruiseAlt + tpa) / 2)
+      const dw = mine(wind(intermediate(from, to, 0.9), (cruiseAlt + tpa) / 2))
       const descGs = windTriangle(legTc, tas, dw?.dir ?? null, dw?.spd ?? 0).gs || tas
       let descNm = (descMin / 60) * descGs
       let scale = 1
@@ -477,12 +498,17 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         const altFt = phase === 'climb' ? climbMidAlt : phase === 'descent' ? (cruiseAlt + tpa) / 2 : cruiseAlt
         const segMid = intermediate(a.pt, b.pt, 0.5)
         const key = `${i}-${k}-${b.id}`
-        const o = ov[key] || {}
-        const fw = wind(segMid, altFt)
+        const o = validOv(ov[key])
+        const rowSel = sel(t)
+        const fc = wind(segMid, altFt)
+        const fw = mine(fc)
         const overridden = (Object.keys(o) as (keyof RowOverride)[]).filter(x => o[x] != null && !Number.isNaN(o[x]))
-        const w = overridden.some(x => x !== 'cas')
+        const rowOv = overridden.some(x => x !== 'cas')
+        const w = rowOv
           ? { dir: o.wdir ?? fw?.dir ?? null, spd: o.wspd ?? fw?.spd ?? 0, temp: o.temp ?? fw?.temp ?? null, stations: fw?.stations ?? [] }
           : fw
+        const windSrc: WindSrc = rowOv ? 'row' : fwSet ? 'yours' : fc ? (stale ? 'stale' : 'forecast') : 'calm'
+        const windWindow = fc && rowSel ? `${rowSel.product.forUse.join('–')}Z` : null
         const oat = w?.temp ?? isaTemp(altFt)
         const rowTas = o.cas != null ? Math.round(tasFromCas(o.cas, altFt, oat)) : phase === 'climb' ? climbTas : tas
         const tc = initialCourse(a.pt, b.pt), varEast = (a.varEast + b.varEast) / 2
@@ -498,6 +524,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
           alt: phase === 'climb' ? `↑${cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa).toLocaleString()}` : cruiseAlt.toLocaleString(),
           wind: w, tas: rowTas, tc, wca: tri.wca, th: tri.th, varEast, mh: toMagnetic(tri.th, varEast), mc: toMagnetic(tc, varEast),
           distNm: dist, gs: tri.gs, eteMin: ete, eta: new Date(t), fuelGal: fuel, remNm: 0, fuelRem: 0, terrainMax: terrainNear(sampleRoute([a.pt, b.pt], 2)),
+          windSrc, windWindow, gph, oat,
         })
       }
       const mainRow = navlog.filter(r => r.leg === i).find(r => r.phase === 'cruise') ?? navlog.filter(r => r.leg === i)[0]
@@ -547,9 +574,13 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     if (usable < fuelUsed + taxiFuel + reserveFuel) add('navlog', 'nogo', 'Fuel below the legal reserve', `Need ${(fuelUsed + taxiFuel + reserveFuel).toFixed(1)} gal (trip + taxi + ${reserveMinutes(anyNight)} min, §91.151); ${usable.toFixed(1)} gal usable on board.`)
     else if (usable < requiredFuel) add('navlog', 'caution', 'Fuel below your personal reserve', `Need ${requiredFuel.toFixed(1)} gal with a ${anyNight ? minimums.reserveNight : minimums.reserveDay}-minute reserve; ${usable.toFixed(1)} gal usable.`)
     else add('navlog', 'ok', 'Fuel covers the trip and reserve', `${requiredFuel.toFixed(1)} gal required, ${usable.toFixed(1)} gal usable.`)
-    if (!fbSel) add('navlog', 'caution', 'No winds aloft forecast', 'Headings and ground speeds assume calm wind.')
-    else if (fbSel.product.source && !fbSel.outside) add('navlog', 'ok', 'Winds aloft from a weather model', `NWS discontinued the FB winds-aloft table on Nov 3, 2026 (NAM retirement, Service Change Notice 26-47), so winds come from ${fbSel.product.source} for ${fbSel.product.forUse.join('–')}Z. Cross-check with your briefing.`)
-    else if (fbSel.outside) add('navlog', 'caution', 'No winds-aloft forecast covers the departure time', `Using the FB ${fbSel.fcst}-hour forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 24 hours ahead — re-brief closer to the flight.`)
+    const srcs = new Set(navlog.map(r => r.windSrc))
+    const staleAt = inp.weather?.winds.find(w => w.stale)?.fetchedAt
+    if (srcs.has('calm')) add('navlog', 'caution', 'No winds aloft forecast', 'Headings and ground speeds assume calm wind.')
+    else if (srcs.has('stale')) add('navlog', 'caution', `Winds aloft are from a forecast fetched ${staleAt ? `at ${new Date(staleAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'earlier'}`, 'The weather model is unreachable right now, so the last good copy is used. Cross-check with your briefing.')
+    else if (srcs.size === 1 && srcs.has('yours')) add('navlog', 'ok', 'Winds aloft from your briefing')
+    else if (fbSel?.outside) add('navlog', 'caution', 'No winds-aloft forecast covers the departure time', `Using the forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 2 days ahead, so re-brief closer to the flight.`)
+    else if (fbSel?.product.source) add('navlog', 'ok', 'Winds aloft from a weather model', `NWS ended the FB winds-aloft forecast on Nov 3, 2026 (Service Change Notice 26-47), so winds come from ${fbSel.product.source} for the time each row is flown. Cross-check with your briefing.`)
     for (const l of legs) {
       const legAlt = flightAlt[l.flight].alt
       const h = hemispheric(l.mc, legAlt, l.terrainMax ?? Math.max(l.from.elev, l.to.elev))

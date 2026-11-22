@@ -49,8 +49,6 @@ export const nwsWindsAloft = fcst => cached(`nwsfb:${fcst}`, 15 * MIN, async () 
   const { issued, products } = await nwsFB(NWS[fcst])
   return Date.now() - issued < 9 * 3600_000 ? products : null
 })
-// The FB station identifiers (the list barely changes; from the latest bulletin, however old).
-export const fbStationIds = () => cached('fbstations', 24 * 60 * MIN, async () => Object.keys((await nwsFB('FD1')).products[0]?.stations || {}))
 
 export const windsAloft = fcst => cached(`fb:${fcst}`, 15 * MIN, async () => parseFB(await awc(`windtemp?region=us&level=low&fcst=${fcst}`, { text: true })))
 

@@ -86,7 +86,7 @@ run-up fuel, takeoff, flight burn, landing for each flight).
 | Airports: runways (true heading, length, width, surface, lights, LDA, displaced threshold, VGSI, pattern side), TPA, magnetic variation, tower and hours, frequencies, AWOS/ASOS + phone, airspace class, Chart Supplement remarks | FAA NASR 28-day subscription (already imported into `nasr_airports`) | Each AIRAC cycle; cycle date shown |
 | METAR, TAF, PIREP, SIGMET (incl. convective), G-AIRMET, CWA, FB winds/temps aloft, area forecast discussion | aviationweather.gov Data API (NOAA/AWC) | Cached 5–15 min server-side |
 | FB winds/temps aloft, second source | The same FBUS bulletin from api.weather.gov (FD1/FD2/FD3 = 6/12/24 h), used when issued within 9 h | 15 min |
-| Winds/temps aloft: NWS discontinued the FB tables (FBUS3x) on 2026-11-03 12Z with the NAM retirement (SCN 26-47); AWC windtemp now answers 400 "discontinued" | Open-Meteo forecast API, pressure levels (NOAA HRRR/GFS), sampled at the AWC FB stations around the route (every one within 1° of the route box, at least the nearest four) at the FB levels 3,000/6,000/9,000/12,000 ft; flagged as model winds. The navlog interpolates these stations exactly as it would an FB | 30 min |
+| Winds/temps aloft (primary since NWS discontinued the FB tables on 2026-11-03 12Z with the NAM retirement, SCN 26-47; AWC windtemp answers 400 "discontinued") | Open-Meteo forecast API, pressure levels (NOAA HRRR/GFS), sampled on a grid over the route box (0.3° margin, ≤ 0.5° apart, ≤ 12 points; `routeGrid` in `services/modelWinds.js`) at 3,000/6,000/9,000/12,000 ft, fetched in parallel with the FB attempts. One retry; on failure the last good answer for the same grid is served for up to 6 h, flagged `stale`. Then your briefing winds per flight (`plan.flightWinds`), then calm | 30 min |
 | Route landmarks | OpenFreeMap vector tiles (OpenStreetMap, zoom 10: towns, peaks, lakes, motorways/trunk roads with route numbers, rivers, railroads), HIFLD transmission lines ≥ 115 kV, FAA Digital Obstacle File (≥ 200 ft AGL); `GET /api/planner/landmarks` | 1–7 days in memory |
 | Magnetic variation | World Magnetic Model 2025 (`magvar` package) | Static model, date-dependent |
 | NOTAMs | FAA NOTAM Search (existing `/api/external/notam`) | 1 h cache |
@@ -120,8 +120,9 @@ marked "sample" until replaced with the tail's own W&B record.
 - Wind components per runway end (magnetic heading from true + variation).
 - W&B: Σ weight × arm; ramp → takeoff (−7 lb taxi fuel) → landing (− trip fuel);
   envelope polygon test; baggage limits; utility category check.
-- Navlog per leg: great-circle distance and initial true course; winds at the
-  cruise altitude interpolated from the nearest FB stations and levels; TAS from
+- Navlog per leg: great-circle distance and initial true course; winds at each
+  row's altitude interpolated from the nearest forecast points and levels, for
+  the forecast window covering the time the row is flown; TAS from
   the POH cruise table at the chosen RPM / pressure altitude / temperature
   deviation; wind triangle → WCA, TH, GS; magnetic variation from NASR; climb
   from Fig. 5-7 (time, fuel, distance, +10 % per 10 °C above standard).
@@ -132,6 +133,13 @@ marked "sample" until replaced with the tail's own W&B record.
 - Daylight: sunrise/sunset/civil twilight at each airport (night ⇒ FLAPS and
   night currency).
 - Freezing level from FB temperatures.
+- Each NavLog column and W&B line, with its assumptions, steps, source and
+  backup, and expected range: [navlog-method.md](navlog-method.md). The brief's
+  Route and fuel area shows the inputs as chips (primary, backup, yours,
+  stand-in), a per-flight entry for your briefing winds, and the worked NavLog;
+  selecting a row (or a W&B line, or a point on the CG chart) shows its
+  workings in the sidebar (`explain.ts`), where wind, temperature and CAS can be
+  replaced for that row.
 
 ## Decision checks (examples)
 

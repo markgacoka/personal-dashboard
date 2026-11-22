@@ -66,7 +66,7 @@ export function PohSummary({ d, profile, plan, planning, u = US }: { d: Derived;
 
 // The W&B sheet line by line: item, source, weight, arm, moment/1000, then
 // ramp, run-up fuel, takeoff, flight burn and landing for each flight.
-export function WbTable({ d, plan, u = US }: { d: Derived; plan: Plan; u?: Units }) {
+export function WbTable({ d, plan, u = US, focus = null, onFocus }: { d: Derived; plan: Plan; u?: Units; focus?: number | null; onFocus?: (i: number) => void }) {
   if (!d.wb.steps.length) return <p className="text-sm text-fg-3">Weight and balance fills in once the aircraft is known.</p>
   const W = (lb: number) => (u.weight === 'kg' ? toW(lb, u).toFixed(1) : (Math.round(lb * 10) / 10).toLocaleString())
   const loads = loadsOf(plan)
@@ -76,8 +76,8 @@ export function WbTable({ d, plan, u = US }: { d: Derived; plan: Plan; u?: Units
         <thead><tr className="text-left text-xs text-fg-3"><th className="pb-1.5 font-medium">Item</th><th className="pb-1.5 font-medium max-sm:hidden">Source</th><th className="pb-1.5 pl-2 text-right font-medium">Weight ({u.weight})</th><th className="pb-1.5 pl-2 text-right font-medium">Arm (in)</th><th className="pb-1.5 pl-2 text-right font-medium">Moment / 1000</th></tr></thead>
         <tbody>
           {d.wb.steps.map((s, i) => (
-            <tr key={i} className={cn('border-t border-border', s.total && 'border-border-strong font-medium text-fg', s.over && 'text-bad')}>
-              <td className="py-1.5 font-sans">{s.label}<div className="text-xs font-normal text-fg-3 sm:hidden">{s.source}{s.over ? ' · over' : ''}</div></td>
+            <tr key={i} onClick={() => onFocus?.(i)} aria-selected={focus === i} className={cn('border-t border-border', onFocus && 'cursor-pointer transition-colors', focus === i ? 'bg-accent-soft' : onFocus && 'hover:bg-hover', s.total && 'border-border-strong font-medium text-fg', s.over && 'text-bad')}>
+              <td className="py-1.5 font-sans">{onFocus ? <button onClick={e => { e.stopPropagation(); onFocus(i) }} className={cn('text-left outline-none focus-visible:underline', focus === i && 'text-accent')}>{s.label}</button> : s.label}<div className="text-xs font-normal text-fg-3 sm:hidden">{s.source}{s.over ? ' · over' : ''}</div></td>
               <td className="py-1.5 font-sans text-fg-3 max-sm:hidden">{s.source}{s.over ? ' · over' : ''}</td>
               <td className="py-1.5 text-right">{W(s.weight)}</td>
               <td className="py-1.5 text-right">{s.arm == null ? '' : s.total ? s.arm.toFixed(2) : +s.arm.toFixed(2)}</td>

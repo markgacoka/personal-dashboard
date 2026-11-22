@@ -5,7 +5,12 @@ import { OptNum } from './FlightInputs'
 import type { Airport, Checkpoint, Derived, NavFix, Plan, WeatherBundle } from './model'
 import { PlannerMap, type MapNotams, type MapRadar, type RouteEdit } from './PlannerMap'
 import { SUGGEST_KIND, candidates, kindName, suggest, type Landmarks, type SuggestKind } from './suggest'
-import { SubHead, deg3 } from './ui'
+import { SubHead, deg3, fmtTime } from './ui'
+import { Tooltip } from '@/components/ui/misc'
+import { Dot } from '@/components/ui/badge'
+import type { InputSource } from './explain'
+import { SourceStrip, TIER_COLOR } from './ExplainView'
+import type { WindSrc } from './model'
 
 const KIND: Record<string, string> = { airport: 'Airport', vfr: 'VFR waypoint', navaid: 'VOR', fix: 'RNAV fix' }
 const fixType = (f: NavFix) =>
@@ -25,8 +30,8 @@ export function fmtLatLon(lat?: number, lon?: number) {
 // and why, every navlog point (TOC, checkpoints, TOD) with position, magnetic
 // course, altitude, distance and terrain; airspace and TFRs on the line.
 // Automatic checkpoints can be dropped.
-export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace, radar, notams, checkpoints, landmarks, landmarksLoading, edit, part }: {
-  part: 'chart' | 'table'; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; routePts: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; airspace: unknown; radar?: MapRadar | null; notams: MapNotams[]
+export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace, radar, notams, checkpoints, landmarks, landmarksLoading, edit, part, sources = [], focusKey = null, onFocus }: {
+  part: 'chart' | 'table'; sources?: InputSource[]; focusKey?: string | null; onFocus?: (key: string) => void; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; routePts: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; airspace: unknown; radar?: MapRadar | null; notams: MapNotams[]
   checkpoints: Checkpoint[]; landmarks: Landmarks | null; landmarksLoading: boolean; edit: RouteEdit
 }) {
   const skip = plan.skipFixes || []
@@ -53,47 +58,34 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
       )}
       {part === 'table' && <>
       {!d.flights.length && <p className="text-sm text-fg-3">The route fills in once the airports resolve and the aircraft's POH is known.</p>}
+      <SourceStrip list={sources} />
       {d.flights.map(f => {
-        const start = f.rows[0]
+        const fw = plan.flightWinds?.[f.n] ?? {}
+        const cruiseRow = f.rows.find(r => r.phase === 'cruise') ?? f.rows[0]
+        const fc = cruiseRow?.windSrc === 'yours' ? null : cruiseRow?.wind
+        const putFw = (k: 'wdir' | 'wspd' | 'temp', v: number | null) => set({ flightWinds: { ...plan.flightWinds, [f.n]: { ...fw, [k]: v } } })
         return (
           <div key={f.n}>
             <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal</span>}>
               {d.flights.length > 1 ? `Flight ${f.n + 1} · ` : ''}<span className="num">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
             </SubHead>
-            <div className="mb-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-center">
-              <div className="text-sm">
-                <span className="num font-medium text-fg">Cruise {f.alt.toLocaleString()} ft MSL</span>
-                <span className="text-fg-3"> · {f.altSet ? `set by you (automatic ${f.altAuto.toLocaleString()} ft)` : `${f.hemispheric ? `lowest VFR altitude for ${Math.round(f.mc)}° magnetic (${f.mc < 180 ? 'odd' : 'even'} thousands + 500)` : 'short hop: below 3,000 ft AGL'}, at least 1,000 ft above the highest terrain${f.terrainMax != null ? ` (${Math.round(f.terrainMax).toLocaleString()} ft)` : ''}`}</span>
+            <div className="mb-5 grid gap-x-6 gap-y-4 lg:grid-cols-2">
+              <div>
+                <div className="text-sm"><span className="num font-medium text-fg">Cruise {f.alt.toLocaleString()} ft MSL</span></div>
+                <p className="mt-0.5 text-[13px] text-fg-3">{f.altSet ? `Set by you; automatic is ${f.altAuto.toLocaleString()} ft.` : `${f.hemispheric ? `Lowest VFR altitude for ${Math.round(f.mc)}° magnetic` : 'Short hop: below 3,000 ft AGL'}, 1,000 ft or more above the highest terrain${f.terrainMax != null ? ` (${Math.round(f.terrainMax).toLocaleString()} ft)` : ''}.`}</p>
+                <div className="mt-2 w-36"><OptNum value={f.altSet ? f.alt : null} placeholder={f.altAuto} unit="ft" step={500} onChange={v => set({ altitudes: { ...plan.altitudes, [f.n]: v ?? 0 } })} label={`Cruise altitude ${f.from.id} to ${f.to.id}`} /></div>
               </div>
-              <OptNum value={f.altSet ? f.alt : null} placeholder={f.altAuto} unit="ft" step={500} onChange={v => set({ altitudes: { ...plan.altitudes, [f.n]: v ?? 0 } })} label={`Cruise altitude ${f.from.id} to ${f.to.id}`} />
+              <div>
+                <div className="text-sm font-medium text-fg">Winds at cruise from your briefing</div>
+                <p className="mt-0.5 text-[13px] text-fg-3">Optional. Replaces the forecast for every row of this flight; blank uses the forecast shown.</p>
+                <div className="mt-2 grid max-w-sm grid-cols-3 gap-2">
+                  <OptNum value={fw.wdir ?? null} placeholder={fc?.dir != null ? deg3(fc.dir) : '—'} unit="°" step={10} onChange={v => putFw('wdir', v)} label="Wind direction from your briefing" />
+                  <OptNum value={fw.wspd ?? null} placeholder={fc ? Math.round(fc.spd) : '—'} unit="kt" onChange={v => putFw('wspd', v)} label="Wind speed from your briefing" />
+                  <OptNum value={fw.temp ?? null} placeholder={fc?.temp ?? '—'} unit="°C" onChange={v => putFw('temp', v)} label="Temperature from your briefing" />
+                </div>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="num w-full text-sm text-fg-2 md:min-w-[46rem] [&_td+td]:pl-2 [&_th]:whitespace-nowrap [&_th+th]:pl-2">
-                <thead><tr className="text-left text-xs text-fg-3">
-                  <th className="pb-1.5 font-medium">Point</th><th className="pb-1.5 font-medium max-sm:hidden">Type</th><th className="pb-1.5 font-medium max-md:hidden">Position</th>
-                  <th className="pb-1.5 text-right font-medium">MC</th><th className="pb-1.5 text-right font-medium">Altitude</th><th className="pb-1.5 text-right font-medium">Leg nm</th>
-                  <th className="pb-1.5 text-right font-medium">Terrain</th><th className="w-8 pb-1.5" />
-                </tr></thead>
-                <tbody>
-                  {start && (
-                    <tr className="border-t border-border"><td className="py-1.5 font-medium">{start.from}<div className="font-sans text-xs font-normal text-fg-3 sm:hidden">Airport, depart</div></td><td className="py-1.5 font-sans text-fg-3 max-sm:hidden">Airport, depart</td>
-                      <td className="py-1.5 text-fg-2 max-md:hidden">{fmtLatLon(f.from.lat, f.from.lon)}</td><td /><td className="py-1.5 text-right">{Math.round(f.from.elev).toLocaleString()}</td><td /><td /><td /></tr>
-                  )}
-                  {f.rows.map(r => (
-                    <tr key={r.key} className={cn('border-t border-border', (r.to.kind === 'toc' || r.to.kind === 'tod') && 'text-fg-2')}>
-                      <td className="py-1.5 font-medium">{r.to.label}<div className="font-sans text-xs font-normal text-fg-3 sm:hidden">{fixType(r.to)}{r.to.freq ? <span className="num"> · {r.to.freq}</span> : null}</div></td>
-                      <td className="py-1.5 font-sans text-fg-3 max-sm:hidden">{fixType(r.to)}{r.to.freq ? <span className="num"> · {r.to.freq}</span> : null}</td>
-                      <td className="py-1.5 text-fg-2 max-md:hidden">{fmtLatLon(r.to.lat, r.to.lon)}</td>
-                      <td className="py-1.5 text-right">{deg3(r.mc)}°</td>
-                      <td className="py-1.5 text-right">{r.alt}</td>
-                      <td className="py-1.5 text-right">{r.distNm.toFixed(1)}</td>
-                      <td className="py-1.5 text-right">{r.terrainMax != null ? Math.round(r.terrainMax).toLocaleString() : ''}</td>
-                      <td className="py-1.5 text-right">{r.to.kind === 'checkpoint' && <button className="text-fg-3 hover:text-bad" aria-label={`Drop ${r.to.label}`} title="Drop this checkpoint" onClick={() => set({ skipFixes: [...skip, r.to.id] })}><X className="size-4" /></button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <NavTable rows={f.rows} from={f.from} focusKey={focusKey} onFocus={onFocus} onDrop={id => set({ skipFixes: [...skip, id] })} />
           </div>
         )
       })}
@@ -204,6 +196,77 @@ function Suggestions({ sugg, pts, edit, loading, errors, off, setOff }: {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+const COLS: { k: string; h: string; tip: string; cls?: string }[] = [
+  { k: 'alt', h: 'Alt', tip: 'Cruise altitude; ↑ climbing to it, ↓ descending to pattern altitude.' },
+  { k: 'mc', h: 'MC', tip: 'Magnetic course: great-circle true course minus east variation (WMM 2025).' },
+  { k: 'wind', h: 'Wind', tip: 'Forecast wind and temperature at the row\'s midpoint and altitude, for the time it\'s flown. The dot shows the source.' },
+  { k: 'tas', h: 'TAS', tip: 'True airspeed: POH cruise table at this altitude, temperature and RPM; POH climb speed while climbing.', cls: 'max-md:hidden' },
+  { k: 'mh', h: 'MH', tip: 'Magnetic heading: course corrected for wind (WCA), minus variation.' },
+  { k: 'dist', h: 'nm', tip: 'Row distance, great circle.' },
+  { k: 'gs', h: 'GS', tip: 'Ground speed from the wind triangle.' },
+  { k: 'ete', h: 'ETE', tip: 'Distance ÷ ground speed; climb rows use the POH climb time.' },
+  { k: 'eta', h: 'ETA', tip: 'Takeoff time plus the time of every row so far.', cls: 'max-lg:hidden' },
+  { k: 'fuel', h: 'Fuel left', tip: 'Usable fuel minus start/taxi and every row so far, in gallons.' },
+]
+const SRC_TIP: Record<WindSrc, string> = { forecast: 'Forecast', stale: 'Old forecast copy', yours: 'Your briefing winds', row: 'Typed into this row', calm: 'No forecast: calm' }
+const SRC_TIER = { forecast: 'primary', stale: 'backup', yours: 'yours', row: 'yours', calm: 'standin' } as const
+
+// The NavLog as worked out: one row per point, every computed column, each row
+// selectable to show its workings in the sidebar.
+function NavTable({ rows, from, focusKey, onFocus, onDrop }: { rows: Derived['navlog']; from: Airport; focusKey: string | null; onFocus?: (key: string) => void; onDrop: (id: string) => void }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="num w-full text-sm text-fg-2 [&_td+td]:pl-3 [&_td]:whitespace-nowrap [&_th+th]:pl-3 [&_th]:whitespace-nowrap">
+        <thead><tr className="text-left text-xs text-fg-3">
+          <th className="pb-1.5 font-medium">Point</th>
+          {COLS.map(c => (
+            <th key={c.k} className={cn('pb-1.5 text-right font-medium', c.cls)}>
+              <Tooltip content={<span className="block text-[13px] leading-snug">{c.tip}</span>}><span tabIndex={0} className="cursor-help underline decoration-border-strong decoration-dotted underline-offset-4">{c.h}</span></Tooltip>
+            </th>
+          ))}
+          <th className="w-7 pb-1.5" />
+        </tr></thead>
+        <tbody>
+          <tr className="border-t border-border">
+            <td className="py-2 font-medium text-fg">{from.label || from.icao || from.id}<div className="font-sans text-xs font-normal text-fg-3">Depart · {Math.round(from.elev).toLocaleString()} ft</div></td>
+            <td colSpan={COLS.length + 1} />
+          </tr>
+          {rows.map(r => {
+            const on = focusKey === r.key
+            const w = r.wind
+            return (
+              <tr key={r.key} onClick={() => onFocus?.(r.key)} aria-selected={on}
+                className={cn('cursor-pointer border-t border-border transition-colors', on ? 'bg-accent-soft' : 'hover:bg-hover')}>
+                <td className="py-2">
+                  <button onClick={e => { e.stopPropagation(); onFocus?.(r.key) }} className={cn('text-left font-medium outline-none focus-visible:underline', on ? 'text-accent' : 'text-fg')}>{r.to.label}</button>
+                  <div className="font-sans text-xs font-normal text-fg-3">{fixType(r.to)}{r.to.freq ? <span className="num"> · {r.to.freq}</span> : null}</div>
+                </td>
+                <td className="py-2 text-right">{r.alt}</td>
+                <td className="py-2 text-right">{deg3(r.mc)}°</td>
+                <td className="py-2 text-right">
+                  <span className="inline-flex items-center justify-end gap-1.5" title={SRC_TIP[r.windSrc]}>
+                    <Dot color={TIER_COLOR[SRC_TIER[r.windSrc]]} />
+                    {w && w.spd ? `${w.dir == null ? 'VRB' : deg3(w.dir)}/${Math.round(w.spd)}` : 'Calm'}
+                  </span>
+                  <div className="text-xs text-fg-3">{Math.round(r.oat)} °C</div>
+                </td>
+                <td className="py-2 text-right max-md:hidden">{Math.round(r.tas)}</td>
+                <td className="py-2 text-right font-medium text-fg">{deg3(r.mh)}°<div className="text-xs font-normal text-fg-3">{r.wca >= 0 ? '+' : '−'}{Math.abs(Math.round(r.wca))}° WCA</div></td>
+                <td className="py-2 text-right">{r.distNm.toFixed(1)}</td>
+                <td className="py-2 text-right">{Math.round(r.gs)}</td>
+                <td className="py-2 text-right">{r.eteMin.toFixed(1)}</td>
+                <td className="py-2 text-right max-lg:hidden">{fmtTime(r.eta)}</td>
+                <td className="py-2 text-right">{r.fuelRem.toFixed(1)}</td>
+                <td className="py-2 text-right">{r.to.kind === 'checkpoint' && <button className="text-fg-3 hover:text-bad" aria-label={`Drop ${r.to.label}`} title="Drop this checkpoint" onClick={e => { e.stopPropagation(); onDrop(r.to.id) }}><X className="size-4" /></button>}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

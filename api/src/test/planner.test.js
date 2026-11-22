@@ -124,7 +124,7 @@ describe('NASR navaids and fixes', async () => {
   })
 })
 
-import { toLevels, toProducts } from '../services/modelWinds.js'
+import { routeGrid, toLevels, toProducts } from '../services/modelWinds.js'
 describe('model winds aloft', () => {
   test('interpolates pressure levels to FB altitudes by height, wrapping direction through north', () => {
     const w = toLevels([{ zFt: 1000, dir: 350, spd: 10, temp: 14 }, { zFt: 5000, dir: 10, spd: 10, temp: 6 }], [3000])
@@ -140,6 +140,20 @@ describe('model winds aloft', () => {
     assert.equal(prods.length, 2)
     assert.deepEqual(prods[0].forUse, ['0600', '0900']); assert.equal(prods[0].valid, '050700')
     assert.deepEqual(prods[0].stations.M1.winds[3000], { dir: 270, spd: 20, temp: 5 })
+  })
+})
+
+describe('model winds grid over the route', () => {
+  test('covers the box with a margin, at most 12 points', () => {
+    const g = routeGrid({ south: 37.0, west: -122.0, north: 37.4, east: -121.6 })
+    assert.ok(g.length >= 4 && g.length <= 12)
+    assert.ok(Math.min(...g.map(p => p.lat)) <= 36.7 && Math.max(...g.map(p => p.lat)) >= 37.7)
+    assert.ok(Math.min(...g.map(p => p.lon)) <= -122.3 && Math.max(...g.map(p => p.lon)) >= -121.3)
+    assert.equal(new Set(g.map(p => p.id)).size, g.length)
+  })
+  test('a long route spreads its points instead of exceeding the cap', () => {
+    const g = routeGrid({ south: 33.9, west: -122.4, north: 37.6, east: -118.2 })
+    assert.ok(g.length <= 12)
   })
 })
 

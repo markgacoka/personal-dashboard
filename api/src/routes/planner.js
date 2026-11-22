@@ -10,7 +10,7 @@ import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
 import { mapScanLater, pohPageMap } from '../services/pohPages.js'
 import { findLibraryPoh, savePageMap } from '../services/pohFinder.js'
-import { modelWinds } from '../services/modelWinds.js'
+import { modelWinds, routeGrid } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
 import { fetchWithTimeout } from '../lib/http.js'
@@ -62,14 +62,6 @@ async function fbStationCoords(ids) {
   return Object.fromEntries(ids.map(i => [i, fbSites.get(i)]).filter(([, v]) => v).map(([k, v]) => [k, { lat: v.lat, lon: v.lon }]))
 }
 
-// The FB stations for a route box: every one inside it (1° margin), at least the nearest four, at most ten.
-export function fbStationsFor(coords, box) {
-  const c = { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 }
-  const all = Object.entries(coords).map(([id, p]) => ({ id, ...p, d: nm(c, p) })).sort((a, b) => a.d - b.d)
-  const inside = all.filter(inBox(box, 1))
-  return (inside.length >= 4 ? inside : all.slice(0, 4)).slice(0, 10).map(({ d, ...s }) => s)
-}
-
 // Checklist steps as saved from the planner: sections of item/action pairs, bounded.
 const validSteps = s => s === null || (Array.isArray(s) && s.length <= 100 && s.every(x => x && typeof x.title === 'string' && x.title.length <= 120 && Array.isArray(x.items) && x.items.length <= 200
   && x.items.every(i => i && typeof i.item === 'string' && i.item.length <= 300 && (i.action == null || (typeof i.action === 'string' && i.action.length <= 200)))))
@@ -114,6 +106,7 @@ export default async function plannerRoutes(fastify) {
     const ids = stations.map(s => String(s).toUpperCase()).filter(s => /^[A-Z0-9]{3,4}$/.test(s)).slice(0, 20)
     const box = { south: Math.max(-90, bbox.south), west: bbox.west, north: Math.min(90, bbox.north), east: bbox.east }
     const route = new Set(ids.map(i => i.replace(/^K/, '')))
+    const modelP = modelWinds(routeGrid(box)).catch(e => ({ data: null, error: e.message, fetchedAt: new Date().toISOString() }))
     const [metars, metarBox, tafs, tafBox, pireps, sigmets, gairmets, cwas, fb06, fb12, fb24, nas, tfr] = await Promise.all([
       settle(ids.length ? awc.metars(ids) : Promise.resolve({ data: [], fetchedAt: new Date().toISOString() })),
       settle(awc.metarsInBox(box)),
@@ -130,26 +123,30 @@ export default async function plannerRoutes(fastify) {
         return ring.some(([lon, lat]) => inBox(box, 1)({ lat, lon }))
       })),
     ])
-    // FB winds aloft: aviationweather.gov, else the same bulletin from the NWS
-    // feed; while neither publishes one, model winds sampled at the FB stations.
+    // Winds aloft: the NWS FB forecast if either feed publishes one again (both
+    // ended Nov 3, 2026); otherwise NOAA model winds on a grid over the route,
+    // fetched alongside so a slow FB feed doesn't delay them.
     let fb = [fb06, fb12, fb24].map((p, i) => ({ fcst: ['06', '12', '24'][i], ...p }))
     if (!fb.some(p => p.data?.length)) {
       const nws = await Promise.all(['06', '12', '24'].map(f => settle(awc.nwsWindsAloft(f))))
       if (nws.some(p => p.data?.length)) fb = nws.map((p, i) => ({ fcst: ['06', '12', '24'][i], ...p, source: 'api.weather.gov' }))
     }
-    const stationIds = [...new Set(fb.flatMap(p => (p.data || []).flatMap(x => Object.keys(x.stations))))]
-    const coords = await fbStationCoords(stationIds).catch(() => ({}))
-    for (const p of fb) {
-      if (!p.data) continue
-      p.data = p.data.map(prod => ({
-        ...prod,
-        stations: Object.fromEntries(Object.entries(prod.stations).filter(([k]) => coords[k] && inBox(box, 3)(coords[k])).map(([k, v]) => [k, { ...coords[k], winds: v }])),
-      }))
-    }
-    let winds = fb
-    if (!fb.some(p => p.data?.length)) {
-      const m = await settle((async () => modelWinds(fbStationsFor(await fbStationCoords((await awc.fbStationIds()).data), box)))())
-      winds = m.data?.length ? m.data.map(prod => ({ fcst: 'model', data: [prod], fetchedAt: m.fetchedAt })) : fb.map(p => ({ ...p, error: p.error || m.error || 'No FB winds-aloft forecast available' }))
+    let winds
+    if (fb.some(p => p.data?.length)) {
+      const stationIds = [...new Set(fb.flatMap(p => (p.data || []).flatMap(x => Object.keys(x.stations))))]
+      const coords = await fbStationCoords(stationIds).catch(() => ({}))
+      winds = fb.map(p => p.data ? {
+        ...p,
+        data: p.data.map(prod => ({
+          ...prod,
+          stations: Object.fromEntries(Object.entries(prod.stations).filter(([k]) => coords[k] && inBox(box, 3)(coords[k])).map(([k, v]) => [k, { ...coords[k], winds: v }])),
+        })),
+      } : p)
+    } else {
+      const m = await modelP
+      winds = m.data?.length
+        ? m.data.map(prod => ({ fcst: 'model', data: [prod], fetchedAt: m.fetchedAt, ...(m.stale ? { stale: true, error: m.error } : {}) }))
+        : [{ fcst: 'model', data: null, fetchedAt: m.fetchedAt, error: m.error || 'No winds-aloft forecast available' }]
     }
     const merge = (a, b, key) => { const m = new Map(); for (const x of [...(b.data || []), ...(a.data || [])]) m.set(x[key], x); return [...m.values()] }
     return {

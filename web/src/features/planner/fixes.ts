@@ -10,7 +10,7 @@ const FIXES: [RegExp, string][] = [
   [/^Departure time is in the past/, 'Change the engine start time under Plan.'],
   [/^Fuel below the legal reserve/, 'Add fuel, carry less, plan a fuel stop or shorten the route.'],
   [/^Fuel below your personal reserve/, 'Add fuel or plan a fuel stop; your reserve is in Pilot → Edit your minimums.'],
-  [/^No winds aloft forecast/, 'Get the winds from your briefing and type them into the NavLog wind cells.'],
+  [/^No winds aloft forecast/, 'Enter the winds and temperature at cruise from your briefing under Route and fuel.'], [/^Winds aloft are from a forecast fetched/, 'Refresh the weather, or enter the winds from your briefing under Route and fuel.'],
   [/^Winds aloft from a weather model/, 'Expected: NWS stopped the FB winds-aloft table on Nov 3, 2026. Compare with your 1800wxbrief winds; type a different wind into any NavLog row to replace it.'],
   [/^No winds-aloft forecast covers/, 'Re-open the plan within about a day of the flight.'],
   [/hemispheric rule/, 'Use the suggested altitude (Brief → Route and fuel, cruise altitude).'],

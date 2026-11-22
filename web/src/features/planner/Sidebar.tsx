@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, ArrowUpRight, ChevronDown, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronDown, ExternalLink } from 'lucide-react'
 import { Badge, Dot } from '@/components/ui/badge'
 import { Segmented, Tooltip } from '@/components/ui/misc'
 import { relTime } from '@/lib/format'
@@ -8,6 +8,9 @@ import type { Check, Status } from './model'
 import { PohLink } from './RefPanel'
 import { STATUS_META, StatusIcon } from './ui'
 import type { Assumption, Line, Source, Topic, Work } from './workings'
+import type { Expl } from './explain'
+import { ExplCard } from './ExplainView'
+import type { RowOverride } from './model'
 
 export type DomainKey = 'plan' | 'pilot' | 'aircraft' | 'weather' | 'route' | 'airports' | 'loading'
 export const DOMAIN_OF: Record<Check['section'], DomainKey> = { trip: 'plan', pilot: 'pilot', aircraft: 'aircraft', weather: 'weather', navlog: 'route', loading: 'loading', performance: 'loading' }
@@ -142,8 +145,11 @@ function FixRow({ c, showArea, onJump }: { c: Check; showArea: boolean; onJump: 
 type View = 'calc' | 'assume' | 'source'
 
 // How every number was reached: the arithmetic, what was assumed, and where the inputs came from.
-export function WorkingsPane({ topics, assumptions, sources, onJump }: { topics: Topic[]; assumptions: Assumption[]; sources: Source[]; onJump?: (k: DomainKey) => void }) {
+export interface Focus { title: string; subtitle: string; items: Expl[]; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void; onClear: () => void }
+
+export function WorkingsPane({ topics, assumptions, sources, onJump, focus }: { topics: Topic[]; assumptions: Assumption[]; sources: Source[]; onJump?: (k: DomainKey) => void; focus?: Focus | null }) {
   const [view, setView] = useState<View>('calc')
+  if (focus) return <FocusView f={focus} />
   return (
     <div className="pb-4">
       <div className="sticky top-0 z-10 border-b border-border bg-card px-3 py-3">
@@ -161,6 +167,23 @@ export function WorkingsPane({ topics, assumptions, sources, onJump }: { topics:
       {view === 'calc' && <Calculations topics={topics} />}
       {view === 'assume' && <Assumptions list={assumptions} onJump={onJump} />}
       {view === 'source' && <Sources list={sources} />}
+    </div>
+  )
+}
+
+// One selected NavLog row or W&B line, quantity by quantity.
+function FocusView({ f }: { f: Focus }) {
+  return (
+    <div className="pb-4">
+      <div className="sticky top-0 z-10 border-b border-border bg-card px-3 py-3">
+        <button onClick={f.onClear} className="inline-flex items-center gap-1 text-[13px] text-fg-3 hover:text-fg"><ArrowLeft className="size-3.5" />All workings</button>
+        <h3 className="mt-2 text-[15px] font-medium text-fg">{f.title}</h3>
+        <p className="mt-0.5 text-[13px] text-fg-3">{f.subtitle}</p>
+      </div>
+      <ul className="mx-3 mt-4 divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
+        {f.items.map(e => <ExplCard key={e.key} e={e} ov={f.ov} onEdit={f.onEdit} />)}
+      </ul>
+      {f.onEdit && <p className="mx-4 mt-4 text-[13px] leading-snug text-fg-3">Values you type here change only this row; clear them to go back to the source.</p>}
     </div>
   )
 }

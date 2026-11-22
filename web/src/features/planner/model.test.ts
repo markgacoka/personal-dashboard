@@ -250,3 +250,32 @@ describe('workings: the arithmetic behind the brief', () => {
     expect(sources(x).map(s => s.what)).toContain('METARs and TAFs')
   })
 })
+
+describe('wind source per row', () => {
+  test('forecast rows are tagged and carry the window', () => {
+    const d = derive(plan(), inputs())
+    expect(d.navlog.every(r => r.windSrc === 'forecast')).toBe(true)
+    expect(d.navlog[0].windWindow).toBe('1700–2400Z')
+  })
+  test('no forecast: calm, flagged as a caution', () => {
+    const d = derive(plan(), inputs({ weather: weather({ winds: [] }) }))
+    expect(d.navlog.every(r => r.windSrc === 'calm' && !r.wind)).toBe(true)
+    expect(d.checks.find(c => c.title === 'No winds aloft forecast')?.status).toBe('caution')
+  })
+  test('your briefing winds replace the forecast for the flight; a row override still wins', () => {
+    const base = derive(plan(), inputs({ weather: weather({ winds: [] }) }))
+    const key = base.navlog.find(r => r.phase === 'cruise')!.key
+    const d = derive(plan({ flightWinds: { 0: { wdir: 180, wspd: 20, temp: 5 } }, overrides: { [key]: { wspd: 30 } } }), inputs({ weather: weather({ winds: [] }) }))
+    const row = d.navlog.find(r => r.key === key)!
+    expect(row.windSrc).toBe('row'); expect(row.wind?.spd).toBe(30); expect(row.wind?.dir).toBe(180)
+    expect(d.navlog.filter(r => r.key !== key).every(r => r.windSrc === 'yours' && r.wind?.dir === 180)).toBe(true)
+    expect(d.checks.some(c => c.title === 'No winds aloft forecast')).toBe(false)
+    expect(d.legs[0].gs).toBeLessThan(base.legs[0].gs) // southbound into a south wind
+  })
+  test('an old copy of the forecast is a backup, with a caution', () => {
+    const w = weather()
+    const d = derive(plan(), inputs({ weather: { ...w, winds: w.winds.map(x => ({ ...x, stale: true })) } }))
+    expect(d.navlog.every(r => r.windSrc === 'stale')).toBe(true)
+    expect(d.checks.some(c => c.status === 'caution' && c.title.startsWith('Winds aloft are from a forecast fetched'))).toBe(true)
+  })
+})

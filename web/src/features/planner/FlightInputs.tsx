@@ -174,7 +174,7 @@ function Field({ label, note, className, children }: { label: string; note?: Rea
 export function OptNum({ value, placeholder, onChange, unit, step, label }: { value: number | null; placeholder: number | string; onChange: (v: number | null) => void; unit?: string; step?: number; label: string }) {
   return (
     <span className="relative block">
-      <Input type="number" inputMode="decimal" aria-label={label} value={value ?? ''} placeholder={String(placeholder)} step={step} onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))} className={cn('num', unit && 'pr-10')} />
+      <Input type="number" inputMode="decimal" aria-label={label} value={value ?? ''} placeholder={String(placeholder)} step={step} onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))} onWheel={e => e.currentTarget.blur()} className={cn('num', unit && 'pr-10')} />
       {unit && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-fg-3">{unit}</span>}
     </span>
   )

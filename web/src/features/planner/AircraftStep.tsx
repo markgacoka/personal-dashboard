@@ -39,7 +39,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
             ['Registered owner', registry?.owner ? titleCase(registry.owner) : null], ['Registration status', registry?.status],
           ]} />
           {registry && <Synced label="" source="FAA aircraft registry" />}
-          <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded ? pohDoc : null} />
+          <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded ? pohDoc : null} read={match?.profile.read} />
         </div>
         <div className="space-y-4 xl:col-span-3">
           {match?.note && <div className="flex gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{match.note}</div>}

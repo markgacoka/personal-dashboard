@@ -1,0 +1,62 @@
+CESSNA                                                                  SECTION 5
+MODEL 172M                                                          PERFORMANCE
+
+
+          TIME, FUEL, AND DISTANCE TO CLIMB
+
+
+CONDITIONS:
+Flaps Up
+Full Throttle
+Standard Temperature
+
+NOTES:
+1. Add 1.1 gallons of fuel for engine start, taxi and takeoff allowance.
+2. To obtain maximum rate of climb as shown in this chart, lean to maximum RPM
+   during climb.
+3. Increase time, fuel and distance by 10% for each 10°C above standard temperature.
+4. Distances shown are based on zero wind.
+
+
+
+
+                                                              FROM SEA LEVEL
+            PRESSURE              CLIMB    RATE OF
+ WEIGHT                   TEMP
+            ALTITUDE        oc    SPEED     CLIMB
+  LBS                                                  TIME    FUEL USED    DISTANCE
+               FT                  KIAS      FPM
+                                                        MIN     GALLONS        NM
+
+   2300          S.L.       15      78        645        0        0.0            0
+
+                1000       13       77        605        2        0.3            2
+
+                2000       11       76        560        3        0.7            4
+
+                3000        9       75        520        5        1.1            7
+
+                4000         7      74        480        7        1.5            9
+
+                5000        5       73        435        9        1.9           12
+
+                6000        3       72        395       12        2.3           16
+
+                7000         1      71        355       15        2.8           19
+
+                8000       -1       70        315       18        3.3           23
+
+                9000       -3       69        270       21        3.9           28
+
+              10,000       -5       68        230       25        4.5           33
+
+              11,000       -7       67        185       30        5.2           40
+
+              12,000       -9       66        145       36        6.1           48
+
+
+               Figure 5-6. Time, Fuel, and Distance to Climb
+
+
+                                                                                     5-15
+

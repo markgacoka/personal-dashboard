@@ -28,7 +28,7 @@ import { NavlogFront, NavlogReverse } from './NavlogSheet'
 import { PerformanceSection } from './PerformanceSection'
 import { PlannerMap, type MapNotams } from './PlannerMap'
 import { WbTable } from './PohSummary'
-import { applyEdits, profileFor } from './poh'
+import { applyEdits, profileFor, withTables } from './poh'
 import { CERTIFICATES, roleOf } from './pilot'
 import { RefPanel, RefProvider, isDocTab, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
@@ -160,7 +160,9 @@ function Planner() {
     year: plan.aircraft?.year ?? edits?.year ?? registry.data?.year ?? fleetRef?.year ?? null,
   }), [plan.aircraft, edits, registry.data, fleetRef])
   const pohQ = usePohFind(plan.tail ? { ...aircraft, tail: plan.tail } : null)
-  const match = useMemo(() => (plan.tail ? applyEdits(profileFor(aircraft.model), edits) : null), [plan.tail, aircraft.model, edits])
+  // This model's own tables when its POH was read; the 172P's for whatever wasn't.
+  const pohDoc = pohQ.data?.doc
+  const match = useMemo(() => (plan.tail ? applyEdits(withTables(profileFor(aircraft.model), pohDoc?.tables, pohDoc?.title), edits) : null), [plan.tail, aircraft.model, edits, pohDoc])
   const u = useMemo(() => unitsForTail(plan.tail), [plan.tail])
   const pilotQ = usePilotInfo()
   const currency = useMemo(() => computeCurrency(flights), [flights])

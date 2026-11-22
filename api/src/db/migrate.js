@@ -1150,6 +1150,11 @@ async function migrateV35() {
   `)
 }
 
+// Planner: a POH's performance tables read from its PDF (pohTables.js), versioned.
+async function migrateV39() {
+  await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS tables JSONB')
+}
+
 // Planner: a checklist's steps, extracted from its PDF or photo and editable.
 async function migrateV38() {
   await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS steps JSONB')
@@ -1200,6 +1205,7 @@ const MIGRATIONS = [
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
   ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37], ['038', migrateV38],
+  ['039', migrateV39],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

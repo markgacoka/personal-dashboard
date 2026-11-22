@@ -1,0 +1,51 @@
+<:11
+....
+ I                                                            TAKEOFF DISTANCE                                                           ~00
+                                                                                                                                         tzjtz:l
+N                                                                                                                                        ~(")
+                                                          MAXIMUM WEIGHT 2300 LBS                                                        1-zj~
+                                                                                                                                         o'""'
+                                                                                                                                         ~0
+       CONDITIONS:
+       Flaps Up                                                                                                                          ~;
+       Full Throttle Prior to Brake Release
+       Paved, Level, Dry Runway
+                                                                                                                                         z
+                                                                                                                                         (")
+                                                                                                                                         tzj
+       Zero Wind
+
+       NOTES:
+       1. Maximum performance technique as specified in Section 4.
+       2. Prior to takeoff from fields above 3000 feet elevation, the mixture should be leaned to give maximum RPM in a full throttle,
+          static runup.
+       3. Decrease distances 10% for each 9 knots headwind. For operation with tailwinds up to 10 knots, increase distances by 10%
+          for each 2 knots.
+       4. Where distance value has been deleted, climb performance after lift-off is le5s than 150 fpm at takeoff speed.
+       5. For operation on a dry, grass runway, increase distances by 15% of the "ground roll" figure.
+
+
+                        TAKEOFF             0°C          10°C          20°C          30°C           40°C
+                          SPEED  PRESS
+        WEIGHT             KIAS
+         LBS                      ALT         TOTAL         TOTAL         TOTAL         TOTAL         TOTAL
+                        LIFT AT   FT   GRND TO CLEAR GRND TO CLEAR GRND TO CLEAR GRND TO CLEAR GRND TO CLEAR
+                        OFF 50FT       ROLL 50FT OBS ROLL 50FT OBS ROLL 50FT OBS ROLL 50FT OBS ROLL 50FT OBS
+
+           2300           52    59    S.L.    775      1380      835   1475    895     1575       960     1685      1030      1795
+                                     1000     850      1510      915   1615    980     1725      1050     1845      1125      1970
+                                     2000     930      1650     1000   1770   1075     1895      1155     2030      1235      2170
+                                     3000    1020      1815     1100   1945   1180     2085      1270     2235      1360      2395
+                                     4000    1125      2000     1210   2145   1300     2305      1395     2475      1495      2655
+
+                                                                                                                                         ~t::::l
+                                     5000    1235      2210     1330   2375   1430     2555      1540     2750      1650      2960
+                                     6000    1365      2450     1470   2640   1580     2850      1700     3070      ---       ---
+                                     7000    1505      2730     1625   2955   1750     3190      ---       ---      ---       ---        tzj(")
+       L.______ _ _ _ L__ ...
+                                     8000    1665      3065     1800   3320   ---      ---       ---       ---      ---       ---        t"'tzj
+                                                                                                                                         1-'00
+                                                                                                                                         ..::100
+
+                                                    Figure 5-4. Takeoff Distance (Sheet 1 of 2)                                          ~~
+

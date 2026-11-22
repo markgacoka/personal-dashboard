@@ -10,6 +10,8 @@ export interface DistanceTable {
   pa: number[]
   temps: number[]
   rows: ([number, number] | null)[][]
+  // Altitude rows the PDF reader couldn't use (interpolated across).
+  missing?: number[]
 }
 
 export interface CruiseRow { pa: number; rpm: number; cols: ([number, number, number] | null)[] } // ISA−20, ISA, ISA+20 → %BHP, KTAS, GPH
@@ -41,6 +43,22 @@ export interface AircraftProfile {
   figures: Record<string, string>
   // Your own cruise numbers (from the aircraft profile) in place of the POH table.
   cruiseFixed?: { ktas?: number | null; gph?: number | null }
+  // Tables read automatically from this model's POH PDF (the rest are the 172P's).
+  read?: { book: string; sections: TableSection[]; missing: TableSection[]; reason?: string }
+}
+
+export type TableSection = 'takeoff' | 'climb' | 'cruise' | 'landing'
+export const TABLE_SECTIONS: TableSection[] = ['takeoff', 'climb', 'cruise', 'landing']
+export const SECTION_LABEL: Record<TableSection, string> = { takeoff: 'takeoff distance', climb: 'climb', cruise: 'cruise', landing: 'landing distance' }
+
+// What the API reads from a POH PDF (api/src/services/pohTables.js).
+export interface PohTables {
+  v: number; none?: string
+  takeoff?: DistanceTable[] | null; landing?: DistanceTable[] | null; climb?: AircraftProfile['climb'] | null; cruise?: CruiseRow[] | null
+  climbStartFuelGal?: number | null
+  takeoffNotes?: { headwindPer9kt: number; tailwindPer2kt: number; grassGroundRoll: number | null } | null
+  landingNotes?: { headwindPer9kt: number; tailwindPer2kt: number; grassGroundRoll: number | null } | null
+  figures?: Partial<Record<TableSection, string | null>>
 }
 
 // What you changed on a tail's profile (saved per tail in planner_aircraft as
@@ -288,4 +306,41 @@ export function profileFor(model?: string | null): ProfileMatch {
 export const POH_PAGES_172P: Record<string, number> = {
   limits: 18, airspeed: 19, weights: 21, cg: 22, fuel: 24, emergency: 31, glide: 38, speeds: 48, checklist: 50,
   beforeTakeoff: 53, landingChecklist: 54, stall: 80, takeoff: 82, climb: 85, cruise: 86, landing: 94, wb: 102,
+}
+
+const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`)
+
+// This model's own tables, read from its POH, in place of the 172P's. A 172
+// variant with its TCDS limits and every table read is exact; anything still
+// borrowed from the 172P is named in the note.
+export function withTables(m: ProfileMatch, t: PohTables | null | undefined, book: string | null | undefined): ProfileMatch {
+  if (!t || !book) return m
+  const p = m.profile
+  const sections = TABLE_SECTIONS.filter(k => (t[k]?.length ?? 0) > 0)
+  const missing = TABLE_SECTIONS.filter(k => !sections.includes(k))
+  if (!sections.length) return { ...m, profile: { ...p, read: { book, sections, missing, reason: t.none } } }
+  const notes = (base: AircraftProfile['takeoffNotes'], n: PohTables['takeoffNotes']) => (n ? { headwindPer9kt: n.headwindPer9kt, tailwindPer2kt: n.tailwindPer2kt, grassGroundRoll: n.grassGroundRoll ?? base.grassGroundRoll } : base)
+  const figs = Object.fromEntries(sections.map(k => [k, t.figures?.[k] ?? p.figures[k]]).filter(([, v]) => v))
+  // Weight and CG limits are known for the 172P and the TCDS variants; for any other
+  // model the heaviest chart weight stands in for the maximum weights.
+  const knownLimits = p.key !== 'C172P' || m.exact
+  const heaviest = (ts?: DistanceTable[] | null) => (ts?.length ? Math.max(...ts.map(x => x.weight)) : null)
+  const tkW = heaviest(t.takeoff), ldW = heaviest(t.landing)
+  const limits = !knownLimits ? { ...p.limits, ...(tkW ? { maxTakeoff: tkW, maxRamp: tkW + Math.round(p.taxiFuelLb) } : {}), ...(ldW ? { maxLanding: ldW } : {}) } : p.limits
+  const profile: AircraftProfile = {
+    ...p, limits,
+    takeoff: t.takeoff?.length ? t.takeoff : p.takeoff, landing: t.landing?.length ? t.landing : p.landing,
+    climb: t.climb?.length ? t.climb : p.climb, cruise: t.cruise?.length ? t.cruise : p.cruise,
+    climbStartFuelGal: t.climbStartFuelGal ?? p.climbStartFuelGal,
+    takeoffNotes: notes(p.takeoffNotes, t.takeoffNotes), landingNotes: notes(p.landingNotes, t.landingNotes),
+    figures: { ...p.figures, ...figs },
+    source: `${book}, tables read from the PDF`,
+    read: { book, sections, missing },
+  }
+  if (!missing.length && knownLimits) return { profile, exact: true, note: null }
+  const parts = [
+    missing.length ? `${list(missing.map(k => SECTION_LABEL[k]))[0].toUpperCase()}${list(missing.map(k => SECTION_LABEL[k])).slice(1)} couldn't be read from the ${book} PDF, so ${missing.length > 1 ? 'those come' : 'that comes'} from the 1982 172P POH.` : null,
+    knownLimits ? null : `Maximum weights come from its charts; the CG envelope and loading stations are still the 172P's, so enter this airplane's in its aircraft profile.`,
+  ].filter(Boolean)
+  return { profile, exact: false, note: `${list(sections.map(k => SECTION_LABEL[k])).replace(/^./, c => c.toUpperCase())} ${sections.length > 1 ? 'are' : 'is'} read from the ${book}. ${parts.join(' ')}` }
 }

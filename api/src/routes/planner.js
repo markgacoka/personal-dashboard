@@ -10,6 +10,7 @@ import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
 import { mapScanLater, pohPageMap } from '../services/pohPages.js'
 import { findLibraryPoh, savePageMap } from '../services/pohFinder.js'
+import { ensureTables } from '../services/pohTables.js'
 import { modelWinds, routeGrid } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
@@ -287,17 +288,21 @@ export default async function plannerRoutes(fastify) {
          AND (tail_number = $1::text OR (tail_number IS NULL AND model = $2::text))
        ORDER BY (tail_number = $1::text) DESC NULLS LAST, created_at DESC LIMIT 1`, [t, mdl])
     const info = m && { key: m.entry.key, title: m.entry.title, variant: m.entry.variant, years: m.entry.years, profile: m.entry.profile, url: m.entry.url, units: m.entry.units, exact: m.exact, sameYears: m.sameYears }
-    if (mine) return { match: info, doc: mine, uploaded: true }
+    // Performance tables from the book itself, for any POH without a hand-checked profile.
+    const withTables = async doc => {
+      try { return { ...doc, tables: await ensureTables(doc, fastify.log) } } catch (e) { fastify.log.warn({ err: e.message, id: doc.id }, 'POH tables failed'); return doc }
+    }
+    if (mine) return { match: info, doc: await withTables(mine), uploaded: true }
     // Not in the curated catalog: this model's own POH from the public manual library.
     if (!m?.exact && model) {
       const found = await findLibraryPoh({ make, model, year: Number(year) || null }, fastify.log)
-      if (found) return { match: { key: `library:${found.id}`, title: found.title, variant: found.model, years: null, profile: null, url: found.source_ref, units: 'US', exact: true, sameYears: false, source: 'library' }, doc: found }
+      if (found) return { match: { key: `library:${found.id}`, title: found.title, variant: found.model, years: null, profile: null, url: found.source_ref, units: 'US', exact: true, sameYears: false, source: 'library' }, doc: await withTables(found) }
     }
     if (!m) return { match: null, doc: null }
     const { url, title, variant, years, profile, units, key } = m.entry
     try {
       const doc = await ensurePoh(m.entry, fastify.log)
-      return { match: { key, title, variant, years, profile, url, units, exact: m.exact, sameYears: m.sameYears }, doc }
+      return { match: { key, title, variant, years, profile, url, units, exact: m.exact, sameYears: m.sameYears }, doc: m.exact && !profile ? await withTables(doc) : doc }
     } catch (e) {
       return reply.status(502).send({ error: e.message, match: { key, title, variant, years, profile, url, units, exact: m.exact } })
     }

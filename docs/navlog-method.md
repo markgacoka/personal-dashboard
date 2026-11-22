@@ -124,8 +124,9 @@ Each step needs the one before it:
      RPM, giving %BHP, KTAS and GPH.
   3. Climb TAS = POH climb IAS + 2 % per 1,000 ft, at mid-climb altitude.
   4. The CAS column is TAS converted back for the altitude and temperature.
-- **Source:** the POH for this model (cruise table, climb chart). **Backup:**
-  the closest POH, flagged. **Yours:** the cruise KTAS and GPH in the aircraft
+- **Source:** the POH for this model (cruise table, climb chart): the 172P's
+  transcribed by hand, or for any other model the tables read from its POH PDF
+  (see below). **Backup:** the 172P tables, flagged. **Yours:** the cruise KTAS and GPH in the aircraft
   profile, or a CAS typed into a row.
 - **Expect:** Cessna 172P at 2,400 RPM: about 105–110 KTAS and 6.5–7 GPH at
   4,000–6,000 ft.
@@ -189,6 +190,42 @@ Each step needs the one before it:
   entry.
 - **Expect:** Fuel remaining at the last row ≥ the reserve. A row under the
   reserve shows red.
+
+### Reading a POH's tables
+
+For a model without a hand-transcribed profile, the planner reads the takeoff
+distance, time/fuel/distance to climb, cruise performance and landing distance
+tables from the POH PDF, with the wind and grass corrections from the chart
+notes (`api/src/services/pohTables.js`). The pages come from the book's page map.
+
+- **Assumes:** a GAMA-format table with text (born-digital or an OCR'd scan).
+  Graph-only charts, like most Piper books, and scans without text can't be
+  read.
+- **Steps:**
+  1. Fit each column's position from the rows that read completely.
+  2. Place every value by position, so a row that OCR split over two lines is
+     joined.
+  3. Check every table against how real tables behave, and drop what fails:
+     - Distances grow with altitude and temperature, and lie within 4 % of the
+       line through their neighbours.
+     - Climb time, fuel and distance grow with altitude.
+     - Cruise power and fuel flow fall from the colder to the warmer column and
+       with lower RPM, and fuel flow carries its decimal.
+  4. A table needs its sea-level row and at least five good rows, or it isn't
+     used.
+- **Backup:** the 172P table for any table that couldn't be read, named in the
+  POH note and the workings.
+- **Expect:** On the 1982 172P book (an OCR'd scan), checked against the
+  hand transcription:
+  - Before these checks, 462 of 470 values matched. All 8 misreads were single
+    digits.
+  - The checks then caught the large ones, including a 66 kt read for 86.
+  - Of the values kept, 2 still differ by one digit: 1,350 ft for 1,360, and
+    6.0 for 5.9 GPH.
+  - The 1976 172M book reads completely: 3 takeoff sheets, landing, climb and
+    all 34 cruise rows.
+
+  Compare a row you rely on with the page in the POH tab.
 
 ## Weight and balance
 

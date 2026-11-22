@@ -43,3 +43,39 @@ describe('airport profile', () => {
     expect(applyAirportProfile(a, { tpaMsl: 100 }).tpaAgl).toBeNull() // below the field: ignored
   })
 })
+
+describe('tables read from a POH PDF', async () => {
+  const { withTables, profileFor } = await import('./poh')
+  const { cruiseAt, climbBetween, distanceAt } = await import('./calc')
+  const tables = (await import('./fixtures/c172m-tables.json')).default as import('./poh').PohTables
+  const m = withTables(profileFor('172M'), tables, 'Cessna 172M Skyhawk POH (1976)')
+  test('a 172M with every table read is exact and keeps its TCDS limits', () => {
+    expect(m.exact).toBe(true); expect(m.note).toBeNull()
+    expect(m.profile.limits.maxTakeoff).toBe(2300)
+    expect(m.profile.read?.sections).toEqual(['takeoff', 'climb', 'cruise', 'landing'])
+    expect(m.profile.figures.takeoff).toBe('Figure 5-4, Takeoff Distance')
+  })
+  test('the numbers are the 172M book\'s', () => {
+    expect(cruiseAt(m.profile, 4000, 0, 2400)).toMatchObject({ ktas: 106, gph: 6.9, bhp: 61 })
+    expect(climbBetween(m.profile, 0, 4000, 0)).toEqual({ min: 7, gal: 1.5, nm: 9 })
+    expect(distanceAt(m.profile.takeoff, 2300, 0, 0)).toMatchObject({ ground: 775, total: 1380 })
+    expect(distanceAt(m.profile.landing, 2300, 6000, 40)).toMatchObject({ ground: 705, total: 1570 })
+  })
+  test('what couldn\'t be read stays the 172P\'s and is named', () => {
+    const p = withTables(profileFor('172M'), { ...tables, landing: null }, 'Cessna 172M POH')
+    expect(p.exact).toBe(false)
+    expect(p.profile.landing).toBe(profileFor('172P').profile.landing)
+    expect(p.note).toMatch(/Landing distance couldn't be read/)
+  })
+  test('another model: its tables, the chart\'s heaviest weight as the maximum, and a note', () => {
+    const p = withTables(profileFor('152'), tables, 'Cessna 152 POH')
+    expect(p.exact).toBe(false)
+    expect(p.profile.limits.maxTakeoff).toBe(2300)
+    expect(p.note).toMatch(/CG envelope and loading stations are still the 172P's/)
+  })
+  test('a scan with no text keeps the 172P and says why', () => {
+    const p = withTables(profileFor('172M'), { v: 1, none: 'no text layer' }, 'Cessna 172M POH')
+    expect(p.profile.read).toMatchObject({ sections: [], reason: 'no text layer' })
+    expect(p.exact).toBe(false)
+  })
+})

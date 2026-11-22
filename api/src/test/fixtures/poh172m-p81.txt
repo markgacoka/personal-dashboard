@@ -1,0 +1,62 @@
+                                                                                                                                                    ~(")
+                                                         LANDING DISTANCE                                                                           -trl
+                                                                                                                                                    Orn
+                                                                                                                                                    t::lrn
+                                                                                                                                                    t:<:1z
+                                                                                                                                                    t">
+                                                                                                                                                    ......
+                                                                                                                                                    -J
+           CONDITIONS:                                                                                                                              t-:1
+           Flaps 40°                                                                                                                                E:
+           Power Off
+           Maximum Braking
+           Paved, Level, Dry Runway
+           Zero Wind
+
+           NOTES:
+           1. Ma ximum performa nce technique as specified in Section 4.
+           2. Decrease distances 10% for each 9 knots head wind . For operation with tailwinds up to 10 knots, increase distances by 10%
+              for each 2 knot s.
+           3. For operati on on a dry, grass runway, increase distances by 45% of the "ground roll" figure.
+
+
+
+                      SPEED            0°C           ~('\o r·                 :: n~"~c                  :;o''c    40°r:
+            WEIGHT      AT
+                            PRESS
+                             ALT
+                                                    ..-        ---- ---·-- --
+                                                              ~· .- 1---~ --- -----··· ··-·-- ·-- - - ·            _ _,.,..,...,. ,= ,. . - -- --
+                                                                                                               ~·~---~ ---
+                                                                                                                             - ~
+
+
+
+
+             LBS       50FT              TOTAL           rDTAL                     rO IAL                   rorAL        IOIAL
+                             FT   GRND TO CLEAR GRND TO CLEAR GRND TO CLEAR GRND TO CLEAR GRND TO ClEAR
+                       KIAS
+                                  ROLL 50FT OBS ROLL 50 H OBS ROLL 50FT OB!3 f101 I_ ~() FT 013<; ROIL 50FTORS
+
+              2300       60     S.L.     495       1205       510       1235       530          1265    545        1295       565       1330
+                                1000     510       1235       530       1265       550          1300    565        1330       585       1365
+                                2000     530       1265       550       1300       570          1335    590        1370       610       1405
+ 01                             3000     550       1300       570       1335       590          1370    610        1405       630       1440        '"d
+  I
+ ~                              4000     570       1335       590       1370       615          1410    635        1445       655       1480        1:<:1
+ ~
+                                5000     590       1370 .     615       1415       635          1450    655        1485       680       1525        ::a
+::::::::                                                                1455       660          1490    685        1535       705       1570        "%jUl
+ 01                             6000     615       1415       640
+ I
+                                                                                                        710        1575       730       1615        01:<:1
+ ~                              7000     640       1455       660       1495       685          1535                                                ::On
+                                                                                                                                                    ~~
+ ~
+                                8000     665       1500       690       1540       710          1580    735        1620       760       1665
+ a'
+ ,.....                                                         -   L___ __ _ _ L - - -   L..
+ p:l
+                                                                                                                                                    ~@
+~                                                        Figure 5-10.       Landing Distance                                                        t:<:1c.n
+

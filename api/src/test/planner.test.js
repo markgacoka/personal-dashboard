@@ -212,3 +212,66 @@ describe('POH library search', async () => {
     assert.equal(rankListings(l, '172M', 1975)[0].url, l[0].url)
   })
 })
+
+describe('POH performance tables from the text layer', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { tablesFromText, corrections, cruiseTable, distanceTables } = await import('../services/pohTables.js')
+  const page = n => readFileSync(new URL(`./fixtures/poh172m-p${n}.txt`, import.meta.url), 'utf8').replace(/\f$/, '')
+  // 1976 Cessna 172M (OCR'd scan): pages 72–73 takeoff, 75 climb, 76 cruise, 81 landing.
+  const pages = Array(90).fill('')
+  for (const n of [72, 73, 75, 76, 81]) pages[n - 1] = page(n)
+  const t = tablesFromText(pages, { takeoff: 72, climb: 75, cruise: 76, landing: 81 })
+
+  test('takeoff: all three weight sheets, with speeds and the deleted cells', () => {
+    assert.deepEqual(t.takeoff.map(x => x.weight), [2300, 2100, 1900])
+    assert.deepEqual(t.takeoff[0].speeds, { liftoff: 52, at50: 59 })
+    assert.deepEqual(t.takeoff[0].temps, [0, 10, 20, 30, 40])
+    assert.deepEqual(t.takeoff[0].rows[0], [[775, 1380], [835, 1475], [895, 1575], [960, 1685], [1030, 1795]])
+    assert.deepEqual(t.takeoff[0].rows[8], [[1665, 3065], [1800, 3320], null, null, null])
+    assert.deepEqual(t.takeoff[2].rows[4], [[725, 1290], [775, 1380], [835, 1475], [895, 1575], [955, 1680]])
+  })
+  test('landing: rows OCR split across lines are joined by column', () => {
+    const l = t.landing[0]
+    assert.equal(l.weight, 2300); assert.equal(l.speeds.at50, 60)
+    assert.deepEqual(l.pa, [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000])
+    assert.deepEqual(l.rows[6], [[615, 1415], [640, 1455], [660, 1490], [685, 1535], [705, 1570]])
+    assert.deepEqual(l.rows[7], [[640, 1455], [660, 1495], [685, 1535], [710, 1575], [730, 1615]])
+  })
+  test('climb from sea level and the start/taxi allowance', () => {
+    assert.equal(t.climb.length, 13)
+    assert.deepEqual(t.climb[4], { pa: 4000, temp: 7, kias: 74, fpm: 480, min: 7, gal: 1.5, nm: 9 })
+    assert.equal(t.climbStartFuelGal, 1.1)
+  })
+  test('cruise: misread cells become blanks, the rest is kept', () => {
+    const r = t.cruise.find(x => x.pa === 10000 && x.rpm === 2400)
+    assert.deepEqual(r.cols, [[57, 104, 6.6], [54, 102, 6.4], null]) // "5'" in the book scan
+    assert.deepEqual(t.cruise.find(x => x.pa === 8000 && x.rpm === 2600).cols[1], [68, 115, 7.5]) // "7. 5"
+    assert.equal(t.cruise.length, 34)
+  })
+  test('notes and figure captions', () => {
+    assert.deepEqual(t.takeoffNotes, { headwindPer9kt: 0.1, tailwindPer2kt: 0.1, grassGroundRoll: 0.15 })
+    assert.equal(t.landingNotes.grassGroundRoll, 0.45)
+    assert.equal(t.figures.takeoff, 'Figure 5-4, Takeoff Distance'); assert.equal(t.figures.landing, 'Figure 5-10, Landing Distance')
+  })
+  test('a misread out of line with its row is rejected', () => {
+    const fmt = (lead, pa, cells) => `${lead.padEnd(12)}${pa.padStart(6)}${cells.map(c => String(c).padStart(7)).join('')}`
+    const rows = [fmt('2400 51 56', 'S.L.', [795, 1460, 860, 1570, 925, 1685, 995, 1810, 1065, 1945]), fmt('', '1000', [875, 1605, 940, 1725, 1015, 1860, 1090, 2000, 1170, 2155]),
+      fmt('', '2000', [960, 1770, 1035, 1910, 1115, 2060, 1200, 2220, 1290, 2395]), fmt('', '3000', [1055, 1960, 1140, 2120, 1230, 2295, 1325, 2480, 1425, 2685]),
+      fmt('', '4000', [1165, 2185, 1260, 2365, 1855, 2570, 1465, 2790, 1575, 3030]), fmt('', '5000', [1285, 2445, 1390, 2660, 1500, 2895, 1620, 3160, 1745, 3455]),
+      fmt('', '6000', [1425, 2755, 1540, 3015, 1665, 3300, 1800, 3620, 1940, 3990])]
+    const [x] = distanceTables([['0°C 10°C 20°C 30°C 40°C', ...rows].join('\n')])
+    assert.deepEqual(x.pa, [0, 1000, 2000, 3000, 5000, 6000]); assert.deepEqual(x.missing, [4000])
+  })
+  test('cruise columns out of order with the rest of the row are dropped', () => {
+    const row = (pa, rpm, cells) => `${pa.padStart(6)}${String(rpm).padStart(6)}${cells.map(c => String(c).padStart(6)).join('')}`
+    const lines = [row('2000', 2400, [72, 110, '8.1', 69, 109, '7.7', 65, 108, '7.3']), row('', 2300, [65, 104, '7.3', 62, 103, '6.9', 69, 102, '6.6']), row('', 2200, [58, 99, '6.6', 55, 97, '6.3', 53, 96, '6']),
+      row('4000', 2400, [69, 109, '7.8', 65, 108, '7.3', 62, 107, '7.0']), row('', 2300, [62, 104, '7.0', 59, 102, '6.6', 57, 101, '6.4']), row('', 2200, [56, 98, '6.3', 54, 96, '6.1', 51, 94, '5.9'])]
+    const c = cruiseTable([lines.join('\n')]).rows
+    assert.equal(c[1].cols[2], null) // 69 %BHP hotter than standard: misread
+    assert.equal(c[2].cols[2], null) // "6" with no decimal
+    assert.deepEqual(c[4].cols[1], [59, 102, 6.6])
+  })
+  test('wind and grass corrections from the notes, OCR spacing and all', () => {
+    assert.deepEqual(corrections('2. Decrease distances 10% for each 9 knots head wind . For operation with tailwinds up to 10 knots, increase distances by 10% for each 2 knot s. 3. For operati on on a dry, grass runway, increase distances by 45% of the "ground roll" figure.'), { headwindPer9kt: 0.1, tailwindPer2kt: 0.1, grassGroundRoll: 0.45 })
+  })
+})

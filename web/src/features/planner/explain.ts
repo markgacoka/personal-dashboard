@@ -4,6 +4,7 @@
 // output. The method itself is written up in docs/navlog-method.md.
 import { inEnvelope, isaTemp, reserveMinutes } from './calc'
 import type { Derived, NavRow, Plan, WbStep, WeatherBundle, WindSrc } from './model'
+import type { TableSection } from './poh'
 import type { Line } from './workings'
 
 // primary: the intended source, current · backup: a fallback or an old copy of
@@ -44,9 +45,11 @@ function windSource(r: NavRow, x: ExplainInput) {
 function pohSource(x: ExplainInput, fig: string | undefined, what: string) {
   const p = x.d.profile!
   const custom = what === 'cruise' && (p.cruiseFixed?.ktas || p.cruiseFixed?.gph)
-  return custom
-    ? { used: 'Your aircraft profile\'s cruise numbers', tier: 'yours' as Tier, backup: `POH ${fig ?? what}` }
-    : { used: `${p.model} POH${fig ? `, ${fig}` : ''}`, tier: (x.pohClosest ? 'backup' : 'primary') as Tier, backup: 'The closest POH, flagged' }
+  if (custom) return { used: 'Your aircraft profile\'s cruise numbers', tier: 'yours' as Tier, backup: `POH ${fig ?? what}` }
+  const read = p.read
+  if (read?.sections.includes(what as TableSection)) return { used: `${read.book}, ${fig ?? what} (read from the PDF)`, tier: 'primary' as Tier, backup: 'The 1982 172P POH tables' }
+  if (read) return { used: `1982 172P POH, ${fig ?? what}: the ${read.book} table couldn't be read`, tier: 'backup' as Tier, backup: 'Your aircraft profile\'s numbers' }
+  return { used: `${p.model} POH${fig ? `, ${fig}` : ''}`, tier: (x.pohClosest ? 'backup' : 'primary') as Tier, backup: 'The closest POH, flagged' }
 }
 
 // The row's explanation, one card per quantity, in the order they're worked out.
@@ -226,7 +229,14 @@ export function inputSources(x: ExplainInput): InputSource[] {
   }
   if (d.profile) {
     const fixed = d.profile.cruiseFixed?.ktas || d.profile.cruiseFixed?.gph
-    out.push({ key: 'perf', label: 'Performance', value: fixed ? 'Your numbers' : `${d.profile.model} POH`, tier: fixed ? 'yours' : x.pohClosest ? 'backup' : 'primary', detail: x.pohClosest ? 'The closest POH to this model: check the numbers against the airplane\'s own book.' : 'Cruise, climb, takeoff and landing tables.' })
+    const read = d.profile.read
+    const all = read && !read.missing.length
+    out.push({
+      key: 'perf', label: 'Performance', value: fixed ? 'Your numbers' : read?.sections.length ? (all ? 'Read from its POH' : 'Partly 172P') : `${d.profile.model} POH`,
+      tier: fixed ? 'yours' : read?.sections.length ? (all ? 'primary' : 'backup') : x.pohClosest ? 'backup' : 'primary',
+      detail: read?.sections.length ? `Read from the ${read.book} PDF: ${read.sections.join(', ')}${read.missing.length ? `; ${read.missing.join(', ')} from the 172P` : ''}. Compare a row with the page in the POH tab.`
+        : x.pohClosest ? 'The closest POH to this model: check the numbers against the airplane\'s own book.' : 'Cruise, climb, takeoff and landing tables.',
+    })
     out.push({ key: 'empty', label: 'Empty weight', value: d.wb.emptySample ? 'POH sample' : 'Aircraft record', tier: d.wb.emptySample ? 'standin' : 'yours', detail: d.wb.emptySample ? 'Enter this tail\'s weighed empty weight and moment under Brief → Aircraft.' : 'Saved for this tail.' })
   }
   if (d.flights.length) {

@@ -7,7 +7,7 @@ import type { AircraftRef, AircraftRegistry } from '@/lib/types'
 import { useResolve, type PlannerDoc, type PohMatch } from './api'
 import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
-import type { AircraftProfile } from './poh'
+import { SECTION_LABEL, TABLE_SECTIONS, type AircraftProfile } from './poh'
 import { joinRoute, splitRoute, tokenize } from './route'
 import { CERTIFICATES, roleOf, type PilotCerts } from './pilot'
 import { Segmented, Tooltip } from '@/components/ui/misc'
@@ -87,7 +87,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
             <NumField label="Year" value={plan.aircraft?.year ?? aircraft.year ?? ''} onChange={v => set({ aircraft: { ...plan.aircraft, year: v || null } })} />
           </div>
         )}
-        <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} />
+        <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} read={profile?.read} />
       </Group>
 
       <Group title="Route" hint="Start and end at airports; everything between is flown over."
@@ -197,21 +197,30 @@ export function EmptyWeight({ tail, planning, save, u }: { tail: string; plannin
   )
 }
 
-export function PohStatus({ poh, loading, error, model, uploaded }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null; uploaded?: PlannerDoc | null }) {
+export function PohStatus({ poh, loading, error, model, uploaded, read }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null; uploaded?: PlannerDoc | null; read?: AircraftProfile['read'] }) {
   const refs = useRefs()
   const open = <button type="button" onClick={() => refs?.show('poh')} className="shrink-0 text-accent hover:underline">Open</button>
-  if (uploaded) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{uploaded.title}</span> · your upload</span>{open}</p>
+  const all = read && read.sections.length === TABLE_SECTIONS.length
+  if (uploaded && (all || !read)) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{uploaded.title}</span> · your upload{all ? ', tables read from it' : ''}</span>{open}</p>
   if (!model) return null
   if (loading) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><Loader2 className="size-3.5 animate-spin" />Finding the {model} POH…</p>
   if (error) return <p className="mt-4 text-[13px] text-bad">{error}</p>
+  if (poh?.exact && all && /^172/.test(model)) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · tables read from the book drive the numbers</span>{open}</p>
   if (poh?.exact && poh.profile) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · drives the numbers</span>{open}</p>
   return (
     <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
       <BookOpen className="mt-0.5 size-3.5 shrink-0" />
-      <span className="min-w-0 flex-1">{!poh ? `No public POH for the ${model}; upload it in the POH tab.` : poh.exact ? `${poh.title}. Its tables aren't transcribed yet, so the numbers ${/^172/.test(model) ? 'use the 172P\'s' : 'are the 172P\'s and don\'t apply to this airplane'}.` : `${poh.title}: closest public POH to the ${model}.${poh.profile ? '' : ' Numbers use the closest transcribed one.'}`}</span>
-      {poh && open}
+      <span className="min-w-0 flex-1">{!poh && !uploaded ? `No public POH for the ${model}; upload it in the POH tab.` : !poh?.exact && !uploaded ? `${poh!.title}: closest public POH to the ${model}.${poh!.profile ? '' : ' Numbers use the closest transcribed one.'}` : tablesLine(uploaded?.title ?? poh!.title, model, read)}</span>
+      {(poh || uploaded) && open}
     </p>
   )
+}
+
+// What the book's own tables cover, and what still comes from the 172P.
+function tablesLine(title: string, model: string, read?: AircraftProfile['read']) {
+  const other = /^172/.test(model) ? 'the 172P\'s' : 'the 172P\'s, which don\'t apply to this airplane'
+  if (!read?.sections.length) return `${title}. ${read?.reason === 'no text layer' ? 'This copy is a scan with no text, so its tables can\'t be read' : 'Its performance tables couldn\'t be read'}; the numbers are ${other}.`
+  return `${title}. Read its ${read.sections.map(k => SECTION_LABEL[k]).join(', ')} tables; ${read.missing.map(k => SECTION_LABEL[k]).join(', ')} ${read.missing.length > 1 ? 'are' : 'is'} ${other}.`
 }
 
 // Who flies: you as pilot in command, or dual with an instructor (who is then PIC).

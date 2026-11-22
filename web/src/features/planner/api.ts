@@ -6,6 +6,7 @@ import type { PilotCerts } from './pilot'
 import { parseChecklist, type ChecklistSection } from './checklistParse'
 import type { AircraftPlanning, Airport, AirportProfile, Minimums, Plan, WeatherBundle } from './model'
 import type { LatLon } from './calc'
+import type { PohTables } from './poh'
 
 const MIN = 60_000
 
@@ -105,7 +106,7 @@ export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
 })
 
-export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; content_type?: string; source: string; created_at: string }
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other'; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; tables?: PohTables | null; content_type?: string; source: string; created_at: string }
 export function useDocuments() {
   const qc = useQueryClient()
   const key = ['planner', 'documents']

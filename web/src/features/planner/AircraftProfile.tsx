@@ -136,7 +136,7 @@ export function AircraftDocs({ tail, model, poh, pohUploaded }: { tail: string; 
         {row('poh', poh, poh ? (pohUploaded ? 'Your upload, used for this tail' : 'Public copy for the model; upload this airplane\'s own to replace it') : 'None found; upload this airplane\'s POH')}
         {row('checklist', checklist, checklist ? `Uploaded ${new Date(checklist.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${docs.extract.isPending ? 'reading steps…' : checklist.steps ? `${stepCount(checklist.steps)} steps in ${checklist.steps.length} sections` : 'steps not read yet: Open → Extract steps'}` : 'Upload the checklist you fly with (PDF or photo); its steps are read out automatically')}
       </div>
-      <p className="mt-1.5 text-xs text-fg-3">The newest upload is the one used. Uploads open beside the plan; performance numbers still come from the transcribed POH tables and your aircraft profile.</p>
+      <p className="mt-1.5 text-xs text-fg-3">The newest upload is the one used. Uploads open beside the plan, and their takeoff, climb, cruise and landing tables are read when the PDF has text; your aircraft profile's numbers win over both.</p>
     </div>
   )
 }

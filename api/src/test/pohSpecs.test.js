@@ -32,7 +32,7 @@ describe('1976 Cessna 172M POH', () => {
     assert.match(s.pitotHeat, /^Optional/)
   })
   test('airspeeds', () => {
-    assert.deepEqual(s.arcs, { white: [41, 85], green: [47, 128], yellow: [128, 160], red: 160 })
+    assert.deepEqual(s.arcs, { white: [41, 85], green: [47, 128], yellow: [128, 160], red: 160 , unit: 'kt' })
     assert.deepEqual([s.limits.vne, s.limits.vno, s.limits.va], [160, 128, [[2300, 97], [1950, 89], [1600, 80]]])
     assert.deepEqual([s.speeds.vx, s.speeds.vy, s.speeds.glide, s.speeds.crosswind, s.speeds.shortApproach], [64, 78, 65, 15, 60])
   })
@@ -58,7 +58,7 @@ describe('1982 Cessna 172P POH', () => {
   test('tires, electrical, airspeeds', () => {
     assert.deepEqual(s.gear.tires, { nose: '34 psi · 5.00-5, 6-ply', main: '28 psi · 6.00-6, 4-ply' })
     assert.deepEqual([s.electrical.volts, s.electrical.alternatorAmps, s.electrical.battery], [28, 60, '24 V'])
-    assert.deepEqual(s.arcs, { white: [33, 85], green: [44, 127], yellow: [127, 158], red: 158 })
+    assert.deepEqual(s.arcs, { white: [33, 85], green: [44, 127], yellow: [127, 158], red: 158 , unit: 'kt' })
     assert.deepEqual(s.limits.vfe, [{ label: 'Flaps 10°', kias: 110 }, { label: 'Flaps 10°–30°', kias: 85 }])
     assert.deepEqual([s.speeds.vx, s.speeds.vy, s.speeds.shortApproach], [60, 76, 61])
   })
@@ -79,7 +79,7 @@ describe('1995 Piper PA-28-161 POH (OCR of a scan)', () => {
     assert.deepEqual(s.gear.tires, { nose: '30 psi · 5.00x5, 4-ply', main: '24 psi · 6.00x6, 4-ply' })
     assert.match(s.brakes.parking, /Hand brake lever/)
     assert.deepEqual([s.electrical.volts, s.electrical.alternatorAmps], [28, 60])
-    assert.deepEqual(s.arcs, { white: [44, 103], green: [50, 126], yellow: [126, 160], red: 160 })
+    assert.deepEqual(s.arcs, { white: [44, 103], green: [50, 126], yellow: [126, 160], red: 160 , unit: 'kt' })
     assert.deepEqual([s.speeds.vx, s.speeds.vy, s.speeds.crosswind], [63, 79, 17])
   })
   test('what the scan lost is left out, not guessed', () => {
@@ -98,7 +98,7 @@ describe('2005 Cessna 172S information manual', () => {
   test('airspeed limitations with a two-line window-open row', () => {
     assert.deepEqual(s.limits, { vne: 163, vno: 129, va: [[2550, 105], [2200, 98], [1900, 90]], vfe: [{ label: 'Flaps 10°', kias: 110 }, { label: 'Flaps 10°–full', kias: 85 }], windowOpen: 163 })
     assert.deepEqual([s.speeds.vx, s.speeds.vy], [62, 74])
-    assert.deepEqual(s.arcs, { white: [40, 85], green: [48, 129], yellow: [129, 163], red: 163 })
+    assert.deepEqual(s.arcs, { white: [40, 85], green: [48, 129], yellow: [129, 163], red: 163 , unit: 'kt' })
   })
 })
 
@@ -120,7 +120,7 @@ describe('1978 Cessna 172N POH (rough OCR text layer)', () => {
   const s = read('c172n-specs.txt.gz')
   test('reads through glued words and letter-for-digit swaps', () => {
     assert.deepEqual([s.engine.model, s.engine.hp, s.engine.rpm], ['O-320-H2AD', 160, 2700]) // "HZAD", "27O0RPM"
-    assert.deepEqual(s.arcs, { white: [41, 85], green: [47, 128], yellow: [128, 160], red: 160 })
+    assert.deepEqual(s.arcs, { white: [41, 85], green: [47, 128], yellow: [128, 160], red: 160 , unit: 'kt' })
     assert.deepEqual([s.limits.vne, s.limits.vno, s.limits.windowOpen], [160, 128, 160]) // "KlAS", "MaximumStructural"
     assert.deepEqual(s.fuel.tanks.map(t => [t.total, t.usable]), [[43, 40], [54, 50]])
   })
@@ -128,4 +128,9 @@ describe('1978 Cessna 172N POH (rough OCR text layer)', () => {
     assert.equal(s.stall, null)
     assert.equal(s.speeds.vx, null)
   })
+})
+
+test('an MPH book\'s airspeed markings are converted to knots', () => {
+  const s = specsFromText(['AIRSPEED INDICATOR MARKINGS\nMARKING   MPH VALUE OR RANGE\nWhite Arc   55 - 100\nGreen Arc   62 - 140\nYellow Arc  140 - 174\nRed Line    174\n'])
+  assert.deepEqual(s.arcs, { white: [48, 87], green: [54, 122], yellow: [122, 151], red: 151, unit: 'mph' })
 })

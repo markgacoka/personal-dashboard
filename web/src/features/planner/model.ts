@@ -158,6 +158,8 @@ export interface Leg {
   from: Airport; to: Airport; distNm: number; tc: number; mc: number; varEast: number
   wind: { dir: number | null; spd: number; temp: number | null; stations: string[] } | null
   tas: number; gph: number; wca: number; th: number; mh: number; gs: number
+  // Cruise pressure altitude and the altimeter setting it came from; descent fuel flow.
+  pa: number; altim: number; descGph: number
   climb: { min: number; gal: number; nm: number } | null
   eteMin: number; fuelGal: number; departAt: Date; arriveAt: Date; terrainMax: number | null; stop: boolean; flight: number
 }
@@ -167,7 +169,7 @@ export interface Flight {
   n: number; from: Airport; to: Airport; legs: Leg[]; rows: NavRow[]
   alt: number; altAuto: number; altSet: boolean; hemispheric: boolean; mc: number; terrainMax: number | null
   distNm: number; eteMin: number; fuelGal: number; departAt: Date; arriveAt: Date
-  climb: { min: number; gal: number; nm: number } | null; cruise: { ktas: number; gph: number; bhp: number } | null
+  climb: { min: number; gal: number; nm: number } | null; cruise: { ktas: number; gph: number; bhp: number; pa: number; altim: number; descGph: number } | null
   tpaFrom: number; tpaTo: number; fuelStart: number
 }
 export interface WbStep { label: string; source: string; weight: number; arm: number | null; moment: number; total?: boolean; max?: number; over?: boolean }
@@ -438,6 +440,12 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     const stale = winds.some(w => w.stale)
     // The forecast window that covers the moment the point is flown.
     const sel = (at: Date | null) => (winds.length && at ? fbFor(winds, at) : fbSel)
+    // The altimeter setting at (or within 25 nm of) an airport, inHg; standard without a METAR.
+    const altimFor = (ap: Airport) => {
+      const ms = inp.weather?.metars.data || []
+      const m = ms.find(x => x.icaoId === (ap.icao || ap.id)) || nearest(ms, ap, 25)?.x
+      return m?.altim ? Math.round(hPaToInHg(m.altim) * 100) / 100 : 29.92
+    }
     const wind = (p: LatLon, alt: number, at: Date | null = t) => { const s = sel(at); return s ? windAt(s.product, p, alt) : null }
     for (let i = 1; i < route.length; i++) {
       const from = route[i - 1], to = route[i]
@@ -451,15 +459,21 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const fwSet = fwOv.wdir != null || fwOv.wspd != null || fwOv.temp != null
       const mine = (fw: ReturnType<typeof wind>) => fwSet ? { dir: fwOv.wdir ?? fw?.dir ?? null, spd: fwOv.wspd ?? fw?.spd ?? 0, temp: fwOv.temp ?? fw?.temp ?? null, stations: fw?.stations ?? [] } : fw
       const midWind = mine(wind(intermediate(from, to, 0.5), cruiseAlt))
-      const isaDev = midWind?.temp != null ? midWind.temp - isaTemp(cruiseAlt) : 0
-      const cr = cruiseAt(profile, cruiseAlt, isaDev, plan.rpm)
+      // The POH tables are by pressure altitude: you fly the indicated altitude
+      // with the local altimeter set, so PA = indicated + (29.92 − setting) × 1000.
+      const setting = altimFor(from)
+      const cruisePa = pressureAltitude(cruiseAlt, setting)
+      const isaDev = midWind?.temp != null ? midWind.temp - isaTemp(cruisePa) : 0
+      const cr = cruiseAt(profile, cruisePa, isaDev, plan.rpm)
       const tas = cr?.ktas ?? 0, gph = cr?.gph ?? 0
-      // Climb: POH time/fuel; ground distance from climb TAS and the wind at mid-climb.
-      const climb = startsAtStop ? climbBetween(profile, pressureAltitude(from.elev, 29.92), cruiseAlt, isaDev) : { min: 0, gal: 0, nm: 0 }
-      const climbMidAlt = (from.elev + cruiseAlt) / 2
-      const climbKias = profile.climb.find(c => c.pa >= climbMidAlt)?.kias ?? 74
-      const climbTas = Math.round(climbKias * (1 + 0.02 * climbMidAlt / 1000))
+      // Climb: POH time/fuel from field to cruise pressure altitude; ground
+      // distance from the climb TAS (POH climb KIAS at the temperature) and the wind at mid-climb.
+      const fieldPa = pressureAltitude(from.elev, setting)
+      const climb = startsAtStop ? climbBetween(profile, fieldPa, cruisePa, isaDev) : { min: 0, gal: 0, nm: 0 }
+      const climbMidAlt = (from.elev + cruiseAlt) / 2, climbMidPa = (fieldPa + cruisePa) / 2
+      const climbKias = profile.climb.find(c => c.pa >= climbMidPa)?.kias ?? profile.climb.at(-1)?.kias ?? 74
       const cw = mine(wind(intermediate(from, to, 0.1), climbMidAlt))
+      const climbTas = Math.round(tasFromCas(climbKias, climbMidPa, cw?.temp ?? isaTemp(climbMidPa) + isaDev))
       const climbGs = windTriangle(legTc, climbTas, cw?.dir ?? null, cw?.spd ?? 0).gs || climbTas
       let climbNm = (climb.min / 60) * climbGs
       // Descent: 500 fpm from cruise to pattern altitude at cruise speed (planning assumption; the POH has no descent table).
@@ -467,6 +481,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       const descMin = endsAtStop ? Math.max(0, cruiseAlt - tpa) / 500 : 0
       const dw = mine(wind(intermediate(from, to, 0.9), (cruiseAlt + tpa) / 2))
       const descGs = windTriangle(legTc, tas, dw?.dir ?? null, dw?.spd ?? 0).gs || tas
+      // No POH descent table: fuel at the cruise table's lowest power at mid-descent.
+      const lowRpm = Math.min(...profile.cruise.map(c => c.rpm))
+      const descGph = cruiseAt(profile, pressureAltitude((cruiseAlt + tpa) / 2, setting), isaDev, lowRpm)?.gph ?? gph
       let descNm = (descMin / 60) * descGs
       let scale = 1
       if (climbNm + descNm > D * 0.98 && climbNm + descNm > 0) { scale = (D * 0.98) / (climbNm + descNm); climbNm *= scale; descNm *= scale }
@@ -516,7 +533,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
         const tri = windTriangle(tc, rowTas, w?.dir ?? null, w?.spd ?? 0)
         const dist = distanceNm(a.pt, b.pt)
         const ete = phase === 'climb' ? climb.min * scale : tri.gs > 0 ? (dist / tri.gs) * 60 : 0
-        const fuel = phase === 'climb' ? climb.gal * scale : (ete / 60) * gph
+        const fuel = phase === 'climb' ? climb.gal * scale : (ete / 60) * (phase === 'descent' ? descGph : gph)
         legMin += ete; legFuel += fuel; fuelUsed += fuel
         t = new Date(t.getTime() + ete * 60_000)
         navlog.push({
@@ -525,11 +542,11 @@ export function derive(plan: Plan, inp: Inputs): Derived {
           alt: phase === 'climb' ? `↑${cruiseAlt.toLocaleString()}` : phase === 'descent' ? `↓${Math.round(tpa).toLocaleString()}` : cruiseAlt.toLocaleString(),
           wind: w, tas: rowTas, tc, wca: tri.wca, th: tri.th, varEast, mh: toMagnetic(tri.th, varEast), mc: toMagnetic(tc, varEast),
           distNm: dist, gs: tri.gs, eteMin: ete, eta: new Date(t), fuelGal: fuel, remNm: 0, fuelRem: 0, terrainMax: terrainNear(sampleRoute([a.pt, b.pt], 2)),
-          windSrc, windWindow, gph, oat,
+          windSrc, windWindow, gph: phase === 'descent' ? descGph : gph, oat,
         })
       }
       const mainRow = navlog.filter(r => r.leg === i).find(r => r.phase === 'cruise') ?? navlog.filter(r => r.leg === i)[0]
-      legs.push({ from, to, distNm: D, tc: legTc, mc: toMagnetic(legTc, (from.magVar + to.magVar) / 2), varEast: (from.magVar + to.magVar) / 2, wind: midWind, tas, gph,
+      legs.push({ from, to, distNm: D, tc: legTc, mc: toMagnetic(legTc, (from.magVar + to.magVar) / 2), varEast: (from.magVar + to.magVar) / 2, wind: midWind, tas, gph, pa: cruisePa, altim: setting, descGph,
         wca: mainRow?.wca ?? 0, th: mainRow?.th ?? legTc, mh: mainRow?.mh ?? legTc, gs: mainRow?.gs ?? tas, climb: climb.min ? climb : null, eteMin: legMin, fuelGal: legFuel,
         departAt: legStart, arriveAt: new Date(t), terrainMax: terrainNear(sampleRoute([from, to], 2)), stop: endsAtStop, flight })
       if (endsAtStop && i < route.length - 1) t = new Date(t.getTime() + plan.stopMinutes * 60_000)
@@ -551,12 +568,12 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     const rows = navlog.filter(r => r.flight === f)
     const from = fl[0].from, to = fl[fl.length - 1].to, fa = flightAlt[f]
     const sum = (k: 'distNm' | 'eteMin' | 'fuelGal') => fl.reduce((x, l) => x + l[k], 0)
-    const isaDev = fl[0].wind?.temp != null ? fl[0].wind.temp - isaTemp(fa.alt) : 0
+    const isaDev = fl[0].wind?.temp != null ? fl[0].wind.temp - isaTemp(fl[0].pa) : 0
     flights.push({
       n: f, from, to, legs: fl, rows, alt: fa.alt, altAuto: fa.altAuto, altSet: fa.altSet, hemispheric: fa.hemispheric, terrainMax: fa.terrainMax,
       mc: toMagnetic(initialCourse(from, to), (from.magVar + to.magVar) / 2), distNm: sum('distNm'), eteMin: sum('eteMin'), fuelGal: sum('fuelGal'),
       departAt: fl[0].departAt, arriveAt: fl[fl.length - 1].arriveAt, climb: fl[0].climb,
-      cruise: profile ? { ktas: fl[0].tas, gph: fl[0].gph, bhp: cruiseAt(profile, fa.alt, isaDev, plan.rpm)?.bhp ?? 0 } : null,
+      cruise: profile ? { ktas: fl[0].tas, gph: fl[0].gph, bhp: cruiseAt(profile, fl[0].pa, isaDev, plan.rpm)?.bhp ?? 0, pa: fl[0].pa, altim: fl[0].altim, descGph: fl[0].descGph } : null,
       tpaFrom: from.elev + (from.tpaAgl || 1000), tpaTo: to.elev + (to.tpaAgl || 1000),
       fuelStart: rows[0] ? rows[0].fuelRem + rows[0].fuelGal + (profile?.climbStartFuelGal ?? 0) : usable,
     })
@@ -696,6 +713,13 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   // ── Aircraft ──
   if (!plan.tail) add('aircraft', 'todo', 'Choose the aircraft')
   else if (inp.match && !inp.match.exact && inp.match.note) add('aircraft', 'caution', 'Closest POH used', inp.match.note)
+  // Units: knots throughout. A table read from a book must say which unit it uses.
+  const rd = profile?.read
+  if (rd?.units) {
+    const unstated = rd.sections.filter(k => rd.units?.[k] == null), mph = rd.sections.filter(k => rd.units?.[k] === 'mph')
+    if (unstated.length) add('aircraft', 'caution', `POH ${unstated.join(', ')} table${unstated.length > 1 ? 's don\'t' : ' doesn\'t'} state knots or MPH`, `Read as knots. Check the ${rd.book} header: an MPH table read as knots makes speeds 15 % too high.`)
+    else add('aircraft', 'ok', mph.length ? `POH ${mph.join(', ')} converted from MPH to knots` : 'POH tables are in knots', mph.length ? `${rd.book} prints MPH and statute miles; speeds and climb distances are divided by 1.151.` : `Every table read from the ${rd.book} names KIAS or KTAS.`)
+  }
   if (plan.tail) {
     const insp = inp.planning.inspections || {}
     for (const i of AV1ATES) {

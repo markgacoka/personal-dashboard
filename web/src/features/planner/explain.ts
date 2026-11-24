@@ -109,16 +109,16 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'TAS', v: `CAS ÷ √σ at ${n0(r.altFt)} ft, ${Math.round(r.oat)} °C = ${Math.round(r.tas)} kt` },
     ] : r.phase === 'climb' ? [
       { k: 'POH climb IAS', v: `${climbIas} kt` },
-      { k: 'Climb TAS', v: `${climbIas} × (1 + 0.02 × ${n1(r.altFt / 1000)}) = ${Math.round(r.tas)} kt` },
+      { k: 'Climb TAS', v: `IAS ÷ √σ at ${n0(r.altFt)} ft, ${Math.round(r.oat)} °C = ${Math.round(r.tas)} kt` },
     ] : [
       { k: 'Power', v: `${plan.rpm} RPM, recommended lean` },
-      { k: 'Pressure altitude', v: `${n0(flight?.alt ?? r.altFt)} ft` },
+      { k: 'Pressure altitude', v: flight?.cruise ? `${n0(flight.alt)} + (29.92 − ${flight.cruise.altim.toFixed(2)}) × 1,000 = ${n0(flight.cruise.pa)} ft` : `${n0(r.altFt)} ft` },
       { k: 'ISA deviation', v: `${sgn(tDev, 0)} °C` },
-      { k: 'POH cruise table', v: `${flight?.cruise ? `${flight.cruise.bhp} % BHP, ` : ''}${Math.round(r.tas)} KTAS, ${r.gph} GPH (interpolated)` },
+      { k: 'POH cruise table', v: r.phase === 'descent' ? `${Math.round(r.tas)} KTAS; ${r.gph} GPH at the table's lowest power (descending)` : `${flight?.cruise ? `${flight.cruise.bhp} % BHP, ` : ''}${Math.round(r.tas)} KTAS, ${r.gph} GPH (interpolated)` },
       { k: 'CAS', v: `TAS × √σ = ${Math.round(r.cas)} kt` },
     ],
     source: casSet ? { used: 'Typed into this row', tier: 'yours', backup: 'POH cruise table' } : pohSource(x, r.phase === 'climb' ? p.figures.climb : p.figures.cruise, r.phase === 'climb' ? 'climb' : 'cruise'),
-    assumes: r.phase === 'climb' ? ['POH climb speed; TAS rises about 2 % per 1,000 ft.'] : r.phase === 'descent' ? ['Descent at cruise TAS (planning figure; the POH has no descent table).'] : ['Cruise at the chosen RPM, leaned as the POH recommends.'],
+    assumes: r.phase === 'climb' ? ['POH climb speed, converted to TAS at the forecast temperature.'] : r.phase === 'descent' ? ['Descent at cruise TAS, power back to the cruise table\'s lowest RPM (the POH has no descent table).'] : ['Cruise at the chosen RPM, leaned as the POH recommends.'],
     expect: { text: `Between Vy and Vne: ${p.vspeeds.vy}–${p.vspeeds.vne} KIAS for the ${p.model}.`, ok: r.cas >= p.vspeeds.vy - 5 && r.cas <= p.vspeeds.vne },
     edit: ['cas'],
   })

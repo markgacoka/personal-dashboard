@@ -13,7 +13,7 @@
 import { pool } from '../db/client.js'
 import { pdfPages } from './pohPages.js'
 
-export const TABLES_VERSION = 1
+export const TABLES_VERSION = 2
 
 const num = s => (/^-?\d{1,2},\d{3}$/.test(s) ? Number(s.replace(',', '')) : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN)
 const isSL = s => /^S\.?L\.?$/i.test(s)
@@ -225,6 +225,27 @@ const caption = (text, re) => {
 }
 
 // Pure: every page's text (index 0 = page 1) and the page map → the tables found.
+// Older books (Cessna before 1976, many Pipers) print speeds in MPH and distances
+// in statute miles. Each table's own header says which: knots when it names
+// KIAS/KTAS/KCAS/KNOTS, MPH when it names only MPH; null when it names neither.
+const MPH_PER_KT = 1.15078
+export function speedUnit(text) {
+  const t = String(text).toUpperCase()
+  if (/\bK(?:IAS|TAS|CAS|NOTS)\b|\bKTS\b/.test(t)) return 'kt'
+  if (/\bMPH\b|\bM\.P\.H\.?/.test(t)) return 'mph'
+  return null
+}
+const kt = v => (v == null ? v : Math.round(v / MPH_PER_KT))
+const nm = v => (v == null ? v : Math.round((v / MPH_PER_KT) * 10) / 10)
+export function toKnots(t, units) {
+  const out = { ...t }
+  if (units.takeoff === 'mph' && t.takeoff) out.takeoff = t.takeoff.map(x => ({ ...x, speeds: Object.fromEntries(Object.entries(x.speeds).map(([k, v]) => [k, kt(v)])) }))
+  if (units.landing === 'mph' && t.landing) out.landing = t.landing.map(x => ({ ...x, speeds: Object.fromEntries(Object.entries(x.speeds).map(([k, v]) => [k, kt(v)])) }))
+  if (units.climb === 'mph' && t.climb) out.climb = t.climb.map(x => ({ ...x, kias: kt(x.kias), nm: nm(x.nm) }))
+  if (units.cruise === 'mph' && t.cruise) out.cruise = t.cruise.map(x => ({ ...x, cols: x.cols.map(c => (c ? [c[0], kt(c[1]), c[2]] : c)) }))
+  return out
+}
+
 export function tablesFromText(pages, pageMap = {}) {
   const at = (key, heading) => {
     const p = pageMap[key]
@@ -242,7 +263,8 @@ export function tablesFromText(pages, pageMap = {}) {
   const cruise = cruiseTable(cr)
   const fuel = cl.join(' ').replace(/\s+/g, ' ').match(/add (\d+(?:\.\d)?) gal\w* of fuel for engine start/i)
   const pick = list => list.map(({ dropped, ...t }) => t) // eslint-disable-line no-unused-vars
-  return {
+  const units = { takeoff: tk.length ? speedUnit(tk.join('\n')) : null, landing: ld.length ? speedUnit(ld.join('\n')) : null, climb: cl.length ? speedUnit(cl.join('\n')) : null, cruise: cr.length ? speedUnit(cr.join('\n')) : null }
+  return toKnots({
     v: TABLES_VERSION,
     takeoff: takeoff.length ? pick(takeoff) : null,
     landing: landing.length ? pick(landing) : null,
@@ -261,7 +283,8 @@ export function tablesFromText(pages, pageMap = {}) {
       takeoff: takeoff.reduce((s, t) => s + t.dropped, 0), landing: landing.reduce((s, t) => s + t.dropped, 0),
       climb: climb?.dropped ?? 0, cruise: cruise?.dropped ?? 0,
     },
-  }
+    units,
+  }, units)
 }
 
 // From the PDF: text-layer books only (a scan without one gets { v, none: true }).

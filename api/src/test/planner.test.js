@@ -284,3 +284,15 @@ test('FAA registry record: registration and airworthiness lines', async () => {
     row('Classification', 'Standard'), row('Category', 'Normal'), row('A/W Date', '04/25/2002'), row('Expiration Date', '07/26/2026')].join('')
   assert.deepEqual(registrationOf(html), { issued: '2002-03-04', expires: '2030-03-31', type: 'Corporation', city: 'SAN JOSE', state: 'CALIFORNIA', engine_make: 'LYCOMING', engine_model: '0-320 SERIES', aw_class: 'Standard', aw_category: 'Normal', aw_date: '2002-04-25' })
 })
+
+test('POH tables: each table\'s speed unit from its header, MPH converted to knots', async () => {
+  const { speedUnit, toKnots } = await import('../services/pohTables.js')
+  assert.equal(speedUnit('PRESS ALT  TEMP  CLIMB SPEED KIAS  RATE OF CLIMB FPM'), 'kt')
+  assert.equal(speedUnit('% BHP  TAS MPH  GPH'), 'mph')
+  assert.equal(speedUnit('KTAS / MPH'), 'kt')
+  assert.equal(speedUnit('CRUISE PERFORMANCE'), null)
+  const t = toKnots({ climb: [{ pa: 0, kias: 90, nm: 0 }, { pa: 2000, kias: 88, nm: 4.6 }], cruise: [{ pa: 2000, rpm: 2500, cols: [null, [75, 138, 8.1], null] }], takeoff: null, landing: null },
+    { climb: 'mph', cruise: 'mph', takeoff: null, landing: null })
+  assert.deepEqual(t.climb.map(r => [r.kias, r.nm]), [[78, 0], [76, 4]])
+  assert.deepEqual(t.cruise[0].cols[1], [75, 120, 8.1])
+})

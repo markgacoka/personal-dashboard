@@ -34,8 +34,10 @@ export function assumptions(x: WorkingsInput): Assumption[] {
   ]
   if (p) out.push(
     { label: 'Start, taxi and run-up fuel', value: `${p.climbStartFuelGal} gal per takeoff`, basis: `POH ${p.figures.climb ?? 'climb chart'} note.` },
-    { label: 'Climb', value: 'POH climb schedule', basis: 'Time, fuel and distance from the POH chart, +10 % per 10 °C above standard; climb TAS is the climb IAS +2 % per 1,000 ft.' },
-    { label: 'Descent', value: '500 fpm at cruise TAS', basis: 'Planning figure (the POH has no descent table), from cruise to pattern altitude: the airport\'s, or 1,000 ft AGL.' },
+    { label: 'Climb', value: 'POH climb schedule', basis: 'Time, fuel and distance from the POH chart between field and cruise pressure altitude (each from the departure altimeter setting), +10 % per 10 °C above standard; climb TAS is the POH climb IAS at the forecast temperature.' },
+    { label: 'Descent', value: '500 fpm at cruise TAS', basis: 'Planning figure (the POH has no descent table): top of descent = (cruise − pattern altitude) ÷ 500 fpm × ground speed before the airport, with the wind at mid-descent; fuel at the cruise table\'s lowest RPM. Pattern altitude is the airport\'s, or 1,000 ft AGL.' },
+    { label: 'Pressure altitude', value: 'From the altimeter setting', basis: 'The POH tables are by pressure altitude: indicated altitude + (29.92 − the nearest METAR altimeter) × 1,000. Without a METAR within 25 nm, 29.92.' },
+    { label: 'Units', value: 'Knots, nautical miles', basis: 'Each POH table\'s header is read for KIAS/KTAS or MPH; MPH tables and markings are divided by 1.151, and a table that states neither is flagged.' },
     { label: 'Cruise power', value: `${plan.rpm} RPM, recommended lean`, basis: p.cruiseFixed?.ktas || p.cruiseFixed?.gph ? 'Your aircraft profile\'s cruise numbers replace the POH table.' : `POH ${p.figures.cruise ?? 'cruise table'}, at the cruise altitude and the forecast temperature there.`, change: 'Plan → Cruise power' },
   )
   out.push(

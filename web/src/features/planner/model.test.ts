@@ -289,3 +289,17 @@ describe('no alternate', () => {
     expect(none.legs).toHaveLength(withAlt.legs.length)
   })
 })
+
+describe('climb, cruise and descent from the POH at the real pressure altitude', () => {
+  const at = (altim: number) => derive(plan(), inputs({ weather: weather({ metars: { data: [metar('KRHV', RHV, 300, 5), metar('KSNS', SNS, 300, 5)].map(m => ({ ...m, altim })), fetchedAt: new Date(NOW).toISOString() } as WeatherBundle['metars'] }) }))
+  test('a low altimeter means a higher pressure altitude: a longer climb', () => {
+    const lo = at(995), hi = at(1030)
+    const climbMin = (d: ReturnType<typeof derive>) => d.navlog.filter(r => r.phase === 'climb').reduce((s, r) => s + r.eteMin, 0)
+    expect(climbMin(lo)).toBeGreaterThan(climbMin(hi))
+  })
+  test('the descent burns less than cruise (the table\'s lowest power), and the climb uses the POH climb fuel', () => {
+    const d = at(1013.2)
+    const rate = (ph: string) => { const rs = d.navlog.filter(r => r.phase === ph); return rs.reduce((s, r) => s + r.fuelGal, 0) / rs.reduce((s, r) => s + r.eteMin, 0) }
+    expect(rate('descent')).toBeLessThan(rate('cruise'))
+  })
+})

@@ -46,7 +46,7 @@ export interface AircraftProfile {
   // Your own cruise numbers (from the aircraft profile) in place of the POH table.
   cruiseFixed?: { ktas?: number | null; gph?: number | null }
   // Tables read automatically from this model's POH PDF (the rest are the 172P's).
-  read?: { book: string; sections: TableSection[]; missing: TableSection[]; reason?: string }
+  read?: { book: string; sections: TableSection[]; missing: TableSection[]; reason?: string; units?: PohTables['units'] }
   // The book whose speeds, tanks and oil were read from its text (withSpecs).
   specsFrom?: string
 }
@@ -63,6 +63,8 @@ export interface PohTables {
   takeoffNotes?: { headwindPer9kt: number; tailwindPer2kt: number; grassGroundRoll: number | null } | null
   landingNotes?: { headwindPer9kt: number; tailwindPer2kt: number; grassGroundRoll: number | null } | null
   figures?: Partial<Record<TableSection, string | null>>
+  // Each table's speed unit as its header states it ('mph' tables arrive converted to knots).
+  units?: Partial<Record<TableSection, 'kt' | 'mph' | null>>
 }
 
 // What you changed on a tail's profile (saved per tail in planner_aircraft as
@@ -360,7 +362,7 @@ export function withTables(m: ProfileMatch, t: PohTables | null | undefined, boo
     takeoffNotes: notes(p.takeoffNotes, t.takeoffNotes), landingNotes: notes(p.landingNotes, t.landingNotes),
     figures: { ...p.figures, ...figs },
     source: `${book}, tables read from the PDF`,
-    read: { book, sections, missing },
+    read: { book, sections, missing, units: t.units },
   }
   if (!missing.length && knownLimits) return { profile, exact: true, note: null }
   const parts = [

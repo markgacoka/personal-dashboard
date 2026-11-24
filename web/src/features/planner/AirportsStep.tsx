@@ -16,6 +16,8 @@ const FREQ_LABEL: Record<string, string> = {
   'LCL/P': 'Tower', 'LCL/S': 'Tower (sec.)', 'GND/P': 'Ground', 'GND/S': 'Ground (sec.)', 'CD/P': 'Clearance', ATIS: 'ATIS', 'D-ATIS': 'D-ATIS', CTAF: 'CTAF', UNICOM: 'UNICOM',
   'APCH/P': 'Approach', 'APCH/S': 'Approach', 'DEP/P': 'Departure', 'DEP/S': 'Departure', 'APCH/P DEP/P': 'Approach/Departure', 'APCH/P DEP/P IC': 'Approach/Departure', 'DEP/P IC': 'Departure', 'APCH/S IC': 'Approach', 'APCH/P IC': 'Approach', 'CLASS C': 'Class C', 'CLASS B': 'Class B',
 }
+import { freqUse, type FreqRole } from './freqs'
+
 const ORDER = ['ATIS', 'D-ATIS', 'CD/P', 'GND/P', 'GND/S', 'LCL/P', 'LCL/S', 'CTAF', 'UNICOM', 'DEP/P', 'DEP/P IC', 'DEP/S', 'APCH/P', 'APCH/S', 'APCH/S IC', 'APCH/P IC', 'APCH/P DEP/P', 'APCH/P DEP/P IC', 'CLASS C', 'CLASS B']
 
 // Step 4: every airport on the trip as AirNav and the Chart Supplement show it —
@@ -132,6 +134,7 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
   const [editing, setEditing] = useState(false)
   const id = a.icao || a.id
   const datis = useDatis(a.icao, a.towered)
+  const frole: FreqRole = /and destination/.test(role) ? 'both' : /^Departure/.test(role) ? 'departure' : 'arrival'
   const atis = datis.data?.data?.[0]
   const inUse = atis ? atisRunways(atis.text) : []
   const tpa = Math.round((a.elev + (a.tpaAgl || 1000)) / 10) * 10
@@ -201,7 +204,10 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
 
       <div className="mt-3 grid gap-x-6 text-sm @lg:grid-cols-2">
         {sorted.map((f, i) => (
-          <div key={i} className="flex min-w-0 items-baseline gap-2 border-b border-border py-1"><span className="shrink-0 text-fg-3">{FREQ_LABEL[f.use] || f.use}</span><span className="num ml-auto text-fg">{f.freq}</span>{f.sector && <span className="w-28 shrink-0 truncate text-right text-xs text-fg-3" title={f.sector}>{f.sector}</span>}</div>
+          <div key={i} className="min-w-0 border-b border-border py-1.5">
+            <div className="flex min-w-0 items-baseline gap-2"><span className="shrink-0 text-fg-2">{FREQ_LABEL[f.use] || f.use}</span><span className="num ml-auto text-fg">{f.freq}</span>{f.sector && <span className="w-28 shrink-0 truncate text-right text-[13px] text-fg-3" title={f.sector}>{f.sector}</span>}</div>
+            {freqUse(f.use, a, frole) && <div className="text-[13px] leading-snug text-fg-3">{freqUse(f.use, a, frole)}</div>}
+          </div>
         ))}
       </div>
 

@@ -58,7 +58,7 @@ export function PohSummary({ d, profile, plan, planning, u = US }: { d: Derived;
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-sm text-fg-3">Climb from the POH table between field and cruise pressure altitude, +10 % per 10 °C above standard. Cruise at the forecast temperature (FB winds aloft), recommended lean. Descent 500 fpm at cruise speed to pattern altitude (planning figure; the POH has no descent table).</p>
+        <p className="mt-2 text-sm text-fg-3">Climb from the POH table between field and cruise pressure altitude (from the altimeter setting), +10 % per 10 °C above standard. Cruise at the forecast temperature (model winds aloft), recommended lean. Descent 500 fpm at cruise speed to pattern altitude, fuel at the table's lowest power (planning figure; the POH has no descent table).</p>
       </div>
     </div>
   )

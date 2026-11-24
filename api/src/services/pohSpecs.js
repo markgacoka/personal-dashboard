@@ -6,8 +6,9 @@
 // whitespace-collapsed text; anything not found is left out rather than guessed.
 import { pool } from '../db/client.js'
 import { ocrPages, pdfPages } from './pohPages.js'
+import { speedUnit } from './pohTables.js'
 
-export const SPECS_VERSION = 1
+export const SPECS_VERSION = 2
 
 const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 }
 const num = s => (s == null ? null : Number(String(s).replace(/[,\s]/g, '')))
@@ -173,7 +174,10 @@ export function arcsOf(t) {
   const a = (name, two = true) => t.match(new RegExp(`${name}(?:\\s*\\([^)]*\\))?\\s+(\\d{2,3})\\b${two ? '\\s*(?:to|[^\\d\\s]{1,3})\\s*(\\d{2,3})\\b' : ''}`, 'i'))
   const w = a('White\\s?Arc'), g = a('Green\\s?Arc'), y = a('Yellow\\s?Arc'), r = a('Red\\s?(?:Radial\\s)?Line', false)
   if (!w || !g) return null
-  return { white: [num(w[1]), num(w[2])], green: [num(g[1]), num(g[2])], yellow: y ? [num(y[1]), num(y[2])] : null, red: r ? num(r[1]) : null }
+  // The markings table's header says KIAS or MPH; an MPH book is converted to knots.
+  const i = t.search(/White\s?Arc/i), unit = speedUnit(t.slice(Math.max(0, i - 600), i)) ?? 'kt'
+  const k = v => (unit === 'mph' ? Math.round(num(v) / 1.15078) : num(v))
+  return { white: [k(w[1]), k(w[2])], green: [k(g[1]), k(g[2])], yellow: y ? [k(y[1]), k(y[2])] : null, red: r ? k(r[1]) : null, unit }
 }
 
 // Figure 2-1: the airspeed limitations table, KCAS and KIAS in the header's order
@@ -237,12 +241,14 @@ export function stallOf(t) {
     }
     return out
   }
-  const aft = rows(block('MOST REARWARD')), fwd = rows(block('MOST FORWARD'))
+  const unit = speedUnit(s.slice(0, 1200)) ?? 'kt'
+  const conv = list => (unit === 'mph' ? list.map(r => ({ ...r, kias: r.kias.map(v => Math.round(v / 1.15078)) })) : list)
+  const aft = conv(rows(block('MOST REARWARD'))), fwd = conv(rows(block('MOST FORWARD')))
   if (!aft.length || aft.length !== fwd.length) return null
   const weight = s.match(/\n\s*(\d{4})\s+(?:UP|\d)/)?.[1]
   const loss = s.match(/altitude loss during a stall recovery (?:is approximately|may be as much as) (\d+) feet/i)
   return {
-    weight: weight ? num(weight) : null, altitudeLoss: loss ? `${/approximately/i.test(loss[0]) ? 'About' : 'Up to'} ${loss[1]} ft in the recovery` : null,
+    unit, weight: weight ? num(weight) : null, altitudeLoss: loss ? `${/approximately/i.test(loss[0]) ? 'About' : 'Up to'} ${loss[1]} ft in the recovery` : null,
     rows: aft.map((r, k) => ({ flaps: r.flaps, aft: r.kias, fwd: fwd[k].kias })),
   }
 }

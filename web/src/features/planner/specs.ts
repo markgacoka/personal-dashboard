@@ -18,10 +18,10 @@ export interface PohSpecs {
   brakes?: { type: string | null; parking: string | null; fluid: string | null } | null
   electrical?: { volts: N; alternatorAmps: N; battery: string | null; bus: string | null; warning: string | null } | null
   pitotHeat?: string | null
-  arcs?: { white: [number, number]; green: [number, number]; yellow: [number, number] | null; red: N } | null
+  arcs?: { white: [number, number]; green: [number, number]; yellow: [number, number] | null; red: N; unit?: 'kt' | 'mph' } | null
   limits?: { vne: N; vno: N; va: [number, number][]; vfe: { label: string; kias: number }[]; windowOpen: N } | null
   speeds?: { vy: N; vx: N; vy10: N; vx10: N; climb: [number, number] | null; approachUp: [number, number] | null; approach: [number, number] | null; finalApproach: N; shortApproach: N; glide: N; crosswind: N } | null
-  stall?: { weight: N; altitudeLoss: string | null; rows: StallRow[] } | null
+  stall?: { weight: N; altitudeLoss: string | null; rows: StallRow[]; unit?: 'kt' | 'mph' } | null
   loadFactors?: { normal: LoadFactor | null; utility: LoadFactor | null; single?: boolean } | null
   icing?: string | null
   dims?: { wingAreaSqFt: N; wheelBaseIn: N }

@@ -43,7 +43,7 @@ export function AirspeedTape({ vs, arcs }: { vs: VS; arcs?: PohSpecs['arcs'] }) 
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-good" />Normal {green[0]}–{green[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-warn" />Smooth air only {yellow[0]}–{yellow[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-[3px] rounded-full bg-bad" />Never exceed {red}</span>
-        <span>KIAS{arcs ? ' · the POH\'s airspeed indicator markings' : ' · from the speeds (the markings weren\'t read from the POH)'}</span>
+        <span>KIAS{arcs ? ` · the POH's airspeed indicator markings${arcs.unit === 'mph' ? ', converted from MPH' : ''}` : ' · from the speeds (the markings weren\'t read from the POH)'}</span>
       </figcaption>
     </figure>
   )

@@ -54,7 +54,7 @@ export function WbLimits({ d, plan, tank, u = US }: { d: Derived; plan: Plan; ta
     }] : []),
   ]
   return (
-    <div className="space-y-5">
+    <div className="max-w-4xl space-y-5">
       <Group title="Weight" note={`Each total against its maximum (POH Sec. 2). Scale from the empty weight, ${W(bew)}.`} rows={weightRows} />
       <Group title="Center of gravity" note="The allowed CG range at that weight, read off the normal-category envelope (it narrows above the knee)." rows={cgRows} />
       <Group title="Loading" note="Baggage areas and fuel." rows={loadRows} />
@@ -73,12 +73,12 @@ function Group({ title, note, rows }: { title: string; note: string; rows: Row[]
       <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3"><h4 className="text-sm font-medium text-fg">{title}</h4><span className="text-[13px] text-fg-3">{note}</span></div>
       <ul className="divide-y divide-border">
         {rows.map(r => (
-          <li key={r.key} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 py-2 sm:grid-cols-[11rem_minmax(0,1fr)_14rem]">
-            <div className="min-w-0"><div className="truncate text-sm text-fg">{r.label}</div>{r.sub && <div className="num text-[13px] text-fg-3">{r.sub}</div>}</div>
+          <li key={r.key} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 py-2 sm:grid-cols-[10rem_minmax(0,1fr)_14.5rem]">
+            <div className="min-w-0"><div className="text-sm text-fg">{r.label}</div>{r.sub && <div className="num text-[13px] text-fg-3">{r.sub}</div>}</div>
             <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto"><Bar row={r} /></div>
-            <div className="flex items-center justify-end gap-1.5 text-right sm:row-start-auto">
+            <div className="flex items-center justify-end gap-2 text-right sm:row-start-auto">
               <StatusIcon status={r.status} />
-              <div><div className="num text-sm text-fg">{r.text}</div><div className={cn('text-[13px]', r.status === 'nogo' ? 'text-bad' : r.status === 'caution' ? 'text-warn' : 'text-fg-3')}>{r.margin}</div></div>
+              <div className="sm:w-48"><div className="num text-sm text-fg">{r.text}</div><div className={cn('text-[13px]', r.status === 'nogo' ? 'text-bad' : r.status === 'caution' ? 'text-warn' : 'text-fg-3')}>{r.margin}</div></div>
             </div>
           </li>
         ))}

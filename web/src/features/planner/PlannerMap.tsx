@@ -36,11 +36,30 @@ const CHART_KEY = 'planner-map-chart'
 const savedChart = (): ChartKey => { try { const v = localStorage.getItem(CHART_KEY); return CHARTS.some(c => c.key === v) ? (v as ChartKey) : 'sectional' } catch { return 'sectional' } }
 
 type FC = GeoJSON.FeatureCollection
+
+// A route airport's popup: weather at your ETA, elevation and pattern
+// altitude, the runway the wind favours, the frequencies you'll use, NOTAMs.
+function airportHtml(a: Airport, role: string, w: Derived['wx'][number] | undefined, perf: Derived['perf'], notams: number) {
+  const esc = escHtml, t = (x: Date) => x.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const rw = perf.find(p => p.runway)?.runway
+  const f = (u: RegExp) => a.frequencies.find(x => u.test(x.use))
+  const freqs = [['ATIS', f(/ATIS/)], ['Tower', f(/^LCL/)], ['Ground', f(/^GND/)], ['CTAF', f(/^CTAF/)]].filter(([, x]) => x).map(([k, x]) => `${k} ${esc((x as { freq: string }).freq)}`).join(' · ')
+  const tpa = Math.round(a.elev + (a.tpaAgl || 1000))
+  return [
+    `<b>${esc(a.icao || a.id)}</b> · ${role}`, esc(a.name),
+    `Elevation ${Math.round(a.elev).toLocaleString()} ft · pattern ${tpa.toLocaleString()} ft${a.towered ? ' · towered' : ''}`,
+    w ? `<b>${w.category ?? 'No report'}</b> at ETA ${t(w.at)}${w.wind.from ? ` · wind ${w.wind.dir == null ? 'VRB' : String(w.wind.dir).padStart(3, '0')}@${w.wind.spd}${w.wind.gust ? `G${w.wind.gust}` : ''}` : ''}` : '',
+    rw ? `Runway ${esc(rw.end.id)}: ${rw.head >= 0 ? `${rw.head} kt headwind` : `${-rw.head} kt tailwind`}, ${Math.abs(rw.cross)} kt crosswind` : '',
+    freqs, notams ? `<span style="color:#d99a00">${notams} NOTAM${notams > 1 ? 's' : ''} for a VFR flight</span>` : '',
+    w?.metar ? `<span style="font-family:monospace">${esc(w.metar.rawOb)}</span>` : '',
+  ].filter(Boolean).join('<br>')
+}
 const empty: FC = { type: 'FeatureCollection', features: [] }
 const LAYERS = [
   { key: 'radar', label: 'Radar' },
   { key: 'airspace', label: 'Airspace' },
   { key: 'wx', label: 'METAR' },
+  { key: 'wind', label: 'Wind' },
   { key: 'pirep', label: 'PIREPs' },
   { key: 'adv', label: 'SIGMET / AIRMET' },
   { key: 'cwa', label: 'CWA' },
@@ -70,7 +89,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
   const [ready, setReady] = useState(false)
   const [controls, setControls] = useState(false) // phones: chart and layer buttons behind one toggle
   const [chart, setChart] = useState<ChartKey>(savedChart)
-  const [on, setOn] = useState<Record<LayerKey, boolean>>({ radar: true, airspace: false, wx: true, pirep: true, adv: true, cwa: true, tfr: true, notam: true, lm: true })
+  const [on, setOn] = useState<Record<LayerKey, boolean>>({ radar: true, airspace: false, wx: true, wind: true, pirep: true, adv: true, cwa: true, tfr: true, notam: true, lm: true })
   const popup = useRef<maplibregl.Popup | null>(null)
   // Handlers are registered once on load; they read the latest props from refs.
   const editRef = useRef(edit); editRef.current = edit
@@ -83,7 +102,16 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       map.addSource(r.id, { type: 'raster', tiles: [r.tiles], tileSize: 256, maxzoom: r.maxzoom, ...(r.minzoom ? { minzoom: r.minzoom } : {}), attribution: r.attribution })
       map.addLayer({ id: r.id, type: 'raster', source: r.id, paint: { 'raster-opacity': r.opacity }, layout: { visibility: 'none' } })
     }
-    for (const id of ['airspace', 'adv', 'tfr', 'route', 'airports', 'metars', 'pireps', 'notams', 'lm-lines', 'cands', 'drag']) map.addSource(id, { type: 'geojson', data: empty })
+    for (const id of ['airspace', 'adv', 'tfr', 'route', 'airports', 'metars', 'pireps', 'notams', 'lm-lines', 'cands', 'drag', 'winds']) map.addSource(id, { type: 'geojson', data: empty })
+    // A wind arrow (points north; rotated to blow downwind), drawn once.
+    if (!map.hasImage('wind-arrow')) {
+      const c = document.createElement('canvas'); c.width = c.height = 32
+      const g = c.getContext('2d')!
+      g.strokeStyle = '#fff'; g.lineWidth = 5; g.lineCap = 'round'
+      const arrow = () => { g.beginPath(); g.moveTo(16, 28); g.lineTo(16, 6); g.moveTo(8, 13); g.lineTo(16, 5); g.lineTo(24, 13); g.stroke() }
+      arrow(); g.strokeStyle = '#1f6feb'; g.lineWidth = 2.5; arrow()
+      map.addImage('wind-arrow', g.getImageData(0, 0, 32, 32))
+    }
     map.addLayer({ id: 'aspc-fill', type: 'fill', source: 'airspace', paint: { 'fill-color': ['match', ['get', 'CLASS'], 'B', '#3987e5', 'C', '#de5d8c', '#3987e5'], 'fill-opacity': ['match', ['get', 'CLASS'], 'D', 0.03, 0.06] } })
     map.addLayer({ id: 'aspc-line', type: 'line', source: 'airspace', paint: { 'line-color': ['match', ['get', 'CLASS'], 'B', '#3987e5', 'C', '#de5d8c', '#3987e5'], 'line-width': 1.1, 'line-opacity': 0.7, 'line-dasharray': ['match', ['get', 'CLASS'], 'D', ['literal', [3, 2]], ['literal', [1, 0]]] } })
     map.addLayer({ id: 'adv-fill', type: 'fill', source: 'adv', filter: ['!=', ['get', 'kind'], 'cwa'], paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.14 } })
@@ -104,6 +132,10 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     map.addLayer({ id: 'pireps', type: 'circle', source: 'pireps', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } })
     map.addLayer({ id: 'notams', type: 'circle', source: 'notams', paint: { 'circle-radius': 9, 'circle-color': '#d99a00', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-translate': [14, -14] } })
     map.addLayer({ id: 'notam-count', type: 'symbol', source: 'notams', layout: { 'text-field': ['to-string', ['get', 'count']], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-allow-overlap': true }, paint: { 'text-color': '#fff', 'text-translate': [14, -14] } })
+    map.addLayer({ id: 'winds', type: 'symbol', source: 'winds', layout: {
+      'icon-image': 'wind-arrow', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['get', 'spd'], 0, 0.55, 30, 1.1],
+      'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true,
+    }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5, 'icon-opacity': ['case', ['get', 'aloft'], 0.95, 0.8] } })
     map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'wp'], 5, 8], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': ['case', ['get', 'wp'], 2, 2.5] } })
     map.addLayer({ id: 'airport-labels', type: 'symbol', source: 'airports', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 13, 'text-offset': [0, 1.4], 'text-anchor': 'top' }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5 } })
     // A popup, optionally with one action button (add / remove a route point)
@@ -134,7 +166,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       }
       popup.current = new maplibregl.Popup({ closeButton: true, maxWidth: '22rem', className: 'planner-pop' }).setLngLat(at).setDOMContent(el).addTo(map)
     }
-    for (const layer of ['airports', 'metars', 'pireps', 'adv-fill', 'cwa-fill', 'tfr-fill', 'notams', 'cands']) {
+    for (const layer of ['airports', 'metars', 'pireps', 'adv-fill', 'cwa-fill', 'tfr-fill', 'notams', 'cands', 'winds']) {
       map.on('click', layer, e => {
         const f = e.features?.[0]
         if (!f || dragged) return
@@ -243,13 +275,25 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       if (wp) return { type: 'Feature', geometry: { type: 'Point', coordinates: [a.lon, a.lat] }, properties: { wp: true, mid, idx: i, label: a.label || a.id, named: a.label ?? '', ident: a.id, color: mapColor('--fg-2'), html: `<b>${esc(a.label || a.id)}</b>${a.label && a.label !== a.id ? ` (${esc(a.id)})` : ''} · ${esc(role)}<br>${esc(a.name)}${a.frequencies[0] ? `<br>${esc(a.frequencies[0].freq)}` : ''}<br>${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}` } }
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [a.lon, a.lat] }, properties: {
         wp: mid, mid, idx: i, label: (mid && a.label) || a.icao || a.id, named: a.label ?? '', ident: a.icao || a.id, color: w?.category ? mapColor(catVar(w.category)) : mapColor('--fg-3'),
-        html: `<b>${esc(a.icao || a.id)}</b> · ${role}<br>${esc(a.name)}<br>${w ? `${w.category ?? 'no report'} at ETA ${w.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${w.metar ? `<br><span style="font-family:monospace">${esc(w.metar.rawOb)}</span>` : ''}` : ''}`,
+        html: airportHtml(a, role, w, d.perf.filter(p => p.airport.id === a.id), (notams || []).find(n => n.icao === (a.icao || a.id))?.count ?? 0),
       } }
     }) })
     set('metars', { type: 'FeatureCollection', features: (weather?.metars.data || []).filter(m => !route.some(a => (a.icao || a.id) === m.icaoId)).map(m => {
       const cat = m.fltCat || category(ceilingOf(m.clouds), parseVisib(m.visib))
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [m.lon, m.lat] }, properties: { color: mapColor(catVar(cat)), html: `<b>${esc(m.icaoId)}</b> ${cat}<br><span style="font-family:monospace">${esc(m.rawOb)}</span>` } }
     }) })
+    // Wind: surface at every METAR (from its report), aloft at the navlog's rows (the forecast used).
+    const num = (v: unknown) => (typeof v === 'number' ? v : null)
+    const sfc = (weather?.metars.data || []).filter(m => num(m.wdir) != null && (m.wspd ?? 0) > 0).map(m => ({
+      type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [m.lon, m.lat] },
+      properties: { rot: (num(m.wdir)! + 180) % 360, spd: m.wspd, label: `${String(num(m.wdir)).padStart(3, '0')}@${m.wspd}${m.wgst ? `G${m.wgst}` : ''}`, aloft: false, html: `<b>${esc(m.icaoId)} surface wind</b><br>${String(num(m.wdir)).padStart(3, '0')}° at ${m.wspd} kt${m.wgst ? `, gusting ${m.wgst}` : ''} (METAR)` },
+    }))
+    const seen = new Set<string>()
+    const aloft = d.navlog.filter(r => r.wind?.dir != null && r.to.lat != null).filter(r => { const k = `${r.flight}-${Math.round((r.to.lat ?? 0) * 10)}-${Math.round((r.to.lon ?? 0) * 10)}`; if (seen.has(k)) return false; seen.add(k); return true }).map(r => ({
+      type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [r.to.lon!, r.to.lat!] },
+      properties: { rot: (r.wind!.dir! + 180) % 360, spd: r.wind!.spd, aloft: true, label: `${String(r.wind!.dir).padStart(3, '0')}/${r.wind!.spd}${r.wind!.temp != null ? ` ${r.wind!.temp > 0 ? '+' : ''}${Math.round(r.wind!.temp)}°` : ''} · ${r.altFt.toLocaleString()}`, html: `<b>Wind aloft at ${esc(r.to.label)}</b><br>${String(r.wind!.dir).padStart(3, '0')}° at ${r.wind!.spd} kt${r.wind!.temp != null ? `, ${Math.round(r.wind!.temp)} °C` : ''} at ${r.altFt.toLocaleString()} ft<br>${r.windSrc === 'forecast' ? 'NOAA HRRR/GFS model forecast' : r.windSrc === 'yours' ? 'Your briefing winds' : r.windSrc === 'row' ? 'Typed into the NavLog' : r.windSrc === 'stale' ? 'Older copy of the forecast' : 'Calm (no forecast)'}${r.windWindow ? ` · valid ${r.windWindow}` : ''}` },
+    }))
+    set('winds', { type: 'FeatureCollection', features: [...sfc, ...aloft] })
     set('pireps', { type: 'FeatureCollection', features: (weather?.pireps.data || []).map(p => {
       const sev = `${p.tbInt1} ${p.icgInt1}`
       const color = /SEV|EXTRM/.test(sev) ? '#e8453c' : /MOD/.test(sev) ? '#e4673a' : /LGT|TRC/.test(sev) ? '#d99a00' : '#8e8d88'
@@ -318,7 +362,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     const vis = (ids: string[], v: boolean) => ids.forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none'))
     const base = CHARTS.find(c => c.key === chart)!.layers as readonly string[]
     for (const r of RASTERS) vis([r.id], base.includes(r.id))
-    vis(['radar'], on.radar); vis(['aspc-fill', 'aspc-line'], on.airspace); vis(['metars'], on.wx); vis(['pireps'], on.pirep)
+    vis(['radar'], on.radar); vis(['aspc-fill', 'aspc-line'], on.airspace); vis(['metars'], on.wx); vis(['winds'], on.wind); vis(['pireps'], on.pirep)
     vis(['adv-fill', 'adv-line'], on.adv); vis(['cwa-fill', 'cwa-line'], on.cwa); vis(['tfr-fill', 'tfr-line'], on.tfr); vis(['notams', 'notam-count'], on.notam)
     vis(['lm-lines', 'lm-line-labels', 'cands', 'cand-labels'], on.lm)
   }, [on, chart, ready])

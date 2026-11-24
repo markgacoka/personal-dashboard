@@ -6,6 +6,8 @@ import type { Derived, Minimums, Plan, WeatherBundle } from './model'
 
 export interface Line { k: string; v: string }
 // One worked result: a title, the answer, the arithmetic and where it comes from.
+import { notamHighlights, type NotamSet } from './brief'
+
 export interface Work { title: string; result: string; lines: Line[]; fig?: string; src?: string }
 export interface Topic { key: string; title: string; items: Work[] }
 export interface Assumption { label: string; value: string; basis: string; change?: string }
@@ -14,6 +16,7 @@ export interface Source { what: string; from: string; at?: string | null; href?:
 export interface WorkingsInput {
   d: Derived; plan: Plan; minimums: Minimums; weather: WeatherBundle | null
   cycle: string | null; pohNote: string | null; altAuto: boolean; altMode?: 'auto' | 'yours' | 'none'; certsSaved: boolean; terrainAt?: string | null
+  notams?: NotamSet[]
 }
 
 const n0 = (x: number) => Math.round(x).toLocaleString()
@@ -139,6 +142,27 @@ export function calculations(x: WorkingsInput): Topic[] {
       }],
     })
   }
+
+  // Each airport on the trip: where its elevation, pattern altitude,
+  // frequencies, weather and NOTAMs came from, as the NavLog uses them.
+  if (d.wx.length) topics.push({
+    key: 'airports', title: 'Airports: elevation, pattern, frequencies, weather, NOTAMs', items: d.wx.map(w => {
+      const a = w.airport, code = id(a)
+      const f = (u: RegExp) => a.frequencies.filter(x => u.test(x.use)).map(x => x.freq).join(', ')
+      const n = x.notams?.find(s => s.icao === code)
+      const hi = n ? notamHighlights(n.items, 6).shown : []
+      return {
+        title: `${code} · ${w.role} at ${t(w.at)}`, result: `${n0(a.elev)} ft`, src: `FAA NASR${x.cycle ? ` cycle ${x.cycle}` : ''}`,
+        lines: [
+          { k: 'Field elevation', v: `${n0(a.elev)} ft MSL (NASR)` },
+          { k: 'Pattern altitude', v: a.tpaAgl ? `${n0(a.elev + a.tpaAgl)} ft MSL: elevation + ${n0(a.tpaAgl)} ft (NASR traffic pattern altitude)` : `${n0(a.elev + 1000)} ft MSL: elevation + 1,000 ft (AIM 4-3-3 default; NASR lists none)` },
+          { k: 'Frequencies on the NavLog', v: [a.towered ? `tower ${f(/^LCL/) || '—'}${a.towerHrs ? ` (${a.towerHrs})` : ''}, ground ${f(/^GND/) || '—'}` : `CTAF ${f(/^CTAF/) || f(/UNICOM/) || '—'}`, f(/ATIS/) && `ATIS ${f(/ATIS/)}`, a.wx?.freq && `${a.wx.type} ${a.wx.freq}`].filter(Boolean).join(' · ') + ' (NASR; D-ATIS from the FAA when the tower publishes it)' },
+          { k: 'Weather used', v: w.wind.from === 'taf' ? `TAF ${w.tafStation ?? ''} for ${t(w.at)} (more than an hour out, so the forecast)` : w.metar ? `METAR ${w.metarStation ?? ''}, observed ${t(new Date(w.metar.obsTime * 1000))}` : 'No METAR or TAF within 25 nm' },
+          { k: 'NOTAMs', v: !n ? 'Not loaded' : n.unavailable ? 'FAA NOTAM Search unavailable: check 1800wxbrief.com' : `${n.items.length} from FAA NOTAM Search${hi.length ? `; for a VFR flight: ${hi.join(' · ')}` : '; none that affect a VFR flight'}` },
+        ],
+      }
+    }),
+  })
 
   // Density altitude at each ETA (one per airport and time).
   if (d.wx.length) topics.push({

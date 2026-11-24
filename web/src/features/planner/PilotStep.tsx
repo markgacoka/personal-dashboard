@@ -7,6 +7,7 @@ import { CheckRows, StatusIcon, SubHead } from './ui'
 import { CertificatesEditor } from './Certificates'
 import { roleOf, type PilotCerts } from './pilot'
 import { RecordsList } from './RecordsList'
+import { RoleRules } from './RoleRules'
 import { PILOT_RECORDS } from './records'
 
 interface MinRow { label: string; limit: string; actual: string; status: Status; where?: string }
@@ -60,7 +61,8 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="space-y-8">
         <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} />
-        <RecordsList title="Your documents" records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
+        <RoleRules current={dual ? 'dual' : (certs?.certificate ?? 'student') === 'student' ? 'solo' : 'private'} />
+        <RecordsList title={<>Your documents <span className="font-normal text-fg-3">· kept for every plan</span></>} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
         <div>
           <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Plan</span>}>This flight under the FAA rules</SubHead>
           {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}

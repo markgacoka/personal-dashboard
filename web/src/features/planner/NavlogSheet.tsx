@@ -46,8 +46,8 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
     set({ overrides: { ...ov, [key]: { ...ov[key], [f]: n != null && Number.isFinite(n) ? n : null } } })
   }
   const code = (a: Airport) => a.icao || a.id
-  const notesLines = [notes.day, notes.aircraft, `WX: ${notes.wx[0]}`, ...notes.wx.slice(1), `NOTAMs: ${notes.notams.join(' · ')}`,
-    ...[dep, dest].filter((a, i, arr) => a.notes && arr.indexOf(a) === i).map(a => `${code(a)}: ${a.notes!.replace(/\s*\n\s*/g, ' · ')}`)]
+  const notesLines = [notes.day, notes.aircraft, `WX: ${notes.wx[0]}`, ...notes.wx.slice(1), `NOTAMs: ${notes.notams.join(' ·')}`,
+    ...[dep, dest].filter((a, i, arr) => a.notes && arr.indexOf(a) === i).map(a => `${code(a)}: ${a.notes!.replace(/\s*\n\s*/g, ' ·')}`)]
 
   return (
     <section className="navlog-front overflow-x-auto">
@@ -62,7 +62,7 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
           <div className="num pb-0.5">Terrain @ {flight.terrainMax != null ? `${Math.round(flight.terrainMax).toLocaleString()} MSL` : '—'}</div>
           <div className="num pb-0.5 text-fg-2">Cruise {flight.alt.toLocaleString()} ft · {plan.rpm} RPM{flight.cruise ? ` · ${flight.cruise.ktas} KTAS · ${flight.cruise.gph} GPH · ${flight.cruise.bhp}% BHP` : ''}</div>
         </div>
-        <div className={cn(B, 'bg-fg py-1 text-center text-base font-bold tracking-wide text-bg')}>VFR NAVIGATION LOG</div>
+        <div className={cn(B, 'nl-bar py-1 text-center text-base font-bold tracking-wide')}>VFR NAVIGATION LOG</div>
         <div className="grid grid-cols-[auto_8rem_auto_1fr]">
           <div className={cn(B, 'px-2 py-1 font-medium')}>Aircraft Number</div>
           <div className={cn(B, 'num px-2 py-1 font-semibold')}>{plan.tail ?? ''}</div>
@@ -78,14 +78,14 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
             <thead>
               <tr>
                 <th className={H} rowSpan={3}>Check Points<div className="normal-case">(Fixes)</div></th>
-                <th className={cn(H, 'bg-fg text-bg')}>VOR</th>
+                <th className={cn(H, 'nl-bar')}>VOR</th>
                 <th className={H} rowSpan={3}>Course<div className="normal-case">(Route)</div></th>
                 <th className={H} rowSpan={2}>Altitude</th>
-                <th className={cn(H, 'bg-fg text-bg')} colSpan={2}>Wind</th>
+                <th className={cn(H, 'nl-bar')} colSpan={2}>Wind</th>
                 <th className={H}>CAS</th>
                 <th className={H} rowSpan={2}>TC</th><th className={H} rowSpan={2}>TH</th><th className={H} rowSpan={2}>MH</th>
                 <th className={H} rowSpan={3}>CH</th>
-                <th className={cn(H, 'bg-fg text-bg')}>Dist.</th><th className={cn(H, 'bg-fg text-bg')}>GS</th>
+                <th className={cn(H, 'nl-bar')}>Dist.</th><th className={cn(H, 'nl-bar')}>GS</th>
                 <th className={H} colSpan={2}>Time Off</th><th className={H}>GPH</th>
               </tr>
               <tr>
@@ -125,9 +125,9 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
           </table>
 
           <div className="flex flex-col">
-            <div className={cn(B, 'bg-fg py-0.5 text-center text-xs font-bold text-bg')}>Airport &amp; ATIS Advisories</div>
+            <div className={cn(B, 'nl-bar py-0.5 text-center text-xs font-bold')}>Airport &amp; ATIS Advisories</div>
             <AdvisoryGrid dep={wxDep} dest={wxDest} u={u} rwyDep={runwayFor(dep, 'takeoff')} rwyDest={runwayFor(dest, 'landing')} />
-            <div className={cn(B, 'bg-fg py-0.5 text-center text-xs font-bold text-bg')}>Airport Frequencies</div>
+            <div className={cn(B, 'nl-bar py-0.5 text-center text-xs font-bold')}>Airport Frequencies</div>
             <FreqGrid dep={dep} dest={dest} />
             <div className="grid grid-cols-[5rem_1fr_1fr]">
               <div className={cn(B, 'bg-fg/[0.07] px-1 text-xs font-semibold')}>Block In</div><div className={B}>{inp(act[`${k}-in`]?.ata ?? '', v => putAct(`${k}-in`, 'ata', v))}</div>
@@ -197,7 +197,7 @@ export function NavlogReverse({ plan, set, d, airports, planning, savePlanning, 
   return (
     <section className="overflow-x-auto">
       <div className="min-w-[80rem]">
-        <div className={cn(B, 'bg-fg py-1 text-center text-base font-bold tracking-wide text-bg')}>WEATHER LOG</div>
+        <div className={cn(B, 'nl-bar py-1 text-center text-base font-bold tracking-wide')}>WEATHER LOG</div>
         <table className="w-full border-collapse">
           <thead>
             <tr><th className={H} rowSpan={2} /><th className={H} colSpan={2}>Ceiling, Visibility and Precipitation</th><th className={H} rowSpan={2}>Winds Aloft</th><th className={H} rowSpan={2}>Icing and Freezing Level</th><th className={H} rowSpan={2}>Turbulence and Cloud Tops</th><th className={H} rowSpan={2}>Position of Fronts, Lows and Highs</th></tr>
@@ -216,7 +216,7 @@ export function NavlogReverse({ plan, set, d, airports, planning, savePlanning, 
 
         <div className="mt-3 grid grid-cols-[minmax(0,1fr)_17rem] gap-3">
           <div>
-            <div className={cn(B, 'bg-fg py-1 text-center text-base font-bold tracking-wide text-bg')}>FLIGHT PLAN</div>
+            <div className={cn(B, 'nl-bar py-1 text-center text-base font-bold tracking-wide')}>FLIGHT PLAN</div>
             <div className="grid grid-cols-12 text-xs">
               <Cell span="col-span-1" label="1. Type"><b>VFR</b></Cell>
               <Cell span="col-span-2" label="2. Aircraft Identification"><span className="num">{fp.ident}</span></Cell>
@@ -246,11 +246,11 @@ export function NavlogReverse({ plan, set, d, airports, planning, savePlanning, 
             <div className={cn(B, 'bg-fg/[0.07] px-2 py-1 text-center text-xs font-semibold')}>CLOSE VFR FLIGHT PLAN WITH <span className="num">{fp.fss}</span> ON ARRIVAL</div>
           </div>
           <div className="flex flex-col">
-            <div className={cn(B, 'bg-fg py-0.5 text-center text-xs font-bold text-bg')}>Notes and NOTAMs</div>
+            <div className={cn(B, 'nl-bar py-0.5 text-center text-xs font-bold')}>Notes and NOTAMs</div>
             <ul className={cn(B, 'min-h-40 flex-1 space-y-1 p-1.5 text-xs')}>
               {d.checks.filter(c => (c.section === 'weather' || c.section === 'navlog') && (c.status === 'nogo' || c.status === 'caution')).slice(0, 9).map((c, i) => <li key={i}>• {c.title}</li>)}
             </ul>
-            <div className={cn(B, 'bg-fg py-0.5 text-center text-xs font-bold text-bg')}>Position Report</div>
+            <div className={cn(B, 'nl-bar py-0.5 text-center text-xs font-bold')}>Position Report</div>
             <div className="grid grid-cols-7 text-[10px]">{['Acft. Ident.', 'Position', 'Time', 'Alt.', 'IFR/VFR', 'Est. Next Fix', 'Name Following Fix'].map(h => <div key={h} className={cn(B, 'bg-fg/[0.07] px-0.5 text-center font-semibold')}>{h}</div>)}{Array.from({ length: 7 }).map((_, i) => <div key={i} className={cn(B, 'h-6')} />)}</div>
             <p className={cn(B, 'p-1 text-[10px] text-fg-3')}>Report conditions aloft — cloud tops, bases, layers, visibility, turbulence, haze, ice, thunderstorms.</p>
           </div>
@@ -305,7 +305,7 @@ function weatherLog(d: Derived, dep?: WxAt, dest?: WxAt, alt?: WxAt, cruiseAlt =
     if (!w) return ''
     const p = w.tafMoment?.prevailing
     if (!p) return w.taf ? 'TAF ends before the ETA' : 'No TAF nearby'
-    return `${w.category ?? ''} at ${fmtTime(w.at)} (TAF ${w.tafStation}): ${p.wdir ?? 'VRB'}/${p.wspd ?? 0}${p.wgst ? `G${p.wgst}` : ''} · vis ${p.visib ?? '—'} · ${(p.clouds || []).map(c => `${c.cover}${c.base != null ? String(Math.round(c.base / 100)).padStart(3, '0') : ''}`).join(' ') || 'SKC'}${p.wxString ? ` · ${p.wxString}` : ''}`
+    return `${w.category ?? ''} at ${fmtTime(w.at)} (TAF ${w.tafStation}): ${p.wdir ?? 'VRB'}/${p.wspd ?? 0}${p.wgst ? `G${p.wgst}` : ''} · vis ${p.visib ?? '—'} · ${(p.clouds || []).map(c => `${c.cover}${c.base != null ? String(Math.round(c.base / 100)).padStart(3, '0') : ''}`).join('') || 'SKC'}${p.wxString ? ` · ${p.wxString}` : ''}`
   }
   const winds = (w?: { airport: Airport }) => {
     if (!d.fb || !w) return ''
@@ -315,14 +315,14 @@ function weatherLog(d: Derived, dep?: WxAt, dest?: WxAt, alt?: WxAt, cruiseAlt =
   const fz = d.freezing ? `Freezing level ~${d.freezing.altFt.toLocaleString()} ft${d.freezing.approx ? ' (approx.)' : ''}` : 'No freezing level below the FB levels'
   const ice = d.hazards.gairmets.filter(g => g.hazard === 'ICE').length ? 'G-AIRMET Zulu icing on the route' : 'No icing advisories on the route'
   const turbP = d.hazards.pireps.filter(p => p.tbInt1)
-  const turb = [d.hazards.gairmets.some(g => /TURB/.test(g.hazard)) ? 'G-AIRMET Tango turbulence' : '', turbP.length ? `${turbP.length} PIREP${turbP.length > 1 ? 's' : ''}: ${turbP.slice(0, 2).map(p => p.tbInt1).join(', ')}` : 'No turbulence PIREPs'].filter(Boolean).join(' · ')
+  const turb = [d.hazards.gairmets.some(g => /TURB/.test(g.hazard)) ? 'G-AIRMET Tango turbulence' : '', turbP.length ? `${turbP.length} PIREP${turbP.length > 1 ? 's' : ''}: ${turbP.slice(0, 2).map(p => p.tbInt1).join(',')}` : 'No turbulence PIREPs'].filter(Boolean).join(' ·')
   const mp = d.samples[Math.floor(d.samples.length / 2)]
   const mid = mp && d.legs.length ? { airport: { ...d.legs[0].from, lat: mp.lat, lon: mp.lon } } : undefined
-  const enrouteAdv = [...d.hazards.sigmets.map(s => `SIGMET ${s.hazard}`), ...new Set(d.hazards.gairmets.filter(g => g.hazard === 'IFR' || g.hazard === 'MT_OBSC').map(g => `G-AIRMET ${g.hazard === 'IFR' ? 'IFR' : 'mountain obscuration'}`)), ...d.hazards.cwas.map(() => 'CWA')].join(' · ')
-  const stops = d.wx.filter(w => w.role === 'stop').map(w => `${w.airport.icao || w.airport.id} ${w.category ?? '—'}`).join(' · ')
+  const enrouteAdv = [...d.hazards.sigmets.map(s => `SIGMET ${s.hazard}`), ...new Set(d.hazards.gairmets.filter(g => g.hazard === 'IFR' || g.hazard === 'MT_OBSC').map(g => `G-AIRMET ${g.hazard === 'IFR' ? 'IFR' : 'mountain obscuration'}`)), ...d.hazards.cwas.map(() => 'CWA')].join(' ·')
+  const stops = d.wx.filter(w => w.role === 'stop').map(w => `${w.airport.icao || w.airport.id} ${w.category ?? '—'}`).join(' ·')
   return [
     { label: 'Departure', reported: rep(dep), forecast: fc(dep), winds: winds(dep), icing: fz, turb },
-    { label: 'Enroute', reported: [stops, d.hazards.pireps.length ? `${d.hazards.pireps.length} PIREPs near the route` : ''].filter(Boolean).join(' · ') || 'See PIREPs', forecast: enrouteAdv || 'No SIGMET, IFR or mountain-obscuration advisories on the route', winds: winds(mid), icing: ice, turb },
+    { label: 'Enroute', reported: [stops, d.hazards.pireps.length ? `${d.hazards.pireps.length} PIREPs near the route` : ''].filter(Boolean).join(' ·') || 'See PIREPs', forecast: enrouteAdv || 'No SIGMET, IFR or mountain-obscuration advisories on the route', winds: winds(mid), icing: ice, turb },
     { label: 'Destination', reported: rep(dest), forecast: fc(dest), winds: winds(dest), icing: fz, turb: '' },
     { label: 'Alternate', reported: alt ? rep(alt) : none ? 'None planned' : rep(alt), forecast: fc(alt), winds: winds(alt), icing: '', turb: '' },
   ]
@@ -337,9 +337,9 @@ function flightPlan(plan: Plan, d: Derived, alt: Airport | null, planning: Aircr
   const fss = d.legs[0].from.fss
   return {
     ident: plan.tail ?? '', type: `${typeCode}/${equip}`, tas: d.legs[0].tas, departure: pts[0].icao || pts[0].id, depTime: fmtZ(d.legs[0].departAt).replace('Z', ''),
-    altitude: [...new Set(d.flights.map(f => f.alt))].join(' / '), route: pts.slice(1, -1).map(p => (p.kind === 'gps' ? icaoCoord(p) : isWaypoint(p) ? p.id : p.icao || p.id)).join(' ') || 'DCT',
-    destination: `${dest.icao || dest.id} · ${dest.name}, ${dest.city}`, ete: fmtMin(d.totals.eteMin).replace(':', ' h ') + ' min',
-    remarks: stops.length ? `Stops ${stops.join(' ')}` : '', fuel: fmtMin(d.totals.enduranceMin).replace(':', ' h ') + ' min', alternate: alt ? alt.icao || alt.id : plan.alternate === false ? 'None' : '',
+    altitude: [...new Set(d.flights.map(f => f.alt))].join(' /'), route: pts.slice(1, -1).map(p => (p.kind === 'gps' ? icaoCoord(p) : isWaypoint(p) ? p.id : p.icao || p.id)).join('') || 'DCT',
+    destination: `${dest.icao || dest.id} · ${dest.name}, ${dest.city}`, ete: fmtMin(d.totals.eteMin).replace(':', ' h') + ' min',
+    remarks: stops.length ? `Stops ${stops.join('')}` : '', fuel: fmtMin(d.totals.enduranceMin).replace(':', ' h') + ' min', alternate: alt ? alt.icao || alt.id : plan.alternate === false ? 'None' : '',
     aboard: soulsOf(plan) || '', fss: fss ? `${fss.id} FSS (1-800-WX-BRIEF / 122.2)` : 'FLIGHT SERVICE (1-800-WX-BRIEF / 122.2)',
   }
 }

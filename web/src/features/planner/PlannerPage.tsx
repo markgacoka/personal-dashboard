@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { ChevronDown, ChevronLeft, ChevronRight, FilePlus2, Loader2, MoreHorizontal, PanelRightOpen, Pencil, Printer, Save, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FilePlus2, Loader2, MoreHorizontal, PanelRightOpen, Pencil, Printer, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -23,25 +23,26 @@ import type { EditPoint, RouteEdit } from './PlannerMap'
 import { flightNotes, type NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { FlightInputs } from './FlightInputs'
-import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver, parseRouteItem, type Airport, type Plan, type Status } from './model'
+import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, loadsOf, makeResolver, parseRouteItem, type Airport, type Check as PlanCheck, type Plan, type Status } from './model'
 import { NavlogFront, NavlogReverse } from './NavlogSheet'
 import { PerformanceSection } from './PerformanceSection'
 import { PlannerMap, type MapNotams } from './PlannerMap'
 import { WbTable } from './PohSummary'
 import { applyEdits, profileFor, withSpecs, withTables } from './poh'
 import { CERTIFICATES, roleOf } from './pilot'
-import { RefPanel, RefProvider, isDocTab, useRefs } from './RefPanel'
+import { RefPanel, RefProvider, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
 import { WeatherSection } from './WeatherSection'
 import { StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
 import { Brief, domainStatus } from './BriefView'
-import { DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from './Sidebar'
+import { DOMAIN_LABEL, DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from './Sidebar'
 import { assumptions, calculations, sources } from './workings'
 import { explainRow, explainWb, inputSources } from './explain'
 import { CgChart } from './ExplainView'
 import { WbLimits } from './WbLimits'
 import type { Focus } from './Sidebar'
 
+import { relTime } from '@/lib/format'
 const DRAFT_KEY = 'planner-draft-v3'
 
 // Three stages: Plan (what you type and the route on the chart), Brief (the
@@ -55,7 +56,8 @@ const blank = (tail: string | null): Plan => ({
   name: 'New flight', route: [homeAirport()], alternate: null, departLocal: nextHourLocal(), rpm: 2400, tail,
   seats: { pilot: 0, front: 0, rearL: 0, rearR: 0 }, loads: { front: 0, rear: 0, bag1: 0, bag2: 0 }, fuelGal: null, stopMinutes: 30, night: null, actuals: {},
 })
-interface Draft { plan: Plan; id: number | null; stage?: Stage; open?: DomainKey | null }
+// saved: the plan as last saved (JSON), to tell unsaved changes apart; savedAt: when.
+interface Draft { plan: Plan; id: number | null; stage?: Stage; open?: DomainKey | null; saved?: string | null; savedAt?: string | null; wizard?: number | null }
 function readDraft(): Draft | null {
   try {
     const s = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem('planner-draft-v2')
@@ -63,7 +65,7 @@ function readDraft(): Draft | null {
     const d = JSON.parse(s) as Draft & { step?: number }
     // Drafts from the nine-step wizard: step 0 was the inputs, 8 the NavLog.
     const stage = d.stage ?? (d.step == null || d.step === 0 ? 'plan' : d.step === 8 ? 'navlog' : 'brief')
-    return { plan: d.plan, id: d.id ?? null, stage, open: d.open ?? null }
+    return { plan: d.plan, id: d.id ?? null, stage, open: d.open ?? null, saved: d.saved ?? null, savedAt: d.savedAt ?? null, wizard: d.wizard ?? null }
   } catch { return null }
 }
 
@@ -211,7 +213,8 @@ function Planner() {
       if (named !== plan) set({ name: named.name })
       if (state.id) await plans.update.mutateAsync({ id: state.id, plan: named })
       else { const r = await plans.create.mutateAsync(named); setState(s => ({ ...s, id: r.id })) }
-      toast.success(`Saved "${named.name}"`)
+      setState(s => ({ ...s, saved: JSON.stringify(named), savedAt: new Date().toISOString() }))
+      toast.success(`Saved "${named.name}" to your plans`)
     } catch (e) { toast.error((e as Error).message) }
   }
   const routeText = plan.route.map(r => { const id = parseRouteItem(r).id; return plan.labels?.[id]?.name ?? id }).join(' → ') || 'No route yet'
@@ -222,9 +225,13 @@ function Planner() {
   const savePlanning = (p: typeof planning) => planningQ.save.mutate(p, { onSuccess: () => toast.success(`${plan.tail} saved`) })
 
   const stage: Stage = state.stage ?? 'plan'
+  const dirty = state.saved !== JSON.stringify(plan)
+  const [confirmNew, setConfirmNew] = useState(false)
+  // A new plan starts in the guided setup: one question group at a time.
+  const startNew = () => setState({ plan: blank(recentTail), id: null, stage: 'plan', saved: null, savedAt: null, wizard: 0 })
   const openDomain = state.open ?? null
   const go = (st: Stage, open?: DomainKey | null) => { setState(s => ({ ...s, stage: st, ...(open !== undefined ? { open } : {}) })); if (open === undefined) window.scrollTo({ top: 0 }) }
-  const jump = (k: DomainKey) => { if (k === 'plan') go('plan'); else go('brief', k); if (!window.matchMedia('(min-width: 80rem)').matches) refs.close() }
+  const jump = (k: DomainKey) => { if (k === 'plan') go('plan'); else go('brief', k); if (!window.matchMedia('(min-width: 96rem)').matches) refs.close() }
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
   const role = roleOf(plan.crew, certs)
   const issues = d.checks.filter(c => c.status !== 'ok').length
@@ -232,8 +239,8 @@ function Planner() {
   const planIssues = d.checks.filter(c => DOMAIN_OF[c.section] === 'plan' && c.status !== 'ok')
 
   // The sidebar's workings, from the same derive() output the brief shows.
-  const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), altMode: plan.alternate === false ? 'none' as const : plan.alternate ? 'yours' as const : 'auto' as const, certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null }
-  const topics = useMemo(() => calculations(wIn), [d, planEff, minimums]) // eslint-disable-line react-hooks/exhaustive-deps
+  const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), altMode: plan.alternate === false ? 'none' as const : plan.alternate ? 'yours' as const : 'auto' as const, certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null, notams: notamSets }
+  const topics = useMemo(() => calculations(wIn), [d, planEff, minimums, notamSets]) // eslint-disable-line react-hooks/exhaustive-deps
   const assumed = useMemo(() => assumptions(wIn), [d, planEff, minimums, certs]) // eslint-disable-line react-hooks/exhaustive-deps
   const srcs = useMemo(() => sources(wIn), [d, wx.data, apts.data, pohStatus, terrain.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -287,8 +294,10 @@ function Planner() {
     if (k === 'loading') return (
       <div className="space-y-8">
         <div><SubHead right={<span className="text-xs text-fg-3">Limits from POH Sec. 2 and Fig. 6-8</span>}>Weight and balance</SubHead><WbTable d={d} plan={plan} u={u} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>
+        <div className="grid gap-8 min-[1800px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {d.wb.steps.length > 0 && d.profile && <div><SubHead right={<span className="text-[13px] text-fg-3">This flight against every weight, CG and loading limit</span>}>Limits</SubHead><WbLimits d={d} plan={plan} u={u} tank={d.profile.fuel.find(f => f.key === (planning.tanks || 'standard')) ?? d.profile.fuel[0]} /></div>}
         {d.wb.steps.length > 0 && <div><SubHead right={<span className="text-xs text-fg-3">Select a point for its workings</span>}>Center of gravity</SubHead><CgChart d={d} focus={sel?.kind === 'wb' ? sel.i : null} onFocus={i => pick({ kind: 'wb', i })} /></div>}
+        </div>
         <div><SubHead>Takeoff and landing</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
       </div>
     )
@@ -307,16 +316,28 @@ function Planner() {
             <PopoverTrigger asChild><Button variant="ghost">Plans<ChevronDown /></Button></PopoverTrigger>
             <PopoverContent align="end" className="max-h-[70dvh] w-80 overflow-hidden p-2">
               <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
-                onOpen={p => setState({ plan: p.data, id: p.id, stage: 'brief' })} onNew={() => setState({ plan: blank(recentTail), id: null, stage: 'plan' })} />
+                onOpen={p => setState({ plan: p.data, id: p.id, stage: 'brief', saved: JSON.stringify(p.data), savedAt: p.updated_at })} onNew={startNew} />
             </PopoverContent>
           </Popover>
-          <Button variant="secondary" onClick={() => setState({ plan: blank(recentTail), id: null, stage: 'plan' })}><FilePlus2 />New</Button>
-          <Button variant="primary" onClick={save} loading={plans.create.isPending || plans.update.isPending}><Save />Save</Button>
+          <SaveState dirty={dirty} id={state.id} savedAt={state.savedAt ?? null} />
+          {dirty && (state.id != null || plan.route.length > 1) ? (
+            <Popover open={confirmNew} onOpenChange={setConfirmNew}>
+              <PopoverTrigger asChild><Button variant="secondary"><FilePlus2 />New</Button></PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-3">
+                <p className="text-sm text-fg">This plan has unsaved changes.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="primary" onClick={async () => { setConfirmNew(false); await save(); startNew() }}>Save, then new</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setConfirmNew(false); startNew() }}>Discard and start new</Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : <Button variant="secondary" onClick={startNew}><FilePlus2 />New</Button>}
+          <Button variant="primary" onClick={save} disabled={!dirty && !!state.id} loading={plans.create.isPending || plans.update.isPending}>{!dirty && state.id ? <><Check />Saved</> : <><Save />{state.id ? 'Save changes' : 'Save'}</>}</Button>
           <Menu>
             <MenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><MoreHorizontal /></Button></MenuTrigger>
             <MenuContent>
               <MenuItem onSelect={() => { go('navlog'); setTimeout(() => window.print(), 300) }}><Printer />Print NavLog</MenuItem>
-              {state.id && <MenuItem danger onSelect={() => { plans.remove.mutate(state.id!); setState({ plan: blank(recentTail), id: null, stage: 'plan' }) }}><Trash2 />Delete plan</MenuItem>}
+              {state.id && <MenuItem danger onSelect={() => { plans.remove.mutate(state.id!); startNew() }}><Trash2 />Delete plan</MenuItem>}
             </MenuContent>
           </Menu>
           {!refOpen && <Button variant="ghost" onClick={() => refs.show(refs.state.tab)}><PanelRightOpen />{issues ? <span className="num">{issues} to fix</span> : 'Workings'}</Button>}
@@ -339,9 +360,21 @@ function Planner() {
 
       <LoadingStrip loading={pending.filter(([, v]) => v).map(([n]) => n)} saving={saving} failed={failed} />
 
-      <div className={cn('grid gap-5', refOpen && (isDocTab(refs.state.tab) ? 'xl:grid-cols-[minmax(0,1fr)_minmax(26rem,42%)]' : 'xl:grid-cols-[minmax(0,1fr)_25rem] 2xl:grid-cols-[minmax(0,1fr)_28rem]'))}>
+      {/* The sidebar keeps one width whatever its tab; widening it (for a PDF) is your choice. */}
+      <div className={cn('grid gap-5', refOpen && (refs.state.wide ? '2xl:grid-cols-[minmax(0,1fr)_minmax(28rem,45%)]' : '2xl:grid-cols-[minmax(0,1fr)_26rem] min-[1920px]:grid-cols-[minmax(0,1fr)_30rem] min-[2560px]:grid-cols-[minmax(0,1fr)_34rem]'))}>
         <div className="min-w-0 space-y-5">
-          {stage === 'plan' && (
+          {stage === 'plan' && state.wizard != null && (
+            <Setup step={state.wizard} setStep={st => setState(s => ({ ...s, wizard: st }))} done={() => { setState(s => ({ ...s, wizard: null })); go('brief') }} skip={() => setState(s => ({ ...s, wizard: null }))}
+              ready={[true, !!plan.tail && !!d.profile, plan.route.length > 1 && d.legs.length > 0, !!plan.departLocal, loadsOf(plan).front > 0]}
+              hasRecords={!!certs?.certificate}>
+              <FlightInputs step={state.wizard} plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
+                pohError={pohQ.error ? (pohQ.error as Error).message : null} u={u} aircraft={aircraft} profile={d.profile} certs={certs ?? null} />
+              {state.wizard === 2 && plan.route.length > 1 && (
+                <div className="mt-5"><RouteStep part="chart" plan={plan} set={set} d={d} routePts={routePts} alternate={altAirport} weather={wx.data ?? null} airspace={airspace.data} radar={radar.data} notams={notams} checkpoints={corridor.data ?? []} landmarks={landmarks.data ?? null} landmarksLoading={landmarks.isFetching} edit={edit} /></div>
+              )}
+            </Setup>
+          )}
+          {stage === 'plan' && state.wizard == null && (
             <>
               <Card className="px-4 py-5 sm:px-7 sm:py-6">
                 <FlightInputs plan={plan} set={set} d={d} fleet={fleet} registry={registry.data} registryLoading={registry.isLoading} poh={pohQ.data?.match} pohUploaded={pohQ.data?.uploaded ? pohQ.data.doc : null} pohLoading={pohQ.isLoading}
@@ -353,7 +386,8 @@ function Planner() {
               </Card>
             </>
           )}
-          {stage === 'brief' && <Brief d={d} status={overall} label={verdict} open={openDomain} setOpen={k => setState(s => ({ ...s, open: k }))} summary={summary} detail={detail} />}
+          {stage === 'brief' && <Brief d={d} status={overall} label={verdict} open={openDomain} setOpen={k => setState(s => ({ ...s, open: k }))} summary={summary} detail={detail}
+            next={<NextStep checks={d.checks} ready={plan.route.length > 1 && !d.checks.some(c => c.status === 'nogo' || c.status === 'todo')} dirty={dirty} onJump={jump} onSave={save} onNavlog={() => go('navlog')} onChecklist={() => refs.show('checklist')} />} />}
           {stage === 'navlog' && (
             <Card className="space-y-8 px-3 py-4 sm:px-5 sm:py-5">
               {d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways. Print puts it on one landscape page.</p>}
@@ -377,7 +411,7 @@ function Planner() {
           <div className="flex items-center gap-2 print:hidden">
             {stage === 'brief' && <Button variant="ghost" onClick={() => go('plan')}><ChevronLeft />Plan</Button>}
             {stage === 'navlog' && <Button variant="ghost" onClick={() => go('brief')}><ChevronLeft />Brief</Button>}
-            {stage === 'plan' && <Button variant="primary" className="ml-auto" onClick={() => go('brief')}>Brief this flight<ChevronRight /></Button>}
+            {stage === 'plan' && state.wizard == null && <Button variant="primary" className="ml-auto" onClick={() => go('brief')}>Brief this flight<ChevronRight /></Button>}
             {stage === 'brief' && <Button variant="primary" className="ml-auto" onClick={() => go('navlog')}>NavLog<ChevronRight /></Button>}
             {stage === 'navlog' && <Button variant="primary" className="ml-auto" onClick={() => window.print()}><Printer />Print</Button>}
           </div>
@@ -385,7 +419,7 @@ function Planner() {
         </div>
 
         {refOpen && (
-          <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 xl:sticky xl:inset-auto xl:top-20 xl:z-auto xl:h-[calc(100dvh-6rem)] xl:bg-transparent xl:p-0 print:hidden">
+          <aside aria-label="Fixes, workings and documents" className="fixed inset-0 z-40 bg-bg p-2 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[28rem] sm:border-l sm:border-border 2xl:sticky 2xl:inset-auto 2xl:top-20 2xl:z-auto 2xl:h-[calc(100dvh-6rem)] 2xl:w-auto 2xl:border-0 2xl:bg-transparent 2xl:p-0 print:hidden">
             <RefPanel className="h-full" tail={plan.tail} model={aircraft.model ?? match?.profile.key.replace(/^C/, '') ?? null} route={routeIds} date={plan.departLocal.slice(0, 10)} pohDoc={pohQ.data?.doc ?? null} pohLoading={pohQ.isFetching || registry.isLoading} pohStatus={pohStatus}
               fixCount={issues} fixTone={worst === 'nogo' ? 'bad' : worst === 'caution' ? 'warn' : 'neutral'} panes={{ fixes: <FixesPane checks={d.checks} onJump={jump} />, workings: <WorkingsPane topics={topics} assumptions={assumed} sources={srcs} onJump={jump} focus={focus} /> }} />
           </aside>
@@ -440,6 +474,86 @@ function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
         <Group title="Past" list={past} />
       </div>
     </div>
+  )
+}
+
+// Under the verdict: the most important thing still open, or, once nothing
+// is, the steps between a finished plan and engine start.
+function NextStep({ checks, ready, dirty, onJump, onSave, onNavlog, onChecklist }: { checks: PlanCheck[]; ready: boolean; dirty: boolean; onJump: (k: DomainKey) => void; onSave: () => void; onNavlog: () => void; onChecklist: () => void }) {
+  if (!ready) {
+    const c = [...checks].filter(x => x.status === 'nogo' || x.status === 'todo').sort((a, b) => (a.status === 'nogo' ? 0 : 1) - (b.status === 'nogo' ? 0 : 1))[0]
+    const left = checks.filter(x => x.status === 'nogo' || x.status === 'todo').length
+    if (!c) return null
+    return (
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+        <p className="min-w-0 flex-1"><span className="text-fg-3">Next{left > 1 ? ` (1 of ${left})` : ''}: </span><span className="text-fg">{c.title}</span>{c.fix ? <span className="text-fg-3"> · {c.fix}</span> : null}</p>
+        <Button size="sm" variant="secondary" className="self-start sm:self-auto" onClick={() => onJump(DOMAIN_OF[c.section])}>Open {DOMAIN_LABEL[DOMAIN_OF[c.section]].toLowerCase()}<ChevronRight /></Button>
+      </div>
+    )
+  }
+  const steps: [string, React.ReactNode][] = [
+    ['Save the plan', dirty ? <Button size="sm" variant="secondary" onClick={onSave}><Save />Save</Button> : <span className="text-good">Saved</span>],
+    ['Get a standard briefing (§91.103)', <a className="text-accent hover:underline" href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer">1800wxbrief.com · 1-800-992-7433</a>],
+    ['File and open a VFR flight plan (optional)', <a className="text-accent hover:underline" href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer">File with Flight Service</a>],
+    ['Print the NavLog', <Button size="sm" variant="secondary" onClick={onNavlog}><Printer />NavLog</Button>],
+    ['Preflight with the checklist', <Button size="sm" variant="ghost" onClick={onChecklist}>Open checklist</Button>],
+  ]
+  return (
+    <div>
+      <p className="text-sm font-medium text-fg">Nothing left to fix. Before you go:</p>
+      <ol className="mt-2 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        {steps.map(([k, v], i) => <li key={k} className="flex min-h-8 items-center justify-between gap-3"><span className="text-fg-2"><span className="num text-fg-3">{i + 1}.</span> {k}</span>{v}</li>)}
+      </ol>
+    </div>
+  )
+}
+
+const SETUP = [
+  { title: 'Who\'s flying', hint: 'Solo, or dual with an instructor. Your certificate, medical and endorsements are kept from earlier plans.' },
+  { title: 'Aircraft', hint: 'The tail number: its registry entry, POH, weights and speeds are looked up.' },
+  { title: 'Route', hint: 'From, any points to fly over, and to. The chart shows the line and suggests checkpoints.' },
+  { title: 'Time and power', hint: 'Engine-start time (local) and cruise RPM: the weather and winds are for this time.' },
+  { title: 'Load', hint: 'People, bags and fuel: weight and balance and fuel reserve come from these.' },
+]
+
+// A new plan's guided setup: one group of questions per step, each with what it
+// is for; done opens the brief. "Show every field" leaves it for the full form.
+function Setup({ step, setStep, done, skip, ready, hasRecords, children }: { step: number; setStep: (n: number) => void; done: () => void; skip: () => void; ready: boolean[]; hasRecords: boolean; children: React.ReactNode }) {
+  const last = step === SETUP.length - 1
+  return (
+    <Card className="px-4 py-5 sm:px-7 sm:py-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="text-[13px] font-medium uppercase tracking-wide text-fg-3">New flight · step {step + 1} of {SETUP.length}</div>
+        <button className="text-[13px] text-accent hover:underline" onClick={skip}>Show every field</button>
+      </div>
+      <ol className="mt-3 grid grid-cols-5 gap-1.5" aria-label="Setup steps">
+        {SETUP.map((st, i) => (
+          <li key={st.title}>
+            <button onClick={() => setStep(i)} aria-current={i === step ? 'step' : undefined} className="group w-full text-left">
+              <span className={cn('block h-1 rounded-full', i === step ? 'bg-accent' : ready[i] && i < step ? 'bg-good' : 'bg-border')} />
+              <span className={cn('mt-1.5 block truncate text-[13px] max-sm:hidden', i === step ? 'font-medium text-fg' : 'text-fg-3 group-hover:text-fg-2')}>{st.title}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-4 text-sm text-fg-2">{SETUP[step].hint}{step === 0 && !hasRecords && ' Add them once under Brief → Pilot and every plan uses them.'}</p>
+      <div className="mt-2">{children}</div>
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+        {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)}><ChevronLeft />Back</Button>}
+        {!ready[step] && <span className="text-[13px] text-fg-3">{step === 1 ? 'Enter a tail number to look up the airplane.' : step === 2 ? 'Enter where you leave from and land.' : step === 4 ? 'Enter the pilot\'s weight.' : ''}</span>}
+        <Button variant="primary" className="ml-auto" onClick={() => (last ? done() : setStep(step + 1))}>{last ? 'Brief this flight' : `Next: ${SETUP[step + 1].title}`}<ChevronRight /></Button>
+      </div>
+    </Card>
+  )
+}
+
+// Saved, unsaved changes, or never saved: always visible next to Save.
+function SaveState({ dirty, id, savedAt }: { dirty: boolean; id: number | null; savedAt: string | null }) {
+  const label = !id ? 'Not saved yet' : dirty ? 'Unsaved changes' : savedAt ? `Saved ${relTime(savedAt)}` : 'Saved'
+  return (
+    <span role="status" className={cn('inline-flex items-center gap-1.5 text-[13px] max-sm:order-last max-sm:w-full', !id || dirty ? 'text-warn' : 'text-fg-3')}>
+      <span aria-hidden className={cn('size-1.5 rounded-full', !id || dirty ? 'bg-warn' : 'bg-good')} />{label}
+    </span>
   )
 }
 

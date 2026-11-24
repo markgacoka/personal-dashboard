@@ -122,7 +122,7 @@ export function CgChart({ d, focus, onFocus }: { d: Derived; focus: number | nul
   const xt = Array.from({ length: x1 - x0 + 1 }, (_, k) => x0 + k).filter(v => v % 2 === 0)
   const yt = Array.from({ length: (y1 - y0) / 100 + 1 }, (_, k) => y0 + k * 100).filter(v => v % 200 === 0)
   return (
-    <figure>
+    <figure className="max-w-3xl">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`CG envelope with ${pts.map(q => `${q.s.label} ${Math.round(q.s.weight)} lb at ${q.cg.toFixed(1)} in`).join(', ')}`}>
         {yt.map(v => <g key={v}><line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke="var(--border)" strokeWidth={1} /><text x={L - 6} y={sy(v)} dy="0.32em" textAnchor="end" className="num fill-fg-3 text-[11px]">{v.toLocaleString()}</text></g>)}
         {xt.map(v => <text key={v} x={sx(v)} y={H - 10} textAnchor="middle" className="num fill-fg-3 text-[11px]">{v}</text>)}

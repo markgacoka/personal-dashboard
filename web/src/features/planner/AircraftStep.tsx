@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { Segmented } from '@/components/ui/misc'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import type { AircraftRegistry } from '@/lib/types'
@@ -29,16 +30,23 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
   planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; savingPlanning: boolean; u: Units
 }) {
   const p = d.profile
+  const [tab, setTab] = useState<'overview' | 'specs' | 'records' | 'mx'>('overview')
   if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number under Plan.</p>
   const night = !!plan.night || d.wx.some(w => w.night)
   const raw = pohDoc?.specs
   const specs = hasSpecs(raw) ? raw : null
   const reg = registry?.registration
+  const open = d.checks.filter(c => c.section === 'aircraft' && c.status !== 'ok').length
   return (
-    <div className="space-y-8">
-      <div className="@container"><div className="grid gap-6 @4xl:grid-cols-5">
+    <div className="space-y-6">
+      {/* One view at a time: the airplane at a glance, its book, your records, its maintenance. */}
+      <Segmented value={tab} onChange={setTab} className="max-w-full" options={[
+        { value: 'overview', label: 'Overview' }, { value: 'specs', label: 'Specifications' },
+        { value: 'records', label: 'Profile and records' }, { value: 'mx', label: 'Maintenance and equipment', count: open || undefined },
+      ]} />
+      {tab === 'overview' && <div className="@container"><div className="grid gap-6 @4xl:grid-cols-5">
         <div className="grid content-start gap-4 @2xl:grid-cols-2 @4xl:col-span-2 @4xl:grid-cols-1">
-          {registry?.photo_url && <img src={registry.photo_url} alt={plan.tail} className="aspect-[16/9] w-full rounded-lg object-cover ring-1 ring-border" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
+          {registry?.photo_url && <img src={registry.photo_url} alt={plan.tail} className="aspect-[16/9] max-h-56 w-full rounded-lg object-cover ring-1 ring-border" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
           <div className="min-w-0 space-y-4">
           <KV items={[
             ['Aircraft', `${titleCase(aircraft.make ?? '')} ${aircraft.model ?? ''}${aircraft.year ? `, ${aircraft.year}` : ''}`],
@@ -75,11 +83,13 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
             </div>
           )}
         </div>
-      </div></div>
+      </div></div>}
 
-      {p && specs && <SpecSheet s={specs} book={pohDoc?.title ?? 'POH'} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
-      {p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">{raw?.pending ? `${raw.pending}: the engine, oil, fuel, tire, electrical and speed sheet appears here when it's done.` : pohDoc ? `The engine, oil, fuel, tire, electrical and speed sheet couldn't be read from ${pohDoc.title}. Upload a clearer copy of this airplane's POH, or read Sections 1, 2, 7 and 8 in it.` : 'No POH found for this airplane yet: upload it and its engine, oil, fuel, tire, electrical and speed sheet is read from it.'}</p>}
+      {tab === 'specs' && p && specs && <SpecSheet s={specs} book={pohDoc?.title ?? 'POH'} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
+      {tab === 'specs' && p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">{raw?.pending ? `${raw.pending}: the engine, oil, fuel, tire, electrical and speed sheet appears here when it's done.` : pohDoc ? `The engine, oil, fuel, tire, electrical and speed sheet couldn't be read from ${pohDoc.title}. Upload a clearer copy of this airplane's POH, or read Sections 1, 2, 7 and 8 in it.` : 'No POH found for this airplane yet: upload it and its engine, oil, fuel, tire, electrical and speed sheet is read from it.'}</p>}
+      {tab === 'specs' && p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}
 
+      {tab === 'records' && <>
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <ProfileEditor tail={plan.tail} planning={planning} save={savePlanning} saving={savingPlanning} registry={{ make: registry?.make, model: registry?.model, year: registry?.year }} />
         <div className="space-y-6">
@@ -87,8 +97,6 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
           <RecordsList title={<>Aircraft records · <span className="num">{plan.tail}</span></>} records={AIRCRAFT_RECORDS} tail={plan.tail} />
         </div>
       </div>
-
-      {p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-4">
@@ -99,13 +107,16 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
             </label>
           )}
         </div>
-        <InspectionDates tail={plan.tail} planning={planning} save={savePlanning} />
       </div>
+      </>}
 
+      {tab === 'mx' && <>
+      <InspectionDates tail={plan.tail} planning={planning} save={savePlanning} />
       <div className="grid gap-6 xl:grid-cols-2">
         <Checklist title="Maintenance, inspections and documents" right={<span className="text-xs text-fg-3">Aircraft logbooks / dispatch</span>} items={MX_DOCS} prefix="mx" plan={plan} set={set} yes="Checked" no="Problem" />
         <Checklist title={night ? 'Required equipment · day and night VFR' : 'Required equipment · day VFR'} right={<span className="text-xs text-fg-3">§91.205</span>} items={night ? [...EQUIPMENT_DAY, ...EQUIPMENT_NIGHT] : EQUIPMENT_DAY} prefix="eq" plan={plan} set={set} yes="Working" no="Inop" />
       </div>
+      </>}
     </div>
   )
 }

@@ -21,11 +21,14 @@ const KIND_LABEL: Record<RoutePoint['kind'], string> = { airport: 'Airport', nav
 // What you type: tail, route, engine-start time, cruise power, who sits where,
 // fuel and taxi time. Everything else is looked up or computed in the later
 // steps, each of which shows its sources and takes an override where one makes sense.
-export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile, certs }: {
+export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile, certs, step = null }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; registryLoading: boolean
   poh: PohMatch | null | undefined; pohUploaded?: PlannerDoc | null; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
   profile: AircraftProfile | null; certs: PilotCerts | null
+  // Guided setup: only this group (0 who, 1 aircraft, 2 route, 3 time and power, 4 load).
+  step?: number | null
 }) {
+  const show = (i: number) => step == null || step === i
   const [tail, setTail] = useState(plan.tail ?? '')
   useEffect(() => setTail(plan.tail ?? ''), [plan.tail])
   const commitTail = () => { const t = tail.toUpperCase().replace(/\s+/g, '').trim(); if (t !== (plan.tail ?? '')) set({ tail: t || null, aircraft: undefined }) }
@@ -58,10 +61,13 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
   return (
     <div className="@container divide-y divide-border">
+      {show(0) && (
       <Group title="Who's flying" hint={certs?.certificate ? CERTIFICATES.find(c => c.key === certs.certificate)!.label : <>Certificate not saved · student assumed</>}>
         <Crew plan={plan} set={set} d={d} certs={certs} />
       </Group>
+      )}
 
+      {show(1) && (
       <Group title="Aircraft" hint="Tail number; the registry and POH are looked up.">
         <div className="grid gap-4 @md:grid-cols-[minmax(0,11rem)_1fr] @md:items-end">
           <Field label="Tail number">
@@ -89,7 +95,9 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
         )}
         <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} read={profile?.read} />
       </Group>
+      )}
 
+      {show(2) && (
       <Group title="Route" hint="Start and end at airports; everything between is flown over."
         aside={<Tooltip content="Navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W or 36.85/-121.53). SkyVector and ForeFlight route strings paste in whole."><span className="mt-2 inline-flex cursor-help items-center gap-1 text-[13px] text-fg-3 hover:text-fg-2"><Info className="size-3.5" />Formats</span></Tooltip>}>
         <div className="grid grid-cols-2 gap-4 @md:grid-cols-[7rem_minmax(0,1fr)_7rem]">
@@ -117,7 +125,9 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
         )}
         {!tokenize(arr).length && tokenize(dep).length > 0 && <p className="mt-3 text-[13px] text-fg-3">Add the arrival airport (the departure again for a local flight).</p>}
       </Group>
+      )}
 
+      {show(3) && (
       <Group title="Time and power" hint="Local engine-start time and cruise RPM.">
         <div className="grid gap-4 @md:grid-cols-2">
           <Field label="Engine start"><Input type="datetime-local" value={plan.departLocal} onChange={e => set({ departLocal: e.target.value })} className="num" /></Field>
@@ -126,7 +136,9 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
           </Field>
         </div>
       </Group>
+      )}
 
+      {show(4) && (
       <Group title="Load" hint={`People and bags in ${u.weight}, fuel and taxi time.`}>
         <div className="grid grid-cols-2 gap-4 @md:grid-cols-4">
           <NumField label="Pilot" value={w(seats.pilot)} onChange={setSeat('pilot')} />
@@ -143,6 +155,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
           </Field>
         </div>
       </Group>
+      )}
     </div>
   )
 }

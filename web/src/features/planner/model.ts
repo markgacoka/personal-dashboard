@@ -713,6 +713,12 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   // ── Aircraft ──
   if (!plan.tail) add('aircraft', 'todo', 'Choose the aircraft')
   else if (inp.match && !inp.match.exact && inp.match.note) add('aircraft', 'caution', 'Closest POH used', inp.match.note)
+  // FAA airport data (frequencies, runways, elevations) is published every 28 days.
+  const cyc = route.find(a => a.cycle)?.cycle
+  if (cyc && departAt) {
+    const ends = new Date(`${cyc}T00:00:00Z`).getTime() + 28 * 86_400_000
+    if (ends <= departAt.getTime()) add('performance', 'caution', `FAA airport data cycle ${cyc} has ended`, 'Frequencies, runways and pattern altitudes may have changed: check the Chart Supplement for each airport.')
+  }
   // Units: knots throughout. A table read from a book must say which unit it uses.
   const rd = profile?.read
   if (rd?.units) {

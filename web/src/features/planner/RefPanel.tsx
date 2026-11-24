@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react'
-import { BookOpen, Download, ExternalLink, Mail, PanelRightClose, Upload, X } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, Mail, Maximize2, Minimize2, PanelRightClose, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
@@ -16,15 +16,15 @@ const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Fixes' }, {
 export const isDocTab = (t: Tab): t is DocTab => t === 'poh' || t === 'checklist' || t === 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
 // docTail: the tail the POH/checklist were picked for; a different tail goes back to its own documents.
-interface RefState { open: boolean; tab: Tab; page: number | string | null; docId: Record<DocTab, number | null>; docTail: string | null }
+interface RefState { open: boolean; wide: boolean; tab: Tab; page: number | string | null; docId: Record<DocTab, number | null>; docTail: string | null }
 interface RefApi { state: RefState; show: (tab: Tab, page?: string | number | null) => void; close: () => void; set: (s: Partial<RefState>) => void }
 const Ctx = createContext<RefApi | null>(null)
 export const useRefs = () => useContext(Ctx)
 
 export function RefProvider({ children }: { children: React.ReactNode }) {
   // Open beside the plan on wide screens; a full-screen sheet on demand elsewhere.
-  const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 80rem)').matches
-  const [state, setState] = useState<RefState>({ open: !!wide, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null }, docTail: null })
+  const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 96rem)').matches
+  const [state, setState] = useState<RefState>({ open: !!wide, wide: false, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null }, docTail: null })
   const api = useMemo<RefApi>(() => ({
     state,
     show: (tab, page) => setState(s => ({ ...s, open: true, tab, page: page ?? null })),
@@ -64,7 +64,8 @@ export function RefPanel({ tail, model, route, date, className, pohDoc, pohLoadi
           </span>
         ))}
         </div>
-        <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="xl:hidden" /><PanelRightClose className="max-xl:hidden" /></Button>
+        <Button size="icon-sm" variant="ghost" className="shrink-0 max-2xl:hidden" onClick={() => r.set({ wide: !r.state.wide })} aria-label={r.state.wide ? 'Narrow the sidebar' : 'Widen the sidebar'} aria-pressed={r.state.wide} title={r.state.wide ? 'Narrow the sidebar' : 'Widen the sidebar (for reading the POH or briefing)'}>{r.state.wide ? <Minimize2 /> : <Maximize2 />}</Button>
+        <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="2xl:hidden" /><PanelRightClose className="max-2xl:hidden" /></Button>
       </div>
       {isDocTab(r.state.tab) ? <DocPane tail={tail} model={model} route={route} date={date} pohDoc={pohDoc} pohLoading={pohLoading} pohStatus={pohStatus} />
         : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panes[r.state.tab]}</div>}

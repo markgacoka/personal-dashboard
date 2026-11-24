@@ -139,6 +139,32 @@ this flight's value marked, margin in words): each total weight against its
 maximum, each CG against the envelope's range at that weight, baggage areas and
 fuel. The CG chart adds the utility-category envelope.
 
+## Flow
+
+- **New plan:** a five-step guided setup (who's flying, aircraft, route, time and
+  power, load), each step saying what it is for; "Show every field" leaves it.
+  Done opens the brief.
+- **Save:** next to Save the header says "Not saved yet", "Unsaved changes" or
+  "Saved n min ago"; starting a new plan with unsaved changes asks to save or
+  discard.
+- **Brief:** under the verdict, the next thing to fix (and how many are left)
+  with a button to its area; once nothing is a no-go or to-do, the steps before
+  engine start (save, standard briefing, file a flight plan, print, checklist).
+- **Pilot:** a solo / dual / private table shows what changes with the role
+  (the current flight's column highlighted). Pilot documents are kept once and
+  used by every plan.
+- **Aircraft:** four tabs (overview, specifications, profile and records,
+  maintenance and equipment) instead of one long page.
+- **Sidebar:** the same width for every tab, widened only by its own button; it
+  sits beside the plan from 1,536 px and opens over it below that.
+- **Map:** surface wind (METARs) and the NavLog's winds aloft as arrows, besides
+  radar, METAR categories, PIREPs, SIGMET/AIRMET/CWA, TFRs, NOTAMs and airspace;
+  route airports show elevation, pattern altitude, the runway the wind favours,
+  ATIS/tower/ground/CTAF and their NOTAM count.
+- **Sources:** Workings → Airports lists where each elevation, pattern
+  altitude, frequency, weather report and NOTAM came from; every frequency
+  says when to use it; an ended NASR cycle is a caution.
+
 ## Calculations (all client-side, pure functions, unit-tested)
 
 - Pressure altitude = field elevation + (29.92 − altimeter) × 1000; ISA temp;

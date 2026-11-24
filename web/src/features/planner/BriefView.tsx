@@ -16,9 +16,11 @@ const tally = (cs: Check[]) => (['nogo', 'caution', 'todo'] as Status[]).map(s =
 
 // The brief: the verdict and the trip's numbers, then one line per area with
 // its answer; open a line for the detail behind it.
-export function Brief({ d, status, label, open, setOpen, summary, detail }: {
+export function Brief({ d, status, label, open, setOpen, summary, detail, next }: {
   d: Derived; status: Status; label: string; open: DomainKey | null; setOpen: (k: DomainKey | null) => void
   summary: Record<DomainKey, React.ReactNode>; detail: (k: DomainKey) => React.ReactNode
+  // What to do now: the next fix, or once nothing is left, the steps before you go.
+  next?: React.ReactNode
 }) {
   const t = d.totals
   const to = d.wb.steps.find(x => x.total && x.label.startsWith('Takeoff'))
@@ -49,6 +51,7 @@ export function Brief({ d, status, label, open, setOpen, summary, detail }: {
             {facts.map(([k, v]) => <div key={k} className="min-w-0"><dt className="text-[13px] text-fg-3">{k}</dt><dd className="num mt-1 truncate text-[15px] text-fg-2">{v}</dd></div>)}
           </dl>
         )}
+        {next && <div className="mt-5 border-t border-fg/10 pt-4">{next}</div>}
       </div>
 
       <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]">

@@ -186,3 +186,17 @@
 .maplibregl-popup-tip { display: none; }
 .maplibregl-ctrl-attrib { font-size: 10px; background: color-mix(in oklch, var(--card) 80%, transparent) !important; }
 .maplibregl-ctrl-scale { background: color-mix(in oklch, var(--card) 80%, transparent); border-color: var(--fg-3); color: var(--fg-2); }
+
+/* Flight planner: long reading sessions on dense tables, so a little less glare
+   than the rest of the dashboard: off-white text, a softer card, and the NavLog's
+   header bars as raised panels on screen (black on paper). Text still ≥ 4.5:1. */
+.planner {
+  --fg: #e9e8e4;
+  --fg-2: #b6b5b0;
+  --card: #161617;
+  --sunken: #202022;
+  --border: #29292b;
+  --border-strong: #38383b;
+}
+.planner .nl-bar { background: var(--border-strong); color: var(--fg); }
+@media print { .planner .nl-bar { background: #000; color: #fff; } }

@@ -16,6 +16,7 @@ const FREQ_LABEL: Record<string, string> = {
   'LCL/P': 'Tower', 'LCL/S': 'Tower (sec.)', 'GND/P': 'Ground', 'GND/S': 'Ground (sec.)', 'CD/P': 'Clearance', ATIS: 'ATIS', 'D-ATIS': 'D-ATIS', CTAF: 'CTAF', UNICOM: 'UNICOM',
   'APCH/P': 'Approach', 'APCH/S': 'Approach', 'DEP/P': 'Departure', 'DEP/S': 'Departure', 'APCH/P DEP/P': 'Approach/Departure', 'APCH/P DEP/P IC': 'Approach/Departure', 'DEP/P IC': 'Departure', 'APCH/S IC': 'Approach', 'APCH/P IC': 'Approach', 'CLASS C': 'Class C', 'CLASS B': 'Class B',
 }
+import { WorkingsLink } from './RefPanel'
 import { freqUse, type FreqRole } from './freqs'
 
 const ORDER = ['ATIS', 'D-ATIS', 'CD/P', 'GND/P', 'GND/S', 'LCL/P', 'LCL/S', 'CTAF', 'UNICOM', 'DEP/P', 'DEP/P IC', 'DEP/S', 'APCH/P', 'APCH/S', 'APCH/S IC', 'APCH/P IC', 'APCH/P DEP/P', 'APCH/P DEP/P IC', 'CLASS C', 'CLASS B']
@@ -38,7 +39,7 @@ export function AirportsStep({ d, routePts, alternate, noAlternate = false, auto
   if (!all.length) return <p className="text-sm text-fg-3">Add the airports under Plan.</p>
   return (
     <div className="@container space-y-6">
-      <Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data · wind from METAR/TAF at your ETA · NOTAMs from the FAA" />
+      <div className="flex flex-wrap items-baseline justify-between gap-2"><Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data · wind from METAR/TAF at your ETA · NOTAMs from the FAA" /><span className="text-[13px]"><WorkingsLink>Where each number came from</WorkingsLink></span></div>
       <div className="grid gap-5 @5xl:grid-cols-2">
         {all.map(a => <AirportCard key={a.id} a={a} role={roleOf(a)} wx={d.wx.find(w => w.airport.id === a.id) ?? null} minimums={minimums} notams={notams.find(n => n.icao === (a.icao || a.id)) ?? null}
           nasr={nasr.find(x => x.id === a.id) ?? a} profile={profiles[a.icao || a.id] ?? null} save={p => saveProfile(a.icao || a.id, p)} saving={savingProfile} />)}

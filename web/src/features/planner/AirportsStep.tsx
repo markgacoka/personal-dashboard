@@ -79,7 +79,7 @@ function Alternate({ dest, value, auto, onChange, exclude, wx }: { dest: Airport
 // Your airport profile: what NASR doesn't say or says wrong. Kept for every
 // plan; pattern altitude and sides feed the navlog (TPA, descent) and the
 // favored runway; notes go on the NavLog sheet.
-function AirportProfileForm({ a, profile, saving, onSave, onCancel }: { a: Airport; profile: AirportProfile | null; saving: boolean; onSave: (p: AirportProfile | null) => void; onCancel: () => void }) {
+export function AirportProfileForm({ a, profile, saving, onSave, onCancel, bare }: { a: Airport; profile: AirportProfile | null; saving: boolean; onSave: (p: AirportProfile | null) => void; onCancel?: () => void; bare?: boolean }) {
   const id = a.icao || a.id
   const [tpa, setTpa] = useState<number | null>(profile?.tpaMsl ?? null)
   const [pattern, setPattern] = useState<Record<string, 'L' | 'R'>>(profile?.pattern ?? {})
@@ -89,8 +89,8 @@ function AirportProfileForm({ a, profile, saving, onSave, onCancel }: { a: Airpo
   const side = (e: (typeof ends)[number]) => pattern[e.id] ?? (e.right ? 'R' : 'L')
   const flip = (e: (typeof ends)[number], v: 'L' | 'R') => setPattern(p => { const n = { ...p }; if (v === (e.right ? 'R' : 'L')) delete n[e.id]; else n[e.id] = v; return n })
   return (
-    <div className="mt-3 space-y-3 rounded-lg px-3 py-3 ring-1 ring-inset ring-border">
-      <div className="text-sm font-medium text-fg">Your <span className="num">{id}</span> profile</div>
+    <div className={cn('space-y-3', !bare && 'mt-3 rounded-lg px-3 py-3 ring-1 ring-inset ring-border')}>
+      {!bare && <div className="text-sm font-medium text-fg">Your <span className="num">{id}</span> profile</div>}
       <label className="block max-w-xs"><span className="mb-1 block text-sm text-fg-2">Pattern altitude (MSL)</span>
         <OptNum value={tpa} placeholder={nasrTpa} unit="ft" step={10} onChange={setTpa} label={`${id} pattern altitude`} />
         <span className="mt-0.5 block text-xs text-fg-3">Blank: {nasrTpa.toLocaleString()} ft {a.tpaAgl ? '(Chart Supplement)' : '(1,000 AGL; none published)'}</span>
@@ -115,7 +115,7 @@ function AirportProfileForm({ a, profile, saving, onSave, onCancel }: { a: Airpo
       </label>
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" loading={saving} onClick={() => onSave({ tpaMsl: tpa, pattern, notes: notes.trim() })}>Save {id} profile</Button>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        {onCancel && <Button variant="ghost" onClick={onCancel}>Cancel</Button>}
         {profile && <Button variant="danger-ghost" className="ml-auto" onClick={() => onSave(null)}>Delete profile</Button>}
       </div>
     </div>
@@ -214,7 +214,7 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
 
       <div className="mt-3 text-sm">
         <div className="mb-1 text-xs font-medium uppercase tracking-wide text-fg-3">NOTAMs that affect a VFR flight</div>
-        {!notams ? <span className="text-fg-3">Loading…</span> : notams.unavailable ? <span className="text-warn">Unavailable — check notams.aim.faa.gov or 1800wxbrief.com.</span>
+        {!notams ? <span className="text-fg-3">Loading…</span> : notams.unavailable ? <span className="text-fg-2">Unavailable — check notams.aim.faa.gov or 1800wxbrief.com.</span>
           : nh!.shown.length ? <ul className="list-disc space-y-0.5 pl-5 text-fg-2">{nh!.shown.map((n, i) => <li key={i}>{n}</li>)}{nh!.more > 0 && <li className="text-fg-3">+{nh!.more} more in the weather step</li>}</ul>
             : <span className="text-fg-3">None ({notams.items.length} total, all IFR procedures, obstacles or charts).</span>}
       </div>

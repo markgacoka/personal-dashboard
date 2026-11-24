@@ -24,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'sleep', element: page(() => import('@/features/sleep/SleepPage')) },
       { path: 'flying', element: page(() => import('@/features/flying/LogbookPage')) },
       { path: 'flying/plan', element: page(() => import('@/features/planner/PlannerPage')) },
+      { path: 'flying/plan/profiles', element: page(() => import('@/features/planner/ProfilesPage')) },
       { path: 'flying/weather', element: <Navigate to="/flying/plan" replace /> },
       { path: 'flying/pilot', element: page(() => import('@/features/flying/PilotPage')) },
       { path: 'flying/pattern/us/:id', element: page(() => import('@/features/pattern/PatternPage')) },

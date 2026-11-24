@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, FilePlus2, Loader2, MoreHorizontal, PanelRightOpen, Pencil, Printer, Save, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FilePlus2, Loader2, MoreHorizontal, PanelRightOpen, Pencil, Printer, Save, Trash2, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Menu, MenuContent, MenuItem, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
@@ -32,9 +33,10 @@ import { applyEdits, profileFor, withSpecs, withTables } from './poh'
 import { CERTIFICATES, roleOf } from './pilot'
 import { RefPanel, RefProvider, useRefs } from './RefPanel'
 import { unitsForTail } from './units'
+import { SELF } from './profiles'
 import { WeatherSection } from './WeatherSection'
-import { StatusIcon, SubHead, fmtMin, fmtTime } from './ui'
-import { Brief, domainStatus } from './BriefView'
+import { SubHead, fmtMin, fmtTime } from './ui'
+import { Brief } from './BriefView'
 import { DOMAIN_LABEL, DOMAIN_OF, FixesPane, WorkingsPane, worstStatus, type DomainKey } from './Sidebar'
 import { assumptions, calculations, sources } from './workings'
 import { explainRow, explainWb, inputSources } from './explain'
@@ -93,6 +95,12 @@ function Planner() {
   const plan = state.plan
   const set = (p: Partial<Plan>) => setState(s => ({ ...s, plan: { ...s.plan, ...p } }))
   useEffect(() => { if (!plan.tail && recentTail) set({ tail: recentTail }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [recentTail])
+  // Your profile's weight fills an empty pilot seat (a new plan, or one started before it was saved).
+  const selfInfo = usePilotInfo().data
+  useEffect(() => {
+    const wt = selfInfo?.weightLb
+    if (wt && !(plan.seats?.pilot) && !plan.seatPeople?.pilot) set({ seats: { ...(plan.seats ?? { pilot: 0, front: 0, rearL: 0, rearR: 0 }), pilot: wt }, seatPeople: { ...plan.seatPeople, pilot: SELF } })
+  }, [selfInfo?.weightLb, plan.seats?.pilot]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(state)) } catch { /* private mode */ } }, [state])
 
   // ── Data ──
@@ -226,7 +234,8 @@ function Planner() {
 
   const stage: Stage = state.stage ?? 'plan'
   const dirty = state.saved !== JSON.stringify(plan)
-  const [confirmNew, setConfirmNew] = useState(false)
+  const [plansOpen, setPlansOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   // A new plan starts in the guided setup: one question group at a time.
   const startNew = () => setState({ plan: blank(recentTail), id: null, stage: 'plan', saved: null, savedAt: null, wizard: 0 })
   const openDomain = state.open ?? null
@@ -234,9 +243,8 @@ function Planner() {
   const jump = (k: DomainKey) => { if (k === 'plan') go('plan'); else go('brief', k); if (!window.matchMedia('(min-width: 96rem)').matches) refs.close() }
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
   const role = roleOf(plan.crew, certs)
-  const issues = d.checks.filter(c => c.status !== 'ok').length
+  const issues = d.checks.filter(c => c.status === 'nogo' || c.status === 'caution' || c.status === 'todo').length
   const worst = worstStatus(d.checks)
-  const planIssues = d.checks.filter(c => DOMAIN_OF[c.section] === 'plan' && c.status !== 'ok')
 
   // The sidebar's workings, from the same derive() output the brief shows.
   const wIn = { d, plan: planEff, minimums, weather: wx.data ?? null, cycle: apts.data?.cycle ?? null, pohNote: pohStatus, altAuto: !d.flights.some(f => f.altSet), altMode: plan.alternate === false ? 'none' as const : plan.alternate ? 'yours' as const : 'auto' as const, certsSaved: !!certs?.certificate, terrainAt: terrain.data?.fetchedAt ?? null, notams: notamSets }
@@ -303,8 +311,6 @@ function Planner() {
     )
     return null
   }
-  const stageStatus = (st: Stage): Status | null => st === 'plan' ? (planIssues.length ? domainStatus({ ...d, checks: planIssues }, 'plan') : null) : st === 'brief' ? overall : null
-  const tone = (s: Status | null) => (s === 'nogo' ? 'text-bad' : s === 'caution' ? 'text-warn' : s === 'ok' ? 'text-good' : 'text-fg-3')
 
   return (
     <div className="planner">
@@ -312,47 +318,42 @@ function Planner() {
         title={<label className="group flex min-w-0 items-center gap-2"><input value={plan.name} onChange={e => set({ name: e.target.value })} aria-label="Plan name" placeholder="Name this flight plan" size={Math.max(10, plan.name.length + 1)} className="field-sizing-content min-w-0 max-w-full bg-transparent outline-none placeholder:text-fg-3 focus:underline" /><Pencil className="size-5 shrink-0 text-fg-3 group-hover:text-fg print:hidden" aria-hidden /></label>}
         description={<span><span className="num">{routeText}</span>{d.departAt && <> · {d.departAt.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>}{d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)} · {d.totals.tripFuel.toFixed(1)} gal</span></>}</span>}
         actions={<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto print:hidden">
-          <Popover>
+          <Button asChild variant="ghost"><Link to="/flying/plan/profiles"><Users />Profiles</Link></Button>
+          <Popover open={plansOpen} onOpenChange={setPlansOpen}>
             <PopoverTrigger asChild><Button variant="ghost">Plans<ChevronDown /></Button></PopoverTrigger>
             <PopoverContent align="end" className="max-h-[70dvh] w-80 overflow-hidden p-2">
-              <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan}
-                onOpen={p => setState({ plan: p.data, id: p.id, stage: 'brief', saved: JSON.stringify(p.data), savedAt: p.updated_at })} onNew={startNew} />
+              <PlanList plans={plans.data} loading={plans.isLoading} currentId={state.id} draft={state.id ? null : plan} unsaved={dirty && (state.id != null || plan.route.length > 1) ? plan.name : null}
+                onSave={save} onOpen={p => { setPlansOpen(false); setState({ plan: p.data, id: p.id, stage: 'brief', saved: JSON.stringify(p.data), savedAt: p.updated_at }) }} onNew={() => { setPlansOpen(false); startNew() }} />
             </PopoverContent>
           </Popover>
-          <SaveState dirty={dirty} id={state.id} savedAt={state.savedAt ?? null} />
-          {dirty && (state.id != null || plan.route.length > 1) ? (
-            <Popover open={confirmNew} onOpenChange={setConfirmNew}>
-              <PopoverTrigger asChild><Button variant="secondary"><FilePlus2 />New</Button></PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-3">
-                <p className="text-sm text-fg">This plan has unsaved changes.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="primary" onClick={async () => { setConfirmNew(false); await save(); startNew() }}>Save, then new</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setConfirmNew(false); startNew() }}>Discard and start new</Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          ) : <Button variant="secondary" onClick={startNew}><FilePlus2 />New</Button>}
-          <Button variant="primary" onClick={save} disabled={!dirty && !!state.id} loading={plans.create.isPending || plans.update.isPending}>{!dirty && state.id ? <><Check />Saved</> : <><Save />{state.id ? 'Save changes' : 'Save'}</>}</Button>
+          {dirty || !state.id
+            ? <Button variant="primary" onClick={save} loading={plans.create.isPending || plans.update.isPending}><Save />{state.id ? 'Save changes' : 'Save'}</Button>
+            : <span role="status" className="inline-flex h-9 items-center gap-1.5 px-1 text-[13px] text-fg-3"><Check className="size-4" />Saved {state.savedAt ? relTime(state.savedAt) : ''}</span>}
           <Menu>
             <MenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><MoreHorizontal /></Button></MenuTrigger>
             <MenuContent>
               <MenuItem onSelect={() => { go('navlog'); setTimeout(() => window.print(), 300) }}><Printer />Print NavLog</MenuItem>
-              {state.id && <MenuItem danger onSelect={() => { plans.remove.mutate(state.id!); startNew() }}><Trash2 />Delete plan</MenuItem>}
+              {state.id && <MenuItem danger onSelect={() => setConfirmDelete(true)}><Trash2 />Delete plan</MenuItem>}
             </MenuContent>
           </Menu>
-          {!refOpen && <Button variant="ghost" onClick={() => refs.show(refs.state.tab)}><PanelRightOpen />{issues ? <span className="num">{issues} to fix</span> : 'Workings'}</Button>}
+          {confirmDelete && state.id && (
+            <div role="alertdialog" aria-label="Delete this plan?" className="flex w-full items-center gap-2 text-[13px] sm:w-auto">
+              <span className="text-fg-2">Delete "{plan.name}" for good?</span>
+              <Button size="sm" variant="danger" onClick={() => { plans.remove.mutate(state.id!); setConfirmDelete(false); startNew() }}>Delete</Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Keep</Button>
+            </div>
+          )}
+          {!refOpen && <Button variant="ghost" onClick={() => refs.show(refs.state.tab)}><PanelRightOpen />{issues ? <span className="num">{issues} checks</span> : 'Workings'}</Button>}
         </div>}
       />
 
       <nav aria-label="Planner stages" className="mb-4 flex items-center gap-1 border-b border-border print:hidden">
         {STAGES.map(st => {
-          const s = stageStatus(st.key), on = stage === st.key
+          const on = stage === st.key
           return (
             <button key={st.key} onClick={() => go(st.key)} aria-current={on ? 'page' : undefined}
               className={cn('-mb-px flex h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-[15px] transition-colors', on ? 'border-accent font-medium text-fg' : 'border-transparent text-fg-3 hover:text-fg')}>
               {st.label}
-              {st.key === 'brief' && s && <span className={cn('inline-flex items-center gap-1 text-[13px] font-normal', tone(s))}><StatusIcon status={s} className="size-3.5" /><span className="max-sm:hidden">{verdict}</span></span>}
-              {st.key === 'plan' && s && <StatusIcon status={s} className="size-3.5" />}
             </button>
           )
         })}
@@ -387,7 +388,7 @@ function Planner() {
             </>
           )}
           {stage === 'brief' && <Brief d={d} status={overall} label={verdict} open={openDomain} setOpen={k => setState(s => ({ ...s, open: k }))} summary={summary} detail={detail}
-            next={<NextStep checks={d.checks} ready={plan.route.length > 1 && !d.checks.some(c => c.status === 'nogo' || c.status === 'todo')} dirty={dirty} onJump={jump} onSave={save} onNavlog={() => go('navlog')} onChecklist={() => refs.show('checklist')} />} />}
+            next={<NextStep checks={d.checks} ready={plan.route.length > 1 && !d.checks.some(c => c.status === 'nogo' || c.status === 'todo')} onJump={jump} onNavlog={() => go('navlog')} onChecklist={() => refs.show('checklist')} />} />}
           {stage === 'navlog' && (
             <Card className="space-y-8 px-3 py-4 sm:px-5 sm:py-5">
               {d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways. Print puts it on one landscape page.</p>}
@@ -409,10 +410,7 @@ function Planner() {
             </Card>
           )}
           <div className="flex items-center gap-2 print:hidden">
-            {stage === 'brief' && <Button variant="ghost" onClick={() => go('plan')}><ChevronLeft />Plan</Button>}
-            {stage === 'navlog' && <Button variant="ghost" onClick={() => go('brief')}><ChevronLeft />Brief</Button>}
             {stage === 'plan' && state.wizard == null && <Button variant="primary" className="ml-auto" onClick={() => go('brief')}>Brief this flight<ChevronRight /></Button>}
-            {stage === 'brief' && <Button variant="primary" className="ml-auto" onClick={() => go('navlog')}>NavLog<ChevronRight /></Button>}
             {stage === 'navlog' && <Button variant="primary" className="ml-auto" onClick={() => window.print()}><Printer />Print</Button>}
           </div>
           <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.74 } }'}</style>
@@ -434,16 +432,30 @@ const whenOf = (p: Plan) => { const d = new Date(p.departLocal); return Number.i
 
 // Saved plans beside the wizard: upcoming first (soonest on top), then past
 // (most recent on top). Saved in your database only.
-function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
-  plans: SavedPlan[] | undefined; loading: boolean; currentId: number | null; draft: Plan | null; onOpen: (p: SavedPlan) => void; onNew: () => void
+function PlanList({ plans, loading, currentId, draft, unsaved, onSave, onOpen, onNew }: {
+  plans: SavedPlan[] | undefined; loading: boolean; currentId: number | null; draft: Plan | null
+  // The open plan's name when leaving it would lose changes: opening another or starting new asks first.
+  unsaved: string | null; onSave: () => Promise<void>; onOpen: (p: SavedPlan) => void; onNew: () => void
 }) {
+  const [leave, setLeave] = useState<(() => void) | null>(null)
+  const guard = (go: () => void) => (unsaved ? setLeave(() => go) : go())
+  if (leave) return (
+    <div className="p-2">
+      <p className="text-sm text-fg">"{unsaved}" has unsaved changes.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant="primary" onClick={async () => { await onSave(); leave(); setLeave(null) }}>Save and continue</Button>
+        <Button size="sm" variant="ghost" onClick={() => { leave(); setLeave(null) }}>Discard changes</Button>
+        <Button size="sm" variant="ghost" onClick={() => setLeave(null)}>Cancel</Button>
+      </div>
+    </div>
+  )
   const now = Date.now()
   const at = (p: SavedPlan) => +new Date(p.data.departLocal) || 0
   const upcoming = (plans ?? []).filter(p => at(p) >= now - 3 * 3600_000).sort((a, b) => at(a) - at(b))
   const past = (plans ?? []).filter(p => at(p) < now - 3 * 3600_000).sort((a, b) => at(b) - at(a))
   const Item = ({ p }: { p: SavedPlan }) => (
     <li>
-      <button onClick={() => onOpen(p)} aria-current={p.id === currentId ? 'true' : undefined}
+      <button onClick={() => (p.id === currentId ? undefined : guard(() => onOpen(p)))} aria-current={p.id === currentId ? 'true' : undefined}
         className={cn('w-full rounded-lg px-3 py-2 text-left ring-1 ring-inset', p.id === currentId ? 'bg-accent-soft ring-accent/40' : 'ring-transparent hover:bg-hover')}>
         <div className={cn('truncate text-sm', p.id === currentId ? 'font-medium text-accent' : 'text-fg')}>{p.name}</div>
         <div className="num truncate text-xs text-fg-3">{routeOf(p.data)}</div>
@@ -458,7 +470,7 @@ function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
     <div className="flex max-h-[inherit] flex-col">
       <div className="flex items-center justify-between gap-2 pb-2">
         <span className="text-sm font-medium text-fg">Flight plans</span>
-        <Button variant="ghost" size="sm" onClick={onNew}><FilePlus2 />New</Button>
+        <Button variant="ghost" size="sm" onClick={() => guard(onNew)}><FilePlus2 />New plan</Button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {draft && (
@@ -477,33 +489,27 @@ function PlanList({ plans, loading, currentId, draft, onOpen, onNew }: {
   )
 }
 
-// Under the verdict: the most important thing still open, or, once nothing
-// is, the steps between a finished plan and engine start.
-function NextStep({ checks, ready, dirty, onJump, onSave, onNavlog, onChecklist }: { checks: PlanCheck[]; ready: boolean; dirty: boolean; onJump: (k: DomainKey) => void; onSave: () => void; onNavlog: () => void; onChecklist: () => void }) {
+// Under the verdict, one action: the most important thing still open, or, once
+// nothing is, what's left between a finished plan and engine start.
+function NextStep({ checks, ready, onJump, onNavlog, onChecklist }: { checks: PlanCheck[]; ready: boolean; onJump: (k: DomainKey) => void; onNavlog: () => void; onChecklist: () => void }) {
   if (!ready) {
-    const c = [...checks].filter(x => x.status === 'nogo' || x.status === 'todo').sort((a, b) => (a.status === 'nogo' ? 0 : 1) - (b.status === 'nogo' ? 0 : 1))[0]
-    const left = checks.filter(x => x.status === 'nogo' || x.status === 'todo').length
+    const open = checks.filter(x => x.status === 'nogo' || x.status === 'todo').sort((a, b) => (a.status === 'nogo' ? 0 : 1) - (b.status === 'nogo' ? 0 : 1))
+    const c = open[0]
     if (!c) return null
     return (
       <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
-        <p className="min-w-0 flex-1"><span className="text-fg-3">Next{left > 1 ? ` (1 of ${left})` : ''}: </span><span className="text-fg">{c.title}</span>{c.fix ? <span className="text-fg-3"> · {c.fix}</span> : null}</p>
-        <Button size="sm" variant="secondary" className="self-start sm:self-auto" onClick={() => onJump(DOMAIN_OF[c.section])}>Open {DOMAIN_LABEL[DOMAIN_OF[c.section]].toLowerCase()}<ChevronRight /></Button>
+        <p className="min-w-0 flex-1"><span className="text-fg-3">Next: </span><span className="text-fg">{c.title}</span>{c.fix ? <span className="text-fg-3"> · {c.fix}</span> : null}</p>
+        <Button size="sm" variant="secondary" className="self-start sm:self-auto" onClick={() => onJump(DOMAIN_OF[c.section])}>Go to {DOMAIN_LABEL[DOMAIN_OF[c.section]].toLowerCase()}<ChevronRight /></Button>
       </div>
     )
   }
-  const steps: [string, React.ReactNode][] = [
-    ['Save the plan', dirty ? <Button size="sm" variant="secondary" onClick={onSave}><Save />Save</Button> : <span className="text-good">Saved</span>],
-    ['Get a standard briefing (§91.103)', <a className="text-accent hover:underline" href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer">1800wxbrief.com · 1-800-992-7433</a>],
-    ['File and open a VFR flight plan (optional)', <a className="text-accent hover:underline" href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer">File with Flight Service</a>],
-    ['Print the NavLog', <Button size="sm" variant="secondary" onClick={onNavlog}><Printer />NavLog</Button>],
-    ['Preflight with the checklist', <Button size="sm" variant="ghost" onClick={onChecklist}>Open checklist</Button>],
-  ]
   return (
-    <div>
-      <p className="text-sm font-medium text-fg">Nothing left to fix. Before you go:</p>
-      <ol className="mt-2 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        {steps.map(([k, v], i) => <li key={k} className="flex min-h-8 items-center justify-between gap-3"><span className="text-fg-2"><span className="num text-fg-3">{i + 1}.</span> {k}</span>{v}</li>)}
-      </ol>
+    <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+      <p className="min-w-0 flex-1 text-fg-2">
+        Before you go: a standard briefing at <a className="text-accent hover:underline" href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer">1800wxbrief.com</a> (§91.103),
+        an optional VFR flight plan with Flight Service, and the <button className="text-accent hover:underline" onClick={onChecklist}>preflight checklist</button>.
+      </p>
+      <Button size="sm" variant="secondary" className="self-start sm:self-auto" onClick={onNavlog}><Printer />NavLog</Button>
     </div>
   )
 }
@@ -544,16 +550,6 @@ function Setup({ step, setStep, done, skip, ready, hasRecords, children }: { ste
         <Button variant="primary" className="ml-auto" onClick={() => (last ? done() : setStep(step + 1))}>{last ? 'Brief this flight' : `Next: ${SETUP[step + 1].title}`}<ChevronRight /></Button>
       </div>
     </Card>
-  )
-}
-
-// Saved, unsaved changes, or never saved: always visible next to Save.
-function SaveState({ dirty, id, savedAt }: { dirty: boolean; id: number | null; savedAt: string | null }) {
-  const label = !id ? 'Not saved yet' : dirty ? 'Unsaved changes' : savedAt ? `Saved ${relTime(savedAt)}` : 'Saved'
-  return (
-    <span role="status" className={cn('inline-flex items-center gap-1.5 text-[13px] max-sm:order-last max-sm:w-full', !id || dirty ? 'text-warn' : 'text-fg-3')}>
-      <span aria-hidden className={cn('size-1.5 rounded-full', !id || dirty ? 'bg-warn' : 'bg-good')} />{label}
-    </span>
   )
 }
 

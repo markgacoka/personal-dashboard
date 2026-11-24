@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { Segmented } from '@/components/ui/misc'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
@@ -61,7 +61,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
           </div>
         </div>
         <div className="space-y-4 @4xl:col-span-3">
-          {match?.note && <div className="flex gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{match.note}</div>}
+          {match?.note && <p className="flex gap-2 text-[13px] text-fg-3"><Info className="mt-0.5 size-3.5 shrink-0" />{match.note}</p>}
           {p && (
             <div>
               <SubHead right={<span className="flex flex-wrap gap-3 text-xs"><PohLink fig="limits">Limitations</PohLink><PohLink fig="speeds">Speeds</PohLink><PohLink fig="emergency">Emergency</PohLink></span>}>{p.model} · {p.engine}</SubHead>
@@ -145,7 +145,7 @@ function Rows({ items }: { items: [string, string | number | null | undefined][]
 
 // Inspection dates from the aircraft logbooks, saved per tail; the review step
 // flags anything due before the flight.
-function InspectionDates({ tail, planning, save }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void }) {
+export function InspectionDates({ tail, planning, save }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void }) {
   const [insp, setInsp] = useState(planning.inspections || {})
   useEffect(() => setInsp(planning.inspections || {}), [planning.inspections])
   const commit = () => { if (JSON.stringify(insp) !== JSON.stringify(planning.inspections || {})) save({ ...planning, inspections: insp }) }

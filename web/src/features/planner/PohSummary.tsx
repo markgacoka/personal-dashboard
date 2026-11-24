@@ -27,7 +27,7 @@ export function PohSummary({ d, profile, plan, planning, u = US }: { d: Derived;
   const alts = [...new Map(d.flights.map(f => [f.alt, f])).values()]
   const rows: [string, React.ReactNode, React.ReactNode?][] = [
     ['MTOW', `${W(L.maxTakeoff)} (ramp ${W(L.maxRamp)}, landing ${W(L.maxLanding)})`, <PohLink key="l" fig="wb">Sec. 2</PohLink>],
-    ['BEW', `${W(bew.weight)} · arm ${bew.arm.toFixed(2)} · moment ${(bew.moment / 1000).toFixed(1)}`, d.wb.emptySample ? <span key="s" className="text-warn">POH sample airplane</span> : 'W&B record'],
+    ['BEW', `${W(bew.weight)} · arm ${bew.arm.toFixed(2)} · moment ${(bew.moment / 1000).toFixed(1)}`, d.wb.emptySample ? <span key="s" className="text-fg-2">POH sample airplane</span> : 'W&B record'],
     ['Usable fuel', `${Fu(tank.usable, 0)} (${Fu(tank.total, 0)} total) · ${profile.fuelGrade}`, tank.label],
     ['Fuel weight', u.weight === 'kg' ? '0.72 kg/L' : '6 lb/gal'],
     ['Start, taxi, takeoff', `${Fu(profile.climbStartFuelGal)} or ${W(profile.taxiFuelLb)}`, <PohLink key="c" fig="climb">Fig. 5-7 note</PohLink>],
@@ -86,7 +86,7 @@ export function WbTable({ d, plan, u = US, focus = null, onFocus }: { d: Derived
           ))}
         </tbody>
       </table>
-      {loads.front <= 0 && <p className="mt-2 text-sm text-warn">Enter the pilot's weight to complete the weight and balance.</p>}
+      {loads.front <= 0 && <p className="mt-2 text-sm text-fg-3">Enter the pilot's weight to complete the weight and balance.</p>}
     </div>
   )
 }

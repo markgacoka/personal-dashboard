@@ -77,7 +77,7 @@ function Group({ title, note, rows }: { title: string; note: string; rows: Row[]
             <div className="min-w-0"><div className="text-sm text-fg">{r.label}</div>{r.sub && <div className="num text-[13px] text-fg-3">{r.sub}</div>}</div>
             <div className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto"><Bar row={r} /></div>
             <div className="flex items-center justify-end gap-2 text-right sm:row-start-auto">
-              <StatusIcon status={r.status} />
+              {r.status !== 'ok' && <StatusIcon status={r.status} />}
               <div className="sm:w-48"><div className="num text-sm text-fg">{r.text}</div><div className={cn('text-[13px]', r.status === 'nogo' ? 'text-bad' : r.status === 'caution' ? 'text-warn' : 'text-fg-3')}>{r.margin}</div></div>
             </div>
           </li>

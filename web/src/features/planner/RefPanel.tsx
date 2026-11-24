@@ -12,7 +12,7 @@ import { Segmented } from '@/components/ui/misc'
 
 type DocTab = 'poh' | 'checklist' | 'briefing'
 export type Tab = 'fixes' | 'workings' | DocTab
-const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Fixes' }, { key: 'workings', label: 'Workings' }, { key: 'poh', label: 'POH' }, { key: 'checklist', label: 'Checklist' }, { key: 'briefing', label: 'Briefing' }]
+const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Checks' }, { key: 'workings', label: 'Workings' }, { key: 'poh', label: 'POH' }, { key: 'checklist', label: 'Checklist' }, { key: 'briefing', label: 'Briefing' }]
 export const isDocTab = (t: Tab): t is DocTab => t === 'poh' || t === 'checklist' || t === 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
 // docTail: the tail the POH/checklist were picked for; a different tail goes back to its own documents.
@@ -59,7 +59,7 @@ export function RefPanel({ tail, model, route, date, className, pohDoc, pohLoadi
           {t.key === 'poh' && <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-border" />}
           <button role="tab" aria-selected={r.state.tab === t.key} onClick={() => r.set({ tab: t.key, page: null })}
             className={cn('press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm', r.state.tab === t.key ? 'bg-pill font-medium text-fg' : 'text-fg-3 hover:text-fg')}>
-            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className={cn('num rounded-full px-1.5 text-xs font-medium', { bad: 'bg-bad-soft text-bad', warn: 'bg-warn-soft text-warn', neutral: 'bg-hover text-fg-2' }[fixTone])}>{fixCount}</span>}
+            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className={cn('num rounded-full px-1.5 text-xs font-medium', fixTone === 'bad' ? 'text-bad' : 'bg-hover text-fg-2')}>{fixCount}</span>}
           </button>
           </span>
         ))}

@@ -173,7 +173,7 @@ function Suggestions({ sugg, pts, edit, loading, errors, off, setOff }: {
             </button>
           ))}
         </div>
-        {errors.length > 0 && <p className="mt-1.5 text-xs text-warn">Unavailable: {errors.join('; ')}</p>}
+        {errors.length > 0 && <p className="mt-1.5 text-xs text-fg-3">Unavailable: {errors.join('; ')}</p>}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {!shown.length && <p className="px-3 py-3 text-sm text-fg-3">{loading ? 'Looking for points near the line…' : 'Nothing within 5 nm of the line for the kinds selected.'}</p>}

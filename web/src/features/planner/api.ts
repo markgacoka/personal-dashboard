@@ -59,7 +59,7 @@ export function usePlanning(tail: string | null) {
   const qc = useQueryClient()
   const key = ['planner', 'aircraft', tail]
   const q = useQuery({ queryKey: key, enabled: !!tail, staleTime: Infinity, queryFn: () => get<AircraftPlanning>(`/api/planner/aircraft/${tail}`) })
-  const save = useMutation({ mutationFn: (data: AircraftPlanning) => put<AircraftPlanning>(`/api/planner/aircraft/${tail}`, data), onSuccess: d => qc.setQueryData(key, d) })
+  const save = useMutation({ mutationFn: (data: AircraftPlanning) => put<AircraftPlanning>(`/api/planner/aircraft/${tail}`, data), onSuccess: d => { qc.setQueryData(key, d); qc.invalidateQueries({ queryKey: ['planner', 'aircraft-profiles'] }) } })
   return { ...q, save }
 }
 
@@ -166,7 +166,7 @@ export const useRadar = () => useQuery({
   queryFn: () => get<{ valid: string | null; fetchedAt: string; tiles: string; error?: string }>('/api/planner/radar'),
 })
 
-export interface PilotInfo { name?: string; phone?: string; address?: string; base?: string; updatedAt?: string }
+export interface PilotInfo { name?: string; phone?: string; address?: string; base?: string; weightLb?: number | null; updatedAt?: string }
 export function usePilotInfo() {
   const qc = useQueryClient()
   const key = ['planner', 'settings', 'pilot']

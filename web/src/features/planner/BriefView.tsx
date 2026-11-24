@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { ChevronRight, Circle } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { worst, type Check, type Derived, type Status } from './model'
 import { DOMAIN_LABEL, DOMAIN_OF, type DomainKey } from './Sidebar'
-import { CheckRows, StatusIcon, fmtMin, fmtTime } from './ui'
+import { CheckRows, VerdictIcon, fmtMin, fmtTime } from './ui'
 
 // PAVE order: the pilot, the airplane, the environment, then the numbers.
 export const BRIEF_DOMAINS: DomainKey[] = ['pilot', 'aircraft', 'weather', 'route', 'airports', 'loading']
-const RANK: Status[] = ['nogo', 'caution', 'todo', 'ok']
-const WORD: Record<Status, string> = { nogo: 'no-go', caution: 'caution', todo: 'to do', ok: 'OK' }
+const RANK: Status[] = ['nogo', 'caution', 'todo', 'ok', 'note']
+const WORD: Record<'nogo' | 'caution' | 'todo', string> = { nogo: 'to fix', caution: 'to decide', todo: 'to finish' }
 
 export const domainChecks = (d: Derived, k: DomainKey) => d.checks.filter(c => DOMAIN_OF[c.section] === k)
 export const domainStatus = (d: Derived, k: DomainKey): Status | null => { const cs = domainChecks(d, k); return cs.length ? worst(cs.map(c => c.status)) : null }
@@ -42,9 +42,9 @@ export function Brief({ d, status, label, open, setOpen, summary, detail, next }
     <div className="space-y-6">
       <div className={cn('rounded-xl px-4 py-5 sm:px-6', tone)}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <StatusIcon status={status} className="size-6" />
+          <VerdictIcon status={status} className="size-6" />
           <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{label}</h2>
-          <span className="text-sm text-fg-2">{counts.map(([s, n]) => `${n} ${WORD[s]}`).join(' · ') || 'every check passed'}</span>
+          <span className="text-sm text-fg-2">{counts.map(([s, n]) => `${n} ${WORD[s as keyof typeof WORD]}`).join(' · ') || 'every check passed'}</span>
         </div>
         {facts.length > 0 && (
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -57,24 +57,28 @@ export function Brief({ d, status, label, open, setOpen, summary, detail, next }
       <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]">
         {BRIEF_DOMAINS.map(k => {
           const cs = domainChecks(d, k).sort((a, b) => RANK.indexOf(a.status) - RANK.indexOf(b.status))
-          const st = domainStatus(d, k), issues = cs.filter(c => c.status !== 'ok'), isOpen = open === k
+          const issues = cs.filter(c => c.status === 'nogo' || c.status === 'caution' || c.status === 'todo'), notes = cs.filter(c => c.status === 'note'), isOpen = open === k
           const tl = tally(cs)
+          // Quiet unless it asks something of you: a red or amber mark only for a no-go or
+          // a decision, the area's answer always, and what's left as plain words.
+          const mark = tl[0]?.[0]
           return (
             <li key={k} ref={el => { refs.current[k] = el }} className="scroll-mt-20">
-              <button onClick={() => setOpen(isOpen ? null : k)} aria-expanded={isOpen} className={cn('flex w-full items-center gap-4 px-4 py-4 text-left hover:bg-hover sm:px-6', isOpen && 'bg-hover')}>
-                {st ? <StatusIcon status={st} className="size-5" /> : <Circle className="size-5 shrink-0 text-fg-3" aria-hidden />}
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-baseline gap-x-3">
-                    <span className="text-[15px] font-medium text-fg">{DOMAIN_LABEL[k]}</span>
-                    {tl.length > 0 && <span className="text-[13px]">{tl.map(([s, n], i) => <span key={s} className={s === 'nogo' ? 'text-bad' : s === 'caution' ? 'text-warn' : 'text-fg-3'}>{i > 0 && <span className="text-fg-3"> · </span>}{n} {WORD[s]}</span>)}</span>}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[13px] text-fg-3">{issues[0] && !isOpen ? issues[0].title : summary[k]}</span>
+              <button onClick={() => setOpen(isOpen ? null : k)} aria-expanded={isOpen} className={cn('grid w-full grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-4 text-left hover:bg-hover sm:px-6', isOpen && 'bg-hover')}>
+                <span aria-hidden className={cn('size-2 rounded-full', mark === 'nogo' ? 'bg-bad' : mark === 'caution' ? 'bg-warn' : 'bg-transparent')} />
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-medium text-fg">{DOMAIN_LABEL[k]}</span>
+                  <span className="mt-0.5 block truncate text-[13px] text-fg-3">{summary[k]}</span>
                 </span>
-                <ChevronRight className={cn('size-4 shrink-0 text-fg-3 transition-transform duration-200', isOpen && 'rotate-90')} />
+                <span className="flex items-center gap-3">
+                  {tl.length > 0 && <span className="text-[13px] max-sm:hidden">{tl.map(([s, n], i) => <span key={s} className={s === 'nogo' ? 'text-bad' : s === 'caution' ? 'text-warn' : 'text-fg-3'}>{i > 0 && <span className="text-fg-3"> · </span>}{n} {WORD[s as keyof typeof WORD]}</span>)}</span>}
+                  <ChevronRight className={cn('size-4 shrink-0 text-fg-3 transition-transform duration-200', isOpen && 'rotate-90')} />
+                </span>
               </button>
               {isOpen && (
                 <div className="space-y-8 border-t border-border px-4 py-6 sm:px-6">
                   {issues.length > 0 && <CheckRows checks={issues} />}
+                  {notes.length > 0 && <CheckRows checks={notes} />}
                   {detail(k)}
                 </div>
               )}

@@ -24,6 +24,8 @@ export interface Plan {
   rpm: number
   tail: string | null
   seats?: { pilot: number; front: number; rearL: number; rearR: number }
+  // Who sits where (a person's profile id, or 'self'): their weight was copied into seats.
+  seatPeople?: Partial<Record<'pilot' | 'front' | 'rearL' | 'rearR', string>>
   loads: { front: number; rear: number; bag1: number; bag2: number }
   // null: full usable fuel for the tanks.
   fuelGal: number | null
@@ -150,7 +152,10 @@ export interface Inputs {
 }
 
 // ── Outputs ───────────────────────────────────────────────────────────────────
-export type Status = 'ok' | 'caution' | 'nogo' | 'todo'
+// nogo: rules the flight out. caution: a risk to decide on. todo: something to
+// enter or tick. note: what the plan had to assume about missing or stale data;
+// it never changes the verdict. ok: passed.
+export type Status = 'ok' | 'caution' | 'nogo' | 'todo' | 'note'
 export type SectionKey = 'trip' | 'pilot' | 'aircraft' | 'loading' | 'performance' | 'navlog' | 'weather'
 export interface Check { section: SectionKey; status: Status; title: string; detail?: string; airport?: string; fix?: string }
 
@@ -271,7 +276,7 @@ function wxNight(legs: Leg[]) {
   return legs.some(l => dark(l.from, l.departAt) || dark(l.to, l.arriveAt))
 }
 
-const STATUS_RANK: Status[] = ['ok', 'todo', 'caution', 'nogo']
+const STATUS_RANK: Status[] = ['note', 'ok', 'todo', 'caution', 'nogo']
 export const worst = (xs: Status[]): Status => xs.reduce<Status>((a, b) => (STATUS_RANK.indexOf(b) > STATUS_RANK.indexOf(a) ? b : a), 'ok')
 
 // Local "YYYY-MM-DDTHH:mm" (browser time zone) → Date.
@@ -387,7 +392,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   if (missing.length && (inp.airports.length || inp.points?.length)) add('trip', 'nogo', `Not found in FAA NASR: ${missing.join(', ')}`, 'Use an airport, navaid (SJC), fix or VFR waypoint (VPCOY), radial/distance (SJC090020) or coordinates (3720N12150W, 37.33/-121.83).')
   if (route.length >= 2 && (isWaypoint(route[0]) || isWaypoint(route[route.length - 1]))) add('trip', 'nogo', 'The route must start and end at an airport')
   if (!departAt) add('trip', 'todo', 'Set the departure time')
-  else if (departAt.getTime() < now - 30 * 60_000) add('trip', 'caution', 'Departure time is in the past', 'Weather is matched to the planned times; update it to brief the actual flight.')
+  else if (departAt.getTime() < now - 30 * 60_000) add('trip', 'todo', 'Departure time is in the past', 'Weather is matched to the planned times; update it to brief the actual flight.')
 
   // ── Navlog ──
   // Each leg becomes rows: from the field to the top of climb, through
@@ -594,10 +599,10 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     else add('navlog', 'ok', 'Fuel covers the trip and reserve', `${requiredFuel.toFixed(1)} gal required, ${usable.toFixed(1)} gal usable.`)
     const srcs = new Set(navlog.map(r => r.windSrc))
     const staleAt = inp.weather?.winds.find(w => w.stale)?.fetchedAt
-    if (srcs.has('calm')) add('navlog', 'caution', 'No winds aloft forecast', 'Headings and ground speeds assume calm wind.')
-    else if (srcs.has('stale')) add('navlog', 'caution', `Winds aloft are from a forecast fetched ${staleAt ? `at ${new Date(staleAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'earlier'}`, 'The weather model is unreachable right now, so the last good copy is used. Cross-check with your briefing.')
+    if (srcs.has('calm')) add('navlog', 'todo', 'Enter the winds aloft from your briefing', 'No forecast reached the planner, so headings and ground speeds assume calm wind.')
+    else if (srcs.has('stale')) add('navlog', 'note', `Winds aloft are from a forecast fetched ${staleAt ? `at ${new Date(staleAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'earlier'}`, 'The weather model is unreachable right now, so the last good copy is used. Cross-check with your briefing.')
     else if (srcs.size === 1 && srcs.has('yours')) add('navlog', 'ok', 'Winds aloft from your briefing')
-    else if (fbSel?.outside) add('navlog', 'caution', 'No winds-aloft forecast covers the departure time', `Using the forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 2 days ahead, so re-brief closer to the flight.`)
+    else if (fbSel?.outside) add('navlog', 'note', 'No winds-aloft forecast covers the departure time', `Using the forecast valid ${fbSel.product.valid.slice(0, 2)} ${fbSel.product.valid.slice(2)}Z; forecasts reach about 2 days ahead, so re-brief closer to the flight.`)
     else if (fbSel?.product.source) add('navlog', 'ok', 'Winds aloft from a weather model', `NWS ended the FB winds-aloft forecast on Nov 3, 2026 (Service Change Notice 26-47), so winds come from ${fbSel.product.source} for the time each row is flown. Cross-check with your briefing.`)
     for (const l of legs) {
       const legAlt = flightAlt[l.flight].alt
@@ -621,9 +626,10 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       wx.push(weatherAt(alt, new Date(lastArr.getTime() + (leg / Math.max(legs[0]?.gs || 100, 60)) * 3_600_000), 'alternate', inp.weather, now))
     }
   }
+  const unreported: string[] = []
   for (const w of wx) {
     const id = w.airport.icao || w.airport.id, night = !!w.night
-    if (!w.metar && !w.taf) { add('weather', 'caution', `${id}: no METAR or TAF within 25 nm`, undefined, id); continue }
+    if (!w.metar && !w.taf) { if (!unreported.includes(id)) unreported.push(id); continue }
     const ceilMin = night ? minimums.ceilingNight : minimums.ceilingDay, visMin = night ? minimums.visNight : minimums.visDay
     const where = `${id} at ${w.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}${w.wind.from === 'taf' ? ` (TAF ${w.tafStation})` : w.metarStation ? ` (METAR ${w.metarStation})` : ''}`
     if (w.category === 'IFR' || w.category === 'LIFR') add('weather', 'nogo', `${where}: ${w.category}`, `Ceiling ${w.ceiling?.toLocaleString() ?? 'none'} ft, visibility ${w.visib ?? '—'} SM — below VFR.`, id)
@@ -666,11 +672,13 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     if (/SEV|EXTRM/.test(sev)) add('weather', 'nogo', `PIREP: severe ${p.tbInt1 ? 'turbulence' : 'icing'} near the route`, p.rawOb)
     else if (/MOD/.test(sev)) add('weather', 'caution', `PIREP: moderate ${/MOD/.test(p.tbInt1) ? 'turbulence' : 'icing'} near the route`, p.rawOb)
   }
+  // One line for every airport without a nearby report: the area forecast and your briefing cover them.
+  if (unreported.length && inp.weather) add('weather', 'note', `No METAR or TAF within 25 nm of ${unreported.join(', ')}`, 'Use the area forecast (GFA) and your standard briefing for these.')
   for (const i of inp.weather?.nas.data?.items || []) add('weather', i.kind === 'Closure' ? 'nogo' : 'caution', `${i.airport}: ${i.kind}`, [i.reason, i.detail].filter(Boolean).join(' — '), i.airport)
   const freezing = fbSel && route[0] ? freezingLevel(fbSel.product, route[0]) : null
   if (freezing && altMax >= freezing.altFt - 500) add('weather', 'caution', `Cruise at or above the freezing level (~${freezing.altFt.toLocaleString()} ft)`, 'Flight into known icing is prohibited (POH Section 2). Stay clear of visible moisture.')
   if (inp.weather) for (const [k, s] of Object.entries({ METARs: inp.weather.metars, TAFs: inp.weather.tafs, PIREPs: inp.weather.pireps, SIGMETs: inp.weather.sigmets, 'G-AIRMETs': inp.weather.gairmets, 'NAS status': inp.weather.nas, TFRs: inp.weather.tfrs })) {
-    if (s.error) add('weather', 'caution', `${k} unavailable`, s.error)
+    if (s.error) add('weather', 'note', `${k} unavailable`, s.error)
   }
 
   // ── Airspace crossed ──
@@ -683,7 +691,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       if (warned.has(`${c.cls}|${c.name}`) || (c.cls === 'C' && !c.atCruise)) continue
       warned.add(`${c.cls}|${c.name}`)
       if (c.cls === 'B') add('navlog', 'caution', `Class B ${c.name} (${c.floor ? c.floor.toLocaleString() : 'SFC'}–${c.ceiling?.toLocaleString() ?? ''} ft) on the line`, c.atCruise ? 'Your cruise altitude is inside it: you need a clearance ("cleared into the Class Bravo") or a route around/under it.' : 'You pass under or over it at cruise — mind the climb and descent.')
-      else if (c.cls === 'C' && c.atCruise) add('navlog', 'caution', `Class C ${c.name} at your cruise altitude`, 'Establish two-way radio communication before entering.')
+      else if (c.cls === 'C' && c.atCruise) add('navlog', 'note', `Class C ${c.name} at your cruise altitude`, 'Establish two-way radio communication before entering.')
     }
   }
 
@@ -712,18 +720,18 @@ export function derive(plan: Plan, inp: Inputs): Derived {
 
   // ── Aircraft ──
   if (!plan.tail) add('aircraft', 'todo', 'Choose the aircraft')
-  else if (inp.match && !inp.match.exact && inp.match.note) add('aircraft', 'caution', 'Closest POH used', inp.match.note)
+  else if (inp.match && !inp.match.exact && inp.match.note) add('aircraft', 'note', 'Closest POH used', inp.match.note)
   // FAA airport data (frequencies, runways, elevations) is published every 28 days.
   const cyc = route.find(a => a.cycle)?.cycle
   if (cyc && departAt) {
     const ends = new Date(`${cyc}T00:00:00Z`).getTime() + 28 * 86_400_000
-    if (ends <= departAt.getTime()) add('performance', 'caution', `FAA airport data cycle ${cyc} has ended`, 'Frequencies, runways and pattern altitudes may have changed: check the Chart Supplement for each airport.')
+    if (ends <= departAt.getTime()) add('performance', 'note', `FAA airport data cycle ${cyc} has ended`, 'Frequencies, runways and pattern altitudes may have changed: check the Chart Supplement for each airport.')
   }
   // Units: knots throughout. A table read from a book must say which unit it uses.
   const rd = profile?.read
   if (rd?.units) {
     const unstated = rd.sections.filter(k => rd.units?.[k] == null), mph = rd.sections.filter(k => rd.units?.[k] === 'mph')
-    if (unstated.length) add('aircraft', 'caution', `POH ${unstated.join(', ')} table${unstated.length > 1 ? 's don\'t' : ' doesn\'t'} state knots or MPH`, `Read as knots. Check the ${rd.book} header: an MPH table read as knots makes speeds 15 % too high.`)
+    if (unstated.length) add('aircraft', 'note', `POH ${unstated.join(', ')} table${unstated.length > 1 ? 's don\'t' : ' doesn\'t'} state knots or MPH`, `Read as knots. Check the ${rd.book} header: an MPH table read as knots makes speeds 15 % too high.`)
     else add('aircraft', 'ok', mph.length ? `POH ${mph.join(', ')} converted from MPH to knots` : 'POH tables are in knots', mph.length ? `${rd.book} prints MPH and statute miles; speeds and climb distances are divided by 1.151.` : `Every table read from the ${rd.book} names KIAS or KTAS.`)
   }
   if (plan.tail) {
@@ -813,7 +821,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
   if (profile && plan.tail) {
     const L = profile.limits
     if (loads.front <= 0) add('loading', 'todo', 'Enter the pilot\'s weight')
-    if (emptySample) add('loading', 'caution', 'Empty weight is the POH sample airplane', `Enter ${plan.tail}'s basic empty weight and moment from its W&B record.`)
+    if (emptySample) add('loading', 'todo', `Enter ${plan.tail}'s empty weight`, `The POH sample airplane's is used until you enter the basic empty weight and moment from ${plan.tail}'s W&B record.`)
     if (ramp.weight > L.maxRamp) add('loading', 'nogo', `Ramp weight ${Math.round(ramp.weight)} lb over the ${L.maxRamp} lb maximum`)
     if (takeoff.weight > L.maxTakeoff) add('loading', 'nogo', `Takeoff weight ${Math.round(takeoff.weight)} lb over the ${L.maxTakeoff} lb maximum`, `Remove ${Math.ceil(takeoff.weight - L.maxTakeoff)} lb (≈${Math.ceil((takeoff.weight - L.maxTakeoff) / 6)} gal of fuel).`)
     else add('loading', 'ok', `Takeoff weight ${Math.round(takeoff.weight)} lb`, `${Math.round(L.maxTakeoff - takeoff.weight)} lb under the maximum.`)
@@ -849,7 +857,7 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     if (alt) { const wa = wx.find(x => x.role === 'alternate'); if (wa) at(alt, wa, 'landing', w) }
     for (const p of perf) {
       const id = p.airport.icao || p.airport.id
-      if (!p.runway) { add('performance', 'caution', `${id}: no runway data`, undefined, id); continue }
+      if (!p.runway) { add('performance', 'note', `${id}: no runway data`, undefined, id); continue }
       const rwy = p.runway, L = p.kind === 'takeoff' ? rwy.toraFt : rwy.ldaFt
       if (!p.dist) add('performance', 'nogo', `${id} ${p.kind}: beyond the POH chart`, `Pressure altitude ${p.wx.pa.toLocaleString()} ft, ${p.wx.tempC ?? '—'} °C.`, id)
       else if (p.dist.ground > L) add('performance', 'nogo', `${id} ${p.kind} RWY ${rwy.end.id}: ground roll ${p.dist.ground} ft exceeds ${L} ft available`, undefined, id)

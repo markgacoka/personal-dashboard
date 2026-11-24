@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, RefreshCw, XCircle } from 'lucide-react'
+import { AlertTriangle, Check as CheckIcon, CheckCircle2, CircleDashed, Info, RefreshCw, XCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -7,11 +7,16 @@ import { relTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Check, Status } from './model'
 
+// Status vocabulary (docs/planner-ux.md): only a no-go gets a full icon; a
+// caution is an amber dot, a to-do a hollow ring, a pass a muted tick and a note
+// (an assumption about data) a muted "i". Colour is never the only signal: each
+// mark carries its label for screen readers, and lists group under a label.
 export const STATUS_META: Record<Status, { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral'; icon: typeof CheckCircle2; text: string }> = {
-  ok: { label: 'OK', tone: 'good', icon: CheckCircle2, text: 'text-good' },
-  caution: { label: 'Caution', tone: 'warn', icon: AlertTriangle, text: 'text-warn' },
+  ok: { label: 'Passed', tone: 'good', icon: CheckCircle2, text: 'text-good' },
+  caution: { label: 'Decide', tone: 'warn', icon: AlertTriangle, text: 'text-warn' },
   nogo: { label: 'No-go', tone: 'bad', icon: XCircle, text: 'text-bad' },
-  todo: { label: 'To do', tone: 'neutral', icon: CircleDashed, text: 'text-fg-3' },
+  todo: { label: 'To finish', tone: 'neutral', icon: CircleDashed, text: 'text-fg-3' },
+  note: { label: 'Note', tone: 'neutral', icon: Info, text: 'text-fg-3' },
 }
 
 export function StatusBadge({ status, label, size = 'sm' }: { status: Status; label?: string; size?: 'sm' | 'md' }) {
@@ -19,9 +24,23 @@ export function StatusBadge({ status, label, size = 'sm' }: { status: Status; la
   return <Badge tone={m.tone} size={size}><m.icon />{label ?? m.label}</Badge>
 }
 
+// The small mark beside a check in a list.
 export function StatusIcon({ status, className }: { status: Status; className?: string }) {
+  const label = STATUS_META[status].label
+  if (status === 'nogo') return <XCircle aria-label={label} className={cn('size-4 shrink-0 text-bad', className)} />
+  if (status === 'ok') return <CheckIcon aria-label={label} className={cn('size-4 shrink-0 text-fg-3', className)} />
+  if (status === 'note') return <Info aria-label={label} className={cn('size-4 shrink-0 text-fg-3', className)} />
+  return (
+    <span role="img" aria-label={label} className={cn('grid size-4 shrink-0 place-items-center', className)}>
+      <span className={cn('size-2 rounded-full', status === 'caution' ? 'bg-warn' : 'ring-[1.5px] ring-inset ring-fg-3')} />
+    </span>
+  )
+}
+
+// The verdict's own icon: the one place a full status icon is used for every state.
+export function VerdictIcon({ status, className }: { status: Status; className?: string }) {
   const m = STATUS_META[status]
-  return <m.icon aria-label={m.label} className={cn('size-4 shrink-0', m.text, className)} />
+  return <m.icon aria-hidden className={cn('size-4 shrink-0', m.text, className)} />
 }
 
 // When a block of data was fetched or issued, and where from.

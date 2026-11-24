@@ -335,6 +335,18 @@ export default async function plannerRoutes(fastify) {
   })
 
   // ── Saved planner state ─────────────────────────────────────────────────────
+  // Every aircraft profile you've saved (the Profiles view lists them).
+  fastify.get('/api/planner/aircraft', async () => {
+    const { rows } = await pool.query('SELECT tail_number, data, updated_at FROM planner_aircraft ORDER BY tail_number')
+    return rows.map(r => ({ tail: r.tail_number, ...r.data, updatedAt: r.updated_at }))
+  })
+  // Removes your values for a tail; its registry entry, POH and documents stay.
+  fastify.delete('/api/planner/aircraft/:tail', async (req, reply) => {
+    const tail = String(req.params.tail).toUpperCase()
+    if (!TAIL.test(tail)) return reply.status(400).send({ error: 'Bad tail number' })
+    await pool.query('DELETE FROM planner_aircraft WHERE tail_number = $1', [tail.startsWith('N') ? tail : `N${tail}`])
+    return reply.status(204).send()
+  })
   fastify.get('/api/planner/aircraft/:tail', async (req, reply) => {
     const tail = String(req.params.tail).toUpperCase()
     if (!TAIL.test(tail)) return reply.status(400).send({ error: 'Bad tail number' })
@@ -355,6 +367,10 @@ export default async function plannerRoutes(fastify) {
   // pattern altitude, pattern side per runway, notes), kept for every plan.
   // GET /api/planner/airport-profiles?ids=KRHV,KSNS → { KRHV: {...}, … }
   fastify.get('/api/planner/airport-profiles', async req => {
+    if (req.query.all === '1') {
+      const { rows } = await pool.query('SELECT airport_id, data, updated_at FROM planner_airport_profiles ORDER BY airport_id')
+      return Object.fromEntries(rows.map(r => [r.airport_id, { ...r.data, updatedAt: r.updated_at }]))
+    }
     const ids = String(req.query.ids || '').toUpperCase().split(',').filter(x => ID.test(x)).slice(0, 20)
     if (!ids.length) return {}
     const { rows } = await pool.query('SELECT airport_id, data, updated_at FROM planner_airport_profiles WHERE airport_id = ANY($1)', [ids])

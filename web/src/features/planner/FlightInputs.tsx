@@ -4,7 +4,10 @@ import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { AircraftRef, AircraftRegistry } from '@/lib/types'
-import { useResolve, type PlannerDoc, type PohMatch } from './api'
+import { Link } from 'react-router'
+import { useInstructors } from '@/lib/queries'
+import { usePilotInfo, useResolve, type PlannerDoc, type PohMatch } from './api'
+import { SELF, seatPerson, usePeople, type Person, type Seat } from './profiles'
 import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
 import { SECTION_LABEL, TABLE_SECTIONS, type AircraftProfile } from './poh'
@@ -68,7 +71,7 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
       )}
 
       {show(1) && (
-      <Group title="Aircraft" hint="Tail number; the registry and POH are looked up.">
+      <Group title="Aircraft" hint={<>Tail number; the registry and POH are looked up.{plan.tail && <> <Link to={`/flying/plan/profiles?tab=aircraft&id=${plan.tail}`} className="text-accent hover:underline">{plan.tail} profile</Link></>}</>}>
         <div className="grid gap-4 @md:grid-cols-[minmax(0,11rem)_1fr] @md:items-end">
           <Field label="Tail number">
             <Input value={tail} onChange={e => setTail(e.target.value.toUpperCase())} onBlur={commitTail} onKeyDown={e => { if (e.key === 'Enter') commitTail() }}
@@ -139,12 +142,12 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
       )}
 
       {show(4) && (
-      <Group title="Load" hint={`People and bags in ${u.weight}, fuel and taxi time.`}>
+      <Group title="Load" hint={<>People and bags in {u.weight}, fuel and taxi time. <Link to="/flying/plan/profiles?tab=pilots" className="text-accent hover:underline">People</Link></>}>
         <div className="grid grid-cols-2 gap-4 @md:grid-cols-4">
-          <NumField label="Pilot" value={w(seats.pilot)} onChange={setSeat('pilot')} />
-          <NumField label={roleOf(plan.crew, certs) === 'dual' ? 'Instructor' : 'Front right'} value={w(seats.front)} onChange={setSeat('front')} />
-          <NumField label="Rear left" value={w(seats.rearL)} onChange={setSeat('rearL')} />
-          <NumField label="Rear right" value={w(seats.rearR)} onChange={setSeat('rearR')} />
+          {(['pilot', 'front', 'rearL', 'rearR'] as Seat[]).map(k => (
+            <SeatField key={k} seat={k} label={k === 'pilot' ? 'Pilot' : k === 'front' ? (roleOf(plan.crew, certs) === 'dual' ? 'Instructor' : 'Front right') : k === 'rearL' ? 'Rear left' : 'Rear right'}
+              value={w(seats[k])} onChange={setSeat(k)} plan={plan} set={set} />
+          ))}
           <NumField label="Baggage 1" value={w(plan.loads.bag1)} onChange={v => set({ loads: { ...plan.loads, bag1: fromW(v, u) } })} />
           <NumField label="Baggage 2" value={w(plan.loads.bag2)} onChange={v => set({ loads: { ...plan.loads, bag2: fromW(v, u) } })} />
           <Field label="Fuel" note="Blank: full usable">
@@ -221,7 +224,7 @@ export function PohStatus({ poh, loading, error, model, uploaded, read }: { poh:
   if (poh?.exact && all && /^172/.test(model)) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · tables read from the book drive the numbers</span>{open}</p>
   if (poh?.exact && poh.profile) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · drives the numbers</span>{open}</p>
   return (
-    <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
+    <p className="mt-4 flex items-start gap-2 text-[13px] text-fg-3">
       <BookOpen className="mt-0.5 size-3.5 shrink-0" />
       <span className="min-w-0 flex-1">{!poh && !uploaded ? `No public POH for the ${model}; upload it in the POH tab.` : !poh?.exact && !uploaded ? `${poh!.title}: closest public POH to the ${model}.${poh!.profile ? '' : ' Numbers use the closest transcribed one.'}` : tablesLine(uploaded?.title ?? poh!.title, model, read)}</span>
       {(poh || uploaded) && open}
@@ -243,6 +246,8 @@ function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => 
   const cert = certs?.certificate ?? 'student'
   const xc = d.checks.some(c => /Instructor('s)? endorse/.test(c.title))
   const ck = plan.checklist ?? {}
+  const cfis = usePeople().list.filter(p => p.role === 'instructor')
+  const logCfis = (useInstructors().data ?? []).map(c => c.name)
   return (
     <div>
       <div className="flex flex-wrap items-end gap-3">
@@ -250,7 +255,12 @@ function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => 
           options={[{ value: 'pic', label: cert === 'student' ? 'Solo' : 'Me as PIC' }, { value: 'dual', label: 'Dual with a CFI' }]} />
         {role === 'dual' && (
           <label className="block w-full max-w-60"><span className="mb-1.5 block text-[13px] text-fg-3">Instructor</span>
-            <Input value={plan.crew?.instructor ?? ''} onChange={e => set({ crew: { ...plan.crew, role, instructor: e.target.value } })} placeholder="CFI's name" maxLength={60} /></label>
+            <Input value={plan.crew?.instructor ?? ''} list="planner-cfis" placeholder="CFI's name" maxLength={60} onChange={e => {
+              const name = e.target.value, p = cfis.find(x => x.name.toLowerCase() === name.trim().toLowerCase())
+              // A CFI with a profile takes the right seat with their weight.
+              set(p ? { ...seatPerson(plan, 'front', p), crew: { ...plan.crew, role, instructor: p.name } } : { crew: { ...plan.crew, role, instructor: name } })
+            }} />
+            <datalist id="planner-cfis">{[...new Set([...cfis.map(c => c.name), ...logCfis])].map(n => <option key={n} value={n} />)}</datalist></label>
         )}
       </div>
       <p className="mt-2.5 text-[13px] text-fg-3">{role === 'dual' ? 'Your instructor is pilot in command; seat them front right.' : cert === 'student' ? 'Student solo: no passengers (§61.89).' : 'You are pilot in command; other seats are passengers.'}</p>
@@ -260,6 +270,30 @@ function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => 
           My instructor endorsed this cross-country in my logbook (§61.93(c)(2))
         </label>
       )}
+    </div>
+  )
+}
+
+// A seat's weight, and who sits there: picking a profile copies their weight in
+// (seatPerson); a weight typed afterwards is this flight's own.
+function SeatField({ seat, label, value, onChange, plan, set }: { seat: Seat; label: string; value: number | ''; onChange: (v: number) => void; plan: Plan; set: (p: Partial<Plan>) => void }) {
+  const people = usePeople().list, self = usePilotInfo().data
+  const options: (Pick<Person, 'id' | 'name' | 'weightLb'> & { role?: Person['role'] })[] = [{ id: SELF, name: self?.name ? `${self.name} (you)` : 'You', weightLb: self?.weightLb ?? null }, ...people]
+  const who = plan.seatPeople?.[seat] ?? ''
+  const pick = (id: string) => set(seatPerson(plan, seat, options.find(o => o.id === id) ?? null))
+  return (
+    <div>
+      <span className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-[13px] text-fg-3">{label}</span>
+        {(people.length > 0 || self?.weightLb) && (
+          <select aria-label={`Who sits ${label.toLowerCase()}`} value={who} onChange={e => pick(e.target.value)}
+            className="min-w-0 max-w-[60%] cursor-pointer truncate bg-transparent text-right text-[13px] text-accent outline-none hover:underline">
+            <option value="">{who ? 'Someone else' : 'Who?'}</option>
+            {options.map(o => <option key={o.id} value={o.id}>{o.name}{o.weightLb ? ` · ${o.weightLb} lb` : ''}</option>)}
+          </select>
+        )}
+      </span>
+      <NumField label="" value={value} onChange={onChange} className="[&>span:first-child]:hidden" />
     </div>
   )
 }

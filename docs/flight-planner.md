@@ -26,9 +26,12 @@ Three stages (`PlannerPage.tsx`):
   and the detail behind them (the former step pages below).
 - **NavLog** is the sheet per flight and the reverse, for print.
 
+How it reads (status vocabulary, flow, profiles, edge cases): `planner-ux.md`.
+
 The sidebar (`RefPanel.tsx`, `Sidebar.tsx`) sits beside every stage from
-1280 px and is a full-screen sheet below: **Fixes** (every check that isn't OK,
-worst first, with what to do and a link to its area; passed checks fold away),
+1,536 px and is a full-screen sheet below: **Checks** (fix before you fly,
+decide, to finish; assumed and passed fold away; each with what to do and a
+link to its area),
 **Workings** (`workings.ts`: each calculation line by line — courses and
 headings, cruise and climb, fuel, pressure and density altitude, runway wind and
 distances, weight and balance — the assumptions the plan makes and where to
@@ -49,7 +52,7 @@ The areas of the brief (the former steps):
 | Pilot | Your certificates (settings key `certificates`: certificate, ratings, medical, flight review, home airport, student and airplane endorsements) held against this flight's role from the Plan stage (you as PIC, or dual with an instructor who is then PIC) by `pilot.ts`: student solo limits (§61.87–§61.95, no passengers, 3/5 SM, 25 nm radius, Class B, night, Appendix D airports), sport and recreational limits, medical expiry (§61.23(d), BasicMed), flight review, §61.57 passenger currency, ASEL and §61.31 endorsements; dual turns personal-minimum breaches into cautions; IMSAFE checklist; personal minimums held against the worst value at any ETA (ceiling, visibility, wind, gust, crosswind, runway length/width, fuel at landing, night); currency from the logbook | Minimums |
 | NavLog (stage) | The sheet per flight and the reverse, print | E6B cells (wind, temperature, CAS), actuals |
 
-Every check that isn't OK carries a fix (`fixes.ts`, or the check's own), listed in the sidebar's Fixes tab and at the top of its area in the brief. Weather for an airport used at two ETAs (a round trip) is one card with only the differences at the second time; identical checks show once.
+Every check that isn't OK carries a fix (`fixes.ts`, or the check's own), listed in the sidebar's Checks tab and at the top of its area in the brief. Data gaps (no nearby METAR, closest POH, ended NASR cycle, stale winds) are notes: shown, never part of the verdict. Weather for an airport used at two ETAs (a round trip) is one card with only the differences at the second time; identical checks show once.
 
 Checklist answers live in the plan (`plan.checklist`: `imsafe.*`, `mx.*`,
 `eq.*`); unanswered is "to do", a failed item is a no-go.
@@ -144,12 +147,15 @@ fuel. The CG chart adds the utility-category envelope.
 - **New plan:** a five-step guided setup (who's flying, aircraft, route, time and
   power, load), each step saying what it is for; "Show every field" leaves it.
   Done opens the brief.
-- **Save:** next to Save the header says "Not saved yet", "Unsaved changes" or
-  "Saved n min ago"; starting a new plan with unsaved changes asks to save or
-  discard.
-- **Brief:** under the verdict, the next thing to fix (and how many are left)
-  with a button to its area; once nothing is a no-go or to-do, the steps before
-  engine start (save, standard briefing, file a flight plan, print, checklist).
+- **Save:** Save is the primary button while changes are unsaved, "Saved n min
+  ago" once saved; opening another plan or starting a new one with unsaved
+  changes asks to save, discard or cancel; deleting a plan asks twice.
+- **Brief:** under the verdict, the one next thing to do with a button to its
+  area; once nothing is a no-go or to-do, the briefing, flight plan, checklist
+  and NavLog.
+- **Profiles** (`/flying/plan/profiles`, `ProfilesPage.tsx`, `profiles.ts`):
+  you, instructors and passengers, aircraft and airports, each created, read,
+  changed and deleted without a plan; seats pick a person and copy their weight.
 - **Pilot:** a solo / dual / private table shows what changes with the role
   (the current flight's column highlighted). Pilot documents are kept once and
   used by every plan.
@@ -163,7 +169,7 @@ fuel. The CG chart adds the utility-category envelope.
   ATIS/tower/ground/CTAF and their NOTAM count.
 - **Sources:** Workings → Airports lists where each elevation, pattern
   altitude, frequency, weather report and NOTAM came from; every frequency
-  says when to use it; an ended NASR cycle is a caution.
+  says when to use it; an ended NASR cycle is a note.
 
 ## Calculations (all client-side, pure functions, unit-tested)
 
@@ -228,7 +234,7 @@ MH = TH − east variation, CH = MH ± deviation, ETE = dist/GS, fuel = ETE × G
 climb rows use the POH climb table, descent is 500 fpm at cruise power to TPA.
 
 Phones and tablets: the three stage tabs fit at 390 px; saved plans are under
-Plans in the header; the sidebar opens full screen from the "to fix" button; map chart and layer buttons fold behind
+Plans in the header; the sidebar opens full screen from the "checks" button; map chart and layer buttons fold behind
 one button when the map is narrower than 576 px; wide tables drop or fold
 secondary columns on phones (takeoff and landing become cards); the NavLog
 sheet stays paper-size and scrolls sideways.

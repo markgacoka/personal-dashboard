@@ -12,7 +12,7 @@ export const TIER_COLOR: Record<Tier, string> = { primary: 'var(--good)', backup
 
 export function TierTag({ tier, className }: { tier: Tier; className?: string }) {
   return (
-    <span className={cn('inline-flex shrink-0 items-center gap-1.5 text-[13px]', tier === 'standin' ? 'text-warn' : 'text-fg-3', className)}>
+    <span className={cn('inline-flex shrink-0 items-center gap-1.5 text-[13px]', tier === 'standin' ? 'text-fg-2' : 'text-fg-3', className)}>
       <Dot color={TIER_COLOR[tier]} />{TIER_LABEL[tier]}
     </span>
   )
@@ -31,10 +31,10 @@ export function SourceStrip({ list }: { list: InputSource[] }) {
         {list.map(s => (
           <li key={s.key}>
             <Tooltip content={<span className="block text-[13px] leading-snug">{s.detail}{s.at && <span className="mt-1 block text-fg-3">Fetched {relTime(new Date(s.at))}</span>}</span>}>
-              <span tabIndex={0} className={cn('inline-flex h-8 items-center gap-2 rounded-full px-3 text-[13px] ring-1 ring-inset', s.tier === 'standin' ? 'bg-warn-soft ring-warn/30' : 'ring-border')}>
+              <span tabIndex={0} className={cn('inline-flex h-8 items-center gap-2 rounded-full px-3 text-[13px] ring-1 ring-inset', s.tier === 'standin' ? 'bg-hover ring-border-strong' : 'ring-border')}>
                 <Dot color={TIER_COLOR[s.tier]} />
                 <span className="text-fg-3">{s.label}</span>
-                <span className={s.tier === 'standin' ? 'text-warn' : 'text-fg-2'}>{s.value}</span>
+                <span className={'text-fg-2'}>{s.value}</span>
               </span>
             </Tooltip>
           </li>

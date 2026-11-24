@@ -37,6 +37,23 @@ covers what it calculates.
 - **Less text**: section and panel subtitles and input-group hints are gone;
   task rows inside a section show titles only.
 
+## Layout rules
+
+- Sections lay out against the width of the content column (`<main>` is a
+  container; container queries, not viewport breakpoints), so opening the work
+  sheet beside the page reflows them the same way a narrower window would.
+- Groups of cards (airports, weather per airport, airspace and TFRs) use
+  `.flow` (`index.css`): cards sit side by side at a minimum width and the last
+  row stretches, so an odd card never leaves an empty half. A card that ends up
+  full width splits into two inner columns (airport: runways and diagram |
+  frequencies, NOTAMs, profile; weather: conditions | METAR, TAF, D-ATIS).
+- Summary tiles use column counts that divide them evenly (six: 1, 2, 3 or 6
+  across; five: the last spans two).
+- Pilot: the crew picker heads the left column (rules, certificates,
+  documents); minimums, IMSAFE and currency fill the right.
+- Weight and balance: the CG chart stays in view beside the limits as they
+  scroll. Checklists use balanced columns, never more than their sections.
+
 ## Flights, outputs and profiles
 
 - **Flights** (`/flying/plan`, `FlightsPage.tsx`): every flight is its own

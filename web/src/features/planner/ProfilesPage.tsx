@@ -99,7 +99,7 @@ export default function ProfilesPage() {
           </ul>
         </Card>
 
-        <Card className={cn('min-w-0 px-4 py-5 sm:px-6', !id && 'max-lg:hidden')}>
+        <Card className={cn('@container min-w-0 px-4 py-5 sm:px-6', !id && 'max-lg:hidden')}>
           {id && <Button variant="ghost" size="sm" className="-ml-2 mb-3 lg:hidden" onClick={() => pick(tab)}><ChevronLeft />{tab === 'pilots' ? 'Pilots' : tab === 'aircraft' ? 'Aircraft' : 'Airports'}</Button>}
           {!current && <p className="text-sm text-fg-3">Choose one from the list, or add one.</p>}
           {current && tab === 'pilots' && (current === SELF ? <SelfProfile />

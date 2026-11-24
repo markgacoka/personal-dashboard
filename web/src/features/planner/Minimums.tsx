@@ -13,7 +13,7 @@ export function MinimumsEditor({ minimums, savedAt, onSave, saving }: { minimums
   return (
     <div>
       <SubHead right={<Synced at={savedAt} label="Saved" source="AOPA Air Safety Institute VFR contract" />}>Personal minimums</SubHead>
-      <div className="grid grid-cols-2 gap-3 rounded-lg p-3 ring-1 ring-inset ring-border sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 rounded-lg p-3 ring-1 ring-inset ring-border @xl:grid-cols-3">
         <NumField label="Max wind" value={m.maxWind} onChange={f('maxWind')} unit="kt" />
         <NumField label="Max gust" value={m.maxGust} onChange={f('maxGust')} unit="kt" />
         <NumField label="Max crosswind" value={m.maxCrosswind} onChange={f('maxCrosswind')} unit="kt" />

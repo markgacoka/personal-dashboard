@@ -50,7 +50,7 @@ export function CertificatesEditor({ certs, onSave, saving, title = 'Your certif
         </div>
       ) : (
         <div className="space-y-5 rounded-lg px-3 py-3 ring-1 ring-inset ring-border">
-          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-3 @xl:grid-cols-2 @5xl:grid-cols-3">
             <label className="block"><span className="mb-1 block text-sm text-fg-2">Certificate</span>
               <Select value={cert} onChange={e => set({ certificate: e.target.value as Certificate })}>{CERTIFICATES.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}</Select></label>
             {DateF({ label: cert === 'student' ? 'Last flight review' : 'Last flight review or checkride', value: c.flightReview, onChange: v => set({ flightReview: v }), hint: '§61.56: 24 calendar months. Blank uses your logbook.' })}
@@ -71,7 +71,7 @@ export function CertificatesEditor({ certs, onSave, saving, title = 'Your certif
           )}
 
           <fieldset><legend className="mb-2 text-sm font-medium text-fg">Medical</legend>
-            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-3 @xl:grid-cols-2 @5xl:grid-cols-3">
               <label className="block"><span className="mb-1 block text-sm text-fg-2">Kind</span>
                 <Select value={med.kind ?? ''} onChange={e => setMed({ kind: (e.target.value || undefined) as MedicalKind | undefined })}><option value="">Not recorded</option>{MEDICAL.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}</Select></label>
               {med.kind && med.kind !== 'none' && med.kind !== 'license' && DateF({ label: med.kind === 'basicmed' ? 'BasicMed exam (CMEC)' : 'Exam date', value: med.date, onChange: v => setMed({ date: v }) })}
@@ -83,7 +83,7 @@ export function CertificatesEditor({ certs, onSave, saving, title = 'Your certif
 
           {cert === 'student' && (
             <fieldset><legend className="mb-2 text-sm font-medium text-fg">Student endorsements</legend>
-              <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-3 @xl:grid-cols-2 @5xl:grid-cols-3">
                 {DateF({ label: 'Solo endorsement', value: en.solo, onChange: v => setEn({ solo: v }), hint: '§61.87(n): good for 90 days.' })}
                 <label className="block"><span className="mb-1 block text-sm text-fg-2">Solo endorsed in (model)</span><Input value={en.soloModel ?? ''} onChange={e => setEn({ soloModel: e.target.value.toUpperCase() })} placeholder="172P" className="uppercase" /></label>
                 {DateF({ label: 'Class B endorsement', value: en.classB, onChange: v => setEn({ classB: v }), hint: '§61.95: 90 days, for one Class B.' })}

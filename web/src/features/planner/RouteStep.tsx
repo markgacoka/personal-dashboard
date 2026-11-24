@@ -48,7 +48,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
       {part === 'chart' && routePts.length > 1 && (
         <div className="space-y-3">
           <RouteChips pts={routePts} edit={edit} />
-          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+          <div className="grid gap-4 @5xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
               <MapBoundary><PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} /></MapBoundary>
               <p className="mt-2 text-[13px] text-fg-3">Drag the line to add a point, drag a point to move it, click it to remove it. Points snap to nearby landmarks.</p>
@@ -70,7 +70,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
             <SubHead right={<span className="num text-xs text-fg-3">{f.distNm.toFixed(1)} nm · {Math.round(f.eteMin)} min · {f.fuelGal.toFixed(2)} gal</span>}>
               {d.flights.length > 1 ? `Flight ${f.n + 1} · ` : ''}<span className="num">{f.from.icao || f.from.id} → {f.to.icao || f.to.id}</span>
             </SubHead>
-            <div className="mb-5 grid gap-x-6 gap-y-4 lg:grid-cols-2">
+            <div className="mb-5 grid gap-x-6 gap-y-4 @3xl:grid-cols-2">
               <div>
                 <div className="text-sm"><span className="num font-medium text-fg">Cruise {f.alt.toLocaleString()} ft MSL</span></div>
                 <p className="mt-0.5 text-[13px] text-fg-3">{f.altSet ? `Set by you; automatic is ${f.altAuto.toLocaleString()} ft.` : `${f.hemispheric ? `Lowest VFR altitude for ${Math.round(f.mc)}° magnetic` : 'Short hop: below 3,000 ft AGL'}, 1,000 ft or more above the highest terrain${f.terrainMax != null ? ` (${Math.round(f.terrainMax).toLocaleString()} ft)` : ''}.`}</p>
@@ -93,7 +93,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
       {skip.length > 0 && <p className="text-sm text-fg-3">Dropped checkpoints: <span className="num">{skip.join(', ')}</span> <button className="inline-flex items-center gap-1 text-accent hover:underline" onClick={() => set({ skipFixes: [] })}><RotateCcw className="size-3.5" />Restore</button></p>}
 
       {(d.crossings.length > 0 || (d.hazards.tfrs?.length ?? 0) > 0) && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flow [--flow-basis:min(100%,24rem)]">
           {d.crossings.length > 0 && (
             <div>
               <SubHead>Airspace on the line</SubHead>

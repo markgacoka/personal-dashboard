@@ -36,7 +36,7 @@ export function PohSummary({ d, profile, plan, planning, u = US }: { d: Derived;
     ['CG range', `forward ${minArm} in ≤ ${W(knee)} → ${fwdTop[0]} in at ${W(fwdTop[1])} · aft ${aft} in`, <PohLink key="e" fig="wb">Fig. 6-8</PohLink>],
   ]
   return (
-    <div className="grid gap-6 2xl:grid-cols-2">
+    <div className="grid gap-6 @5xl:grid-cols-2">
       <div>
         <SubHead right={<span className="text-xs text-fg-3">{profile.source}</span>}>Performance (POH)</SubHead>
         <dl className="grid grid-cols-[9rem_1fr_auto] gap-x-3 gap-y-1.5 text-sm">

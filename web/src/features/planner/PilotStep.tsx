@@ -49,17 +49,18 @@ export function minimumsRows(d: Derived, m: Minimums): MinRow[] {
 }
 
 // Step 7: you — IMSAFE, your minimums against this flight, and recency from the logbook.
-export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts, pilotName, personId }: {
+export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts, pilotName, personId, crew }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; currency: CurrencyItem[]; minimums: Minimums; savedAt?: string; saveMinimums: (m: Minimums) => void; saving: boolean
-  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean; pilotName?: string; personId?: string
+  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean; pilotName?: string; personId?: string; crew?: React.ReactNode
 }) {
   const dual = roleOf(plan.crew, certs) === 'dual'
   const rows = minimumsRows(d, minimums).map(r => (dual && r.status === 'nogo' ? { ...r, status: 'caution' as const } : r))
   // The privilege checks (pilot.ts) are the pilot-section ones that aren't IMSAFE or minimums.
   const rules = d.checks.filter(c => c.section === 'pilot' && !/^IMSAFE|^Not fit|ETA is after civil twilight/.test(c.title))
   return (
-    <div className="grid gap-8 xl:grid-cols-2">
+    <div className="@container"><div className="grid items-start gap-8 @5xl:grid-cols-2">
       <div className="space-y-8">
+        {crew}
         <div>
           <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61</span>}>This flight under the FAA rules</SubHead>
           {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check it.</p>}
@@ -67,18 +68,6 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
         </div>
         <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} title={pilotName ? `${pilotName}'s certificates` : undefined} />
         <RecordsList title={<>{pilotName ? `${pilotName}'s documents` : 'Documents'}</>} person={personId} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
-        <Checklist title="IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />
-        <div>
-          <SubHead right={<span className="text-xs text-fg-3">Logbook</span>}>Currency</SubHead>
-          <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
-            {currency.filter(c => c.key !== 'ifr').map(c => (
-              <li key={c.key} className="flex gap-3 px-3 py-2.5">
-                <StatusIcon status={c.state === 'current' ? 'ok' : c.state === 'na' ? 'todo' : 'caution'} className="mt-0.5" />
-                <div className="min-w-0"><div className="text-sm text-fg">{c.name} <span className="text-fg-3">· {c.rule}</span></div><div className="text-sm text-fg-3">{c.requirement} — {c.detail}</div></div>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
       <div className="space-y-8">
         <div>
@@ -97,7 +86,19 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
           <summary className="cursor-pointer text-sm text-accent">Edit minimums</summary>
           <div className="mt-3"><MinimumsEditor minimums={minimums} savedAt={savedAt} onSave={saveMinimums} saving={saving} /></div>
         </details>
+        <Checklist title="IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />
+        <div>
+          <SubHead right={<span className="text-xs text-fg-3">Logbook</span>}>Currency</SubHead>
+          <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
+            {currency.filter(c => c.key !== 'ifr').map(c => (
+              <li key={c.key} className="flex gap-3 px-3 py-2.5">
+                <StatusIcon status={c.state === 'current' ? 'ok' : c.state === 'na' ? 'todo' : 'caution'} className="mt-0.5" />
+                <div className="min-w-0"><div className="text-sm text-fg">{c.name} <span className="text-fg-3">· {c.rule}</span></div><div className="text-sm text-fg-3">{c.requirement} — {c.detail}</div></div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
-    </div>
+    </div></div>
   )
 }

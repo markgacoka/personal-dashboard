@@ -74,8 +74,8 @@ export function PilotSection() {
   const f = useFlight()
   return (
     <Section k="pilot">
-      <Panel><CrewPicker /></Panel>
-      {f.pilot && <PilotStep plan={f.plan} set={f.set} d={f.d} currency={f.currency} certs={f.certs ?? null} pilotName={f.pilot.name}
+      {!f.pilot && <Panel><CrewPicker /></Panel>}
+      {f.pilot && <PilotStep crew={<Panel><CrewPicker /></Panel>} plan={f.plan} set={f.set} d={f.d} currency={f.currency} certs={f.certs ?? null} pilotName={f.pilot.name}
         saveCerts={c => f.savePilot({ certs: c })?.then(() => toast.success(`${f.pilot!.name}'s certificates saved`), e => toast.error((e as Error).message))} savingCerts={f.crew.saving}
         personId={f.pilot.id} minimums={f.minimums} savedAt={f.minQ.data?.updatedAt} saveMinimums={m => f.minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={f.minQ.save.isPending} />}
     </Section>
@@ -229,10 +229,10 @@ export function WbDoc() {
       {d.wb.steps.length > 0 ? (
         <>
           <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 6 · <PohLink fig="wb">loading page</PohLink></span>}>Loading, line by line</SubHead><WbTable d={d} plan={f.plan} u={f.u} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
-          <div className="grid gap-8 min-[1700px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] print:grid-cols-1">
-            <div><SubHead>Center of gravity envelope</SubHead><CgChart d={d} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
+          <div className="@container"><div className="grid items-start gap-8 @5xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] print:grid-cols-1">
+            <div className="@5xl:sticky @5xl:top-20 print:static"><SubHead>Center of gravity envelope</SubHead><CgChart d={d} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
             {d.profile && <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 2 · <PohLink fig="limits">limits page</PohLink></span>}>Against every limit</SubHead><WbLimits d={d} plan={f.plan} u={f.u} tank={tank} /></div>}
-          </div>
+          </div></div>
         </>
       ) : <p className="text-sm text-fg-3">The weight and balance appears once the aircraft is chosen.</p>}
       <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 5 · <PohLink fig="takeoff">takeoff</PohLink> · <PohLink fig="landing">landing</PohLink></span>}>Takeoff and landing distances</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
@@ -276,7 +276,7 @@ export function WxDoc() {
       <WeatherBrief d={f.d} weather={f.weather} loading={f.wxQ.isLoading} refetch={() => f.wxQ.refetch()} fetching={f.wxQ.isFetching} />
       <section>
         <SubHead>Sources</SubHead>
-        <ul className="grid gap-x-8 gap-y-1 text-[13px] sm:grid-cols-2">
+        <ul className="grid gap-x-8 gap-y-1 text-[13px] @xl:grid-cols-2">
           {wxSources.map(x => (
             <li key={x.what} className="flex flex-wrap gap-x-2"><span className="text-fg-3">{x.what}:</span>
               {x.href ? <a href={x.href} target="_blank" rel="noreferrer" className="text-accent hover:underline">{x.from}</a> : <span className="text-fg-2">{x.from}</span>}

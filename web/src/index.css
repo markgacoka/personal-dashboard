@@ -232,3 +232,8 @@
 @media print { .rwy-grow, .rwy-pattern, .rwy-wind { animation: none; opacity: 1; } }
 
 @media print { :root { color-scheme: light; } html { background: #fff !important; } }
+
+/* A row-filling layout: cards sit side by side at --flow-basis or wider and the
+   last row stretches to the full width, so an odd card never leaves a hole. */
+.flow { display: flex; flex-wrap: wrap; gap: var(--flow-gap, 1.25rem); }
+.flow > * { flex: 1 1 var(--flow-basis, 24rem); min-width: 0; }

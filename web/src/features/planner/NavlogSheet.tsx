@@ -156,7 +156,7 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
 // marks in its header. Any figure on the sheet opens that row's full workings.
 function SourceKey({ list, open }: { list: { n: number; key: string; label: string; refs: Ref[]; assumes: string[] }[]; open?: (card: string) => void }) {
   return (
-    <div className="mt-2 grid gap-x-6 gap-y-1 border-t border-fg/25 pt-2 text-[11px] leading-snug text-fg-2 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-3 print:text-[9px]">
+    <div className="mt-2 grid gap-x-6 gap-y-1 border-t border-fg/25 pt-2 text-[11px] leading-snug text-fg-2 @xl:grid-cols-2 @4xl:grid-cols-3 print:grid-cols-3 print:text-[9px]">
       {list.map(c => (
         <div key={c.key} className="flex min-w-0 gap-1.5">
           <span className="num grid size-4 shrink-0 place-items-center rounded-full bg-fg/10 text-[9.5px] font-semibold text-fg">{c.n}</span>
@@ -166,7 +166,7 @@ function SourceKey({ list, open }: { list: { n: number; key: string; label: stri
           </span>
         </div>
       ))}
-      <p className="text-fg-3 print:hidden sm:col-span-2 xl:col-span-3">Select any figure for its calculation, assumptions and sources.</p>
+      <p className="text-fg-3 print:hidden @xl:col-span-2 @4xl:col-span-3">Select any figure for its calculation, assumptions and sources.</p>
     </div>
   )
 }

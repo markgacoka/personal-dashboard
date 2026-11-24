@@ -54,7 +54,7 @@ function Shell({ saved }: { saved: SavedPlan }) {
           {f.setup ? <NewFlight /> : (
             <div className={cn('grid gap-6 lg:grid-cols-[14.5rem_minmax(0,1fr)]', sheet && (f.refs.state.wide ? '2xl:grid-cols-[14.5rem_minmax(0,1fr)_minmax(28rem,42%)]' : '2xl:grid-cols-[14.5rem_minmax(0,1fr)_28rem] min-[2200px]:grid-cols-[14.5rem_minmax(0,1fr)_34rem]'))}>
               <Rail />
-              <main className="min-w-0">
+              <main className="@container min-w-0">
                 <Status />
                 {section === 'overview' && <Summary printAll={printAll} />}
                 {section === 'pilot' && <PilotSection />}

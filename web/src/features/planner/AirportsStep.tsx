@@ -41,7 +41,7 @@ export function AirportsStep({ d, routePts, alternate, noAlternate = false, auto
   return (
     <div className="@container space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2"><Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data · wind from METAR/TAF at your ETA · NOTAMs from the FAA" /><span className="text-[13px]"><WorkingsLink>Where each number came from</WorkingsLink></span></div>
-      <div className="grid gap-5 @5xl:grid-cols-2">
+      <div className="flow [--flow-basis:min(100%,34rem)]">
         {all.map(a => <AirportCard key={a.id} a={a} role={roleOf(a)} wx={d.wx.find(w => w.airport.id === a.id) ?? null} minimums={minimums} notams={notams.find(n => n.icao === (a.icao || a.id)) ?? null}
           nasr={nasr.find(x => x.id === a.id) ?? a} profile={profiles[a.icao || a.id] ?? null} save={p => saveProfile(a.icao || a.id, p)} saving={savingProfile} />)}
       </div>
@@ -169,6 +169,8 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
         {wx?.category && <Cat cat={wx.category} />}
       </div>
 
+      <div className="grid gap-x-8 @6xl:grid-cols-2">
+      <div className="min-w-0">
       <div className="mt-4 grid items-center gap-x-6 gap-y-4 @xl:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
         <RunwayDiagram airport={a} wind={wx?.wind.from ? wx.wind : null} active={inUse.length ? inUse : best ? [best.end.id] : []} className="mx-auto max-w-[19rem]" />
         <div className="min-w-0 space-y-3">
@@ -207,7 +209,9 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
         ['Density altitude', wx?.da != null ? <span className="num">{wx.da.toLocaleString()} ft ({wx.tempC} °C, {wx.altimInHg?.toFixed(2)} inHg)</span> : null],
       ]} />
 
-      <div className="mt-3 grid gap-x-6 text-sm @lg:grid-cols-2">
+      </div>
+      <div className="min-w-0">
+      <div className="mt-3 grid @6xl:mt-4 gap-x-6 text-sm @lg:grid-cols-2">
         {sorted.map((f, i) => (
           <div key={i} className="min-w-0 border-b border-border py-1.5">
             <div className="flex min-w-0 items-baseline gap-2"><span className="shrink-0 text-fg-2">{FREQ_LABEL[f.use] || f.use}</span><span className="num ml-auto text-fg">{f.freq}</span>{f.sector && <span className="w-28 shrink-0 truncate text-right text-[13px] text-fg-3" title={f.sector}>{f.sector}</span>}</div>
@@ -233,6 +237,8 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
           {more && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-2">{a.remarks.map((r, i) => <li key={i}>{r}</li>)}</ul>}
         </div>
       )}
+      </div>
+      </div>
     </div>
   )
 }

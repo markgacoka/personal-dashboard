@@ -11,12 +11,12 @@ import type { Derived, WeatherBundle, WxAt } from './model'
 import { Cat, StatusIcon, SubHead, Synced, deg3, fmtTime, fmtZ } from './ui'
 
 export function WeatherSection({ d, weather, loading, refetch, fetching }: { d: Derived; weather: WeatherBundle | null; loading: boolean; refetch: () => void; fetching: boolean }) {
-  if (loading && !weather) return <div className="grid gap-4 lg:grid-cols-2">{[0, 1].map(i => <Skeleton key={i} className="h-64" />)}</div>
+  if (loading && !weather) return <div className="grid gap-4 @3xl:grid-cols-2">{[0, 1].map(i => <Skeleton key={i} className="h-64" />)}</div>
   if (!d.wx.length) return <p className="text-sm text-fg-3">Add a route and departure time to brief the weather at each ETA.</p>
   return (
     <>
       <Synced at={weather?.metars.fetchedAt} source="aviationweather.gov (NOAA AWC) · nasstatus.faa.gov · tfr.faa.gov · refreshes every 5 min" onRefresh={refetch} refreshing={fetching} />
-      <div className="grid gap-4 lg:grid-cols-2 3xl:grid-cols-3">
+      <div className="flow [--flow-basis:min(100%,28rem)] [--flow-gap:1rem]">
         {byAirport(d.wx).map(ws => <AirportWx key={ws[0].airport.id + ws[0].role} ws={ws} nas={weather?.nas.data?.items.filter(x => x.airport === ws[0].airport.id) ?? []} />)}
       </div>
       <Hazards d={d} weather={weather} />
@@ -56,12 +56,14 @@ function AirportWx({ ws, nas }: { ws: WxAt[]; nas: { kind: string; reason: strin
   const datis = useDatis(id, w.airport.towered && w.at.getTime() - Date.now() < 3 * 3_600_000)
   const t = w.tafMoment
   return (
-    <div className="rounded-lg p-4 ring-1 ring-inset ring-border">
+    <div className="@container rounded-lg p-4 ring-1 ring-inset ring-border">
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="num text-lg font-medium">{id}</span><span className="text-sm text-fg-3">{ws.map(x => `${ROLE[x.role]} ${fmtTime(x.at)} (${fmtZ(x.at)})`).join(' · ')}</span>
         <span className="ml-auto flex items-center gap-1.5">{ws.some(x => x.night) && <Badge tone="warn">Night</Badge>}{[...new Set(ws.map(x => x.category))].map(c => <Cat key={c ?? 'none'} cat={c} />)}</span>
       </div>
-      <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="grid gap-x-8 @4xl:grid-cols-2">
+      <div className="min-w-0">
+      <div className="mt-2 flex flex-col gap-4 @md:flex-row @md:items-center">
       <WindCompass size={150} wdir={w.wind.dir ?? (w.wind.spd ? 'VRB' : null)} wspd={w.wind.spd} wgst={w.wind.gust}
         best={bestEnd(w)}
         runways={w.airport.runways.filter(r => r.ends.length === 2 && r.ends.every(e => e.trueHdg != null)).map(r => ({ le_ident: r.ends[0].id, le_hdg: r.ends[0].trueHdg!, he_ident: r.ends[1].id, he_hdg: r.ends[1].trueHdg!, length_ft: r.len, surface: r.surface ?? undefined }))} />
@@ -89,6 +91,8 @@ function AirportWx({ ws, nas }: { ws: WxAt[]; nas: { kind: string; reason: strin
           </div>
         )
       })}
+      </div>
+      <div className="min-w-0 @4xl:pt-2">
       {w.metar && (
         <div className="mt-3"><div className="mb-0.5 flex justify-between text-xs text-fg-3"><span>METAR {w.metar.icaoId}</span><span>{w.metarAgeMin} min ago</span></div>
           <code className="block break-words rounded-md bg-sunken px-3 py-2 font-mono text-[13px] text-fg-2">{w.metar.rawOb}</code></div>
@@ -107,6 +111,8 @@ function AirportWx({ ws, nas }: { ws: WxAt[]; nas: { kind: string; reason: strin
         </div>
       )}
       {nas.map((n, i) => <div key={i} className="mt-3 flex gap-2 rounded-md bg-warn-soft px-3 py-2 text-sm text-warn"><StatusIcon status="caution" className="mt-0.5" /><span><b>{n.kind}</b> — {n.reason} {n.detail}</span></div>)}
+      </div>
+      </div>
     </div>
   )
 }
@@ -126,7 +132,7 @@ function Hazards({ d, weather }: { d: Derived; weather: WeatherBundle | null }) 
   ]
   const dedup = rows.filter((r, i) => rows.findIndex(x => x.kind === r.kind && x.title === r.title) === i)
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="flow [--flow-basis:min(100%,28rem)]">
       <div>
         <SubHead right={<Synced at={weather?.sigmets.fetchedAt} source="10 nm corridor" />}>Advisories and restrictions on the route</SubHead>
         {dedup.length ? (

@@ -97,6 +97,21 @@ function RunwayTile({ p, label, go }: { p: PerfAt; label: string; go: () => void
   )
 }
 
+// Column counts that divide the tiles evenly at each width (6 → 1, 2, 3 or 6
+// across; 4 → 2 or 4), so no row is left with a hole; five put the last one
+// across two columns.
+const COLS: Record<number, string> = {
+  6: '@2xl:grid-cols-2 @5xl:grid-cols-3 @[104rem]:grid-cols-6',
+  5: '@2xl:grid-cols-2 @5xl:grid-cols-3 @2xl:[&>*:last-child]:col-span-2',
+  4: '@2xl:grid-cols-2 @[80rem]:grid-cols-4',
+  3: '@4xl:grid-cols-3',
+  2: '@2xl:grid-cols-2',
+}
+function TileGrid({ children }: { children: (React.ReactNode | false | null | undefined)[] }) {
+  const list = children.filter(Boolean)
+  return <div className={cn('grid gap-3', COLS[list.length])}>{list}</div>
+}
+
 export function Summary({ printAll }: { printAll: () => void }) {
   const f = useFlight()
   const { d, plan } = f
@@ -118,8 +133,8 @@ export function Summary({ printAll }: { printAll: () => void }) {
 
       {d.legs.length > 0 ? (
         <div className="@container">
-          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
-            <Tile title="Route" icon={Navigation} go={go('route')}>
+          <TileGrid>{[
+            <Tile key="route" title="Route" icon={Navigation} go={go('route')}>
               <div className="num truncate text-lg font-medium text-fg">{f.routeText}</div>
               <dl className="num mt-3 grid grid-cols-3 gap-2 text-[13px]">
                 <div><dt className="text-fg-3">Distance</dt><dd className="text-fg">{Math.round(t.distNm)} nm</dd></div>
@@ -127,18 +142,18 @@ export function Summary({ printAll }: { printAll: () => void }) {
                 <div><dt className="text-fg-3">Cruise</dt><dd className="truncate text-fg">{d.flights.map(x => `${(x.alt / 1000).toFixed(1)}k`).join(' / ')} ft</dd></div>
               </dl>
               <div className="num mt-3 text-[13px] text-fg-3">Off {fmtTime(d.takeoffAt)} · on {fmtTime(d.legs.at(-1)!.arriveAt)}{d.flights[0]?.cruise ? ` · ${d.flights[0].cruise.ktas} KTAS` : ''}</div>
-            </Tile>
-            <Tile title={<>Fuel · <span className="num text-fg-2">{t.requiredFuel.toFixed(1)} of {t.usableFuel.toFixed(1)} gal</span></>} icon={Fuel} go={() => f.explain({ kind: 'topic', key: 'fuel' })}>
+            </Tile>,
+            <Tile key="fuel" title={<>Fuel · <span className="num text-fg-2">{t.requiredFuel.toFixed(1)} of {t.usableFuel.toFixed(1)} gal</span></>} icon={Fuel} go={() => f.explain({ kind: 'topic', key: 'fuel' })}>
               <FuelBar taxi={t.taxiFuel} trip={t.tripFuel} reserve={t.reserveFuel} usable={t.usableFuel} />
-            </Tile>
-            {to && d.profile && (
-              <Tile title="Weight and balance" icon={Scale} go={go('loading')}>
+            </Tile>,
+            to && d.profile && (
+              <Tile key="wb" title="Weight and balance" icon={Scale} go={go('loading')}>
                 <WbGauge weight={to.weight} max={d.profile.limits.maxTakeoff} cg={to.arm} env={d.profile.envelope.normal} />
               </Tile>
-            )}
-            {dep && <RunwayTile p={dep} label="Departure" go={go('airports')} />}
-            {arr && <RunwayTile p={arr} label="Arrival" go={go('airports')} />}
-            <Tile title="Weather" icon={CloudSun} go={go('weather')}>
+            ),
+            dep && <RunwayTile key="dep" p={dep} label="Departure" go={go('airports')} />,
+            arr && <RunwayTile key="arr" p={arr} label="Arrival" go={go('airports')} />,
+            <Tile key="wx" title="Weather" icon={CloudSun} go={go('weather')}>
               <ul className="space-y-2">
                 {d.wx.map(w => (
                   <li key={`${w.role}-${code(w.airport)}`} className="num flex items-center gap-2 text-[13px]">
@@ -149,13 +164,13 @@ export function Summary({ printAll }: { printAll: () => void }) {
                   </li>
                 ))}
               </ul>
-            </Tile>
-          </div>
+            </Tile>,
+          ]}</TileGrid>
         </div>
       ) : <p className="text-sm text-fg-3">Tiles appear once the route resolves.</p>}
 
       {must.length > 0 && (
-        <section><h3 className="mb-2 text-[15px] font-medium text-fg">To resolve</h3><ul className="grid gap-x-8 rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5 2xl:grid-cols-2 [&>li]:border-b [&>li]:border-border [&>li:last-child]:border-0 2xl:[&>li:nth-last-child(2):nth-child(odd)]:border-0">{must.map(x => <TaskRow key={x.id} t={x} compact onGo={() => f.go(x.section)} />)}</ul></section>
+        <section><h3 className="mb-2 text-[15px] font-medium text-fg">To resolve</h3><ul className="grid gap-x-8 rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5 @5xl:grid-cols-2 [&>li]:border-b [&>li]:border-border [&>li:last-child]:border-0 2xl:[&>li:nth-last-child(2):nth-child(odd)]:border-0">{must.map(x => <TaskRow key={x.id} t={x} compact onGo={() => f.go(x.section)} />)}</ul></section>
       )}
 
       {rec.length > 0 && (

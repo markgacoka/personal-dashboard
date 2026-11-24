@@ -62,7 +62,7 @@ export function PerformanceSection({ d, profile }: { d: Derived; profile: Aircra
           </tbody>
         </table>
       </div>
-      <div className="mt-4 grid gap-4 text-sm text-fg-3 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4 text-sm text-fg-3 @3xl:grid-cols-2">
         <div>
           <SubHead>How these are computed</SubHead>
           <p><PohLink fig="takeoff">{profile.figures.takeoff}</PohLink> and <PohLink fig="landing">{profile.figures.landing}</PohLink> with the POH wind and surface corrections. Every step, line by line: <WorkingsLink>Workings</WorkingsLink>.</p>

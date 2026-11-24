@@ -113,7 +113,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
       <Block id="airworthy" title="Airworthiness for this flight" lead="AV1ATES inspections from the logbook dates, the documents on board (ARROW) and the equipment this flight needs (§91.205). Ticks are for this flight; dates and equipment are kept for the airplane.">
         <div className="space-y-8">
           <InspectionDates tail={plan.tail} planning={planning} save={savePlanning} />
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-6 @4xl:grid-cols-2">
             <Checklist title="Maintenance, inspections and documents" right={<span className="text-xs text-fg-3">Aircraft logbooks / dispatch</span>} items={MX_DOCS} prefix="mx" plan={plan} set={set} yes="Checked" no="Problem" />
             <Checklist title={night ? 'Required equipment · day and night VFR' : 'Required equipment · day VFR'} right={<span className="text-xs text-fg-3">§91.205</span>} items={night ? [...EQUIPMENT_DAY, ...EQUIPMENT_NIGHT] : EQUIPMENT_DAY} prefix="eq" plan={plan} set={set} yes="Working" no="Inop" />
           </div>
@@ -122,7 +122,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
       </Block>
 
       <Block id="profile" title="Profile and records" lead={`${plan.tail}'s own numbers over the book's, kept for every plan, and its documents.`}>
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid gap-6 @5xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <ProfileEditor tail={plan.tail} planning={planning} save={savePlanning} saving={savingPlanning} registry={{ make: registry?.make, model: registry?.model, year: registry?.year }} />
         <div className="space-y-6">
           <AircraftDocs tail={plan.tail} model={aircraft.model ?? null} poh={pohDoc} pohUploaded={pohUploaded} />
@@ -130,7 +130,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 @4xl:grid-cols-2">
         <div className="space-y-4">
           <EmptyWeight tail={plan.tail} planning={planning} save={savePlanning} u={u} />
           {p && p.fuel.length > 1 && (
@@ -145,11 +145,11 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
   )
 }
 
-export function Block({ id, title, lead, right, children }: { id: string; title: React.ReactNode; lead?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) {
+export function Block({ id, title, right, children }: { id: string; title: React.ReactNode; lead?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={`ac-${id}`} className="scroll-mt-24">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2 border-b border-border pb-2">
-        <div className="min-w-0"><h3 className="text-base font-medium tracking-[-0.011em] text-fg">{title}</h3>{lead && <p className="mt-0.5 max-w-3xl text-[13px] text-fg-3">{lead}</p>}</div>{right}
+        <div className="min-w-0"><h3 className="text-base font-medium tracking-[-0.011em] text-fg">{title}</h3></div>{right}
       </div>
       {children}
     </section>
@@ -172,7 +172,7 @@ function RegistrationLine({ status, issued, expires }: { status?: string | null;
 
 function Rows({ items }: { items: [string, string | number | null | undefined][] }) {
   return (
-    <div className="grid gap-x-6 text-sm 2xl:grid-cols-2">
+    <div className="grid gap-x-6 text-sm @5xl:grid-cols-2">
       {items.filter(([, v]) => v != null && v !== '').map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-border py-1.5"><span className="text-fg-3">{k}</span><span className="num text-right text-fg">{v}</span></div>)}
     </div>
   )
@@ -180,7 +180,7 @@ function Rows({ items }: { items: [string, string | number | null | undefined][]
 
 // Inspection dates from the aircraft logbooks, saved per tail; the review step
 // flags anything due before the flight.
-export function InspectionDates({ tail, planning, save }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void }) {
+export function InspectionDates({ planning, save }: { tail: string; planning: AircraftPlanning; save: (p: AircraftPlanning) => void }) {
   const [insp, setInsp] = useState(planning.inspections || {})
   useEffect(() => setInsp(planning.inspections || {}), [planning.inspections])
   const commit = () => { if (JSON.stringify(insp) !== JSON.stringify(planning.inspections || {})) save({ ...planning, inspections: insp }) }
@@ -191,8 +191,8 @@ export function InspectionDates({ tail, planning, save }: { tail: string; planni
   }
   return (
     <div onBlur={commit}>
-      <SubHead right={<Synced at={planning.updatedAt} label="Saved" source={`${tail}'s logbook dates, kept for every plan`} />}>Inspection dates (optional)</SubHead>
-      <div className="grid grid-cols-2 gap-3">
+      <SubHead right={<Synced at={planning.updatedAt} label="Saved" />}>Inspection dates</SubHead>
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
         {AV1ATES.filter(i => i.months && !i.ifrOnly).map(i => {
           const dd = due(i.key, i.months!)
           return (

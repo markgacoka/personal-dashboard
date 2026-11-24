@@ -85,7 +85,7 @@ export function SpecSheet({ s, book, p, d, rpm, planning, savePlanning, tail }: 
   return (
     <div>
       <SubHead right={<span className="flex flex-wrap gap-3 text-[13px]"><span className="text-fg-3">Read from the {s.ocr ? 'scanned ' : ''}book{s.ocr ? ' by OCR' : ''}</span><PohLink fig="limits">Sec. 2 Limitations</PohLink><PohLink fig="stall">Stall speeds</PohLink></span>}>Specifications · {book}</SubHead>
-      <div className="grid gap-x-8 gap-y-6 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-x-8 gap-y-6 @2xl:grid-cols-2 @5xl:grid-cols-3">
         {(e || pr) && <Group title="Engine and propeller" refs="Sec. 1, 2" items={[
           ['Engine', e?.model ? `${e.make ? `${e.make} ` : ''}${e.model}` : null],
           ['Power', e?.hp ? `${e.hp} hp${e.rpm ? ` at ${e.rpm.toLocaleString()} RPM` : ''}` : null],

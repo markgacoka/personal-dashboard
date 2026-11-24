@@ -96,7 +96,8 @@ export function ChecklistRun({ secs, compact }: { secs: ChecklistSection[]; comp
   const [done, setDone] = useState<Set<string>>(new Set())
   const toggle = (k: string) => setDone(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
   return (
-    <div className={cn('grid gap-x-8 gap-y-5', !compact && '@3xl:grid-cols-2 @7xl:grid-cols-3')}>
+    // Balanced columns about 20rem wide, never more columns than sections.
+    <div className={cn(compact ? 'grid gap-y-5' : 'gap-x-8 [&>section]:mb-5')} style={compact ? undefined : { columns: `${secs.length} 20rem` }}>
       {secs.map((s, i) => (
         <section key={i} className="break-inside-avoid">
           <h4 className="mb-1.5 flex items-baseline justify-between gap-2 text-sm font-medium text-fg">{s.title}<span className="num text-[13px] font-normal text-fg-3">{s.items.filter((_, j) => done.has(`${i}.${j}`)).length}/{s.items.length}</span></h4>

@@ -11,6 +11,7 @@ import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
 import { mapScanLater, pohPageMap } from '../services/pohPages.js'
 import { findLibraryPoh, savePageMap } from '../services/pohFinder.js'
 import { ensureTables } from '../services/pohTables.js'
+import { ensureSpecs } from '../services/pohSpecs.js'
 import { modelWinds, routeGrid } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
@@ -295,8 +296,13 @@ export default async function plannerRoutes(fastify) {
        ORDER BY (tail_number = $1::text) DESC NULLS LAST, created_at DESC LIMIT 1`, [t, mdl])
     const info = m && { key: m.entry.key, title: m.entry.title, variant: m.entry.variant, years: m.entry.years, profile: m.entry.profile, url: m.entry.url, units: m.entry.units, exact: m.exact, sameYears: m.sameYears }
     // Performance tables from the book itself, for any POH without a hand-checked profile.
+    // The spec sheet (engine, oil, fuel, gear, electrical, speeds…) is read from every POH.
+    const withSpecs = async doc => {
+      if (!doc) return doc
+      try { return { ...doc, specs: await ensureSpecs(doc, fastify.log) } } catch (e) { fastify.log.warn({ err: e.message, id: doc.id }, 'POH specs failed'); return doc }
+    }
     const withTables = async doc => {
-      try { return { ...doc, tables: await ensureTables(doc, fastify.log) } } catch (e) { fastify.log.warn({ err: e.message, id: doc.id }, 'POH tables failed'); return doc }
+      try { return withSpecs({ ...doc, tables: await ensureTables(doc, fastify.log) }) } catch (e) { fastify.log.warn({ err: e.message, id: doc.id }, 'POH tables failed'); return withSpecs(doc) }
     }
     if (mine) return { match: info, doc: await withTables(mine), uploaded: true }
     // Not in the curated catalog: this model's own POH from the public manual library.
@@ -308,7 +314,7 @@ export default async function plannerRoutes(fastify) {
     const { url, title, variant, years, profile, units, key } = m.entry
     try {
       const doc = await ensurePoh(m.entry, fastify.log)
-      return { match: { key, title, variant, years, profile, url, units, exact: m.exact, sameYears: m.sameYears }, doc: m.exact && !profile ? await withTables(doc) : doc }
+      return { match: { key, title, variant, years, profile, url, units, exact: m.exact, sameYears: m.sameYears }, doc: m.exact && !profile ? await withTables(doc) : await withSpecs(doc) }
     } catch (e) {
       return reply.status(502).send({ error: e.message, match: { key, title, variant, years, profile, url, units, exact: m.exact } })
     }

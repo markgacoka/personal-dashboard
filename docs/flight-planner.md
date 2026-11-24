@@ -109,9 +109,16 @@ Per-model max weights and CG limits come from TCDS 3A12 where the POH is
 missing. Per-tail empty weight/moment start from the POH sample airplane and are
 marked "sample" until replaced with the tail's own W&B record.
 
-The 172M profile flies its own 1976 POH's tanks (38/48 gal usable), V-speeds
-and oil limits; only the CG envelope and stations come from TCDS / the 172P.
-Each model with a transcribed spec sheet (`specs.ts`: 172M, 172P) shows, under
+Each airplane's spec sheet is read from its own POH's text
+(`api/src/services/pohSpecs.js`): GAMA-format "Label: value" lines and fixed
+phrases, Cessna and Piper wording, with OCR repairs ("27O0", "KlAS", "4B" for
+48). A scanned book is OCR'd once in the background and the page polls until it
+is done. Anything not found is left out, never guessed; implausible speeds are
+ignored. Tested against the 1976 172M, 1978 172N, 1982 172P, 2005 172S, 1979
+152 and 1995 PA-28-161 books (`api/src/test/pohSpecs.test.js`). The book's
+V-speeds, tanks, fuel grades, oil and crosswind replace the profile's for every
+airplane except the hand-checked 172P; your aircraft profile edits still win.
+The sheet shows, under
 Brief → Aircraft: an airspeed-indicator strip (arcs and V-speeds), engine and
 propeller, oil (sump, dipstick minimum, pressure, grades), fuel system (tanks,
 usable/unusable, grades and dye colours, planned burn and endurance), gear,

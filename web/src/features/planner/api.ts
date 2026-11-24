@@ -1,4 +1,5 @@
 import type { RecordKind } from './records'
+import type { PohSpecs } from './specs'
 // Data for the planner: queries against /api/planner/* and the existing
 // aviation endpoints, plus the saved plan / per-tail / minimums state.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -107,7 +108,7 @@ export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
 })
 
-export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other' | RecordKind; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; tables?: PohTables | null; content_type?: string; source: string; created_at: string }
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other' | RecordKind; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; tables?: PohTables | null; specs?: PohSpecs | null; content_type?: string; source: string; created_at: string }
 export function useDocuments() {
   const qc = useQueryClient()
   const key = ['planner', 'documents']
@@ -150,6 +151,8 @@ export const usePohFind = (a: { make?: string | null; model?: string | null; yea
   const qc = useQueryClient()
   return useQuery({
     queryKey: ['planner', 'poh-find', a?.make, a?.model, a?.year, a?.tail], enabled: !!a?.model || !!a?.tail, staleTime: Infinity, retry: 1,
+    // A scanned book's spec sheet is read by OCR in the background: look again until it's there.
+    refetchInterval: q => (q.state.data?.doc?.specs?.pending ? 30_000 : false),
     queryFn: async () => {
       const r = await post<{ match: PohMatch | null; doc: PlannerDoc | null; uploaded?: boolean }>('/api/planner/poh/find', a)
       if (r.doc) qc.invalidateQueries({ queryKey: ['planner', 'documents'] })

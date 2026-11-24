@@ -14,6 +14,8 @@ export interface DistanceTable {
   missing?: number[]
 }
 
+import { hasSpecs, specOverrides, type PohSpecs } from './specs'
+
 export interface CruiseRow { pa: number; rpm: number; cols: ([number, number, number] | null)[] } // ISA−20, ISA, ISA+20 → %BHP, KTAS, GPH
 
 export interface AircraftProfile {
@@ -45,6 +47,8 @@ export interface AircraftProfile {
   cruiseFixed?: { ktas?: number | null; gph?: number | null }
   // Tables read automatically from this model's POH PDF (the rest are the 172P's).
   read?: { book: string; sections: TableSection[]; missing: TableSection[]; reason?: string }
+  // The book whose speeds, tanks and oil were read from its text (withSpecs).
+  specsFrom?: string
 }
 
 export type TableSection = 'takeoff' | 'climb' | 'cruise' | 'landing'
@@ -364,4 +368,24 @@ export function withTables(m: ProfileMatch, t: PohTables | null | undefined, boo
     knownLimits ? null : `Maximum weights come from its charts; the CG envelope and loading stations are still the 172P's, so enter this airplane's in its aircraft profile.`,
   ].filter(Boolean)
   return { profile, exact: false, note: `${list(sections.map(k => SECTION_LABEL[k])).replace(/^./, c => c.toUpperCase())} ${sections.length > 1 ? 'are' : 'is'} read from the ${book}. ${parts.join(' ')}` }
+}
+
+// The book's own V-speeds, tanks, fuel grades, oil and crosswind (read from its
+// text, specs.ts) over the profile's, for every airplane except the hand-checked
+// 172P. Your aircraft profile edits still win (applyEdits runs after this).
+export function withSpecs(m: ProfileMatch, s: PohSpecs | null | undefined, book: string | null | undefined): ProfileMatch {
+  if (!hasSpecs(s) || (m.profile.key === 'C172P' && m.exact)) return m
+  const o = specOverrides(s), p = m.profile
+  const profile: AircraftProfile = {
+    ...p,
+    vspeeds: { ...p.vspeeds, ...(o.vspeeds as Partial<AircraftProfile['vspeeds']>) },
+    fuel: o.fuel.length ? o.fuel : p.fuel,
+    fuelGrade: o.fuelGrade ?? p.fuelGrade,
+    oil: o.oil ?? p.oil,
+    crosswindDemo: o.crosswindDemo ?? p.crosswindDemo,
+    engine: o.engine ?? p.engine,
+    speeds: o.speeds.length ? o.speeds : p.speeds,
+    specsFrom: book ?? undefined,
+  }
+  return { ...m, profile }
 }

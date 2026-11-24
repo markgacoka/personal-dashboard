@@ -2,14 +2,14 @@ import { cn } from '@/lib/utils'
 import type { AircraftPlanning, Derived } from './model'
 import type { AircraftProfile } from './poh'
 import { PohLink } from './RefPanel'
-import type { AircraftSpecs } from './specs'
+import type { PohSpecs } from './specs'
 import { SubHead } from './ui'
 
 type VS = AircraftProfile['vspeeds']
 
 // The airspeed indicator laid flat: the white, green and yellow arcs and the red
 // line from the POH (Fig. 2-2), with each V-speed marked under it.
-export function AirspeedTape({ vs, arcs }: { vs: VS; arcs?: AircraftSpecs['arcs'] | null }) {
+export function AirspeedTape({ vs, arcs }: { vs: VS; arcs?: PohSpecs['arcs'] }) {
   const white: [number, number] = arcs?.white ?? [vs.vso, Number(String(vs.vfe).match(/\d+/)?.[0] ?? 85)]
   const green: [number, number] = arcs?.green ?? [vs.vs1, vs.vno]
   const yellow: [number, number] = arcs?.yellow ?? [vs.vno, vs.vne]
@@ -43,7 +43,7 @@ export function AirspeedTape({ vs, arcs }: { vs: VS; arcs?: AircraftSpecs['arcs'
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-good" />Normal {green[0]}–{green[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-warn" />Smooth air only {yellow[0]}–{yellow[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-[3px] rounded-full bg-bad" />Never exceed {red}</span>
-        <span>KIAS{arcs ? ` · ${arcs.ref}` : ' · from the speeds (no marking table for this model)'}</span>
+        <span>KIAS{arcs ? ' · the POH\'s airspeed indicator markings' : ' · from the speeds (the markings weren\'t read from the POH)'}</span>
       </figcaption>
     </figure>
   )
@@ -70,107 +70,109 @@ const FUEL_DOT: Record<string, string> = { Blue: '#3b82f6', Green: '#22a35a', Re
 
 // Everything the POH says about the airplane, grouped the way a preflight goes:
 // engine and propeller, oil, fuel, gear and brakes, electrical, limits, stall
-// speeds and the published performance. Pitot heat is optional equipment, so
+// speeds and the published performance, as read from the book's text. A line
+// the book didn't yield is left out. Pitot heat is optional equipment, so
 // whether this airplane has it is yours to say.
-export function SpecSheet({ s, p, d, rpm, planning, savePlanning, tail }: { s: AircraftSpecs; p: AircraftProfile; d: Derived; rpm: number; planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; tail: string }) {
+export function SpecSheet({ s, book, p, d, rpm, planning, savePlanning, tail }: { s: PohSpecs; book: string; p: AircraftProfile; d: Derived; rpm: number; planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; tail: string }) {
   const tank = p.fuel.find(f => f.key === (planning.tanks || 'standard')) ?? p.fuel[0]
   const gphs = p.cruise.flatMap(r => r.cols.filter(c => !!c).map(c => c![2])).filter(g => g > 0)
   const f0 = d.flights[0]
   const gph = f0?.cruise?.gph ?? null
   const pitot = planning.equipment?.pitotHeat
   const setPitot = (v: boolean | undefined) => savePlanning({ ...planning, equipment: { ...planning.equipment, pitotHeat: v } })
+  const e = s.engine, pr = s.propeller, o = s.oil, fu = s.fuel, g = s.gear, b = s.brakes, el = s.electrical, l = s.limits, lf = s.loadFactors
+  const lfLine = (x?: { weight: number | null; flapsUp: string | null; flapsDown: string | null } | null) => (x ? [x.flapsUp && `${x.flapsUp} flaps up`, x.flapsDown && `${x.flapsDown} flaps down`].filter(Boolean).join(' · ') + (x.weight ? ` (${x.weight.toLocaleString()} lb)` : '') : null)
   return (
     <div>
-      <SubHead right={<span className="flex flex-wrap gap-3 text-[13px]"><PohLink fig="limits">Sec. 2 Limitations</PohLink><PohLink fig="stall">Fig. 5-3</PohLink></span>}>Specifications · {s.book}</SubHead>
+      <SubHead right={<span className="flex flex-wrap gap-3 text-[13px]"><span className="text-fg-3">Read from the {s.ocr ? 'scanned ' : ''}book{s.ocr ? ' by OCR' : ''}</span><PohLink fig="limits">Sec. 2 Limitations</PohLink><PohLink fig="stall">Stall speeds</PohLink></span>}>Specifications · {book}</SubHead>
       <div className="grid gap-x-8 gap-y-6 md:grid-cols-2 2xl:grid-cols-3">
-        <Group title="Engine and propeller" refs={`${s.engine.ref}, 2`} items={[
-          ['Engine', `${s.engine.make} ${s.engine.model}`],
-          ['Power', `${s.engine.hp} hp at ${s.engine.rpm.toLocaleString()} RPM`],
-          ['Type', `${s.engine.type}; ${s.engine.displacement}`],
-          ['Tachometer green', s.tach.map(t => `${t.green[0]}–${t.green[1]} at ${t.label.toLowerCase()}`).join(' · ')],
-          ['Propeller', `${s.propeller.make} ${s.propeller.model}, ${s.propeller.blades} blades, ${s.propeller.type.toLowerCase()}`],
-          ['Propeller diameter', `${s.propeller.diameterIn[1]} in maximum, ${s.propeller.diameterIn[0]} in minimum`],
-          ['Ground clearance', s.propeller.groundClearance],
-        ]} />
-        <Group title="Oil" refs={s.oil.ref} items={[
-          ['Sump capacity', `${s.oil.sumpQt} qt (${s.oil.totalQt} qt with the filter change)`],
-          ['On the dipstick', `Not less than ${s.oil.minQt} qt; ${s.oil.extendedQt} qt for longer flights`],
-          ['Pressure', `${s.oil.pressurePsi.min} psi minimum · ${s.oil.pressurePsi.green[0]}–${s.oil.pressurePsi.green[1]} psi normal · ${s.oil.pressurePsi.max} psi maximum`],
-          ['Temperature', `${s.oil.maxTempF} °F maximum`],
-          ['Type', s.oil.spec],
-          ['Viscosity', <ul key="v" className="space-y-0.5">{s.oil.viscosity.map(v => <li key={v}>{v}</li>)}</ul>],
-        ]} />
-        <Group title="Fuel system" refs={s.fuel.ref} items={[
-          ['Tanks', s.fuel.system],
-          ['Selector', s.fuel.selector],
-          ['Grades', <span key="g" className="flex flex-wrap gap-x-3 gap-y-1">{s.fuel.grades.map(g => <span key={g.grade} className="inline-flex items-center gap-1.5"><i className="inline-block size-2.5 rounded-full ring-1 ring-inset ring-border" style={{ background: FUEL_DOT[g.color] }} />{g.grade} · {g.color.toLowerCase()}</span>)}</span>],
-          ['', s.fuel.gradeNote],
-          ['Burn', gph ? `${gph} GPH planned at ${f0.alt.toLocaleString()} ft and ${rpm} RPM · ${Math.min(...gphs)}–${Math.max(...gphs)} GPH across the cruise table` : gphs.length ? `${Math.min(...gphs)}–${Math.max(...gphs)} GPH across the cruise table` : null],
+        {(e || pr) && <Group title="Engine and propeller" refs="Sec. 1, 2" items={[
+          ['Engine', e?.model ? `${e.make ? `${e.make} ` : ''}${e.model}` : null],
+          ['Power', e?.hp ? `${e.hp} hp${e.rpm ? ` at ${e.rpm.toLocaleString()} RPM` : ''}` : null],
+          ['Type', e?.type ? `${e.type}${e.displacement ? `; ${e.displacement}` : ''}` : e?.displacement],
+          ['Propeller', pr?.model ? `${pr.make ? `${pr.make} ` : ''}${pr.model}${pr.blades ? `, ${pr.blades} blades` : ''}${pr.type ? `, ${pr.type.toLowerCase()}` : ''}` : null],
+          ['Propeller diameter', pr?.diameterIn ? `${pr.diameterIn[1]} in maximum, ${pr.diameterIn[0]} in minimum` : null],
+          ['Ground clearance', pr?.groundClearance],
+        ]} />}
+        {o && <Group title="Oil" refs="Sec. 1, 2, 8" items={[
+          ['Sump capacity', o.sumpQt ? `${o.sumpQt} qt${o.totalQt ? ` (${o.totalQt} qt with the filter change)` : ''}` : null],
+          ['On the dipstick', o.minQt ? `Not less than ${o.minQt} qt${o.extendedQt ? `; ${o.extendedQt} qt for longer flights` : ''}` : null],
+          ['Pressure', o.pressurePsi ? [o.pressurePsi.min && `${o.pressurePsi.min} psi minimum`, o.pressurePsi.green && `${o.pressurePsi.green[0]}–${o.pressurePsi.green[1]} psi normal`, o.pressurePsi.max && `${o.pressurePsi.max} psi maximum`].filter(Boolean).join(' · ') : null],
+          ['Temperature', o.maxTempF ? `${o.maxTempF} °F maximum` : null],
+          ['Type', o.spec],
+          ['Viscosity', o.viscosity.length ? <ul key="v" className="space-y-0.5">{o.viscosity.map(v => <li key={v}>{v}</li>)}</ul> : null],
+        ]} />}
+        {(fu || tank) && <Group title="Fuel system" refs="Sec. 1, 2, 7" items={[
+          ['Tanks', fu?.system],
+          ['Selector', fu?.selector],
+          ['Grades', fu?.grades.length ? <span key="g" className="flex flex-wrap gap-x-3 gap-y-1">{fu.grades.map(x => <span key={x.grade} className="inline-flex items-center gap-1.5"><i className="inline-block size-2.5 rounded-full ring-1 ring-inset ring-border" style={{ background: FUEL_DOT[x.color] }} />{x.grade} · {x.color.toLowerCase()}</span>)}</span> : null],
+          ['Burn', gph && f0 ? `${gph} GPH planned at ${f0.alt.toLocaleString()} ft and ${rpm} RPM${gphs.length ? ` · ${Math.min(...gphs)}–${Math.max(...gphs)} GPH across the cruise table` : ''}` : gphs.length ? `${Math.min(...gphs)}–${Math.max(...gphs)} GPH across the cruise table` : null],
           ['Endurance', gph && tank ? `${(tank.usable / gph).toFixed(1)} h on ${tank.usable} gal usable at ${gph} GPH, no reserve` : null],
         ]}>
-          <table className="num mt-2 w-full text-sm text-fg-2">
-            <thead><tr className="text-left text-[13px] text-fg-3"><th className="pb-1 font-medium">Tanks</th><th className="pb-1 pl-3 text-right font-medium">Each</th><th className="pb-1 pl-3 text-right font-medium">Total</th><th className="pb-1 pl-3 text-right font-medium">Unusable</th><th className="pb-1 pl-3 text-right font-medium">Usable</th></tr></thead>
-            <tbody>{s.fuel.tanks.map(t => (
-              <tr key={t.key} className={cn('border-t border-border', t.key === tank?.key && 'text-fg')}>
-                <td className="py-1 font-sans">{t.label}{t.key === tank?.key && <span className="text-[13px] text-fg-3"> · this airplane</span>}</td><td className="py-1 pl-3 text-right">{t.each}</td><td className="py-1 pl-3 text-right">{t.total}</td><td className="py-1 pl-3 text-right">{t.unusable}</td><td className="py-1 pl-3 text-right">{t.usable} gal</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </Group>
-        <Group title="Landing gear and brakes" refs={s.gear.ref} items={[
-          ['Gear', `${s.gear.type}; ${s.gear.nose.toLowerCase()}`],
-          ['Shock absorption', s.gear.shock],
-          ['Nose tire', s.gear.tires.nose],
-          ['Main tires', s.gear.tires.main],
-          ['Nose strut', s.gear.strut],
-          ['Brakes', s.brakes.type],
-          ['Parking brake', `Yes. ${s.brakes.parking}`],
-          ['Brake fluid', s.brakes.fluid],
-          ['Wheel base', `${s.dims.wheelBaseIn} in`],
-          ['Turning radius', s.dims.turningRadius],
-        ]} />
-        <Group title="Electrical and pitot heat" refs={s.electrical.ref} items={[
-          ['System', `${s.electrical.volts}-volt DC`],
-          ['Alternator', `${s.electrical.alternatorAmps} A, engine driven`],
-          ['Battery', s.electrical.battery],
-          ['Buses', s.electrical.bus],
-          ['Warning', s.electrical.warning],
+          {fu && fu.tanks.length > 0 && (
+            <table className="num mt-2 w-full text-sm text-fg-2">
+              <thead><tr className="text-left text-[13px] text-fg-3"><th className="pb-1 font-medium">Tanks</th><th className="pb-1 pl-3 text-right font-medium">Each</th><th className="pb-1 pl-3 text-right font-medium">Total</th><th className="pb-1 pl-3 text-right font-medium">Unusable</th><th className="pb-1 pl-3 text-right font-medium">Usable</th></tr></thead>
+              <tbody>{fu.tanks.map(t => (
+                <tr key={t.key} className={cn('border-t border-border', t.key === tank?.key && 'text-fg')}>
+                  <td className="py-1 font-sans">{t.label}{t.key === tank?.key && <span className="text-[13px] text-fg-3"> · this airplane</span>}</td><td className="py-1 pl-3 text-right">{t.each}</td><td className="py-1 pl-3 text-right">{t.total}</td><td className="py-1 pl-3 text-right">{t.unusable}</td><td className="py-1 pl-3 text-right">{t.usable} gal</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </Group>}
+        {(g || b) && <Group title="Landing gear and brakes" refs="Sec. 7, 8" items={[
+          ['Gear', g?.type ? `${g.type}${g.nose ? `; ${g.nose.toLowerCase()}` : ''}` : null],
+          ['Shock absorption', g?.shock],
+          ['Nose tire', g?.tires?.nose],
+          ['Main tires', g?.tires?.main],
+          ['Nose strut', g?.strut],
+          ['Brakes', b?.type],
+          ['Parking brake', b?.parking ? `Yes. ${b.parking}` : null],
+          ['Brake fluid', b?.fluid],
+          ['Wheel base', s.dims?.wheelBaseIn ? `${s.dims.wheelBaseIn} in` : null],
+        ]} />}
+        <Group title="Electrical and pitot heat" refs="Sec. 7" items={[
+          ['System', el?.volts ? `${el.volts}-volt DC` : null],
+          ['Alternator', el?.alternatorAmps ? `${el.alternatorAmps} A, engine driven` : null],
+          ['Battery', el?.battery],
+          ['Buses', el?.bus],
+          ['Warning', el?.warning],
           ['Pitot heat (book)', s.pitotHeat],
         ]}>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-fg-3">Pitot heat on {tail}</span>
-            {([[true, 'Installed'], [false, 'Not installed'], [undefined, 'Not sure']] as [boolean | undefined, string][]).map(([v, l]) => (
-              <button key={l} onClick={() => setPitot(v)} aria-pressed={pitot === v}
-                className={cn('press inline-flex h-8 items-center rounded-full px-3 text-sm ring-1 ring-inset', pitot === v ? 'bg-accent-soft text-accent ring-accent/40' : 'text-fg-2 ring-border hover:bg-hover')}>{l}</button>
+            {([[true, 'Installed'], [false, 'Not installed'], [undefined, 'Not sure']] as [boolean | undefined, string][]).map(([v, lb]) => (
+              <button key={lb} onClick={() => setPitot(v)} aria-pressed={pitot === v}
+                className={cn('press inline-flex h-8 items-center rounded-full px-3 text-sm ring-1 ring-inset', pitot === v ? 'bg-accent-soft text-accent ring-accent/40' : 'text-fg-2 ring-border hover:bg-hover')}>{lb}</button>
             ))}
           </div>
         </Group>
-        <Group title="Limits" refs={s.loadFactors.ref} items={[
-          ['Load factor, normal', `${s.loadFactors.normal.flapsUp} flaps up · ${s.loadFactors.normal.flapsDown} flaps down (${s.loadFactors.normal.weight.toLocaleString()} lb)`],
-          ['Load factor, utility', `${s.loadFactors.utility.flapsUp} flaps up · ${s.loadFactors.utility.flapsDown} flaps down (${s.loadFactors.utility.weight.toLocaleString()} lb)`],
-          ['Flaps extended', s.vfe.map(v => `${v.kias} KIAS ${v.label.toLowerCase()}`).join(' · ')],
-          ['Windows open', `${s.windowOpenKias} KIAS`],
+        <Group title="Limits" refs="Sec. 2" items={[
+          [lf?.single ? 'Load factor' : 'Load factor, normal', lfLine(lf?.normal)],
+          ['Load factor, utility', lfLine(lf?.utility)],
+          ['Flaps extended', l?.vfe.length ? l.vfe.map(v => `${v.kias} KIAS ${v.label.toLowerCase()}`).join(' · ') : null],
+          ['Windows open', l?.windowOpen ? `${l.windowOpen} KIAS` : null],
           ['Maneuvering (Va)', p.vspeeds.va.map(([w, v]) => `${v} at ${w.toLocaleString()} lb`).join(' · ')],
           ['Crosswind demonstrated', `${p.crosswindDemo} kt`],
-          ['Icing', s.icing],
+          ['Icing', s.icing ? `${s.icing}. If you meet it anyway: pitot heat on (if installed), turn back or change altitude, cabin heat and defrost full.` : null],
         ]} />
-        <Group title="Stall speeds" refs={`${s.stall.ref} · power off, ${s.stall.weight.toLocaleString()} lb`}>
+        {s.stall && <Group title="Stall speeds" refs={`power off${s.stall.weight ? `, ${s.stall.weight.toLocaleString()} lb` : ''}`}>
           <table className="num w-full text-sm text-fg-2">
             <thead>
-              <tr className="text-left text-[13px] text-fg-3"><th className="pb-1 font-medium">Flaps</th><th className="pb-1 font-medium">CG</th>{['0°', '30°', '45°', '60°'].map(b => <th key={b} className="pb-1 text-right font-medium">{b} bank</th>)}</tr>
+              <tr className="text-left text-[13px] text-fg-3"><th className="pb-1 font-medium">Flaps</th><th className="pb-1 font-medium">CG</th>{['0°', '30°', '45°', '60°'].map(x => <th key={x} className="pb-1 pl-2 text-right font-medium">{x} bank</th>)}</tr>
             </thead>
             <tbody>
-              {s.stall.rows.flatMap(r => [['Aft', r.aft], ['Fwd', r.fwd]].map(([cg, v], i) => (
+              {s.stall.rows.flatMap(r => ([['Aft', r.aft], ['Fwd', r.fwd]] as [string, number[]][]).map(([cg, v], i) => (
                 <tr key={`${r.flaps}${cg}`} className={cn(i === 0 && 'border-t border-border')}>
-                  <td className="py-1 font-sans">{i === 0 ? r.flaps : ''}</td><td className="py-1 font-sans text-fg-3">{cg as string}</td>
-                  {(v as number[]).map((k, j) => <td key={j} className="py-1 text-right">{k}</td>)}
+                  <td className="py-1 font-sans">{i === 0 ? r.flaps : ''}</td><td className="py-1 font-sans text-fg-3">{cg}</td>
+                  {v.map((k, j) => <td key={j} className="py-1 pl-2 text-right">{k}</td>)}
                 </tr>
               )))}
             </tbody>
           </table>
-          <p className="mt-1.5 text-[13px] text-fg-3">KIAS (approximate). {s.stall.altitudeLoss}. A forward CG stalls faster.</p>
-        </Group>
-        <Group title="Published performance" refs="Sec. 1 · standard day, maximum weight" items={[...s.summary.map(x => [x.label, x.value] as Item), ['Standard empty weight', `${s.emptyStandard.toLocaleString()} lb`], ['Wing area', `${s.dims.wingAreaSqFt} sq ft`]]} />
+          <p className="mt-1.5 text-[13px] text-fg-3">KIAS (approximate).{s.stall.altitudeLoss ? ` ${s.stall.altitudeLoss}.` : ''} A forward CG stalls faster.</p>
+        </Group>}
+        {(s.summary?.length || s.emptyStandard) ? <Group title="Published performance" refs="Sec. 1 · standard day, maximum weight" items={[...(s.summary ?? []).map(x => [x.label, x.value] as Item), ['Standard empty weight', s.emptyStandard ? `${s.emptyStandard.toLocaleString()} lb` : null], ['Wing area', s.dims?.wingAreaSqFt ? `${s.dims.wingAreaSqFt} sq ft` : null]]} /> : null}
       </div>
     </div>
   )

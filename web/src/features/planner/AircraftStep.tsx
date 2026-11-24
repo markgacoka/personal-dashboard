@@ -16,7 +16,7 @@ import { KV, NumField, StatusIcon, SubHead, Synced } from './ui'
 import { AirspeedTape, SpecSheet } from './AircraftSpecs'
 import { RecordsList } from './RecordsList'
 import { AIRCRAFT_RECORDS } from './records'
-import { specsFor } from './specs'
+import { hasSpecs } from './specs'
 import type { Units } from './units'
 
 // Step 2: everything known about the airplane from its tail number — FAA
@@ -31,7 +31,8 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
   const p = d.profile
   if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number under Plan.</p>
   const night = !!plan.night || d.wx.some(w => w.night)
-  const specs = specsFor(aircraft.model ?? registry?.model)
+  const raw = pohDoc?.specs
+  const specs = hasSpecs(raw) ? raw : null
   const reg = registry?.registration
   return (
     <div className="space-y-8">
@@ -41,7 +42,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
           <div className="min-w-0 space-y-4">
           <KV items={[
             ['Aircraft', `${titleCase(aircraft.make ?? '')} ${aircraft.model ?? ''}${aircraft.year ? `, ${aircraft.year}` : ''}`],
-            ['Engine', planning.profile?.engine ? p?.engine : reg?.engine_model ? `${titleCase(reg.engine_make ?? '')} ${reg.engine_model.replace(/^0-/, 'O-').toLowerCase().replace(/^o-/, 'O-')}${specs ? ` (book: ${specs.engine.model}, ${specs.engine.hp} hp)` : ''}` : registry?.engine_type ? `${registry.engine_type}${registry.engine_hp ? `, ${registry.engine_hp} hp` : ''}` : p?.engine],
+            ['Engine', planning.profile?.engine ? p?.engine : reg?.engine_model ? `${titleCase(reg.engine_make ?? '')} ${reg.engine_model.replace(/^0-/, 'O-').toLowerCase().replace(/^o-/, 'O-')}${specs?.engine?.model ? ` (book: ${specs.engine.model}${specs.engine.hp ? `, ${specs.engine.hp} hp` : ''})` : ''}` : registry?.engine_type ? `${registry.engine_type}${registry.engine_hp ? `, ${registry.engine_hp} hp` : ''}` : p?.engine],
             ['Seats', registry?.seats], ['Serial', registry?.serial && <span className="num">{registry.serial}</span>], ['Mode S', registry?.mode_s_hex && <span className="num uppercase">{registry.mode_s_hex}</span>],
             ['Registered owner', registry?.owner ? `${titleCase(registry.owner)}${reg?.type ? ` (${reg.type.toLowerCase()})` : ''}${reg?.city ? `, ${titleCase(reg.city)}${reg.state ? `, ${titleCase(reg.state)}` : ''}` : ''}` : null],
             ['Registration', registry?.status || reg?.expires ? <RegistrationLine status={registry?.status} issued={reg?.issued} expires={reg?.expires} /> : null],
@@ -69,17 +70,15 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
                 ['Best glide', `${p.vspeeds.glide} KIAS · ~${p.glideNmPer1000} nm per 1,000 ft`],
                 ['Normal approach', `${p.vspeeds.approach} KIAS · short field ${p.vspeeds.shortApproach}`],
                 ['Max demonstrated crosswind', `${p.crosswindDemo} kt`],
-                ['Oil', specs ? null : p.oil],
-                ['Load factors', specs ? null : '+3.8 / −1.52 g flaps up · +3.0 g flaps down (172P)'],
-                ['Icing', specs ? null : 'Flight into known icing prohibited'],
+                ['Oil', specs?.oil ? null : p.oil],
               ]} />
             </div>
           )}
         </div>
       </div></div>
 
-      {p && specs && <SpecSheet s={specs} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
-      {p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">The tire pressures, oil, fuel system, electrical and stall-speed sheet is transcribed for the 172M and 172P. For the {aircraft.model ?? 'this model'}, read them in its POH: Sections 1, 2, 7 and 8.</p>}
+      {p && specs && <SpecSheet s={specs} book={pohDoc?.title ?? 'POH'} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
+      {p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">{raw?.pending ? `${raw.pending}: the engine, oil, fuel, tire, electrical and speed sheet appears here when it's done.` : pohDoc ? `The engine, oil, fuel, tire, electrical and speed sheet couldn't be read from ${pohDoc.title}. Upload a clearer copy of this airplane's POH, or read Sections 1, 2, 7 and 8 in it.` : 'No POH found for this airplane yet: upload it and its engine, oil, fuel, tire, electrical and speed sheet is read from it.'}</p>}
 
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <ProfileEditor tail={plan.tail} planning={planning} save={savePlanning} saving={savingPlanning} registry={{ make: registry?.make, model: registry?.model, year: registry?.year }} />

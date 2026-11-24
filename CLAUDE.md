@@ -105,10 +105,12 @@ background for scans). For a model without a hand-transcribed profile, the
 takeoff, landing, climb and cruise tables and their wind/grass notes are read
 from the book's text layer (`services/pohTables.js`, stored versioned in
 `planner_documents.tables`) and replace the 172P's (`poh.ts` `withTables`);
-whatever can't be read stays the 172P's and is named. The 172M and 172P spec sheets (engine,
-propeller, oil, fuel system, gear and tires, brakes, electrical, airspeed
-markings, stall speeds, load factors, published performance) are transcribed in
-`specs.ts`; the FAA registry adds registration and airworthiness dates
+whatever can't be read stays the 172P's and is named. Every POH's spec sheet (engine, propeller,
+oil, fuel system, gear and tires, brakes, electrical, airspeed markings and
+limits, normal speeds, stall speeds, load factors, published performance) is
+read from its text (`services/pohSpecs.js`, Cessna and Piper wording, OCR for
+scans in the background; stored versioned in `planner_documents.specs`) and its
+speeds, tanks, oil and crosswind feed the profile (`poh.ts` `withSpecs`); the FAA registry adds registration and airworthiness dates
 (`faa-registry.js` `registrationOf`). Pilot records (certificates, medical, ID,
 endorsements, logbook) and per-tail aircraft records (airworthiness,
 registration, radio licence, W&B, equipment list, airframe and engine logs) are

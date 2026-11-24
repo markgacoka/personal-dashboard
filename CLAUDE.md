@@ -65,6 +65,13 @@ evidence, creates an entry with `foreflight_source = 'nice-air-auto'`. The
 entries are rebuilt when adsb.lol adds coverage. `POST /api/nice-air/autolog/run`
 runs it now; `POST /api/flights/:id/refresh-track` re-collects one track.
 
+## Watch assistant log
+
+The Assistant page (`/assistant`, `web/src/features/assistant/`) shows every request made from the Garmin watch
+assistant (repo `markgacoka/watch-assistant`, its own compose project on the `web` network). `api/src/routes/assistant.js`
+reads `http://watch-assistant:8000/assistant/v1/log` and `/models` with the read-only `ASSISTANT_LOG_TOKEN` from
+`/var/www/app/.env` (`ASSISTANT_URL` overrides the address). Without the token the routes answer 503.
+
 ## NICE AIR charges and Hobbs
 
 `services/niceAirPortal.js` signs in to NICE AIR's Paperless141 portal

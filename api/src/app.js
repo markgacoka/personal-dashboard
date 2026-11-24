@@ -15,6 +15,7 @@ import aviationRoutes from './routes/aviation.js'
 import trackRoutes from './routes/tracks.js'
 import niceAirRoutes from './routes/niceAir.js'
 import chessRoutes from './routes/chess.js'
+import assistantRoutes from './routes/assistant.js'
 import financeRoutes, { scheduleFinanceSync } from './routes/finance.js'
 import mailRoutes from './routes/mail.js'
 import { runMigrations } from './db/migrate.js'
@@ -62,7 +63,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
   })
 
   // Routes that work without the database (they degrade to external APIs only).
-  for (const routes of [aircraftRoutes, aviationRoutes, trackRoutes, niceAirRoutes, chessRoutes,
+  for (const routes of [aircraftRoutes, aviationRoutes, trackRoutes, niceAirRoutes, chessRoutes, assistantRoutes,
                         authRoutes, athleteRoutes, activitiesRoutes, statsRoutes]) {
     await fastify.register(routes)
   }

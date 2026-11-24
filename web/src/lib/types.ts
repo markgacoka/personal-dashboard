@@ -283,3 +283,17 @@ export interface TrackSummary {
   gaps: { from: string; to: string; seconds: number; near: string | null }[]
   distance_nm: number | null; airborne_minutes: number | null
 }
+
+// Watch assistant (/api/assistant/*): requests from the Garmin watch and the free models answering them.
+export type AssistantMode = 'ask' | 'translate' | 'transcribe'
+export interface AssistantExchange {
+  at: number; mode: AssistantMode; route: string; model: string; tools: string[]; ms: number | null
+  question: string; answer: string
+}
+export interface AssistantSummary {
+  today: number; week: number; total: number; medianMs: number | null; p90Ms: number | null
+  models: { model: string; count: number }[]
+}
+export interface AssistantLog { exchanges: AssistantExchange[]; summary: AssistantSummary }
+export interface AssistantModel { model: string; latency: number; score: number; tools: boolean; failures: number; usable: boolean }
+export interface AssistantModels { ranked: AssistantModel[]; speech: string[]; providers: string[]; speedBudget: number }

@@ -1,4 +1,4 @@
-import { Activity, BedDouble, BookOpen, Crown, Home, IdCard, Inbox, Landmark, PlaneLanding, PlugZap, Route, UserRound, type LucideIcon } from 'lucide-react'
+import { Activity, BedDouble, BookOpen, Crown, Home, IdCard, Inbox, Landmark, PlaneLanding, PlugZap, Route, UserRound, Watch, type LucideIcon } from 'lucide-react'
 
 export interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean; keywords?: string }
 export interface NavGroup { label?: string; items: NavItem[] }
@@ -20,7 +20,10 @@ export const NAV: NavGroup[] = [
     { to: '/money/connections', label: 'Connections', icon: PlugZap, keywords: 'plaid link accounts institutions' },
   ] },
   { label: 'Play', items: [{ to: '/chess', label: 'Chess', icon: Crown, keywords: 'rating games chess.com' }] },
-  { label: 'Communicate', items: [{ to: '/mail', label: 'Mail', icon: Inbox, keywords: 'email inbox' }] },
+  { label: 'Communicate', items: [
+    { to: '/mail', label: 'Mail', icon: Inbox, keywords: 'email inbox' },
+    { to: '/assistant', label: 'Assistant', icon: Watch, keywords: 'watch voice garmin requests log questions answers models' },
+  ] },
 ]
 
 export const ACCOUNT: NavItem = { to: '/account', label: 'Account', icon: UserRound, keywords: 'security sign out two-factor passkey' }

@@ -48,10 +48,10 @@ const EDIT_LABEL: Record<keyof RowOverride, { label: string; unit: string }> = {
 
 // One quantity: its answer, the arithmetic, the source and its backup, what it
 // assumes, and whether the answer lands where a right one should.
-export function ExplCard({ e, ov, onEdit }: { e: Expl; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void }) {
+export function ExplCard({ e, ov, onEdit, className }: { e: Expl; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void; className?: string }) {
   const ok = e.expect.ok
   return (
-    <li className="px-3 py-3">
+    <li className={cn('px-3 py-3', className)}>
       <div className="flex items-baseline gap-3">
         <h4 className="min-w-0 flex-1 text-sm font-medium text-fg">{e.title}</h4>
         <span className="num shrink-0 text-[13px] font-medium text-fg">{e.value}</span>

@@ -106,7 +106,7 @@ export function pilotChecks(x: PilotInput): Check[] {
   const when = x.depart ?? new Date()
   const certLabel = CERTIFICATES.find(k => k.key === cert)!.label.toLowerCase()
 
-  if (!x.certs?.certificate) add('todo', 'Add your pilot certificate', 'Until then the checks assume a student pilot.', 'Brief → Pilot → Your certificates: save your certificate, ratings, medical and endorsements.')
+  if (!x.certs?.certificate) add('todo', 'Add your pilot certificate', 'Until then the checks assume a student pilot.', 'Pilot → Your certificates: save your certificate, ratings, medical and endorsements.')
 
   if (role === 'dual') {
     add('ok', `Dual with ${x.crew.instructor?.trim() || 'your instructor'}`, 'The instructor is pilot in command: solo limits, §61.57 recency and your personal minimums don\'t bind (minimum breaches show as cautions to talk through). The instructor needs a current CFI certificate, flight review, medical and passenger currency for anyone in the back.')
@@ -157,7 +157,7 @@ export function pilotChecks(x: PilotInput): Check[] {
     if (x.lowestCeiling != null && x.lowestCeiling < x.cruiseAlt + 500) add('caution', `Ceiling ${x.lowestCeiling.toLocaleString()} ft near your ${x.cruiseAlt.toLocaleString()} ft cruise`, '§61.89(a)(8): a student must keep visual reference to the surface.', 'Plan a lower altitude well clear of the clouds, or wait.')
     if (x.maxFromHomeNm > 25) {
       add(en.soloXc ? 'ok' : 'nogo', en.soloXc ? 'Solo cross-country endorsement' : `Goes ${Math.round(x.maxFromHomeNm)} nm from ${x.home}: a solo cross-country`, '§61.93(c)(1): beyond 25 nm needs the cross-country training endorsement for airplanes.', en.soloXc ? undefined : 'Keep within 25 nm, or finish the cross-country training and get the endorsement.')
-      add(x.xcEndorsedForFlight ? 'ok' : 'todo', x.xcEndorsedForFlight ? 'Instructor endorsed this cross-country' : 'Instructor\'s endorsement for this cross-country', '§61.93(c)(2): your CFI reviews this plan and endorses this flight in your logbook.', x.xcEndorsedForFlight ? undefined : 'Show your CFI this plan; tick it under Who\'s flying on the Plan page once endorsed.')
+      add(x.xcEndorsedForFlight ? 'ok' : 'todo', x.xcEndorsedForFlight ? 'Instructor endorsed this cross-country' : 'Instructor\'s endorsement for this cross-country', '§61.93(c)(2): your CFI reviews this plan and endorses this flight in your logbook.', x.xcEndorsedForFlight ? undefined : 'Show your CFI this plan; tick it under Pilot → Who\'s flying once it\'s in your logbook.')
     } else if (x.landsAway) add(en.soloNearby || en.soloXc ? 'ok' : 'nogo', en.soloNearby || en.soloXc ? 'Endorsed to solo to a nearby airport' : 'Landing at another airport within 25 nm', '§61.93(b)(1): needs your CFI\'s endorsement for that airport.', en.soloNearby || en.soloXc ? undefined : 'Get the endorsement, or fly back to where you departed.')
     for (const a of x.airports.filter(a => NO_STUDENT_SOLO.includes(a))) add('nogo', `No student solo at ${a}`, '14 CFR 91 Appendix D, Section 4.', 'Choose another airport.')
     if (x.classB.length) {
@@ -171,7 +171,7 @@ export function pilotChecks(x: PilotInput): Check[] {
       const maxPax = 1
       if (x.passengers > maxPax) add('nogo', `A ${certLabel} may carry one passenger`, cert === 'sport' ? '§61.315(c)(1).' : '§61.101(b).', 'Fewer passengers.')
       if (x.night) add('nogo', `No night flight on a ${certLabel} certificate`, cert === 'sport' ? '§61.315(c)(5).' : '§61.101(e)(8).', 'Land before the end of civil twilight.')
-      if (x.cruiseAlt > 10000) add('nogo', 'Above 10,000 ft MSL', cert === 'sport' ? '§61.315(c)(12).' : '§61.101(e)(11).', 'Lower the cruise altitude under Brief → Route and fuel.')
+      if (x.cruiseAlt > 10000) add('nogo', 'Above 10,000 ft MSL', cert === 'sport' ? '§61.315(c)(12).' : '§61.101(e)(11).', 'Lower the cruise altitude under Route and fuel.')
       if (x.controlled.length && !en.towered) add('nogo', `Class B, C or D airspace / towered airport: ${x.controlled.join(', ')}`, cert === 'sport' ? '§61.325 endorsement required.' : '§61.101(d) endorsement required.', 'Get the endorsement, or route to non-towered fields outside B, C and D.')
     }
     if (cert === 'sport') {

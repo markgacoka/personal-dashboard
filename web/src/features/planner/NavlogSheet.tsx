@@ -30,8 +30,10 @@ function useCells(plan: Plan, set: (p: Partial<Plan>) => void, readOnly?: boolea
 // highest terrain above the sheet, the briefing notes, the navlog rows with
 // TOC and TOD, and the airport frequencies. Wind cells take your own numbers
 // (E6B style) and the row recomputes; blank cells are for the cockpit.
-export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
+export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onExplain }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; flight: Flight; notes: ReturnType<typeof flightNotes>; u?: Units; readOnly?: boolean
+  // Selecting a computed figure opens its workings (row key, and which quantity: course, wind, tas, heading, time, fuel).
+  onExplain?: (rowKey: string, card?: string) => void
 }) {
   const { act, inp, putAct } = useCells(plan, set, readOnly)
   const F = (gal: number) => toF(gal, u).toFixed(u.fuel === 'L' ? 1 : 2)
@@ -115,7 +117,7 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
                 <td className={C} colSpan={2}>ETD {hhmm(flight.departAt)}</td><td className={C}>{F(flight.fuelStart)}</td>
               </tr>
               <tr><td className={C} /><td className={C} colSpan={2}>{inp(act[`${k}-atd`]?.ata ?? '', v => putAct(`${k}-atd`, 'ata', v), '', 'ATD')}</td><td className={C} title="After start, taxi and takeoff">{F(flight.fuelStart - taxi)}</td></tr>
-              {flight.rows.map(r => <SheetRow key={r.key} r={r} act={act} putAct={putAct} F={F} inp={inp} reserve={d.totals.reserveFuel} ov={ov[r.key] || {}} putOv={(f, v) => putOv(r.key, f, v)} readOnly={readOnly} />)}
+              {flight.rows.map(r => <SheetRow key={r.key} r={r} act={act} putAct={putAct} F={F} inp={inp} reserve={d.totals.reserveFuel} ov={ov[r.key] || {}} putOv={(f, v) => putOv(r.key, f, v)} readOnly={readOnly} fx={onExplain ? card => onExplain(r.key, card) : undefined} />)}
               <tr>
                 <td className={cn(C, 'bg-fg/[0.07] text-right font-semibold')} colSpan={11}>Totals »</td>
                 <td className={cn(C, 'font-semibold')}>{flight.distNm.toFixed(1)}</td><td className={cn(C, 'bg-fg/[0.07]')} />
@@ -141,10 +143,12 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly }: {
   )
 }
 
-function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly }: {
+function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly, fx }: {
   r: NavRow; act: Act; putAct: (k: string, f: ActField, v: string) => void; F: (g: number) => string; inp: Inp; reserve: number
-  ov: RowOverride; putOv: (f: keyof RowOverride, v: string) => void; readOnly?: boolean
+  ov: RowOverride; putOv: (f: keyof RowOverride, v: string) => void; readOnly?: boolean; fx?: (card?: string) => void
 }) {
+  // A computed figure: select it for how it was worked out.
+  const X = (card: string | undefined, node: React.ReactNode, what: string) => fx ? <button type="button" className="fig" onClick={() => fx(card)} title={`How ${what} was worked out`}>{node}</button> : node
   const dev = Number(act[r.key]?.dev) || 0
   const label = r.to.kind === 'toc' ? 'TOC' : r.to.kind === 'tod' ? 'TOD' : r.to.label
   const varW = -r.varEast
@@ -157,27 +161,27 @@ function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly }: {
   return (
     <Fragment>
       <tr>
-        <td className={cn(C, 'text-left text-sm font-semibold')} rowSpan={2}>{label}{r.to.kind === 'toc' || r.to.kind === 'tod' ? <div className="text-[10px] font-normal text-fg-3">{r.to.kind === 'toc' ? 'top of climb' : 'top of descent'}</div> : null}</td>
+        <td className={cn(C, 'text-left text-sm font-semibold')} rowSpan={2}>{X(undefined, label, `the ${label} row`)}{r.to.kind === 'toc' || r.to.kind === 'tod' ? <div className="text-[10px] font-normal text-fg-3">{r.to.kind === 'toc' ? 'top of climb' : 'top of descent'}</div> : null}</td>
         <td className={C}>{r.to.kind === 'waypoint' && /VOR|NDB|TACAN|DME/.test(r.to.navType ?? '') ? r.to.id.replace(/\d{6}$/, '') : ''}</td>
         <td className={C} rowSpan={2}>{r.from}→{label}</td>
         <td className={C} rowSpan={2}>{r.alt}</td>
         <td className={C}>{e6b('wdir', r.wind?.dir == null ? (r.wind ? 'VRB' : '') : deg3(r.wind.dir))}</td><td className={C}>{e6b('wspd', r.wind ? String(r.wind.spd) : '')}</td>
         <td className={C}>{e6b('cas', String(r.cas))}</td>
-        <td className={C}>{deg3(r.tc)}</td><td className={C}>{deg3(r.th)}</td><td className={cn(C, 'font-bold')}>{deg3(r.mh)}</td>
+        <td className={C}>{X('course', deg3(r.tc), 'the true course')}</td><td className={C}>{X('heading', deg3(r.th), 'the true heading')}</td><td className={cn(C, 'font-bold')}>{X('heading', deg3(r.mh), 'the magnetic heading')}</td>
         <td className={cn(C, 'font-semibold')} rowSpan={2}>{dev ? deg3(r.mh + dev) : ''}</td>
-        <td className={C}>{r.distNm.toFixed(1)}</td><td className={C}>{Math.round(r.gs)}</td>
-        <td className={C}>{r.eteMin.toFixed(1)}</td><td className={C}>{hhmm(r.eta)}</td><td className={C}>{F(r.fuelGal)}</td>
+        <td className={C}>{X('course', r.distNm.toFixed(1), 'the distance')}</td><td className={C}>{X('time', Math.round(r.gs), 'the ground speed')}</td>
+        <td className={C}>{X('time', r.eteMin.toFixed(1), 'the time en route')}</td><td className={C}>{X('time', hhmm(r.eta), 'the ETA')}</td><td className={C}>{X('fuel', F(r.fuelGal), 'the fuel')}</td>
       </tr>
       <tr>
         <td className={C}>{r.to.freq ?? ''}</td>
         <td className={C} colSpan={2}>{e6b('temp', r.wind?.temp != null ? sign(r.wind.temp) : '')}</td>
-        <td className={C}>{r.tas}</td>
-        <td className={C}>{Number.isNaN(r.wca) ? '—' : sign(r.wca)}</td>
-        <td className={C}>{sign(varW)}</td>
+        <td className={C}>{X('tas', r.tas, 'the true airspeed')}</td>
+        <td className={C}>{X('heading', Number.isNaN(r.wca) ? '—' : sign(r.wca), 'the wind correction')}</td>
+        <td className={C}>{X('course', sign(varW), 'the variation')}</td>
         <td className={C}>{inp(act[r.key]?.dev ?? '', v => putAct(r.key, 'dev', v), '', '±')}</td>
-        <td className={C}>{r.remNm.toFixed(1)}</td><td className={C}>{inp(act[r.key]?.gs ?? '', v => putAct(r.key, 'gs', v))}</td>
+        <td className={C}>{X('course', r.remNm.toFixed(1), 'the distance remaining')}</td><td className={C}>{inp(act[r.key]?.gs ?? '', v => putAct(r.key, 'gs', v))}</td>
         <td className={C} /><td className={C}>{inp(act[r.key]?.ata ?? '', v => putAct(r.key, 'ata', v))}</td>
-        <td className={cn(C, r.fuelRem < reserve && 'text-bad')}>{F(r.fuelRem)}</td>
+        <td className={cn(C, r.fuelRem < reserve && 'text-bad')}>{X('fuel', F(r.fuelRem), 'the fuel remaining')}</td>
       </tr>
     </Fragment>
   )

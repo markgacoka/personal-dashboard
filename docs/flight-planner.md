@@ -13,44 +13,31 @@ takeoff distance, which depends on the weight, which depends on the fuel the
 navlog says is needed — but on paper each is worked separately and the
 go/no-go decision is never written down.
 
-## Layout: Plan, Brief, NavLog, and a sidebar
+## Layout: the flight file
 
-Three stages (`PlannerPage.tsx`):
+How it reads (sections, work sheet, profiles, status vocabulary, edge cases):
+`planner-ux.md`. In short: a new flight asks where and when, the aircraft and
+who's flying (`PlannerPage.tsx`); then the sections Overview, Pilot, Aircraft,
+Weather, Airports, Route and fuel, Weight and performance and NavLog
+(`Sections.tsx`), each with its own inputs and what's still open in it
+(`readiness.ts`). All data is fetched and derived once in `useFlight.ts`. Any
+underlined figure opens the work sheet (`WorkSheet.tsx`): that figure's
+workings (`explain.ts`), every calculation, assumption and source
+(`workings.ts`), and the POH, checklist and briefing documents.
 
-- **Plan** asks for what only the pilot knows (the Flight inputs below) and
-  holds the route chart.
-- **Brief** opens with the verdict and the trip's numbers, then one line per
-  area in PAVE order: Pilot, Aircraft, Weather, Route and fuel, Airports,
-  Weight and performance (`BriefView.tsx`). Each line shows its worst check and
-  the first issue, or its answer when it's fine; opening a line shows its issues
-  and the detail behind them (the former step pages below).
-- **NavLog** is the sheet per flight and the reverse, for print.
-
-How it reads (status vocabulary, flow, profiles, edge cases): `planner-ux.md`.
-
-The sidebar (`RefPanel.tsx`, `Sidebar.tsx`) sits beside every stage from
-1,536 px and is a full-screen sheet below: **Checks** (fix before you fly,
-decide, to finish; assumed and passed fold away; each with what to do and a
-link to its area),
-**Workings** (`workings.ts`: each calculation line by line — courses and
-headings, cruise and climb, fuel, pressure and density altitude, runway wind and
-distances, weight and balance — the assumptions the plan makes and where to
-change each, and the source of every input with its fetch time), and the
-**POH**, **Checklist** and **Briefing** documents. POH figure links open the
-POH tab at that page.
-
-The areas of the brief (the former steps):
+The sections and what they hold:
 
 | Area | Shows | Inputs / overrides |
 |---|---|---|
-| Plan (stage) | Registry match, POH match, route tokens resolved, the route chart | Plan name in the header (blank: named after the route on save); who flies (solo/PIC or dual); tail; departure, route (points flown over) and arrival — one flight, one navlog, so an airport in the route is flown over, never a stop; engine start (local), cruise RPM, seats and baggage areas 1–2, fuel (blank = full usable), start and taxi minutes (10) |
+| New flight | Where and when, the aircraft (profile cards, or the five-step aircraft setup), who's flying (solo/PIC or dual with an instructor profile) | Flight name in the header (blank: named after the route on save); departure, route (points flown over) and arrival — one flight, one navlog, so an airport in the route is flown over, never a stop; engine start (local), cruise RPM |
 | Aircraft | FAA registry (make, model, year, engine, serial, Mode S, owner, status), POH V-speeds and limits, Performance (POH) page with climb and cruise at each flight's altitude | Tail's empty weight and moment, tanks, inspection dates; the aircraft profile (make, model, year, engine, max weights, fuel, arms, V-speeds, crosswind, cruise TAS/GPH over the POH table), all saved per tail; upload the tail's POH (PDF) and checklist (PDF or photo; the newest upload is the one used, ahead of the catalog POH). A checklist's steps are read out on upload (pdftotext, else Tesseract OCR, server side; `checklistParse.ts` turns the text into sections of item/action steps, stored in `planner_documents.steps`) and can be ticked through or edited in the Checklist tab; horsepower, complex and tailwheel for the §61.31 checks; maintenance/documents and §91.205 equipment checklists |
 | Route and fuel | (Chart on the Plan stage.) The route as chips; the chart with suggested points; per leg the points you could fly over within 5 nm (NASR airports, VFR waypoints, VORs, fixes; towns, peaks, lakes, towers ≥ 200 ft AGL) and where the line crosses highways, rivers, railroads and power lines; cruise altitude and its reason; every navlog point (TOC, automatic checkpoints, TOD) with position, MC, altitude, leg distance, terrain; airspace and TFRs on the line | Add a suggested point (it goes into the route); name any point flown over (route chip or map popup; the name is the navlog checkpoint); drag the line to add a point, drag a point to move it, click it to remove it (drops snap to a nearby point, or onto a highway/river/railroad/power line, else a coordinate); altitude; drop an automatic checkpoint |
 | Airports | Per airport: runways (length × width, surface, pattern side, head/cross wind at ETA), the favored runway (or the D-ATIS runways in use), elevation, TPA, AWOS/ASOS and phone, FSS, sun, density altitude, frequencies, NOTAMs that affect VFR, Chart Supplement remarks; alternate | Alternate (automatic: nearest suitable airport within 40 nm of the destination, off the route, not reporting IFR); airport profile per field: pattern altitude, pattern side per runway end, notes (on the NavLog), saved for every plan |
 | Weather | METAR/TAF at each ETA, hazards (SIGMET, G-AIRMET, CWA, PIREP, TFR, NAS status), winds aloft, NOTAMs, map | — |
 | Weight & performance | W&B sheet from ramp to each landing; takeoff and landing distances | — |
 | Pilot | Your certificates (settings key `certificates`: certificate, ratings, medical, flight review, home airport, student and airplane endorsements) held against this flight's role from the Plan stage (you as PIC, or dual with an instructor who is then PIC) by `pilot.ts`: student solo limits (§61.87–§61.95, no passengers, 3/5 SM, 25 nm radius, Class B, night, Appendix D airports), sport and recreational limits, medical expiry (§61.23(d), BasicMed), flight review, §61.57 passenger currency, ASEL and §61.31 endorsements; dual turns personal-minimum breaches into cautions; IMSAFE checklist; personal minimums held against the worst value at any ETA (ceiling, visibility, wind, gust, crosswind, runway length/width, fuel at landing, night); currency from the logbook | Minimums |
-| NavLog (stage) | The sheet per flight and the reverse, print | E6B cells (wind, temperature, CAS), actuals |
+| Weight and performance | Seats (each picks a person profile), bags, fuel, taxi; CG envelope chart, limit bars, the W&B sheet line by line, takeoff and landing distances | Seat weights, baggage areas 1–2, fuel (blank = full usable), start and taxi minutes (10) |
+| NavLog | The sheet per flight (every computed cell opens its workings), the reverse, the aircraft's checklist; print | E6B cells (wind, temperature, CAS), actuals |
 
 Every check that isn't OK carries a fix (`fixes.ts`, or the check's own), listed in the sidebar's Checks tab and at the top of its area in the brief. Data gaps (no nearby METAR, closest POH, ended NASR cycle, stale winds) are notes: shown, never part of the verdict. Weather for an airport used at two ETAs (a round trip) is one card with only the differences at the second time; identical checks show once.
 
@@ -144,32 +131,12 @@ fuel. The CG chart adds the utility-category envelope.
 
 ## Flow
 
-- **New plan:** a five-step guided setup (who's flying, aircraft, route, time and
-  power, load), each step saying what it is for; "Show every field" leaves it.
-  Done opens the brief.
-- **Save:** Save is the primary button while changes are unsaved, "Saved n min
-  ago" once saved; opening another plan or starting a new one with unsaved
-  changes asks to save, discard or cancel; deleting a plan asks twice.
-- **Brief:** under the verdict, the one next thing to do with a button to its
-  area; once nothing is a no-go or to-do, the briefing, flight plan, checklist
-  and NavLog.
-- **Profiles** (`/flying/plan/profiles`, `ProfilesPage.tsx`, `profiles.ts`):
-  you, instructors and passengers, aircraft and airports, each created, read,
-  changed and deleted without a plan; seats pick a person and copy their weight.
-- **Pilot:** a solo / dual / private table shows what changes with the role
-  (the current flight's column highlighted). Pilot documents are kept once and
-  used by every plan.
-- **Aircraft:** four tabs (overview, specifications, profile and records,
-  maintenance and equipment) instead of one long page.
-- **Sidebar:** the same width for every tab, widened only by its own button; it
-  sits beside the plan from 1,536 px and opens over it below that.
-- **Map:** surface wind (METARs) and the NavLog's winds aloft as arrows, besides
-  radar, METAR categories, PIREPs, SIGMET/AIRMET/CWA, TFRs, NOTAMs and airspace;
-  route airports show elevation, pattern altitude, the runway the wind favours,
-  ATIS/tower/ground/CTAF and their NOTAM count.
-- **Sources:** Workings → Airports lists where each elevation, pattern
-  altitude, frequency, weather report and NOTAM came from; every frequency
-  says when to use it; an ended NASR cycle is a note.
+See `planner-ux.md`. Saving: Save is the primary button while changes are
+unsaved, "Saved n min ago" once saved; opening another flight or starting a new
+one with unsaved changes asks to save, discard or cancel; deleting a flight asks
+twice. Profiles (`/flying/plan/profiles`, `ProfilesPage.tsx`, `profiles.ts`)
+lists and edits you, instructors and passengers, aircraft (with the same setup
+and checklist editor) and airports.
 
 ## Calculations (all client-side, pure functions, unit-tested)
 
@@ -233,8 +200,8 @@ as E6BX), WCA = asin(Vw·sin(W−TC)/TAS), GS = TAS·cos WCA − Vw·cos(W−TC)
 MH = TH − east variation, CH = MH ± deviation, ETE = dist/GS, fuel = ETE × GPH;
 climb rows use the POH climb table, descent is 500 fpm at cruise power to TPA.
 
-Phones and tablets: the three stage tabs fit at 390 px; saved plans are under
-Plans in the header; the sidebar opens full screen from the "checks" button; map chart and layer buttons fold behind
+Phones and tablets: the section rail becomes a row of chips; saved flights are under
+Plans in the header; the work sheet opens full screen; map chart and layer buttons fold behind
 one button when the map is narrower than 576 px; wide tables drop or fold
 secondary columns on phones (takeoff and landing become cards); the NavLog
 sheet stays paper-size and scrolls sideways.
@@ -242,7 +209,7 @@ sheet stays paper-size and scrolls sideways.
 ## Persistence
 
 `planner_plans` (named plans, JSON), `planner_aircraft` (per-tail empty weight,
-moment, tanks, equipment, inspection dates, and `profile`: your values over the
+moment, tanks, equipment, inspection dates, `checklist` (sections of item/action steps), and `profile`: your values over the
 POH/TCDS/registry ones), `planner_airport_profiles` (per airport: pattern
 altitude MSL, pattern sides, notes), `planner_documents` (POH, checklist and
 briefing PDFs; uploads carry the tail), `planner_settings` (personal minimums).

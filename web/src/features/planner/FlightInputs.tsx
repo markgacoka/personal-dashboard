@@ -1,40 +1,32 @@
-import { useDeferredValue, useEffect, useState } from 'react'
-import { BookOpen, CircleDashed, Info, Loader2, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
+import { createContext, useContext, useDeferredValue, useEffect, useState } from 'react'
+import { CircleDashed, Info, MapPin, Navigation, Plane, Radio, XCircle } from 'lucide-react'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { AircraftRef, AircraftRegistry } from '@/lib/types'
 import { Link } from 'react-router'
-import { useInstructors } from '@/lib/queries'
-import { usePilotInfo, useResolve, type PlannerDoc, type PohMatch } from './api'
+import { usePilotInfo, useResolve } from './api'
 import { SELF, seatPerson, usePeople, type Person, type Seat } from './profiles'
 import type { AircraftPlanning, Derived, Plan, RoutePoint } from './model'
 import { loadsOf } from './model'
-import { SECTION_LABEL, TABLE_SECTIONS, type AircraftProfile } from './poh'
+import type { AircraftProfile } from './poh'
 import { joinRoute, splitRoute, tokenize } from './route'
-import { CERTIFICATES, roleOf, type PilotCerts } from './pilot'
-import { Segmented, Tooltip } from '@/components/ui/misc'
-import { useRefs } from './RefPanel'
+import { roleOf, type PilotCerts } from './pilot'
+import { Tooltip } from '@/components/ui/misc'
 import { NumField, SubHead } from './ui'
 import { fromF, fromW, toF, toW, type Units } from './units'
 
 const KIND_ICON = { airport: Plane, navaid: Radio, fix: Navigation, vfr: MapPin, gps: MapPin, radial: Radio, unknown: XCircle } as const
 const KIND_LABEL: Record<RoutePoint['kind'], string> = { airport: 'Airport', navaid: 'Navaid', fix: 'Fix', vfr: 'VFR waypoint', gps: 'Coordinates', radial: 'Radial/DME', unknown: 'Not found' }
 
-// What you type: tail, route, engine-start time, cruise power, who sits where,
-// fuel and taxi time. Everything else is looked up or computed in the later
-// steps, each of which shows its sources and takes an override where one makes sense.
-export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, poh, pohUploaded, pohLoading, pohError, u, aircraft, profile, certs, step = null }: {
-  plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; fleet: AircraftRef[]; registry: AircraftRegistry | null | undefined; registryLoading: boolean
-  poh: PohMatch | null | undefined; pohUploaded?: PlannerDoc | null; pohLoading: boolean; pohError: string | null; u: Units; aircraft: { make?: string | null; model?: string | null; year?: number | null }
-  profile: AircraftProfile | null; certs: PilotCerts | null
-  // Guided setup: only this group (0 who, 1 aircraft, 2 route, 3 time and power, 4 load).
-  step?: number | null
-}) {
-  const show = (i: number) => step == null || step === i
-  const [tail, setTail] = useState(plan.tail ?? '')
-  useEffect(() => setTail(plan.tail ?? ''), [plan.tail])
-  const commitTail = () => { const t = tail.toUpperCase().replace(/\s+/g, '').trim(); if (t !== (plan.tail ?? '')) set({ tail: t || null, aircraft: undefined }) }
+// What only the pilot knows about the flight: the route, engine-start time and
+// cruise power, who sits where, bags, fuel and taxi time. Each section shows
+// the group it needs (2 route, 3 time and power, 4 load).
+export function FlightInputs({ bare = false, ...p }: Props) {
+  return <Bare.Provider value={bare}><Inputs {...p} /></Bare.Provider>
+}
+interface Props { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; u: Units; profile: AircraftProfile | null; certs: PilotCerts | null; step: 2 | 3 | 4; bare?: boolean }
+function Inputs({ plan, set, d, u, profile, certs, step }: Props) {
+  const show = (i: number) => step === i
 
   // Departure, the points flown over, arrival: one flight, one navlog.
   const parts = splitRoute(plan.route)
@@ -53,7 +45,6 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
     set({ route: next, labels })
   }
   const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') commitRoute() }
-  const noRegistry = !!plan.tail && !registryLoading && !registry?.model
 
   const loads = loadsOf(plan)
   const seats = plan.seats ?? { pilot: loads.front, front: 0, rearL: loads.rear, rearR: 0 }
@@ -64,42 +55,6 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 
   return (
     <div className="@container divide-y divide-border">
-      {show(0) && (
-      <Group title="Who's flying" hint={certs?.certificate ? CERTIFICATES.find(c => c.key === certs.certificate)!.label : <>Certificate not saved · student assumed</>}>
-        <Crew plan={plan} set={set} d={d} certs={certs} />
-      </Group>
-      )}
-
-      {show(1) && (
-      <Group title="Aircraft" hint={<>Tail number; the registry and POH are looked up.{plan.tail && <> <Link to={`/flying/plan/profiles?tab=aircraft&id=${plan.tail}`} className="text-accent hover:underline">{plan.tail} profile</Link></>}</>}>
-        <div className="grid gap-4 @md:grid-cols-[minmax(0,11rem)_1fr] @md:items-end">
-          <Field label="Tail number">
-            <Input value={tail} onChange={e => setTail(e.target.value.toUpperCase())} onBlur={commitTail} onKeyDown={e => { if (e.key === 'Enter') commitTail() }}
-              placeholder="N227AN" list="planner-fleet" className="num uppercase" autoCapitalize="characters" spellCheck={false} />
-            <datalist id="planner-fleet">{fleet.map(a => <option key={a.id} value={a.tail_number}>{a.make} {a.model}{a.year ? ` (${a.year})` : ''}</option>)}</datalist>
-          </Field>
-          <div className="min-w-0 text-sm">
-            {registryLoading && plan.tail && <p className="flex h-10 items-center gap-2 text-fg-3"><Loader2 className="size-4 animate-spin" />Looking up {plan.tail}…</p>}
-            {registry?.model && (
-              <div className="flex items-center gap-3">
-                {registry.photo_url && <img src={registry.photo_url} alt="" className="h-10 w-16 shrink-0 rounded-md object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
-                <div className="min-w-0"><div className="truncate text-fg-2">{titleCase(registry.make ?? '')} {registry.model}{registry.year ? ` · ${registry.year}` : ''}</div><div className="text-[13px] text-fg-3">FAA registry</div></div>
-              </div>
-            )}
-            {noRegistry && <p className="text-[13px] text-fg-3">Not in the FAA registry: enter make, model and year.</p>}
-          </div>
-        </div>
-        {(noRegistry || plan.aircraft) && (
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            <Field label="Make"><Input value={plan.aircraft?.make ?? aircraft.make ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, make: e.target.value } })} placeholder="Cessna" /></Field>
-            <Field label="Model"><Input value={plan.aircraft?.model ?? aircraft.model ?? ''} onChange={e => set({ aircraft: { ...plan.aircraft, model: e.target.value.toUpperCase() } })} placeholder="172P" className="uppercase" /></Field>
-            <NumField label="Year" value={plan.aircraft?.year ?? aircraft.year ?? ''} onChange={v => set({ aircraft: { ...plan.aircraft, year: v || null } })} />
-          </div>
-        )}
-        <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded} read={profile?.read} />
-      </Group>
-      )}
-
       {show(2) && (
       <Group title="Route" hint="Start and end at airports; everything between is flown over."
         aside={<Tooltip content="Navaids (SJC), fixes and VFR waypoints (VPCOY), airports (E16), radial/distance (SJC090020), coordinates (3651N12131W or 36.85/-121.53). SkyVector and ForeFlight route strings paste in whole."><span className="mt-2 inline-flex cursor-help items-center gap-1 text-[13px] text-fg-3 hover:text-fg-2"><Info className="size-3.5" />Formats</span></Tooltip>}>
@@ -164,7 +119,10 @@ export function FlightInputs({ plan, set, d, fleet, registry, registryLoading, p
 }
 
 // One input group: what it is on the left, its fields on the right (stacked when narrow).
+// In the new-flight setup the step supplies the heading, so the group is just its fields.
+const Bare = createContext(false)
 function Group({ title, hint, aside, children }: { title: string; hint?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
+  if (useContext(Bare)) return <section className="py-3 first:pt-0">{children}{aside && <div className="mt-1">{aside}</div>}</section>
   return (
     <section className="grid gap-4 py-7 first:pt-1 last:pb-1 @3xl:grid-cols-[12rem_minmax(0,1fr)] @3xl:gap-10">
       <div>
@@ -209,67 +167,6 @@ export function EmptyWeight({ tail, planning, save, u }: { tail: string; plannin
         <label className="block"><span className="mb-1 block text-sm text-fg-2">Weight</span><OptNum value={ew == null ? null : Math.round(toW(ew, u) * 10) / 10} placeholder={Math.round(toW(1467, u))} unit={u.weight} onChange={v => setEw(v == null ? null : fromW(v, u))} label="Empty weight" /></label>
         <label className="block"><span className="mb-1 block text-sm text-fg-2">Moment / 1000</span><OptNum value={em} placeholder={57.3} onChange={setEm} label="Empty moment" /></label>
       </div>
-    </div>
-  )
-}
-
-export function PohStatus({ poh, loading, error, model, uploaded, read }: { poh: PohMatch | null | undefined; loading: boolean; error: string | null; model?: string | null; uploaded?: PlannerDoc | null; read?: AircraftProfile['read'] }) {
-  const refs = useRefs()
-  const open = <button type="button" onClick={() => refs?.show('poh')} className="shrink-0 text-accent hover:underline">Open</button>
-  const all = read && read.sections.length === TABLE_SECTIONS.length
-  if (uploaded && (all || !read)) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{uploaded.title}</span> · your upload{all ? ', tables read from it' : ''}</span>{open}</p>
-  if (!model) return null
-  if (loading) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><Loader2 className="size-3.5 animate-spin" />Finding the {model} POH…</p>
-  if (error) return <p className="mt-4 text-[13px] text-bad">{error}</p>
-  if (poh?.exact && all && /^172/.test(model)) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · tables read from the book drive the numbers</span>{open}</p>
-  if (poh?.exact && poh.profile) return <p className="mt-4 flex items-center gap-2 text-[13px] text-fg-3"><BookOpen className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate"><span className="text-fg-2">{poh.title}</span> · drives the numbers</span>{open}</p>
-  return (
-    <p className="mt-4 flex items-start gap-2 text-[13px] text-fg-3">
-      <BookOpen className="mt-0.5 size-3.5 shrink-0" />
-      <span className="min-w-0 flex-1">{!poh && !uploaded ? `No public POH for the ${model}; upload it in the POH tab.` : !poh?.exact && !uploaded ? `${poh!.title}: closest public POH to the ${model}.${poh!.profile ? '' : ' Numbers use the closest transcribed one.'}` : tablesLine(uploaded?.title ?? poh!.title, model, read)}</span>
-      {(poh || uploaded) && open}
-    </p>
-  )
-}
-
-// What the book's own tables cover, and what still comes from the 172P.
-function tablesLine(title: string, model: string, read?: AircraftProfile['read']) {
-  const other = /^172/.test(model) ? 'the 172P\'s' : 'the 172P\'s, which don\'t apply to this airplane'
-  if (!read?.sections.length) return `${title}. ${read?.reason === 'no text layer' ? 'This copy is a scan with no text, so its tables can\'t be read' : 'Its performance tables couldn\'t be read'}; the numbers are ${other}.`
-  return `${title}. Read its ${read.sections.map(k => SECTION_LABEL[k]).join(', ')} tables; ${read.missing.map(k => SECTION_LABEL[k]).join(', ')} ${read.missing.length > 1 ? 'are' : 'is'} ${other}.`
-}
-
-// Who flies: you as pilot in command, or dual with an instructor (who is then PIC).
-// The Pilot step and Review apply the FAA rules for that role and your certificate.
-function Crew({ plan, set, d, certs }: { plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; certs: PilotCerts | null }) {
-  const role = roleOf(plan.crew, certs)
-  const cert = certs?.certificate ?? 'student'
-  const xc = d.checks.some(c => /Instructor('s)? endorse/.test(c.title))
-  const ck = plan.checklist ?? {}
-  const cfis = usePeople().list.filter(p => p.role === 'instructor')
-  const logCfis = (useInstructors().data ?? []).map(c => c.name)
-  return (
-    <div>
-      <div className="flex flex-wrap items-end gap-3">
-        <Segmented value={role} onChange={r => set({ crew: { ...plan.crew, role: r } })}
-          options={[{ value: 'pic', label: cert === 'student' ? 'Solo' : 'Me as PIC' }, { value: 'dual', label: 'Dual with a CFI' }]} />
-        {role === 'dual' && (
-          <label className="block w-full max-w-60"><span className="mb-1.5 block text-[13px] text-fg-3">Instructor</span>
-            <Input value={plan.crew?.instructor ?? ''} list="planner-cfis" placeholder="CFI's name" maxLength={60} onChange={e => {
-              const name = e.target.value, p = cfis.find(x => x.name.toLowerCase() === name.trim().toLowerCase())
-              // A CFI with a profile takes the right seat with their weight.
-              set(p ? { ...seatPerson(plan, 'front', p), crew: { ...plan.crew, role, instructor: p.name } } : { crew: { ...plan.crew, role, instructor: name } })
-            }} />
-            <datalist id="planner-cfis">{[...new Set([...cfis.map(c => c.name), ...logCfis])].map(n => <option key={n} value={n} />)}</datalist></label>
-        )}
-      </div>
-      <p className="mt-2.5 text-[13px] text-fg-3">{role === 'dual' ? 'Your instructor is pilot in command; seat them front right.' : cert === 'student' ? 'Student solo: no passengers (§61.89).' : 'You are pilot in command; other seats are passengers.'}</p>
-      {xc && (
-        <label className="mt-3 flex items-center gap-2 text-[13px] text-fg-2">
-          <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={ck['crew.xcEndorsed'] === true} onChange={e => set({ checklist: { ...ck, 'crew.xcEndorsed': e.target.checked } })} />
-          My instructor endorsed this cross-country in my logbook (§61.93(c)(2))
-        </label>
-      )}
     </div>
   )
 }

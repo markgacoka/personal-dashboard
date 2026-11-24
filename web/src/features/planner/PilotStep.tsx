@@ -64,7 +64,7 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
         <RoleRules current={dual ? 'dual' : (certs?.certificate ?? 'student') === 'student' ? 'solo' : 'private'} />
         <RecordsList title={<>Your documents <span className="font-normal text-fg-3">· kept for every plan</span></>} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
         <div>
-          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Plan</span>}>This flight under the FAA rules</SubHead>
+          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Who's flying above</span>}>This flight under the FAA rules</SubHead>
           {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}
         </div>
         <Checklist title="Pilot condition · IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />

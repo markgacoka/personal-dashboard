@@ -200,3 +200,7 @@
 }
 .planner .nl-bar { background: var(--border-strong); color: var(--fg); }
 @media print { .planner .nl-bar { background: #000; color: #fff; } }
+/* A computed figure: select it for its workings (the work sheet). */
+.planner .fig { cursor: pointer; text-decoration: underline dotted; text-decoration-color: color-mix(in oklch, var(--fg-3) 70%, transparent); text-underline-offset: 3px; font: inherit; color: inherit; }
+.planner .fig:hover, .planner .fig:focus-visible { text-decoration-color: var(--accent); color: var(--accent); outline: none; }
+@media print { .planner .fig { text-decoration: none; } }

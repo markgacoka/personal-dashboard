@@ -2,6 +2,7 @@
 // landing performance at every airport, weather at each ETA, and the list of
 // go/no-go checks. Pure; the page renders what this returns.
 import type { AircraftProfile, ProfileEdits, ProfileMatch } from './poh'
+import type { ChecklistSection } from './checklistParse'
 import {
   category, ceilingOf, climbBetween, corrected, cruiseAt, densityAltitude, distanceAt, distanceNm, fbFor, freezingLevel, hPaToInHg, hemispheric,
   inEnvelope, initialCourse, pointInPolygon, intermediate, isaTemp, parseVisib, pressureAltitude, reserveMinutes, tafAt, tafCategory, toMagnetic, touchesCorridor,
@@ -88,6 +89,8 @@ export interface AircraftPlanning {
   equipment?: { transponder?: string; adsbOut?: boolean; gps?: string; equipCode?: string; autopilot?: boolean; pitotHeat?: boolean; notes?: string }
   inspections?: Record<string, string | number | undefined> // ISO dates; 'hundredHoursLeft'
   profile?: ProfileEdits // your values over the POH / registry ones
+  // The airplane's own checklist, written or imported once; it's in every brief and prints with the NavLog.
+  checklist?: ChecklistSection[]
   updatedAt?: string
 }
 

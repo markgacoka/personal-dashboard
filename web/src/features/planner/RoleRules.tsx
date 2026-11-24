@@ -23,7 +23,7 @@ const ROWS: [string, Record<Col, string>][] = [
 export function RoleRules({ current }: { current: Col }) {
   return (
     <div>
-      <SubHead right={<span className="text-[13px] text-fg-3">Change it under Plan → Who's flying</span>}>Solo, dual or private: what changes</SubHead>
+      <SubHead right={<span className="text-[13px] text-fg-3">Change it under Who's flying above</span>}>Solo, dual or private: what changes</SubHead>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[34rem] text-sm">
           <thead>

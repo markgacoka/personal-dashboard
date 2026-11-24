@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Info } from 'lucide-react'
-import { Segmented } from '@/components/ui/misc'
+import { Button } from '@/components/ui/button'
+import { ChecklistEditor, ChecklistRun } from './AircraftChecklist'
+import { EquipmentForm, PohReport } from './ProfileForms'
 import { Input, Select } from '@/components/ui/input'
 import { titleCase } from '@/lib/format'
 import type { AircraftRegistry } from '@/lib/types'
@@ -8,7 +10,7 @@ import type { PlannerDoc, PohMatch } from './api'
 import { AircraftDocs, ProfileEditor } from './AircraftProfile'
 import { AV1ATES, EQUIPMENT_DAY, EQUIPMENT_NIGHT, MX_DOCS } from './checklists'
 import { Checklist } from './Checklist'
-import { EmptyWeight, PohStatus } from './FlightInputs'
+import { EmptyWeight } from './FlightInputs'
 import type { AircraftPlanning, Derived, Plan } from './model'
 import { PohSummary } from './PohSummary'
 import type { ProfileMatch } from './poh'
@@ -30,21 +32,24 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
   planning: AircraftPlanning; savePlanning: (p: AircraftPlanning) => void; savingPlanning: boolean; u: Units
 }) {
   const p = d.profile
-  const [tab, setTab] = useState<'overview' | 'specs' | 'records' | 'mx'>('overview')
-  if (!plan.tail) return <p className="text-sm text-fg-3">Enter the tail number under Plan.</p>
+  const [editList, setEditList] = useState(false)
+  if (!plan.tail) return null
   const night = !!plan.night || d.wx.some(w => w.night)
   const raw = pohDoc?.specs
   const specs = hasSpecs(raw) ? raw : null
   const reg = registry?.registration
-  const open = d.checks.filter(c => c.section === 'aircraft' && c.status !== 'ok').length
+  const list = planning.checklist ?? []
+  const eq = planning.equipment ?? {}
+  // The airplane as a pilot briefs it: what it is and its speeds, the book and
+  // what was read from it, its systems, this flight's performance, the
+  // checklist, airworthiness for this flight, then your profile values.
+  const blocks: [string, string][] = [['glance', 'At a glance'], ['book', 'POH'], ['specs', 'Systems and limits'], ['perf', 'Performance this flight'], ['checklist', 'Checklist'], ['airworthy', 'Airworthiness'], ['profile', 'Profile and records']]
   return (
-    <div className="space-y-6">
-      {/* One view at a time: the airplane at a glance, its book, your records, its maintenance. */}
-      <Segmented value={tab} onChange={setTab} className="max-w-full" options={[
-        { value: 'overview', label: 'Overview' }, { value: 'specs', label: 'Specifications' },
-        { value: 'records', label: 'Profile and records' }, { value: 'mx', label: 'Maintenance and equipment', count: open || undefined },
-      ]} />
-      {tab === 'overview' && <div className="@container"><div className="grid gap-6 @4xl:grid-cols-5">
+    <div className="space-y-12">
+      <nav aria-label="Aircraft brief" className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1">
+        {blocks.map(([k, l]) => <button key={k} onClick={() => document.getElementById(`ac-${k}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="h-8 shrink-0 rounded-full px-3 text-[13px] text-fg-3 ring-1 ring-inset ring-border hover:text-fg">{l}</button>)}
+      </nav>
+      <Block id="glance" title="At a glance"><div className="@container"><div className="grid gap-6 @4xl:grid-cols-5">
         <div className="grid content-start gap-4 @2xl:grid-cols-2 @4xl:col-span-2 @4xl:grid-cols-1">
           {registry?.photo_url && <img src={registry.photo_url} alt={plan.tail} className="aspect-[16/9] max-h-56 w-full rounded-lg object-cover ring-1 ring-border" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
           <div className="min-w-0 space-y-4">
@@ -57,7 +62,6 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
             ['Airworthiness', reg?.aw_class ? `${reg.aw_class}${reg.aw_category ? `, ${reg.aw_category.toLowerCase()} category` : ''}${reg.aw_date ? ` · issued ${fmtDay(reg.aw_date)}` : ''}` : null],
           ]} />
           {registry && <Synced label="" source="FAA aircraft registry" />}
-          <PohStatus poh={poh} loading={pohLoading} error={pohError} model={aircraft.model} uploaded={pohUploaded ? pohDoc : null} read={match?.profile.read} />
           </div>
         </div>
         <div className="space-y-4 @4xl:col-span-3">
@@ -83,13 +87,41 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
             </div>
           )}
         </div>
-      </div></div>}
+      </div></div></Block>
 
-      {tab === 'specs' && p && specs && <SpecSheet s={specs} book={pohDoc?.title ?? 'POH'} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
-      {tab === 'specs' && p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">{raw?.pending ? `${raw.pending}: the engine, oil, fuel, tire, electrical and speed sheet appears here when it's done.` : pohDoc ? `The engine, oil, fuel, tire, electrical and speed sheet couldn't be read from ${pohDoc.title}. Upload a clearer copy of this airplane's POH, or read Sections 1, 2, 7 and 8 in it.` : 'No POH found for this airplane yet: upload it and its engine, oil, fuel, tire, electrical and speed sheet is read from it.'}</p>}
-      {tab === 'specs' && p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}
+      <Block id="book" title="POH" lead="Which book the numbers come from, and what was read from it. Anything not found is left blank, never guessed.">
+        {pohError ? <p className="text-sm text-bad">{pohError}</p> : <PohReport match={poh} doc={pohDoc} uploaded={pohUploaded} loading={pohLoading} model={aircraft.model} />}
+        <div className="mt-3 flex flex-wrap gap-3 text-[13px]"><PohLink fig="limits">Limitations</PohLink><PohLink fig="speeds">Speeds</PohLink><PohLink fig="checklist">Checklists</PohLink><PohLink fig="emergency">Emergency procedures</PohLink></div>
+      </Block>
 
-      {tab === 'records' && <>
+      <Block id="specs" title="Systems and limits">
+      {p && specs && <SpecSheet s={specs} book={pohDoc?.title ?? 'POH'} p={p} d={d} rpm={plan.rpm} planning={planning} savePlanning={savePlanning} tail={plan.tail} />}
+      {p && !specs && <p className="rounded-lg px-3 py-2.5 text-sm text-fg-3 ring-1 ring-inset ring-border">{raw?.pending ? `${raw.pending}: the engine, oil, fuel, tire, electrical and speed sheet appears here when it's done.` : pohDoc ? `The engine, oil, fuel, tire, electrical and speed sheet couldn't be read from ${pohDoc.title}. Upload a clearer copy of this airplane's POH, or read Sections 1, 2, 7 and 8 in it.` : 'No POH found for this airplane yet: upload it and its engine, oil, fuel, tire, electrical and speed sheet is read from it.'}</p>}
+      </Block>
+
+      <Block id="perf" title="Performance this flight" lead="Climb and cruise at this flight's altitudes and temperatures, from the POH tables.">
+        {p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}
+      </Block>
+
+      <Block id="checklist" title={`${plan.tail} checklist`} lead={list.length ? 'The checklist you fly this airplane with, from its profile. Tap a step to tick it; it prints after the NavLog.' : 'Write out the checklist you fly this airplane with, or paste it from the POH. It becomes part of every brief for this airplane and prints after the NavLog.'}
+        right={list.length > 0 && !editList ? <Button size="sm" variant="ghost" onClick={() => setEditList(true)}>Edit checklist</Button> : null}>
+        {editList || !list.length
+          ? <ChecklistEditor tail={plan.tail} value={list} saving={savingPlanning} onCancel={list.length ? () => setEditList(false) : undefined} onSave={c => { savePlanning({ ...planning, checklist: c }); setEditList(false) }} />
+          : <div className="@container"><ChecklistRun secs={list} /></div>}
+      </Block>
+
+      <Block id="airworthy" title="Airworthiness for this flight" lead="AV1ATES inspections from the logbook dates, the documents on board (ARROW) and the equipment this flight needs (§91.205). Ticks are for this flight; dates and equipment are kept for the airplane.">
+        <div className="space-y-8">
+          <InspectionDates tail={plan.tail} planning={planning} save={savePlanning} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Checklist title="Maintenance, inspections and documents" right={<span className="text-xs text-fg-3">Aircraft logbooks / dispatch</span>} items={MX_DOCS} prefix="mx" plan={plan} set={set} yes="Checked" no="Problem" />
+            <Checklist title={night ? 'Required equipment · day and night VFR' : 'Required equipment · day VFR'} right={<span className="text-xs text-fg-3">§91.205</span>} items={night ? [...EQUIPMENT_DAY, ...EQUIPMENT_NIGHT] : EQUIPMENT_DAY} prefix="eq" plan={plan} set={set} yes="Working" no="Inop" />
+          </div>
+          <EquipmentForm pitot={!specs} eq={eq} setEq={x => savePlanning({ ...planning, equipment: { ...eq, ...x } })} />
+        </div>
+      </Block>
+
+      <Block id="profile" title="Profile and records" lead={`${plan.tail}'s own numbers over the book's, kept for every plan, and its documents.`}>
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <ProfileEditor tail={plan.tail} planning={planning} save={savePlanning} saving={savingPlanning} registry={{ make: registry?.make, model: registry?.model, year: registry?.year }} />
         <div className="space-y-6">
@@ -108,16 +140,19 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
           )}
         </div>
       </div>
-      </>}
-
-      {tab === 'mx' && <>
-      <InspectionDates tail={plan.tail} planning={planning} save={savePlanning} />
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Checklist title="Maintenance, inspections and documents" right={<span className="text-xs text-fg-3">Aircraft logbooks / dispatch</span>} items={MX_DOCS} prefix="mx" plan={plan} set={set} yes="Checked" no="Problem" />
-        <Checklist title={night ? 'Required equipment · day and night VFR' : 'Required equipment · day VFR'} right={<span className="text-xs text-fg-3">§91.205</span>} items={night ? [...EQUIPMENT_DAY, ...EQUIPMENT_NIGHT] : EQUIPMENT_DAY} prefix="eq" plan={plan} set={set} yes="Working" no="Inop" />
-      </div>
-      </>}
+      </Block>
     </div>
+  )
+}
+
+export function Block({ id, title, lead, right, children }: { id: string; title: React.ReactNode; lead?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section id={`ac-${id}`} className="scroll-mt-24">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2 border-b border-border pb-2">
+        <div className="min-w-0"><h3 className="text-base font-medium tracking-[-0.011em] text-fg">{title}</h3>{lead && <p className="mt-0.5 max-w-3xl text-[13px] text-fg-3">{lead}</p>}</div>{right}
+      </div>
+      {children}
+    </section>
   )
 }
 

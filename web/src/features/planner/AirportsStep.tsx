@@ -36,7 +36,7 @@ export function AirportsStep({ d, routePts, alternate, noAlternate = false, auto
   const dest = routePts.length >= 2 && !isWaypoint(routePts[routePts.length - 1]) ? routePts[routePts.length - 1] : null
   const all = [...apts, ...(alternate && !apts.some(a => a.id === alternate.id) ? [alternate] : [])]
   const roleOf = (a: Airport) => (a.id === alternate?.id && !apts.some(x => x.id === a.id) ? 'Alternate' : a.id === routePts[0]?.id ? (a.id === dest?.id ? 'Departure and destination' : 'Departure') : 'Destination')
-  if (!all.length) return <p className="text-sm text-fg-3">Add the airports under Plan.</p>
+  if (!all.length) return <p className="text-sm text-fg-3">Add the airports under Route and fuel.</p>
   return (
     <div className="@container space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2"><Synced at={cycle ?? undefined} label="FAA NASR cycle" source="Chart Supplement data · wind from METAR/TAF at your ETA · NOTAMs from the FAA" /><span className="text-[13px]"><WorkingsLink>Where each number came from</WorkingsLink></span></div>

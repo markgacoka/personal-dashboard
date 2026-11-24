@@ -1,124 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, ChevronDown, ExternalLink } from 'lucide-react'
 import { Badge, Dot } from '@/components/ui/badge'
 import { Segmented, Tooltip } from '@/components/ui/misc'
 import { relTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { Check, Status } from './model'
 import { PohLink } from './RefPanel'
-import { StatusIcon } from './ui'
+import { SECTION_LABEL, type SectionKey } from './readiness'
 import type { Assumption, Line, Source, Topic, Work } from './workings'
 import type { Expl } from './explain'
 import { ExplCard } from './ExplainView'
 import type { RowOverride } from './model'
 
-export type DomainKey = 'plan' | 'pilot' | 'aircraft' | 'weather' | 'route' | 'airports' | 'loading'
-export const DOMAIN_OF: Record<Check['section'], DomainKey> = { trip: 'plan', pilot: 'pilot', aircraft: 'aircraft', weather: 'weather', navlog: 'route', loading: 'loading', performance: 'loading' }
-export const DOMAIN_LABEL: Record<DomainKey, string> = { plan: 'Plan', pilot: 'Pilot', aircraft: 'Aircraft', weather: 'Weather', route: 'Route and fuel', airports: 'Airports', loading: 'Weight and performance' }
-const RANK: Status[] = ['nogo', 'caution', 'todo', 'ok', 'note']
-
-export const worstStatus = (checks: Check[]): Status => checks.reduce<Status>((w, c) => (RANK.indexOf(c.status) < RANK.indexOf(w) ? c.status : w), 'ok')
-
-// "§61.89(a)(1). Rest" → the rule cited, then the explanation.
-function splitRule(detail?: string): { rule: string | null; why: string | null } {
-  if (!detail) return { rule: null, why: null }
-  const m = detail.match(/^(§\s?\d[\d.]*(?:\([a-z0-9]+\))*(?:[–-]§?\d[\d.]*)?)[.:]?\s*/i)
-  if (!m) return { rule: null, why: detail }
-  const why = detail.slice(m[0].length).trim()
-  return { rule: m[1], why: why ? why[0].toUpperCase() + why.slice(1) : null }
-}
-
-/* ───────────────────────────── Checks ───────────────────────────── */
-
-// What the pilot acts on, worst first and grouped by what it asks of you: fix
-// it, decide on it, finish it. Notes (what the plan assumed about missing data)
-// and passed checks sit folded at the bottom. No counters or filters: the
-// groups are the summary.
-const GROUPS: { status: Status; head: string; hint: string; folded?: boolean }[] = [
-  { status: 'nogo', head: 'Fix before you fly', hint: 'Each one rules the flight out as planned.' },
-  { status: 'caution', head: 'Decide', hint: 'Risks to weigh, or talk through with your instructor.' },
-  { status: 'todo', head: 'To finish', hint: 'Entries and ticks the plan still needs.' },
-  { status: 'note', head: 'Assumed', hint: 'Data that was missing or stale, and what was used instead.', folded: true },
-  { status: 'ok', head: 'Passed', hint: '', folded: true },
-]
-
-export function FixesPane({ checks, onJump }: { checks: Check[]; onJump: (k: DomainKey) => void }) {
-  const open = checks.filter(c => c.status === 'nogo' || c.status === 'caution' || c.status === 'todo')
-  return (
-    <div className="pb-4">
-      {!open.length && (
-        <div className="px-4 pb-2 pt-6">
-          <p className="text-sm font-medium text-fg">Nothing left to fix</p>
-          <p className="mt-1 text-[13px] text-fg-3">Get a standard briefing before you go; the workings show how each number was reached.</p>
-        </div>
-      )}
-      {GROUPS.map(g => {
-        const items = checks.filter(c => c.status === g.status)
-        if (!items.length) return null
-        const list = <ul className="mx-2">{items.map((c, i) => <FixRow key={`${c.section}-${c.title}-${i}`} c={c} onJump={onJump} />)}</ul>
-        if (g.folded) return (
-          <details key={g.status} className="group mt-4 px-2">
-            <summary className="flex cursor-pointer list-none items-baseline gap-2 rounded-lg px-2 py-1.5 hover:bg-hover">
-              <ChevronDown className="size-3.5 shrink-0 -rotate-90 self-center text-fg-3 transition-transform group-open:rotate-0" />
-              <span className="text-sm text-fg-2">{g.head}</span><span className="num text-[13px] text-fg-3">{items.length}</span>
-            </summary>
-            {g.hint && <p className="px-2 pb-1 pl-8 text-[13px] text-fg-3">{g.hint}</p>}
-            <div className="-mx-2">{list}</div>
-          </details>
-        )
-        return (
-          <section key={g.status} className="mt-5">
-            <header className="px-4 pb-1">
-              <h3 className="flex items-baseline gap-2 text-sm font-medium text-fg">{g.head}<span className="num font-normal text-fg-3">{items.length}</span></h3>
-              <p className="text-[13px] text-fg-3">{g.hint}</p>
-            </header>
-            {list}
-          </section>
-        )
-      })}
-    </div>
-  )
-}
-
-function FixRow({ c, onJump }: { c: Check; onJump: (k: DomainKey) => void }) {
-  const [open, setOpen] = useState(false)
-  const { rule, why } = splitRule(c.detail)
-  const domain = DOMAIN_OF[c.section]
-  const ok = c.status === 'ok'
-  const hasBody = !!(why || rule || (c.fix && !ok))
-  return (
-    <li>
-      <button onClick={() => hasBody && setOpen(o => !o)} aria-expanded={hasBody ? open : undefined}
-        className={cn('flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left', hasBody && 'hover:bg-hover')}>
-        <StatusIcon status={c.status} className="mt-0.5" />
-        <span className={cn('min-w-0 flex-1 text-sm leading-snug', c.status === 'nogo' ? 'text-fg' : 'text-fg-2')}>{c.title}</span>
-        {<span className="mt-px shrink-0 text-[13px] text-fg-3">{DOMAIN_LABEL[domain].split(' ')[0]}</span>}
-        {hasBody && <ChevronDown className={cn('mt-0.5 size-4 shrink-0 text-fg-3 transition-transform duration-200', open && 'rotate-180')} />}
-      </button>
-      {open && hasBody && (
-        <div className="space-y-2 pb-3 pl-9 pr-2">
-          {c.fix && !ok && <p className="text-[13px] leading-snug text-fg-2">{c.fix}</p>}
-          {(rule || why) && <p className="text-[13px] leading-snug text-fg-3">{why}{rule && <span className="num"> {why ? '· ' : ''}{rule}</span>}</p>}
-          {!ok && c.status !== 'note' && (
-            <button onClick={() => onJump(domain)} className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline">
-              {DOMAIN_LABEL[domain]}<ArrowRight className="size-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-    </li>
-  )
-}
-
-/* ──────────────────────────── Workings ──────────────────────────── */
-
 type View = 'calc' | 'assume' | 'source'
 
-// How every number was reached: the arithmetic, what was assumed, and where the inputs came from.
-export interface Focus { title: string; subtitle: string; items: Expl[]; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void; onClear: () => void }
+export interface Focus { title: string; subtitle: string; items: Expl[]; card?: string; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void; onClear: () => void }
 
-export function WorkingsPane({ topics, assumptions, sources, onJump, focus }: { topics: Topic[]; assumptions: Assumption[]; sources: Source[]; onJump?: (k: DomainKey) => void; focus?: Focus | null }) {
+export function WorkingsPane({ topics, assumptions, sources, onJump, focus, topic }: { topics: Topic[]; assumptions: Assumption[]; sources: Source[]; onJump?: (k: SectionKey) => void; focus?: Focus | null; topic?: string | null }) {
   const [view, setView] = useState<View>('calc')
+  // Opened at one topic (a fact on the overview, a figure in a section): scroll to it.
+  useEffect(() => { if (!focus && topic) { setView('calc'); requestAnimationFrame(() => document.getElementById(`wk-${topic}`)?.scrollIntoView({ block: 'start' })) } }, [topic, focus])
   if (focus) return <FocusView f={focus} />
   return (
     <div className="pb-4">
@@ -150,8 +50,11 @@ function FocusView({ f }: { f: Focus }) {
         <h3 className="mt-2 text-[15px] font-medium text-fg">{f.title}</h3>
         <p className="mt-0.5 text-[13px] text-fg-3">{f.subtitle}</p>
       </div>
+      {/* The figure you selected first, then the rest of the row in the order it's worked out. */}
       <ul className="mx-3 mt-4 divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
-        {f.items.map(e => <ExplCard key={e.key} e={e} ov={f.ov} onEdit={f.onEdit} />)}
+        {[...f.items].sort((a, b) => Number(b.key === f.card) - Number(a.key === f.card)).map(e => (
+          <ExplCard key={e.key} e={e} ov={f.ov} onEdit={f.onEdit} className={cn(e.key === f.card && f.items.length > 1 && 'bg-accent-soft/40')} />
+        ))}
       </ul>
       {f.onEdit && <p className="mx-4 mt-4 text-[13px] leading-snug text-fg-3">Values you type here change only this row; clear them to go back to the source.</p>}
     </div>
@@ -229,15 +132,13 @@ const A_GROUP: Record<string, string> = {
 }
 const A_ORDER = ['Stand-ins for missing data', 'Time and fuel', 'Performance', 'Route', 'Weather', 'Pilot', 'Other']
 const isStandIn = (a: Assumption) => a.value === 'Calm' || /sample/i.test(a.value) || a.label === 'Pilot certificate'
-const LABEL_DOMAIN = Object.fromEntries(Object.entries(DOMAIN_LABEL).map(([k, v]) => [v.toLowerCase(), k as DomainKey]))
-// "Brief → Pilot → minimums" → pilot; "Plan → Fuel and taxi" → plan.
-function changeTarget(change: string): DomainKey | null {
-  const [stage, area] = change.split('→').map(s => s.trim().toLowerCase())
-  if (stage === 'plan') return 'plan'
-  return area ? LABEL_DOMAIN[area] ?? null : null
+const LABEL_SECTION = Object.fromEntries((Object.entries(SECTION_LABEL) as [SectionKey, string][]).map(([k, v]) => [v.toLowerCase(), k]))
+// "Pilot → minimums" → pilot; "Weight and performance → fuel and taxi" → loading.
+function changeTarget(change: string): SectionKey | null {
+  return LABEL_SECTION[change.split('→')[0].trim().toLowerCase()] ?? null
 }
 
-function Assumptions({ list, onJump }: { list: Assumption[]; onJump?: (k: DomainKey) => void }) {
+function Assumptions({ list, onJump }: { list: Assumption[]; onJump?: (k: SectionKey) => void }) {
   const grouped = A_ORDER.map(g => ({ g, items: list.filter(a => (isStandIn(a) ? A_ORDER[0] : A_GROUP[a.label] ?? 'Other') === g) })).filter(x => x.items.length)
   return (
     <div>

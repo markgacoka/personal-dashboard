@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react'
-import { BookOpen, Download, ExternalLink, Mail, Maximize2, Minimize2, PanelRightClose, Upload, X } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, Mail, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/input'
@@ -11,8 +11,7 @@ import { ChecklistSteps } from './ChecklistSteps'
 import { Segmented } from '@/components/ui/misc'
 
 type DocTab = 'poh' | 'checklist' | 'briefing'
-export type Tab = 'fixes' | 'workings' | DocTab
-const TABS: { key: Tab; label: string }[] = [{ key: 'fixes', label: 'Checks' }, { key: 'workings', label: 'Workings' }, { key: 'poh', label: 'POH' }, { key: 'checklist', label: 'Checklist' }, { key: 'briefing', label: 'Briefing' }]
+export type Tab = 'workings' | DocTab
 export const isDocTab = (t: Tab): t is DocTab => t === 'poh' || t === 'checklist' || t === 'briefing'
 // page: a page number, or a figure key ("takeoff") looked up in the open POH's page map.
 // docTail: the tail the POH/checklist were picked for; a different tail goes back to its own documents.
@@ -23,8 +22,7 @@ export const useRefs = () => useContext(Ctx)
 
 export function RefProvider({ children }: { children: React.ReactNode }) {
   // Open beside the plan on wide screens; a full-screen sheet on demand elsewhere.
-  const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 96rem)').matches
-  const [state, setState] = useState<RefState>({ open: !!wide, wide: false, tab: 'fixes', page: null, docId: { poh: null, checklist: null, briefing: null }, docTail: null })
+  const [state, setState] = useState<RefState>({ open: false, wide: false, tab: 'workings', page: null, docId: { poh: null, checklist: null, briefing: null }, docTail: null })
   const api = useMemo<RefApi>(() => ({
     state,
     show: (tab, page) => setState(s => ({ ...s, open: true, tab, page: page ?? null })),
@@ -48,32 +46,7 @@ export function WorkingsLink({ children }: { children: React.ReactNode }) {
   return <button type="button" onClick={() => r?.show('workings')} className="text-accent hover:underline">{children}</button>
 }
 
-export function RefPanel({ tail, model, route, date, className, pohDoc, pohLoading, pohStatus, panes, fixCount, fixTone = 'neutral' }: { tail: string | null; model: string | null; route: string[]; date: string; className?: string; pohDoc?: PlannerDoc | null; pohLoading?: boolean; pohStatus?: string | null; panes: { fixes: React.ReactNode; workings: React.ReactNode }; fixCount: number; fixTone?: 'bad' | 'warn' | 'neutral' }) {
-  const r = useRefs()!
-  return (
-    <div className={cn('flex h-full min-h-0 flex-col rounded-xl bg-card ring-1 ring-inset ring-white/[0.04]', className)}>
-      <div className="flex items-center gap-1 border-b border-border px-2 py-2">
-        <div role="tablist" aria-label="Sidebar" className="scrollbar-none flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
-        {TABS.map(t => (
-          <span key={t.key} className="contents">
-          {t.key === 'poh' && <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-border" />}
-          <button role="tab" aria-selected={r.state.tab === t.key} onClick={() => r.set({ tab: t.key, page: null })}
-            className={cn('press inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm', r.state.tab === t.key ? 'bg-pill font-medium text-fg' : 'text-fg-3 hover:text-fg')}>
-            {t.label}{t.key === 'fixes' && fixCount > 0 && <span className={cn('num rounded-full px-1.5 text-xs font-medium', fixTone === 'bad' ? 'text-bad' : 'bg-hover text-fg-2')}>{fixCount}</span>}
-          </button>
-          </span>
-        ))}
-        </div>
-        <Button size="icon-sm" variant="ghost" className="shrink-0 max-2xl:hidden" onClick={() => r.set({ wide: !r.state.wide })} aria-label={r.state.wide ? 'Narrow the sidebar' : 'Widen the sidebar'} aria-pressed={r.state.wide} title={r.state.wide ? 'Narrow the sidebar' : 'Widen the sidebar (for reading the POH or briefing)'}>{r.state.wide ? <Minimize2 /> : <Maximize2 />}</Button>
-        <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={r.close} aria-label="Close the sidebar"><X className="2xl:hidden" /><PanelRightClose className="max-2xl:hidden" /></Button>
-      </div>
-      {isDocTab(r.state.tab) ? <DocPane tail={tail} model={model} route={route} date={date} pohDoc={pohDoc} pohLoading={pohLoading} pohStatus={pohStatus} />
-        : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panes[r.state.tab]}</div>}
-    </div>
-  )
-}
-
-function DocPane({ tail, model, route, date, pohDoc, pohLoading, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; pohDoc?: PlannerDoc | null; pohLoading?: boolean; pohStatus?: string | null }) {
+export function DocPane({ tail, model, route, date, pohDoc, pohLoading, pohStatus }: { tail: string | null; model: string | null; route: string[]; date: string; pohDoc?: PlannerDoc | null; pohLoading?: boolean; pohStatus?: string | null }) {
   const r = useRefs()!
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)

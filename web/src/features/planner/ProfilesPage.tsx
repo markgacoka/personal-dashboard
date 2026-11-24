@@ -12,6 +12,8 @@ import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useAirports, useCertificates, useMinimums, usePilotInfo, usePlanning, usePlans, usePohFind } from './api'
 import { AircraftDocs, ProfileEditor } from './AircraftProfile'
+import { ChecklistEditor } from './AircraftChecklist'
+import { AircraftSetup, EquipmentForm, PohReport } from './ProfileForms'
 import { InspectionDates } from './AircraftStep'
 import { AirportProfileForm } from './AirportsStep'
 import { CertificatesEditor } from './Certificates'
@@ -105,7 +107,10 @@ export default function ProfilesPage() {
               exists={people.list.some(p => p.id === current)} used={usedBy('pilots', current)} saving={people.save.isPending}
               onSave={async p => { await people.upsert(p); toast.success(`${p.name} saved`); setDraft(null); pick('pilots', p.id) }}
               onDelete={async p => { await people.remove(p.id); toast.success(`${p.name} deleted`); pick('pilots') }} />)}
-          {current && tab === 'aircraft' && <AircraftProfileView key={current} tail={current} used={usedBy('aircraft', current)} saved={(aircraft.data ?? []).some(a => a.tail === current)}
+          {current && tab === 'aircraft' && !(aircraft.data ?? []).some(a => a.tail === current) && (draft === current || lists.aircraft.some(i => i.id === current && i.draft))
+            ? <div><Lead title={<>New aircraft{current ? <> · <span className="num">{current}</span></> : ''}</>}>Asked once and kept in its profile: the registry entry, the POH and what was read from it, its weights, equipment, inspections and checklist.</Lead>
+                <AircraftSetup key={current} initialTail={current} onCancel={() => { setDraft(null); pick('aircraft') }} onDone={t => { setDraft(null); pick('aircraft', t) }} /></div>
+            : current && tab === 'aircraft' && <AircraftProfileView key={current} tail={current} used={usedBy('aircraft', current)} saved={(aircraft.data ?? []).some(a => a.tail === current)}
             onDelete={async () => { await aircraft.remove.mutateAsync(current); toast.success(`${current} profile deleted`); pick('aircraft') }} />}
           {current && tab === 'airports' && <AirportProfileView key={current} id={current} profile={airports.data?.[current] ?? null} used={usedBy('airports', current)} saving={airports.save.isPending}
             onSave={p => airports.save.mutate({ id: current, profile: p }, { onSuccess: () => { toast.success(p ? `${current} saved` : `${current} profile deleted`); if (!p) pick('airports') }, onError: e => toast.error(e.message) })} />}
@@ -225,7 +230,8 @@ function AircraftProfileView({ tail, used, saved, onDelete }: { tail: string; us
     <div>
       <Lead title={<span className="num">{tail}</span>}>{name || (registry.isLoading ? 'Looking up the FAA registry…' : 'Not in the FAA registry: enter make and model under "Your values" below.')}{name ? '. Its empty weight drives the weight and balance; inspection dates the airworthiness checks; your values replace the POH\'s in every calculation.' : ''}</Lead>
       {!saved && <p className="-mt-3 mb-6 text-[13px] text-fg-3">No profile yet: saving any value below creates it.</p>}
-      {registry.data && <KV className="mb-8" items={[['Registry', registry.data.status], ['Engine', registry.data.engine_type ? `${registry.data.engine_type}${registry.data.engine_hp ? `, ${registry.data.engine_hp} hp` : ''}` : null], ['Seats', registry.data.seats], ['POH', poh.isLoading ? 'Finding it…' : poh.data?.doc?.title ?? (poh.data?.match ? poh.data.match.title : 'None found yet')]]} />}
+      {registry.data && <KV className="mb-8" items={[['Registry', registry.data.status], ['Engine', registry.data.engine_type ? `${registry.data.engine_type}${registry.data.engine_hp ? `, ${registry.data.engine_hp} hp` : ''}` : null], ['Seats', registry.data.seats], ]} />}
+      <section className="mb-8"><SubHead>POH and what was read from it</SubHead><PohReport match={poh.data?.match} doc={poh.data?.doc} uploaded={poh.data?.uploaded} loading={poh.isLoading} model={ident.model} /></section>
       <div className="grid gap-8 xl:grid-cols-2">
         <div className="space-y-8">
           <EmptyWeight tail={tail} planning={planning} save={save} u={u} />
@@ -236,6 +242,11 @@ function AircraftProfileView({ tail, used, saved, onDelete }: { tail: string; us
           <RecordsList title={<>Aircraft records · <span className="num">{tail}</span></>} records={AIRCRAFT_RECORDS} tail={tail} />
         </div>
       </div>
+      <div className="mt-8"><EquipmentForm eq={planning.equipment ?? {}} setEq={x => save({ ...planning, equipment: { ...planning.equipment, ...x } })} /></div>
+      <section className="mt-8">
+        <SubHead right={<span className="text-[13px] text-fg-3">In every brief for {tail}; prints after the NavLog</span>}>Checklist</SubHead>
+        <ChecklistEditor tail={tail} value={planning.checklist} saving={planningQ.save.isPending} onSave={c => save({ ...planning, checklist: c })} />
+      </section>
       <div className="mt-8"><ProfileEditor tail={tail} planning={planning} save={save} saving={planningQ.save.isPending} registry={{ make: registry.data?.make, model: registry.data?.model, year: registry.data?.year }} /></div>
       {saved && <DeleteRow what={`${tail}'s profile`} used={used} onDelete={onDelete} after="they fall back to the POH sample airplane's empty weight." note="Deletes your values for this airplane (empty weight, inspections, overrides); its registry entry, POH and uploaded records stay." />}
     </div>

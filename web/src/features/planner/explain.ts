@@ -201,7 +201,7 @@ export function explainWb(x: ExplainInput, s: WbStep, i: number): Expl {
       { k: 'Moment', v: `${n0(s.weight)} × ${s.arm?.toFixed(1)} = ${n0(s.moment)} lb-in` },
     ],
     source: isEmpty
-      ? (d.wb.emptySample ? { used: 'POH sample airplane', tier: 'standin', backup: `${plan.tail ?? 'This tail'}'s W&B record (Brief → Aircraft)` } : { used: `${plan.tail}'s W&B record`, tier: 'yours' })
+      ? (d.wb.emptySample ? { used: 'POH sample airplane', tier: 'standin', backup: `${plan.tail ?? 'This tail'}'s W&B record (Aircraft → Profile and records)` } : { used: `${plan.tail}'s W&B record`, tier: 'yours' })
       : isFuel ? { used: s.label.startsWith('Fuel ') ? (plan.fuelGal == null ? 'Full usable fuel for the tanks' : 'Your fuel entry') : s.label === 'Flight burn' ? 'NavLog fuel × 6 lb/gal' : `POH (${p.climbStartFuelGal} gal)`, tier: s.label.startsWith('Fuel ') && plan.fuelGal != null ? 'yours' : 'primary' }
         : { used: 'Your seat and baggage weights', tier: 'yours' },
     assumes: isEmpty ? ['Includes unusable fuel and full oil, per the weighing record.'] : isFuel ? ['6 lb per gallon (100LL).', `Fuel arm ${p.fuelArm} in.`] : ['Weights include clothing and headsets.', ...(stn?.range ? [`Arm range ${stn.range}.`] : [])],
@@ -237,7 +237,7 @@ export function inputSources(x: ExplainInput): InputSource[] {
       detail: read?.sections.length ? `Read from the ${read.book} PDF: ${read.sections.join(', ')}${read.missing.length ? `; ${read.missing.join(', ')} from the 172P` : ''}. Compare a row with the page in the POH tab.`
         : x.pohClosest ? 'The closest POH to this model: check the numbers against the airplane\'s own book.' : 'Cruise, climb, takeoff and landing tables.',
     })
-    out.push({ key: 'empty', label: 'Empty weight', value: d.wb.emptySample ? 'POH sample' : 'Aircraft record', tier: d.wb.emptySample ? 'standin' : 'yours', detail: d.wb.emptySample ? 'Enter this tail\'s weighed empty weight and moment under Brief → Aircraft.' : 'Saved for this tail.' })
+    out.push({ key: 'empty', label: 'Empty weight', value: d.wb.emptySample ? 'POH sample' : 'Aircraft record', tier: d.wb.emptySample ? 'standin' : 'yours', detail: d.wb.emptySample ? 'Enter this tail\'s weighed empty weight and moment under Aircraft → Profile and records.' : 'Saved for this tail.' })
   }
   if (d.flights.length) {
     const unknown = d.flights.some(f => f.terrainMax == null)

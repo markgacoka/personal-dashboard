@@ -14,6 +14,7 @@ import { PerformanceSection } from './PerformanceSection'
 import { PilotStep } from './PilotStep'
 import { AircraftPicker, CrewPicker } from './Pickers'
 import { PlannerMap } from './PlannerMap'
+import { MapBoundary } from './MapBoundary'
 import { WbTable } from './PohSummary'
 import { PersonForm } from './ProfileForms'
 import { seatPerson } from './profiles'
@@ -191,7 +192,7 @@ export function NavlogDoc({ workings = false, printWorkings = false }: { working
         </div>
       )}
       {f.plan.tail && list.length > 0 && <ChecklistPrint tail={f.plan.tail} secs={list} />}
-      <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.74 } }'}</style>
+      <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.74 } .navlog-reverse > div { zoom: 0.62 } }'}</style>
     </div>
   )
 }
@@ -230,7 +231,7 @@ export function WbDoc() {
       {d.wb.steps.length > 0 ? (
         <>
           <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 6 · <PohLink fig="wb">loading page</PohLink></span>}>Loading, line by line</SubHead><WbTable d={d} plan={f.plan} u={f.u} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
-          <div className="grid gap-8 min-[1700px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] print:grid-cols-2">
+          <div className="grid gap-8 min-[1700px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] print:grid-cols-1">
             <div><SubHead right={<span className="text-[13px] text-fg-3 print:hidden">Select a point for its workings</span>}>Center of gravity envelope</SubHead><CgChart d={d} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
             {d.profile && <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 2 · <PohLink fig="limits">limits page</PohLink></span>}>Against every limit</SubHead><WbLimits d={d} plan={f.plan} u={f.u} tank={tank} /></div>}
           </div>
@@ -249,7 +250,7 @@ export function WeatherBriefSection() {
     <div>
       <OutputHead k="weather" lead="The weather at each airport at the time you're there, hazards along the route, winds aloft and NOTAMs, with where each came from and when. Not a substitute for a standard briefing." />
       <div className="mb-8 space-y-4 print:hidden">
-        {f.routePts.length > 1 && <PlannerMap className="h-[24rem] rounded-xl" route={f.routePts} alternate={f.altAirport} weather={f.weather} d={f.d} airspace={f.airspace} radar={f.radar} notams={f.notams} />}
+        {f.routePts.length > 1 && <MapBoundary><PlannerMap className="h-[24rem] rounded-xl" route={f.routePts} alternate={f.altAirport} weather={f.weather} d={f.d} airspace={f.airspace} radar={f.radar} notams={f.notams} /></MapBoundary>}
         <Panel title="Standard briefing" lead="§91.103: all available information for a flight away from the airport. Get it from Flight Service and keep the PDF beside the plan.">
           <div className="flex flex-wrap items-center gap-3">
             <a href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline">1800wxbrief.com<ExternalLink className="size-3.5" /></a>

@@ -234,7 +234,7 @@ export function NavlogReverse({ plan, set, d, airports, planning, savePlanning, 
   const wxDep = d.wx.find(w => w.role === 'departure'), wxDest = d.wx.find(w => w.role === 'destination'), wxAlt = d.wx.find(w => w.role === 'alternate')
   const fp = flightPlan(plan, d, alt, planning, registry)
   return (
-    <section className="overflow-x-auto">
+    <section className="navlog-reverse overflow-x-auto">
       <div className="min-w-[80rem]">
         <div className={cn(B, 'nl-bar py-1 text-center text-base font-bold tracking-wide')}>WEATHER LOG</div>
         <table className="w-full border-collapse">

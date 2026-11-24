@@ -199,7 +199,19 @@
   --border-strong: #38383b;
 }
 .planner .nl-bar { background: var(--border-strong); color: var(--fg); }
-@media print { .planner .nl-bar { background: #000; color: #fff; } }
+/* On paper: black on white, whatever the screen theme, with greys that survive a printer. */
+@media print {
+  :root, .planner {
+    --bg: #fff; --card: #fff; --sunken: #fff; --hover: #fff; --pill: transparent; --pill-hover: transparent;
+    --border: #9a9a9a; --border-strong: #555; --fg: #000; --fg-2: #1a1a1a; --fg-3: #555;
+    --accent: #1d4ed8; --accent-soft: transparent; --good: #15803d; --good-soft: #dcfce7; --warn: #a16207; --warn-soft: #fef3c7; --bad: #b91c1c; --bad-soft: #fee2e2;
+    --grid: #d4d4d4; --axis: #555;
+  }
+  html, body { background: #fff !important; color: #000; }
+  .planner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .planner .navlog-front, .planner .navlog-reverse { overflow: visible; }
+  .planner .nl-bar { background: #000; color: #fff; }
+}
 /* A computed figure: select it for its workings (the work sheet). */
 .planner .fig { cursor: pointer; text-decoration: underline dotted; text-decoration-color: color-mix(in oklch, var(--fg-3) 70%, transparent); text-underline-offset: 3px; font: inherit; color: inherit; }
 .planner .fig:hover, .planner .fig:focus-visible { text-decoration-color: var(--accent); color: var(--accent); outline: none; }

@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, Pencil, Plus, RotateCcw, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { OptNum } from './FlightInputs'
 import type { Airport, Checkpoint, Derived, NavFix, Plan, WeatherBundle } from './model'
+import { MapBoundary } from './MapBoundary'
 import { PlannerMap, type MapNotams, type MapRadar, type RouteEdit } from './PlannerMap'
 import { SUGGEST_KIND, candidates, kindName, suggest, type Landmarks, type SuggestKind } from './suggest'
 import { SubHead, deg3, fmtTime } from './ui'
@@ -49,7 +50,7 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
           <RouteChips pts={routePts} edit={edit} />
           <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
-              <PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} />
+              <MapBoundary><PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} /></MapBoundary>
               <p className="mt-2 text-[13px] text-fg-3">Drag the line to add a point, drag a point to move it, click it to remove it. Points snap to nearby landmarks.</p>
             </div>
             <Suggestions sugg={sugg} pts={routePts} edit={edit} loading={landmarksLoading} errors={landmarks?.errors ?? []} off={off} setOff={setOff} />

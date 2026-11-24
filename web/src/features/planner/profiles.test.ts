@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { seatPerson } from './profiles'
+import { seatPerson, usedBy } from './profiles'
 
 const base = { seats: { pilot: 170, front: 0, rearL: 0, rearR: 0 }, seatPeople: { pilot: 'self' }, crew: { role: 'pic' as const } }
 
@@ -27,5 +27,20 @@ describe('seatPerson', () => {
     const out = seatPerson(base, 'pilot', null)
     expect(out.seatPeople).toEqual({})
     expect(out.seats).toBeUndefined()
+  })
+})
+
+describe('usedBy', () => {
+  const plans = [
+    { data: { route: ['KRHV', 'KSNS'], tail: 'N739HE', crew: { pilotId: 'p1' }, seatPeople: { front: 'p2' } } },
+    { data: { route: ['KPAO', 'KRHV*', 'KMRY'], tail: 'N227AN', alternate: 'KSNS', crew: { instructorId: 'p2' } } },
+  ] as unknown as Parameters<typeof usedBy>[0]
+  test('counts flights that load an aircraft, airport or person', () => {
+    expect(usedBy(plans, 'aircraft', 'N739HE')).toBe(1)
+    expect(usedBy(plans, 'airports', 'KRHV')).toBe(2)
+    expect(usedBy(plans, 'airports', 'KSNS')).toBe(2)
+    expect(usedBy(plans, 'pilots', 'p2')).toBe(2)
+    expect(usedBy(plans, 'pilots', 'p9')).toBe(0)
+    expect(usedBy(undefined, 'pilots', 'p1')).toBe(0)
   })
 })

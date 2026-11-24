@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { Switch } from '@/components/ui/misc'
+import { Dialog, DialogContent } from '@/components/ui/overlay'
 import { useRegistry } from '@/lib/queries'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -17,36 +18,64 @@ import { SECTION_LABEL, profileFor, withSpecs, withTables } from './poh'
 import { newId, useAircraftProfiles, useCrew, type Person, type PersonRole } from './profiles'
 import { hasSpecs, type PohSpecs } from './specs'
 import { unitsForTail } from './units'
+import { RecordsList } from './RecordsList'
+import { PILOT_RECORDS } from './records'
 
-// The forms that create profiles at the step that needs them: you (once), an
-// instructor or passenger (when seating them), an aircraft (when choosing it).
-// The Profiles page edits the same records afterwards.
+// The forms that create profiles at the step that needs them, opened as modals
+// inside a flight; the Profiles page edits the same records.
 
 const Label = ({ children, className }: { children: React.ReactNode; className?: string }) => <span className={cn('mb-1 block text-sm text-fg-2', className)}>{children}</span>
 const Hint = ({ children }: { children: React.ReactNode }) => <p className="mt-1 text-[13px] text-fg-3">{children}</p>
 
-/* ── Instructors and passengers ── */
-// A pilot, instructor or passenger, created where they're first needed. A
-// pilot's medical and endorsements are completed under Pilot, where they're checked.
-export function PersonForm({ role, initial, onDone, onCancel }: { role: PersonRole; initial?: Partial<Person>; onDone: (p: Person) => void; onCancel: () => void }) {
+/* ── Pilots, instructors and passengers ── */
+// The fields that make a person profile. A pilot's medical and endorsements
+// are completed under Pilot, where they're checked; their documents (medical,
+// certificate, ID…) are uploaded to their own profile once it exists.
+export function PersonForm({ role, initial, onDone, onCancel, exists }: { role: PersonRole; initial?: Partial<Person>; onDone: (p: Person) => void; onCancel: () => void; exists?: boolean }) {
   const crew = useCrew()
-  const [p, setP] = useState<Person>({ id: initial?.id ?? newId(), name: initial?.name ?? '', role, weightLb: initial?.weightLb ?? null, cfi: initial?.cfi, phone: initial?.phone, certs: initial?.certs ?? (role === 'pilot' ? { certificate: 'student' } : undefined) })
-  const ok = p.name.trim() && (p.weightLb == null || (p.weightLb > 20 && p.weightLb < 400))
+  const [p, setP] = useState<Person>({ id: initial?.id ?? newId(), name: initial?.name ?? '', role: initial?.role ?? role, weightLb: initial?.weightLb ?? null, cfi: initial?.cfi, phone: initial?.phone, address: initial?.address, base: initial?.base, notes: initial?.notes, certs: initial?.certs ?? (role === 'pilot' ? { certificate: 'student' } : undefined) })
+  const badWeight = p.weightLb != null && !(p.weightLb > 20 && p.weightLb < 400)
+  const ok = !!p.name.trim() && !badWeight
+  const save = async () => { const x = { ...p, name: p.name.trim() }; try { await crew.save(x); toast.success(`${x.name} saved`); onDone(x) } catch (e) { toast.error((e as Error).message) } }
   return (
-    <div className="space-y-3 rounded-lg p-3 ring-1 ring-inset ring-border">
-      <div className="text-sm font-medium text-fg">{initial?.id ? 'Edit' : 'New'} {role}</div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block"><Label>Name</Label><Input value={p.name} onChange={e => setP({ ...p, name: e.target.value.slice(0, 60) })} autoFocus placeholder="Full name" /></label>
-        <label className="block"><Label>Weight</Label><OptNum value={p.weightLb} placeholder="lb, dressed" unit="lb" onChange={v => setP({ ...p, weightLb: v })} label="Weight" /></label>
-        {role === 'pilot' && <label className="block"><Label>Certificate</Label><Select value={p.certs?.certificate ?? 'student'} onChange={e => setP({ ...p, certs: { ...p.certs, certificate: e.target.value as Certificate } })}>{CERTIFICATES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</Select></label>}
-        {role === 'instructor' && <label className="block"><Label>CFI certificate number</Label><Input value={p.cfi ?? ''} onChange={e => setP({ ...p, cfi: e.target.value.slice(0, 20) })} placeholder="Optional" className="num" /></label>}
+    <form className="space-y-5" onSubmit={e => { e.preventDefault(); if (ok) save() }}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block sm:col-span-2"><Label>Name</Label><Input value={p.name} onChange={e => setP({ ...p, name: e.target.value.slice(0, 60) })} autoFocus={!p.name} placeholder={p.role === 'pilot' ? 'As on the certificate' : 'Full name'} /></label>
+        <label className="block"><Label>Weight</Label><OptNum value={p.weightLb} placeholder="Dressed" unit="lb" onChange={v => setP({ ...p, weightLb: v })} label="Weight" /></label>
+        {p.role === 'pilot' && <label className="block"><Label>Certificate</Label><Select value={p.certs?.certificate ?? 'student'} onChange={e => setP({ ...p, certs: { ...p.certs, certificate: e.target.value as Certificate } })}>{CERTIFICATES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</Select></label>}
+        {p.role === 'instructor' && <label className="block"><Label>CFI number</Label><Input value={p.cfi ?? ''} onChange={e => setP({ ...p, cfi: e.target.value.slice(0, 20) })} placeholder="Optional" className="num" /></label>}
+        {p.role !== 'passenger' && <label className="block"><Label>Phone</Label><Input value={p.phone ?? ''} onChange={e => setP({ ...p, phone: e.target.value.slice(0, 30) })} placeholder="Optional" inputMode="tel" /></label>}
+        {p.role === 'pilot' && <label className="block"><Label>Home base</Label><Input value={p.base ?? ''} onChange={e => setP({ ...p, base: e.target.value.toUpperCase().slice(0, 4) })} placeholder="KRHV" className="num uppercase placeholder:normal-case" /></label>}
       </div>
-      {p.weightLb != null && !(p.weightLb > 20 && p.weightLb < 400) && <p className="text-[13px] text-bad">Enter a weight between 20 and 400 lb.</p>}
-      <div className="flex gap-2">
-        <Button size="sm" variant="primary" disabled={!ok} loading={crew.saving} onClick={async () => { const x = { ...p, name: p.name.trim() }; await crew.save(x); toast.success(`${x.name} saved`); onDone(x) }}>Save {role}</Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {badWeight && <p className="text-[13px] text-bad">Enter a weight between 20 and 400 lb.</p>}
+      {p.role === 'pilot' && exists && <RecordsList title="Documents" person={p.id} records={PILOT_RECORDS.filter(r => !r.when || (r.when === 'student') === ((p.certs?.certificate ?? 'student') === 'student'))} />}
+      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <Button type="submit" variant="primary" disabled={!ok} loading={crew.saving}>{exists ? 'Save' : `Add ${p.role}`}</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
-    </div>
+    </form>
+  )
+}
+
+// The same, in a modal: where a profile is added or edited from inside a flight.
+export function PersonDialog({ open, onOpenChange, role, initial, exists, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; role: PersonRole; initial?: Partial<Person>; exists?: boolean; onDone?: (p: Person) => void }) {
+  const noun = (initial?.role ?? role) === 'pilot' ? 'pilot' : (initial?.role ?? role) === 'instructor' ? 'instructor' : 'passenger'
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && <DialogContent title={exists ? initial?.name || `Edit ${noun}` : `New ${noun}`} wide={exists && noun === 'pilot'}>
+        <PersonForm role={role} initial={initial} exists={exists} onCancel={() => onOpenChange(false)} onDone={p => { onDone?.(p); onOpenChange(false) }} />
+      </DialogContent>}
+    </Dialog>
+  )
+}
+
+export function AircraftDialog({ open, onOpenChange, initialTail, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; initialTail?: string; onDone: (tail: string) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && <DialogContent title={initialTail ? `Set up ${initialTail}` : 'New aircraft'} wide>
+        <AircraftSetup initialTail={initialTail} onCancel={() => onOpenChange(false)} onDone={t => { onDone(t); onOpenChange(false) }} />
+      </DialogContent>}
+    </Dialog>
   )
 }
 
@@ -143,7 +172,6 @@ export function AircraftSetup({ initialTail, onDone, onCancel }: { initialTail?:
           <div className="flex flex-wrap items-center gap-2">
             <input ref={fileRef} type="file" accept="application/pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
             <Button size="sm" variant="secondary" loading={docs.upload.isPending} onClick={() => fileRef.current?.click()}><Upload />Upload {tail}'s POH</Button>
-            <span className="text-[13px] text-fg-3">This airplane's own book (PDF) beats a public copy: its weights, speeds and tables are read from it.</span>
           </div>
         </div>
       )}
@@ -151,7 +179,7 @@ export function AircraftSetup({ initialTail, onDone, onCancel }: { initialTail?:
       {step === 2 && tail && (
         <div className="space-y-5">
           <EmptyWeight tail={tail} planning={draft} save={setDraft} u={u} />
-          <Hint>From the airplane's current weight and balance record (in its documents, often in the POH's Section 6). Without it, the POH's sample airplane is used and the brief asks for it.</Hint>
+          <Hint>From its current weight and balance record.</Hint>
           {profile.fuel.length > 1 && (
             <label className="block max-w-md"><Label>Fuel tanks</Label>
               <Select value={draft.tanks || profile.fuel[0].key} onChange={e => setDraft(d => ({ ...d, tanks: e.target.value }))}>{profile.fuel.map(f => <option key={f.key} value={f.key}>{f.label} ({f.usable} gal usable)</option>)}</Select></label>
@@ -168,8 +196,7 @@ export function AircraftSetup({ initialTail, onDone, onCancel }: { initialTail?:
 
       {step === 4 && tail && (
         <div>
-          <Hint>Upload a photo or PDF of the checklist you fly {tail} with, or add its lines by hand in order. It's part of every brief for {tail} and prints after the NavLog. You can skip this and add it later.</Hint>
-          <div className="mt-3"><ChecklistEditor tail={tail} value={draft.checklist} onSave={c => { setDraft(d => ({ ...d, checklist: c })); toast.success(`${c.reduce((n, s) => n + s.items.length, 0)} steps kept; Finish saves them`) }} /></div>
+          <div><ChecklistEditor tail={tail} value={draft.checklist} onSave={c => { setDraft(d => ({ ...d, checklist: c })); toast.success(`${c.reduce((n, s) => n + s.items.length, 0)} steps kept; Finish saves them`) }} /></div>
         </div>
       )}
 
@@ -196,7 +223,6 @@ export function EquipmentForm({ eq, setEq, pitot = true }: { eq: NonNullable<Air
         {pitot && <label className="flex items-center justify-between gap-3 self-end rounded-lg px-1 pb-2 text-sm text-fg-2">Pitot heat<Switch checked={eq.pitotHeat === true} onCheckedChange={v => setEq({ pitotHeat: v })} /></label>}
         <label className="flex items-center justify-between gap-3 self-end rounded-lg px-1 pb-2 text-sm text-fg-2">Autopilot<Switch checked={eq.autopilot === true} onCheckedChange={v => setEq({ autopilot: v })} /></label>
       </div>
-      <Hint>ADS-B Out is required in and above Class B and C (§91.225); the planner flags a route through them without it.</Hint>
     </div>
   )
 }

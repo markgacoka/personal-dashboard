@@ -67,7 +67,7 @@ async function fbStationCoords(ids) {
 // Checklist steps as saved from the planner: sections of item/action pairs, bounded.
 const validSteps = s => s === null || (Array.isArray(s) && s.length <= 100 && s.every(x => x && typeof x.title === 'string' && x.title.length <= 120 && Array.isArray(x.items) && x.items.length <= 200
   && x.items.every(i => i && typeof i.item === 'string' && i.item.length <= 300 && (i.action == null || (typeof i.action === 'string' && i.action.length <= 200)))))
-const DOC_COLS = 'id, kind, title, model, tail_number, route, filename, content_type, size, page_map, steps, source, created_at'
+const DOC_COLS = 'id, kind, title, model, tail_number, person_id, route, filename, content_type, size, page_map, steps, source, created_at'
 // Pilot records (kept once, no tail) and aircraft records (per tail) sit beside the POHs and briefings.
 export const PILOT_DOCS = ['student-cert', 'pilot-cert', 'medical', 'id', 'endorsement', 'logbook']
 export const AIRCRAFT_DOCS = ['airworthiness', 'registration', 'radio-license', 'wb', 'equipment-list', 'airframe-log', 'engine-log']
@@ -236,13 +236,15 @@ export default async function plannerRoutes(fastify) {
     if (AIRCRAFT_DOCS.includes(kind) && !req.query.tail) return reply.status(400).send({ error: 'An aircraft document needs ?tail=' })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
-      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type, page_map)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${DOC_COLS}`,
+      `INSERT INTO planner_documents (kind, title, model, tail_number, filename, bytes, size, route, content_type, page_map, person_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING ${DOC_COLS}`,
       [kind, title, req.query.model ? String(req.query.model).toUpperCase().slice(0, 20) : null, req.query.tail ? String(req.query.tail).toUpperCase().slice(0, 8) : null,
         String(req.query.filename || `${title}.pdf`).slice(0, 200), req.body, req.body.length,
         req.query.route ? String(req.query.route).toUpperCase().split(/[\s,]+/).filter(x => ID.test(x)).slice(0, 12) : null, type,
         // An uploaded POH gets the same figure links as the catalog's, read from its headings.
-        kind === 'poh' && type === 'application/pdf' ? JSON.stringify(await pohPageMap(req.body)) : null])
+        kind === 'poh' && type === 'application/pdf' ? JSON.stringify(await pohPageMap(req.body)) : null,
+        // A pilot record names the pilot profile it belongs to ('self' is stored as NULL, like the records before profiles).
+        req.query.person && req.query.person !== 'self' && /^[\w-]{1,40}$/.test(String(req.query.person)) ? String(req.query.person) : null])
     if (kind === 'poh' && type === 'application/pdf' && !Object.keys(rows[0].page_map ?? {}).length) mapScanLater(rows[0].id, req.body, savePageMap, req.log)
     return rows[0]
   })

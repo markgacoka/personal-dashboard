@@ -16,12 +16,12 @@ import { AircraftPicker, CrewPicker } from './Pickers'
 import { PlannerMap } from './PlannerMap'
 import { MapBoundary } from './MapBoundary'
 import { WbTable } from './PohSummary'
-import { PersonForm } from './ProfileForms'
+import { PersonDialog } from './ProfileForms'
 import { seatPerson } from './profiles'
 import { SECTION_LABEL, type SectionKey, type Task } from './readiness'
 import { RouteStep } from './RouteStep'
 import { StatusIcon, SubHead, fmtTime } from './ui'
-import { explainRow } from './explain'
+import { explainRow, type Expl, type Ref } from './explain'
 import { PohLink } from './RefPanel'
 import { useFlight } from './useFlight'
 import { WbLimits } from './WbLimits'
@@ -31,13 +31,13 @@ import { WeatherSection as WeatherBrief } from './WeatherSection'
 // what to do), the inputs that belong to it, then the brief.
 
 const TASK_STATUS = { nogo: 'nogo', caution: 'caution', todo: 'todo', recommended: 'note' } as const
-export function TaskRow({ t, onGo }: { t: Task; onGo?: () => void }) {
+export function TaskRow({ t, onGo, compact }: { t: Task; onGo?: () => void; compact?: boolean }) {
   return (
     <li className="flex gap-3 py-2">
       <StatusIcon status={TASK_STATUS[t.kind]} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className={cn('text-sm', t.kind === 'nogo' ? 'text-fg' : 'text-fg-2')}>{t.title}</div>
-        {t.detail && <div className="mt-0.5 text-[13px] leading-snug text-fg-3">{t.detail}</div>}
+        {t.detail && !compact && <div className="mt-0.5 text-[13px] leading-snug text-fg-3">{t.detail}</div>}
       </div>
       {onGo && <button onClick={onGo} className="inline-flex shrink-0 items-center gap-1 self-start text-[13px] text-accent hover:underline">{SECTION_LABEL[t.section]}<ArrowRight className="size-3.5" /></button>}
     </li>
@@ -55,7 +55,7 @@ export function Section({ k, lead, right, children }: { k: SectionKey; lead?: Re
       </header>
       {open.length > 0 && (
         <section aria-label="Still open" className="rounded-xl px-4 py-2 ring-1 ring-inset ring-border sm:px-5">
-          <ul className="divide-y divide-border">{open.map(t => <TaskRow key={t.id} t={t} />)}</ul>
+          <ul className="divide-y divide-border">{open.map(t => <TaskRow key={t.id} t={t} compact />)}</ul>
         </section>
       )}
       {children}
@@ -73,11 +73,11 @@ const Panel = ({ title, lead, children, className }: { title?: React.ReactNode; 
 export function PilotSection() {
   const f = useFlight()
   return (
-    <Section k="pilot" lead="Who's flying, what the FAA rules allow on this flight for that role, whether you're fit to fly, and the weather against your personal minimums.">
-      <Panel title="Who's flying" lead="Load a pilot profile (and an instructor's for a dual flight), or add one here. Profiles keep the certificate, medical, endorsements and weight for every flight."><CrewPicker /></Panel>
+    <Section k="pilot">
+      <Panel><CrewPicker /></Panel>
       {f.pilot && <PilotStep plan={f.plan} set={f.set} d={f.d} currency={f.currency} certs={f.certs ?? null} pilotName={f.pilot.name}
         saveCerts={c => f.savePilot({ certs: c })?.then(() => toast.success(`${f.pilot!.name}'s certificates saved`), e => toast.error((e as Error).message))} savingCerts={f.crew.saving}
-        minimums={f.minimums} savedAt={f.minQ.data?.updatedAt} saveMinimums={m => f.minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={f.minQ.save.isPending} />}
+        personId={f.pilot.id} minimums={f.minimums} savedAt={f.minQ.data?.updatedAt} saveMinimums={m => f.minQ.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} saving={f.minQ.save.isPending} />}
     </Section>
   )
 }
@@ -85,8 +85,8 @@ export function PilotSection() {
 export function AircraftSection() {
   const f = useFlight()
   return (
-    <Section k="aircraft" lead="The airplane from its registry, its POH and its profile: what it is, its speeds and systems, its performance today, its checklist and whether it's airworthy for this flight.">
-      <Panel title="Aircraft"><AircraftPicker /></Panel>
+    <Section k="aircraft">
+      <Panel><AircraftPicker /></Panel>
       {f.plan.tail && (
         <AircraftStep plan={f.plan} set={f.set} d={f.d} registry={f.registry.data} match={f.match} poh={f.pohQ.data?.match} pohDoc={f.pohDoc} pohUploaded={!!f.pohQ.data?.uploaded}
           savingPlanning={f.planningQ.save.isPending} pohLoading={f.pohQ.isLoading} pohError={f.pohQ.error ? (f.pohQ.error as Error).message : null} aircraft={f.aircraft} planning={f.planning} savePlanning={f.savePlanning} u={f.u} />
@@ -98,7 +98,7 @@ export function AircraftSection() {
 export function AirportsSection() {
   const f = useFlight()
   return (
-    <Section k="airports" lead="Each airport at the time you're there: runways and the wind on them, pattern, frequencies and when to use them, NOTAMs, and your alternate. Your notes for an airport are kept in its profile.">
+    <Section k="airports">
       <AirportsStep d={f.d} routePts={f.routePts} alternate={f.altAirport} noAlternate={f.plan.alternate === false} autoAlternate={f.autoAlt} setAlternate={v => f.set({ alternate: v })} minimums={f.minimums} notams={f.notamSets} cycle={f.cycle}
         nasr={f.nasr} profiles={f.aptProfiles.data ?? {}} savingProfile={f.aptProfiles.save.isPending}
         saveProfile={(id, p) => f.aptProfiles.save.mutate({ id, profile: p }, { onSuccess: () => toast.success(p ? `${id} profile saved` : `${id} profile deleted`), onError: e => toast.error(e.message) })} />
@@ -110,7 +110,7 @@ export function RouteSection() {
   const f = useFlight()
   const common = { plan: f.plan, set: f.set, d: f.d, routePts: f.routePts, alternate: f.altAirport, weather: f.weather, airspace: f.airspace, radar: f.radar, notams: f.notams, checkpoints: f.corridor, landmarks: f.landmarks, landmarksLoading: f.landmarksLoading, edit: f.edit }
   return (
-    <Section k="route" lead="Where and when: the route on the chart with checkpoints you can see, altitudes, winds aloft and fuel. Select a row for how it was worked out.">
+    <Section k="route">
       <Panel>
         <FlightInputs step={2} plan={f.plan} set={f.set} d={f.d} u={f.u} profile={f.d.profile} certs={f.certs ?? null} />
         <FlightInputs step={3} plan={f.plan} set={f.set} d={f.d} u={f.u} profile={f.d.profile} certs={f.certs ?? null} />
@@ -123,16 +123,27 @@ export function RouteSection() {
 
 /* ── Outputs: the three documents the flight produces ── */
 
-function OutputHead({ k, lead, extra }: { k: SectionKey; lead: React.ReactNode; extra?: React.ReactNode }) {
-  const f = useFlight()
-  const open = f.tasks.some(t => t.kind !== 'recommended')
+// The NavLog's source key: for each column group, every source its figures
+// used across the sheet's rows (an API with when it was fetched, a POH figure,
+// a rule), numbered to match the marks in the column headers.
+export const NAV_COLS: { key: string; label: string }[] = [
+  { key: 'course', label: 'Course, distance, variation' }, { key: 'wind', label: 'Wind and temperature' }, { key: 'tas', label: 'True airspeed' },
+  { key: 'heading', label: 'Heading and wind correction' }, { key: 'time', label: 'Ground speed, time, ETA' }, { key: 'fuel', label: 'Fuel' },
+]
+export function sourceKey(rows: Expl[][]): { n: number; key: string; label: string; refs: Ref[]; assumes: string[] }[] {
+  return NAV_COLS.map((c, i) => {
+    const xs = rows.map(r => r.find(e => e.key === c.key)).filter((e): e is Expl => !!e)
+    const seen = new Set<string>(), refs: Ref[] = []
+    for (const r of xs.flatMap(e => e.refs ?? [])) if (!seen.has(r.label)) { seen.add(r.label); refs.push(r) }
+    const assumes = [...new Set(xs.flatMap(e => e.assumes))].slice(0, 3)
+    return { n: i + 1, key: c.key, label: c.label, refs, assumes }
+  })
+}
+
+function OutputHead({ k, extra }: { k: SectionKey; extra?: React.ReactNode }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-3 print:hidden">
-      <div className="min-w-0">
-        <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{SECTION_LABEL[k]}</h2>
-        <p className="mt-1 max-w-3xl text-sm text-fg-3">{lead}</p>
-        {open && <p className="mt-1 text-[13px] text-fg-3">Some items are still open (<button className="text-accent hover:underline" onClick={() => f.go('overview')}>Overview</button>); this prints with what's known.</p>}
-      </div>
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
+      <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{SECTION_LABEL[k]}</h2>
       <div className="flex flex-wrap items-center gap-3">{extra}<Button variant="primary" onClick={() => window.print()}><Printer />Print</Button></div>
     </header>
   )
@@ -149,37 +160,27 @@ function DocTitle({ title }: { title: string }) {
   )
 }
 
-const pref = (k: string, dflt: boolean) => { try { const v = localStorage.getItem(k); return v == null ? dflt : v === '1' } catch { return dflt } }
-const setPref = (k: string, v: boolean) => { try { localStorage.setItem(k, v ? '1' : '0') } catch { /* private mode */ } }
-
 export function NavlogSection() {
-  const [work, setWork] = useState(() => pref('planner-navlog-workings', true))
-  const [printWork, setPrintWork] = useState(() => pref('planner-navlog-print-workings', false))
   return (
     <div>
-      <OutputHead k="navlog" lead={<>The NavLog you fly with: one sheet per flight, then the weather log and flight plan, then the aircraft's checklist. Under each checkpoint, how every figure in the row was worked out and the API or POH page it came from; select a figure for its full workings.</>}
-        extra={<>
-          <label className="flex items-center gap-2 text-[13px] text-fg-2"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={work} onChange={e => { setWork(e.target.checked); setPref('planner-navlog-workings', e.target.checked) }} />Show workings</label>
-          {work && <label className="flex items-center gap-2 text-[13px] text-fg-2"><input type="checkbox" className="size-4 accent-[var(--accent)]" checked={printWork} onChange={e => { setPrintWork(e.target.checked); setPref('planner-navlog-print-workings', e.target.checked) }} />Print them</label>}
-        </>} />
-      <NavlogDoc workings={work} printWorkings={work && printWork} />
+      <OutputHead k="navlog" />
+      <NavlogDoc />
     </div>
   )
 }
 
-export function NavlogDoc({ workings = false, printWorkings = false }: { workings?: boolean; printWorkings?: boolean }) {
+export function NavlogDoc() {
   const f = useFlight()
   const list = f.planning.checklist ?? []
   return (
     <div className="space-y-10 rounded-xl bg-card px-3 py-4 ring-1 ring-inset ring-white/[0.04] sm:px-5 sm:py-5 print:rounded-none print:bg-transparent print:p-0 print:ring-0">
-      {f.d.flights.length > 0 && <p className="text-sm text-fg-3 xl:hidden print:hidden">The sheet is the paper NavLog at full size; scroll it sideways.</p>}
       {f.d.flights.map(fl => (
         <div key={fl.n} className="break-after-page">
           <SubHead right={<span className="num text-xs text-fg-3">{fl.distNm.toFixed(1)} nm · {Math.round(fl.eteMin)} min · {fl.fuelGal.toFixed(2)} gal · arrive {fmtTime(fl.arriveAt)}</span>}>
             NavLog {f.d.flights.length > 1 ? `${fl.n + 1} of ${f.d.flights.length} · ` : ''}<span className="num">{fl.from.icao || fl.from.id} → {fl.to.icao || fl.to.id}</span>
           </SubHead>
           <NavlogFront plan={f.planEff} set={f.set} d={f.d} flight={fl} u={f.u} onExplain={(key, card) => f.explain({ kind: 'nav', key, card })}
-            workings={workings ? r => explainRow(f.xIn, r) : null} printWorkings={printWorkings}
+            focusKey={f.focus?.kind === 'nav' ? f.focus.key : null} sources={sourceKey(fl.rows.map(r => explainRow(f.xIn, r)))}
             notes={flightNotes(f.d, fl, f.acName, f.notamSets, f.role === 'dual' ? f.plan.crew?.instructor?.trim() || 'instructor' : null)} />
         </div>
       ))}
@@ -192,7 +193,7 @@ export function NavlogDoc({ workings = false, printWorkings = false }: { working
         </div>
       )}
       {f.plan.tail && list.length > 0 && <ChecklistPrint tail={f.plan.tail} secs={list} />}
-      <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.74 } .navlog-reverse > div { zoom: 0.62 } }'}</style>
+      <style>{'@media print { @page { size: letter landscape; margin: 0.25in } .navlog-front > div { zoom: 0.68 } .navlog-reverse > div { zoom: 0.62 } }'}</style>
     </div>
   )
 }
@@ -204,16 +205,13 @@ export function WbSection() {
   const open = f.tasks.filter(t => t.section === 'loading')
   return (
     <div>
-      <OutputHead k="loading" lead="Who and what is on board, then the weight and balance from ramp to each landing against every limit, the CG envelope, and the takeoff and landing distances. Select a line or a point for its workings." />
+      <OutputHead k="loading" />
       <div className="mb-8 space-y-4 print:hidden">
-        {open.length > 0 && <ul className="divide-y divide-border rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5">{open.map(t => <TaskRow key={t.id} t={t} />)}</ul>}
-        <Panel title="Loading">
+        {open.length > 0 && <ul className="divide-y divide-border rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5">{open.map(t => <TaskRow key={t.id} t={t} compact />)}</ul>}
+        <Panel>
           <FlightInputs step={4} plan={f.plan} set={f.set} d={f.d} u={f.u} profile={f.d.profile} certs={f.certs ?? null} />
-          <div className="mt-3">
-            {adding
-              ? <PersonForm role="passenger" onCancel={() => setAdding(false)} onDone={p => { if (seatFree) f.set(seatPerson(f.plan, seatFree, p)); setAdding(false) }} />
-              : <Button size="sm" variant="ghost" onClick={() => setAdding(true)}><Plus />New passenger profile</Button>}
-          </div>
+          <div className="mt-3"><Button size="sm" variant="ghost" onClick={() => setAdding(true)}><Plus />New passenger</Button></div>
+          <PersonDialog open={adding} onOpenChange={setAdding} role="passenger" onDone={p => { if (seatFree) f.set(seatPerson(f.plan, seatFree, p)) }} />
         </Panel>
       </div>
       <WbDoc />
@@ -232,13 +230,13 @@ export function WbDoc() {
         <>
           <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 6 · <PohLink fig="wb">loading page</PohLink></span>}>Loading, line by line</SubHead><WbTable d={d} plan={f.plan} u={f.u} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
           <div className="grid gap-8 min-[1700px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] print:grid-cols-1">
-            <div><SubHead right={<span className="text-[13px] text-fg-3 print:hidden">Select a point for its workings</span>}>Center of gravity envelope</SubHead><CgChart d={d} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
+            <div><SubHead>Center of gravity envelope</SubHead><CgChart d={d} focus={f.focus?.kind === 'wb' ? f.focus.i : null} onFocus={i => f.explain({ kind: 'wb', i })} /></div>
             {d.profile && <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 2 · <PohLink fig="limits">limits page</PohLink></span>}>Against every limit</SubHead><WbLimits d={d} plan={f.plan} u={f.u} tank={tank} /></div>}
           </div>
         </>
       ) : <p className="text-sm text-fg-3">The weight and balance appears once the aircraft is chosen.</p>}
       <div><SubHead right={<span className="text-[13px] text-fg-3">POH Section 5 · <PohLink fig="takeoff">takeoff</PohLink> · <PohLink fig="landing">landing</PohLink></span>}>Takeoff and landing distances</SubHead><PerformanceSection d={d} profile={d.profile} /></div>
-      <p className="text-[13px] text-fg-3">Empty weight: {d.wb.emptySample ? `the POH sample airplane, a stand-in until ${f.plan.tail}'s own record is entered (Aircraft → Profile and records)` : `${f.plan.tail}'s weight and balance record`}. Arms and limits: {d.profile?.source ?? 'the POH'}.</p>
+      <p className="text-[13px] text-fg-3">Empty weight: {d.wb.emptySample ? 'POH sample airplane (stand-in)' : `${f.plan.tail}'s record`} · arms and limits: {d.profile?.source ?? 'the POH'}</p>
     </div>
   )
 }
@@ -248,11 +246,12 @@ export function WeatherBriefSection() {
   const briefed = f.plan.checklist?.['brief.standard'] === true
   return (
     <div>
-      <OutputHead k="weather" lead="The weather at each airport at the time you're there, hazards along the route, winds aloft and NOTAMs, with where each came from and when. Not a substitute for a standard briefing." />
+      <OutputHead k="weather" />
       <div className="mb-8 space-y-4 print:hidden">
         {f.routePts.length > 1 && <MapBoundary><PlannerMap className="h-[24rem] rounded-xl" route={f.routePts} alternate={f.altAirport} weather={f.weather} d={f.d} airspace={f.airspace} radar={f.radar} notams={f.notams} /></MapBoundary>}
-        <Panel title="Standard briefing" lead="§91.103: all available information for a flight away from the airport. Get it from Flight Service and keep the PDF beside the plan.">
+        <Panel>
           <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-fg">Standard briefing <span className="font-normal text-fg-3">§91.103</span></span>
             <a href="https://www.1800wxbrief.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline">1800wxbrief.com<ExternalLink className="size-3.5" /></a>
             <span className="text-sm text-fg-3">or 1-800-992-7433</span>
             <Button size="sm" variant="ghost" onClick={() => f.refs.show('briefing')}>Briefing PDF</Button>

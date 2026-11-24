@@ -3,7 +3,41 @@
 How the planner at `/flying/plan` is organised and why. `flight-planner.md`
 covers what it calculates.
 
-## Flights, outputs and profiles (current)
+## Summary, profiles in modals, runway diagram (current)
+
+- **Summary** (was Overview) is tiles, not text: route, fuel as one bar
+  (taxi, trip, reserve, extra against usable), takeoff weight against the
+  maximum and the CG between the envelope's limits at that weight, a runway
+  diagram for the departure and the arrival, and each airport's flight
+  category and wind. Then "To resolve" (titles only, each linking to its
+  section) and the suggestions folded behind one line. The verdict chip in the
+  header is hidden on the Summary, which states it once.
+- **Profiles are added and edited in modals** (`ProfileForms.tsx`
+  `PersonDialog`, `AircraftDialog`; airport profiles in `Pickers.tsx`
+  `RouteAirportProfiles`). Every profile tile on the new-flight screen and in
+  Pilot and Aircraft has edit and delete; delete asks in a confirm dialog and
+  says how many saved flights use it (`profiles.ts` `usedBy`). The self pilot
+  can't be deleted; a logbook tail without a profile has nothing to delete.
+- **Documents belong to a profile**: a pilot record (certificate, medical, ID,
+  endorsements, logbook) is uploaded to that pilot's profile
+  (`planner_documents.person_id`; records from before profiles belong to the
+  self pilot), an aircraft record or checklist to its tail.
+- **Runway diagram** (`RunwayDiagram.tsx`): the runways to scale, true north
+  up, from the NASR runway-end coordinates (the Chart Supplement's data), the
+  runway in use (D-ATIS, else the favored one) in the accent colour with its
+  direction of travel and its traffic pattern on the published or profiled
+  side, and wind streaks drifting with the wind. Headwind and crosswind beside
+  it. Motion stops for reduced motion and print.
+- **NavLog shows only the log.** No inline workings. Each computed column
+  carries a numbered mark (1 course, 2 wind, 3 TAS, 4 heading, 5 time, 6 fuel)
+  matching a source key under the sheet: the APIs (with fetch time) and POH
+  figures each column used, across all rows. Any figure opens that row's
+  workings in the side sheet and highlights the row; figures have no underline
+  on the sheet, only a hover. The key prints with the sheet on one page.
+- **Less text**: section and panel subtitles and input-group hints are gone;
+  task rows inside a section show titles only.
+
+## Flights, outputs and profiles
 
 - **Flights** (`/flying/plan`, `FlightsPage.tsx`): every flight is its own
   saved plan at `/flying/plan/:id`, so several can be open at once. You can

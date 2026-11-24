@@ -8,7 +8,7 @@ import type { AircraftPlanning, Airport, Derived, Flight, NavRow, Plan, RowOverr
 import { isWaypoint, soulsOf } from './model'
 import { deg3, fmtMin, fmtTime, fmtZ, hhmm } from './ui'
 import { fmtP, toF, type Units, US } from './units'
-import type { Expl } from './explain'
+import type { Ref } from './explain'
 import { RefList } from './ExplainView'
 
 const B = 'border border-fg/45'
@@ -32,12 +32,12 @@ function useCells(plan: Plan, set: (p: Partial<Plan>) => void, readOnly?: boolea
 // highest terrain above the sheet, the briefing notes, the navlog rows with
 // TOC and TOD, and the airport frequencies. Wind cells take your own numbers
 // (E6B style) and the row recomputes; blank cells are for the cockpit.
-export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onExplain, workings, printWorkings }: {
+export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onExplain, focusKey, sources }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; flight: Flight; notes: ReturnType<typeof flightNotes>; u?: Units; readOnly?: boolean
   // Selecting a computed figure opens its workings (row key, and which quantity: course, wind, tas, heading, time, fuel).
   onExplain?: (rowKey: string, card?: string) => void
-  // Inline workings under each row: how every figure in it was reached and where its inputs came from.
-  workings?: ((r: NavRow) => Expl[]) | null; printWorkings?: boolean
+  // The row whose workings are open (highlighted), and the source key printed under the sheet.
+  focusKey?: string | null; sources?: { n: number; key: string; label: string; refs: Ref[]; assumes: string[] }[]
 }) {
   const { act, inp, putAct } = useCells(plan, set, readOnly)
   const F = (gal: number) => toF(gal, u).toFixed(u.fuel === 'L' ? 1 : 2)
@@ -52,6 +52,8 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
     set({ overrides: { ...ov, [key]: { ...ov[key], [f]: n != null && Number.isFinite(n) ? n : null } } })
   }
   const code = (a: Airport) => a.icao || a.id
+  // A column's source mark, numbered like the key under the sheet.
+  const M = (n: number) => sources?.length ? <sup className="num ml-0.5 text-[8.5px] font-semibold text-accent print:text-fg">{n}</sup> : null
   const notesLines = [notes.day, notes.aircraft, `WX: ${notes.wx[0]}`, ...notes.wx.slice(1), `NOTAMs: ${notes.notams.join(' ·')}`,
     ...[dep, dest].filter((a, i, arr) => a.notes && arr.indexOf(a) === i).map(a => `${code(a)}: ${a.notes!.replace(/\s*\n\s*/g, ' ·')}`)]
 
@@ -85,9 +87,9 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
               <tr>
                 <th className={H} rowSpan={3}>Check Points<div className="normal-case">(Fixes)</div></th>
                 <th className={cn(H, 'nl-bar')}>VOR</th>
-                <th className={H} rowSpan={3}>Course<div className="normal-case">(Route)</div></th>
+                <th className={H} rowSpan={3}>Course{M(1)}<div className="normal-case">(Route)</div></th>
                 <th className={H} rowSpan={2}>Altitude</th>
-                <th className={cn(H, 'nl-bar')} colSpan={2}>Wind</th>
+                <th className={cn(H, 'nl-bar')} colSpan={2}>Wind{M(2)}</th>
                 <th className={H}>CAS</th>
                 <th className={H} rowSpan={2}>TC</th><th className={H} rowSpan={2}>TH</th><th className={H} rowSpan={2}>MH</th>
                 <th className={H} rowSpan={3}>CH</th>
@@ -106,10 +108,10 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
                 <th className={H}>Freq.</th>
                 <th className={cn(B, 'px-1 text-center font-semibold')} title="Field elevation">{Math.round(dep.elev)}</th>
                 <th className={H} colSpan={2}>Temp</th>
-                <th className={H}>TAS</th>
-                <th className={H}>−L/+R<br />WCA</th><th className={H}>−E/+W<br />Var.</th><th className={H}>± Dev.</th>
+                <th className={H}>TAS{M(3)}</th>
+                <th className={H}>−L/+R<br />WCA{M(4)}</th><th className={H}>−E/+W<br />Var.</th><th className={H}>± Dev.</th>
                 <th className={cn(B, 'px-1 text-center font-semibold')} title="Total distance">{flight.distNm.toFixed(1)}</th>
-                <th className={H}>ETE<br />ATE</th><th className={H}>ETA<br />ATA</th><th className={H}>Fuel<br />Rem.</th>
+                <th className={H}>ETE{M(5)}<br />ATE</th><th className={H}>ETA<br />ATA</th><th className={H}>Fuel{M(6)}<br />Rem.</th>
               </tr>
             </thead>
             <tbody>
@@ -122,10 +124,7 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
               </tr>
               <tr><td className={C} /><td className={C} colSpan={2}>{inp(act[`${k}-atd`]?.ata ?? '', v => putAct(`${k}-atd`, 'ata', v), '', 'ATD')}</td><td className={C} title="After start, taxi and takeoff">{F(flight.fuelStart - taxi)}</td></tr>
               {flight.rows.map(r => (
-                <Fragment key={r.key}>
-                  <SheetRow r={r} act={act} putAct={putAct} F={F} inp={inp} reserve={d.totals.reserveFuel} ov={ov[r.key] || {}} putOv={(f, v) => putOv(r.key, f, v)} readOnly={readOnly} fx={onExplain ? card => onExplain(r.key, card) : undefined} />
-                  {workings && <WorkingsRow items={workings(r)} label={r.to.kind === 'toc' ? 'TOC' : r.to.kind === 'tod' ? 'TOD' : r.to.label} print={!!printWorkings} onOpen={onExplain ? card => onExplain(r.key, card) : undefined} />}
-                </Fragment>
+                <SheetRow key={r.key} r={r} act={act} putAct={putAct} F={F} inp={inp} reserve={d.totals.reserveFuel} ov={ov[r.key] || {}} putOv={(f, v) => putOv(r.key, f, v)} readOnly={readOnly} on={focusKey === r.key} fx={onExplain ? card => onExplain(r.key, card) : undefined} />
               ))}
               <tr>
                 <td className={cn(C, 'bg-fg/[0.07] text-right font-semibold')} colSpan={11}>Totals »</td>
@@ -147,40 +146,34 @@ export function NavlogFront({ plan, set, d, flight, notes, u = US, readOnly, onE
             </div>
           </div>
         </div>
+        {sources && sources.length > 0 && <SourceKey list={sources} open={onExplain && flight.rows[0] ? card => onExplain(flight.rows[0].key, card) : undefined} />}
       </div>
     </section>
   )
 }
 
-// Under a row: each figure's arithmetic in the order it's worked out (course →
-// wind → airspeed → heading → ground speed and time → fuel), what it assumes,
-// and the API or POH page each input came from.
-function WorkingsRow({ items, label, print, onOpen }: { items: Expl[]; label: string; print: boolean; onOpen?: (card: string) => void }) {
+// Under the sheet: where each column's figures come from, numbered like the
+// marks in its header. Any figure on the sheet opens that row's full workings.
+function SourceKey({ list, open }: { list: { n: number; key: string; label: string; refs: Ref[]; assumes: string[] }[]; open?: (card: string) => void }) {
   return (
-    <tr className={cn('nl-work', !print && 'print:hidden')}>
-      <td colSpan={16} className="border border-fg/25 bg-fg/[0.03] px-2 py-1.5 text-left align-top">
-        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-fg-3">How the {label} row was worked out</div>
-        <div className="grid gap-x-6 gap-y-1.5 xl:grid-cols-2 min-[1800px]:grid-cols-3">
-          {items.map(e => (
-            <div key={e.key} className="min-w-0 text-[12px] leading-snug">
-              <div className="flex items-baseline gap-2">
-                {onOpen ? <button type="button" className="fig font-semibold" onClick={() => onOpen(e.key)}>{e.title}</button> : <span className="font-semibold">{e.title}</span>}
-                <span className="num font-semibold text-fg">{e.value}</span>
-              </div>
-              <div className="num text-fg-2">{e.steps.map((l, i) => <span key={i}>{i > 0 && <span className="text-fg-3"> · </span>}<span className="text-fg-3">{l.k}:</span> {l.v}</span>)}</div>
-              {e.assumes.length > 0 && <div className="text-fg-3">Assumes: {e.assumes.join(' ')}</div>}
-              {e.refs && e.refs.length > 0 && <div className="text-fg-3">Source: <RefList inline refs={e.refs} /></div>}
-            </div>
-          ))}
+    <div className="mt-2 grid gap-x-6 gap-y-1 border-t border-fg/25 pt-2 text-[11px] leading-snug text-fg-2 sm:grid-cols-2 xl:grid-cols-3 print:grid-cols-3 print:text-[9px]">
+      {list.map(c => (
+        <div key={c.key} className="flex min-w-0 gap-1.5">
+          <span className="num grid size-4 shrink-0 place-items-center rounded-full bg-fg/10 text-[9.5px] font-semibold text-fg">{c.n}</span>
+          <span className="min-w-0">
+            {open ? <button type="button" className="font-semibold hover:text-accent print:font-semibold" onClick={() => open(c.key)}>{c.label}</button> : <span className="font-semibold">{c.label}</span>}
+            <span className="text-fg-3"> · </span>{c.refs.length ? <RefList inline refs={c.refs} /> : <span className="text-fg-3">computed from the columns before it</span>}
+          </span>
         </div>
-      </td>
-    </tr>
+      ))}
+      <p className="text-fg-3 print:hidden sm:col-span-2 xl:col-span-3">Select any figure for its calculation, assumptions and sources.</p>
+    </div>
   )
 }
 
-function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly, fx }: {
+function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly, fx, on }: {
   r: NavRow; act: Act; putAct: (k: string, f: ActField, v: string) => void; F: (g: number) => string; inp: Inp; reserve: number
-  ov: RowOverride; putOv: (f: keyof RowOverride, v: string) => void; readOnly?: boolean; fx?: (card?: string) => void
+  ov: RowOverride; putOv: (f: keyof RowOverride, v: string) => void; readOnly?: boolean; fx?: (card?: string) => void; on?: boolean
 }) {
   // A computed figure: select it for how it was worked out.
   const X = (card: string | undefined, node: React.ReactNode, what: string) => fx ? <button type="button" className="fig" onClick={() => fx(card)} title={`How ${what} was worked out`}>{node}</button> : node
@@ -195,7 +188,7 @@ function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly, fx }: 
   const sign = (x: number) => { const n = Math.round(x); return `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}` }
   return (
     <Fragment>
-      <tr>
+      <tr className={cn(on && 'nl-on')}>
         <td className={cn(C, 'text-left text-sm font-semibold')} rowSpan={2}>{X(undefined, label, `the ${label} row`)}{r.to.kind === 'toc' || r.to.kind === 'tod' ? <div className="text-[10px] font-normal text-fg-3">{r.to.kind === 'toc' ? 'top of climb' : 'top of descent'}</div> : null}</td>
         <td className={C}>{r.to.kind === 'waypoint' && /VOR|NDB|TACAN|DME/.test(r.to.navType ?? '') ? r.to.id.replace(/\d{6}$/, '') : ''}</td>
         <td className={C} rowSpan={2}>{r.from}→{label}</td>
@@ -207,7 +200,7 @@ function SheetRow({ r, act, putAct, F, inp, reserve, ov, putOv, readOnly, fx }: 
         <td className={C}>{X('course', r.distNm.toFixed(1), 'the distance')}</td><td className={C}>{X('time', Math.round(r.gs), 'the ground speed')}</td>
         <td className={C}>{X('time', r.eteMin.toFixed(1), 'the time en route')}</td><td className={C}>{X('time', hhmm(r.eta), 'the ETA')}</td><td className={C}>{X('fuel', F(r.fuelGal), 'the fuel')}</td>
       </tr>
-      <tr>
+      <tr className={cn(on && 'nl-on')}>
         <td className={C}>{r.to.freq ?? ''}</td>
         <td className={C} colSpan={2}>{e6b('temp', r.wind?.temp != null ? sign(r.wind.temp) : '')}</td>
         <td className={C}>{X('tas', r.tas, 'the true airspeed')}</td>

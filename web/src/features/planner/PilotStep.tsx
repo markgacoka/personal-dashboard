@@ -49,9 +49,9 @@ export function minimumsRows(d: Derived, m: Minimums): MinRow[] {
 }
 
 // Step 7: you — IMSAFE, your minimums against this flight, and recency from the logbook.
-export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts, pilotName }: {
+export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts, pilotName, personId }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; currency: CurrencyItem[]; minimums: Minimums; savedAt?: string; saveMinimums: (m: Minimums) => void; saving: boolean
-  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean; pilotName?: string
+  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean; pilotName?: string; personId?: string
 }) {
   const dual = roleOf(plan.crew, certs) === 'dual'
   const rows = minimumsRows(d, minimums).map(r => (dual && r.status === 'nogo' ? { ...r, status: 'caution' as const } : r))
@@ -60,16 +60,16 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
   return (
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="space-y-8">
-        <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} title={pilotName ? `${pilotName}: certificates, medical and endorsements` : undefined} />
-        <RoleRules current={dual ? 'dual' : (certs?.certificate ?? 'student') === 'student' ? 'solo' : 'private'} />
-        <RecordsList title={<>Pilot documents <span className="font-normal text-fg-3">· kept for every plan</span></>} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
         <div>
-          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Who's flying above</span>}>This flight under the FAA rules</SubHead>
-          {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}
+          <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61</span>}>This flight under the FAA rules</SubHead>
+          {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check it.</p>}
+          <details className="mt-2"><summary className="cursor-pointer text-[13px] text-fg-3 hover:text-fg">What each role allows</summary><div className="mt-3"><RoleRules current={dual ? 'dual' : (certs?.certificate ?? 'student') === 'student' ? 'solo' : 'private'} /></div></details>
         </div>
-        <Checklist title="Pilot condition · IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />
+        <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} title={pilotName ? `${pilotName}'s certificates` : undefined} />
+        <RecordsList title={<>{pilotName ? `${pilotName}'s documents` : 'Documents'}</>} person={personId} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
+        <Checklist title="IMSAFE" right={<span className="text-xs text-fg-3">AIM 8-1-1</span>} items={IMSAFE} prefix="imsafe" plan={plan} set={set} yes="Fit" no="Not fit" />
         <div>
-          <SubHead right={<span className="text-xs text-fg-3">From your logbook</span>}>Currency and recency</SubHead>
+          <SubHead right={<span className="text-xs text-fg-3">Logbook</span>}>Currency</SubHead>
           <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
             {currency.filter(c => c.key !== 'ifr').map(c => (
               <li key={c.key} className="flex gap-3 px-3 py-2.5">
@@ -82,8 +82,7 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
       </div>
       <div className="space-y-8">
         <div>
-          <SubHead right={<span className="text-xs text-fg-3">Worst value at any ETA</span>}>Personal minimums for this flight</SubHead>
-          {dual && <p className="mb-2 text-sm text-fg-3">Dual: these are your solo limits. A breach shows as a caution to talk through with your instructor, not a no-go.</p>}
+          <SubHead right={<span className="text-xs text-fg-3">{dual ? 'Solo limits · cautions on dual' : 'Worst at any ETA'}</span>}>Personal minimums</SubHead>
           <ul className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
             {rows.map(r => (
               <li key={r.label} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-sm">
@@ -95,7 +94,7 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
           </ul>
         </div>
         <details className="group">
-          <summary className="cursor-pointer text-sm text-accent">Edit your minimums</summary>
+          <summary className="cursor-pointer text-sm text-accent">Edit minimums</summary>
           <div className="mt-3"><MinimumsEditor minimums={minimums} savedAt={savedAt} onSave={saveMinimums} saving={saving} /></div>
         </details>
       </div>

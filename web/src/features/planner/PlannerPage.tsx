@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
-import { Calculator, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FilePlus2, Loader2, MoreHorizontal, Pencil, Printer, Trash2, Users } from 'lucide-react'
+import { Calculator, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FilePlus2, Loader2, MoreHorizontal, Navigation, Pencil, Plane, Printer, Trash2, UserRound, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Menu, MenuContent, MenuItem, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { relTime } from '@/lib/format'
@@ -8,11 +8,12 @@ import { cn } from '@/lib/utils'
 import { usePlan, type SavedPlan } from './api'
 import { FlightInputs } from './FlightInputs'
 import { parseRouteItem, type Status } from './model'
-import { AircraftPicker, CrewPicker } from './Pickers'
-import { SECTIONS, SECTION_LABEL, sectionState, type SectionKey, type TaskKind } from './readiness'
+import { AircraftPicker, CrewPicker, RouteAirportProfiles } from './Pickers'
+import { Summary } from './Summary'
+import { SECTIONS, sectionState, type SectionKey, type TaskKind } from './readiness'
 import { RefProvider } from './RefPanel'
-import { AircraftSection, AirportsSection, NavlogDoc, NavlogSection, PilotSection, RouteSection, TaskRow, WbDoc, WbSection, WeatherBriefSection, WxDoc } from './Sections'
-import { VerdictIcon, fmtMin, fmtTime } from './ui'
+import { AircraftSection, AirportsSection, NavlogDoc, NavlogSection, PilotSection, RouteSection, WbDoc, WbSection, WeatherBriefSection, WxDoc } from './Sections'
+import { VerdictIcon, fmtMin } from './ui'
 import { FlightCtx, useFlight, useFlightActions, useFlightState } from './useFlight'
 import { WorkSheet } from './WorkSheet'
 
@@ -55,7 +56,7 @@ function Shell({ saved }: { saved: SavedPlan }) {
               <Rail />
               <main className="min-w-0">
                 <Status />
-                {section === 'overview' && <Overview printAll={printAll} />}
+                {section === 'overview' && <Summary printAll={printAll} />}
                 {section === 'pilot' && <PilotSection />}
                 {section === 'aircraft' && <AircraftSection />}
                 {section === 'airports' && <AirportsSection />}
@@ -95,13 +96,13 @@ function Header({ printAll }: { printAll: () => void }) {
           </label>
           {!f.setup && (
             <p className="mt-1 text-sm text-fg-3">
-              <span className="num text-fg-2">{f.routeText}</span>{when && <> · {when}</>}{plan.tail && <> · <span className="num">{plan.tail}</span></>}{crew && <> · {crew}</>}
+              {plan.name.replace(/\s/g, '') !== f.routeText.replace(/\s/g, '') && <><span className="num text-fg-2">{f.routeText}</span> · </>}{when}{plan.tail && <> · <span className="num">{plan.tail}</span></>}{crew && <> · {crew}</>}
               {d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)}</span></>}
             </p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!f.setup && <Verdict onClick={() => f.go('overview')} />}
+          {!f.setup && f.section !== 'overview' && <Verdict onClick={() => f.go('overview')} />}
           <SaveStatus />
           <Switcher />
           <Menu>
@@ -245,93 +246,6 @@ function Pager() {
   )
 }
 
-/* ── Overview ── */
-function Overview({ printAll }: { printAll: () => void }) {
-  const f = useFlight()
-  const { d, plan } = f
-  const t = d.totals
-  const to = d.wb.steps.find(x => x.total && x.label.startsWith('Takeoff'))
-  const must = f.tasks.filter(x => x.kind !== 'recommended'), rec = f.tasks.filter(x => x.kind === 'recommended')
-  const fact = (k: string, v: React.ReactNode, topic?: string) => (
-    <div key={k} className="min-w-0"><dt className="text-[13px] text-fg-3">{k}</dt><dd className="num mt-1 truncate text-[15px] text-fg">{topic ? <button className="fig" onClick={() => f.explain({ kind: 'topic', key: topic })}>{v}</button> : v}</dd></div>
-  )
-  const code = (a: { icao: string | null; id: string }) => a.icao || a.id
-  const dep = d.perf.find(p => p.kind === 'takeoff'), arr = [...d.perf].reverse().find(p => p.kind === 'landing' && p.wx.role !== 'alternate')
-  const areas: [SectionKey, React.ReactNode][] = [
-    ['pilot', f.pilot ? [f.pilot.name, f.role === 'dual' ? `dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : 'pilot in command', f.certs?.certificate ? null : 'certificate not entered'].filter(Boolean).join(' · ') : 'No pilot loaded yet'],
-    ['aircraft', plan.tail ? `${plan.tail} · ${f.acName}${d.profile ? ` · ${d.profile.engine.split(',')[0]}` : ''}` : 'Not chosen yet'],
-    ['airports', [dep?.runway && `${code(dep.airport)} RWY ${dep.runway.end.id}`, arr?.runway && `${code(arr.airport)} RWY ${arr.runway.end.id}`, f.effAlt ? `alternate ${f.effAlt}` : plan.alternate === false && 'no alternate'].filter(Boolean).join(' · ') || 'Once the route is set'],
-    ['route', d.legs.length ? `${d.flights.map(x => `${x.alt.toLocaleString()} ft`).join(' / ')} · ${Math.round(t.distNm)} nm · ${t.requiredFuel.toFixed(1)} of ${t.usableFuel.toFixed(1)} gal needed` : 'Once the route resolves'],
-  ]
-  const outputs: [SectionKey, React.ReactNode][] = [
-    ['navlog', d.flights.length ? `${d.flights.reduce((n, x) => n + x.rows.length, 0)} checkpoints · ${fmtMin(t.eteMin)} · ${t.tripFuel.toFixed(1)} gal` : 'Once the route and aircraft are set'],
-    ['loading', to ? `Takeoff ${Math.round(to.weight).toLocaleString()} lb, CG ${to.arm?.toFixed(1)} in${dep?.dist && dep.runway ? ` · ${dep.dist.total.toLocaleString()} of ${dep.runway.toraFt.toLocaleString()} ft to clear 50 ft` : ''}` : 'Once the aircraft is chosen'],
-    ['weather', d.wx.length ? d.wx.filter(w => w.role !== 'alternate').map(w => `${code(w.airport)} ${w.category ?? 'no report'} at ${fmtTime(w.at)}`).join(' · ') : 'Once the route is set'],
-  ]
-  const Cards = ({ list }: { list: [SectionKey, React.ReactNode][] }) => (
-    <ul className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
-      {list.map(([k, v]) => (
-        <li key={k}>
-          <button onClick={() => f.go(k)} className="flex h-full w-full items-start gap-3 rounded-xl bg-card px-4 py-3.5 text-left ring-1 ring-inset ring-white/[0.04] hover:bg-hover">
-            <span className="mt-1.5 grid w-3.5 shrink-0 place-items-center">{MARK[k === 'navlog' ? (d.flights.length ? 'done' : 'todo') : sectionState(f.tasks, k)]}</span>
-            <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-fg">{SECTION_LABEL[k]}</span><span className="mt-0.5 block text-[13px] text-fg-3">{v}</span></span>
-            <ChevronRight className="mt-0.5 size-4 shrink-0 text-fg-3" />
-          </button>
-        </li>
-      ))}
-    </ul>
-  )
-  return (
-    <div className="space-y-8">
-      <section className="rounded-xl bg-card px-4 py-5 ring-1 ring-inset ring-white/[0.04] sm:px-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <VerdictIcon status={f.verdict} className="size-6" />
-          <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{f.verdictLabel}</h2>
-          <span className="text-sm text-fg-3">{f.verdict === 'nogo' ? 'Something below rules this flight out as planned.' : f.verdict === 'todo' ? 'Finish the items below for a complete brief.' : f.verdict === 'caution' ? 'Legal and within limits; weigh the decisions below.' : 'Legal, within limits and every check passed.'}</span>
-        </div>
-        {d.legs.length > 0 && (
-          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 xl:grid-cols-5">
-            {fact('Takeoff → land', <>{fmtTime(d.takeoffAt)} → {fmtTime(d.legs.at(-1)!.arriveAt)}</>, 'legs')}
-            {fact('Distance · time', <>{Math.round(t.distNm)} nm · {fmtMin(t.eteMin)}</>, 'legs')}
-            {fact('Fuel needed · aboard', <>{t.requiredFuel.toFixed(1)} · {t.usableFuel.toFixed(1)} gal</>, 'fuel')}
-            {fact('Takeoff weight · CG', to ? <>{Math.round(to.weight).toLocaleString()} lb · {to.arm?.toFixed(1)} in</> : '—', 'wb')}
-            {fact('Cruise', <>{d.flights.map(x => `${x.alt.toLocaleString()} ft`).join(' / ')}{d.flights[0]?.cruise ? ` · ${d.flights[0].cruise.ktas} KTAS` : ''}</>, 'perf')}
-          </dl>
-        )}
-        {d.legs.length > 0 && <p className="mt-4 text-[13px] text-fg-3">Select a figure for how it was worked out.</p>}
-      </section>
-
-      {must.length > 0 && (
-        <section>
-          <h3 className="mb-1 text-[15px] font-medium text-fg">Before this brief is complete</h3>
-          <p className="mb-2 text-[13px] text-fg-3">Worst first. Each links to the section where it's done.</p>
-          <ul className="divide-y divide-border rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5">{must.map(x => <TaskRow key={x.id} t={x} onGo={() => f.go(x.section)} />)}</ul>
-        </section>
-      )}
-
-      {!must.length && plan.route.length > 1 && (
-        <section className="rounded-xl px-4 py-4 ring-1 ring-inset ring-border sm:px-5">
-          <h3 className="text-[15px] font-medium text-fg">Ready to print</h3>
-          <p className="mt-1 text-sm text-fg-2">The NavLog (with the flight plan and {plan.tail}'s checklist), the weight and balance and the weather briefing. File the flight plan with Flight Service if you want one, and preflight with the checklist.</p>
-          <div className="mt-3 flex flex-wrap gap-2"><Button variant="primary" onClick={printAll}><Printer />Print all three</Button><Button variant="ghost" onClick={() => f.refs.show('checklist')}>Checklist</Button></div>
-        </section>
-      )}
-
-      <section><h3 className="mb-2 text-[15px] font-medium text-fg">The brief</h3><Cards list={areas} /></section>
-      <section><h3 className="mb-2 text-[15px] font-medium text-fg">The outputs</h3><Cards list={outputs} /></section>
-
-      {rec.length > 0 && (
-        <section>
-          <h3 className="mb-1 text-[15px] font-medium text-fg">For a complete picture</h3>
-          <p className="mb-2 text-[13px] text-fg-3">Not part of the go/no-go; they replace stand-ins with this airplane's own data.</p>
-          <ul className="divide-y divide-border rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5">{rec.map(x => <TaskRow key={x.id} t={x} onGo={() => f.go(x.section)} />)}</ul>
-        </section>
-      )}
-      <p className="text-[13px] text-fg-3">Not a substitute for a standard briefing (1800wxbrief.com or 1-800-WX-BRIEF), your instructor's judgment or the POH in the airplane.</p>
-    </div>
-  )
-}
-
 /* ── New flight ── */
 // Three things make a flight: where and when, the airplane, and who's flying
 // (loaded from profiles, or created here). Everything else is asked in its section.
@@ -342,23 +256,25 @@ function NewFlight() {
   const inputs = { plan, set: f.set, d: f.d, u: f.u, profile: f.d.profile, certs: f.certs ?? null }
   return (
     <div className="rounded-xl bg-card px-4 py-6 ring-1 ring-inset ring-white/[0.04] sm:px-7">
-      <Step n={1} title="Where and when" lead="Departure, any points to fly over, and the arrival (the departure again for a local flight). The engine-start time sets the weather and winds."><FlightInputs bare step={2} {...inputs} /><FlightInputs bare step={3} {...inputs} /></Step>
-      <Step n={2} title="Aircraft" lead="One of your aircraft, or a new one: its registry, POH, weights and checklist are set up once and kept."><AircraftPicker /></Step>
-      <Step n={3} title="Who's flying" lead="Load a pilot profile, and an instructor's for a dual flight, or add one. Their certificates decide which FAA rules apply."><CrewPicker /></Step>
+      <Step n={1} icon={Navigation} title="Where and when"><FlightInputs bare step={2} {...inputs} /><FlightInputs bare step={3} {...inputs} /><div className="mt-5"><RouteAirportProfiles /></div></Step>
+      <Step n={2} icon={Plane} title="Aircraft"><AircraftPicker /></Step>
+      <Step n={3} icon={UserRound} title="Who's flying"><CrewPicker /></Step>
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
-        {!ready && <span className="text-[13px] text-fg-3">{plan.route.length < 2 ? 'Add the arrival airport.' : !plan.tail ? 'Choose the aircraft.' : 'Choose who\'s flying.'}</span>}
-        <Button variant="primary" className="ml-auto" disabled={!ready} onClick={f.finishSetup}>Brief this flight<ChevronRight /></Button>
+        {!ready && <span className="text-[13px] text-fg-3">{plan.route.length < 2 ? 'Add the arrival (the departure again for a local flight).' : !plan.tail ? 'Choose the aircraft.' : 'Choose the pilot.'}</span>}
+        <Button variant="primary" className="ml-auto max-sm:w-full" disabled={!ready} onClick={f.finishSetup}>Brief this flight<ChevronRight /></Button>
       </div>
     </div>
   )
 }
 
-function Step({ n, title, lead, children }: { n: number; title: string; lead: string; children: React.ReactNode }) {
+function Step({ n, icon: I, title, children }: { n: number; icon: typeof Plane; title: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-4 border-t border-border py-6 first:border-t-0 first:pt-0 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-8">
-      <div><div className="flex items-baseline gap-2"><span className="num text-[13px] text-fg-3">{n}</span><h3 className="text-[15px] font-medium text-fg">{title}</h3></div><p className="mt-1 text-[13px] text-fg-3">{lead}</p></div>
+    <section className="grid gap-4 border-t border-border py-6 first:border-t-0 first:pt-0 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
+      <div className="flex items-center gap-3 lg:items-start">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent"><I className="size-4" /></span>
+        <div><div className="num text-[12px] text-fg-3">Step {n}</div><h3 className="text-[15px] font-medium text-fg">{title}</h3></div>
+      </div>
       <div className="min-w-0">{children}</div>
     </section>
   )
 }
-

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { del, get, put } from '@/lib/api'
 import { useCertificates, usePilotInfo } from './api'
 import type { PilotCerts } from './pilot'
-import type { AircraftPlanning, AirportProfile, Plan } from './model'
+import { parseRouteItem, type AircraftPlanning, type AirportProfile, type Plan } from './model'
 
 // Profiles (docs/planner-ux.md, "Profiles"): the people, aircraft and airports
 // a plan loads. Each is created, read, changed and deleted on its own (the
@@ -113,4 +113,11 @@ export function useCrew() {
     save, remove: (id: string) => (id === SELF ? Promise.resolve() : people.remove(id)),
     isLoading: info.isLoading || certs.isLoading || people.isLoading, saving: info.save.isPending || certs.save.isPending || people.save.isPending,
   }
+}
+
+// How many saved flights load a profile, so deleting it can say what's affected.
+export function usedBy(plans: { data: Plan }[] | undefined, kind: 'pilots' | 'aircraft' | 'airports', key: string) {
+  return (plans ?? []).filter(({ data: p }) => kind === 'aircraft' ? p.tail === key
+    : kind === 'airports' ? p.route.some(r => parseRouteItem(r).id === key) || p.alternate === key
+      : Object.values(p.seatPeople ?? {}).includes(key) || p.crew?.pilotId === key || p.crew?.instructorId === key).length
 }

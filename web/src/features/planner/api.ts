@@ -126,14 +126,14 @@ export const useCorridor = (bbox: ReturnType<typeof bboxOf>) => useQuery({
   queryFn: () => get<import('./model').Checkpoint[]>(`/api/planner/corridor?south=${bbox!.south}&west=${bbox!.west}&north=${bbox!.north}&east=${bbox!.east}`),
 })
 
-export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other' | RecordKind; title: string; model: string | null; tail_number: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; tables?: PohTables | null; specs?: PohSpecs | null; content_type?: string; source: string; created_at: string }
+export interface PlannerDoc { id: number; kind: 'poh' | 'briefing' | 'checklist' | 'other' | RecordKind; title: string; model: string | null; tail_number: string | null; person_id?: string | null; route: string[] | null; filename: string | null; size: number; page_map: Record<string, number> | null; steps?: ChecklistSection[] | null; tables?: PohTables | null; specs?: PohSpecs | null; content_type?: string; source: string; created_at: string }
 export function useDocuments() {
   const qc = useQueryClient()
   const key = ['planner', 'documents']
   const q = useQuery({ queryKey: key, staleTime: 5 * MIN, queryFn: () => get<PlannerDoc[]>('/api/planner/documents') })
   const upload = useMutation({
-    mutationFn: async ({ file, kind, model, route, tail, title }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string; tail?: string; title?: string }) => {
-      const qs = new URLSearchParams({ kind, title: title || file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}), ...(tail ? { tail } : {}) })
+    mutationFn: async ({ file, kind, model, route, tail, title, person }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string; tail?: string; title?: string; person?: string }) => {
+      const qs = new URLSearchParams({ kind, title: title || file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}), ...(tail ? { tail } : {}), ...(person ? { person } : {}) })
       const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': /^image\/(png|jpeg)$/.test(file.type) ? file.type : 'application/pdf' }, body: file, credentials: 'same-origin' })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Upload failed (${r.status})`)
       return r.json() as Promise<PlannerDoc>

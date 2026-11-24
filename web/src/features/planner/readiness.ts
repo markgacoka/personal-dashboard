@@ -6,7 +6,7 @@ export type SectionKey = 'overview' | 'pilot' | 'aircraft' | 'weather' | 'airpor
 // brief: where you work through the flight; output: the three documents it
 // produces (each printable on its own or together).
 export const SECTIONS: { key: SectionKey; label: string; short: string; group: 'brief' | 'output' }[] = [
-  { key: 'overview', label: 'Overview', short: 'Overview', group: 'brief' },
+  { key: 'overview', label: 'Summary', short: 'Summary', group: 'brief' },
   { key: 'pilot', label: 'Pilot', short: 'Pilot', group: 'brief' },
   { key: 'aircraft', label: 'Aircraft', short: 'Aircraft', group: 'brief' },
   { key: 'airports', label: 'Airports', short: 'Airports', group: 'brief' },

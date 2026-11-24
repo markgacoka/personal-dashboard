@@ -216,3 +216,19 @@
 .planner .fig { cursor: pointer; text-decoration: underline dotted; text-decoration-color: color-mix(in oklch, var(--fg-3) 70%, transparent); text-underline-offset: 3px; font: inherit; color: inherit; }
 .planner .fig:hover, .planner .fig:focus-visible { text-decoration-color: var(--accent); color: var(--accent); outline: none; }
 @media print { .planner .fig { text-decoration: none; } }
+/* In the NavLog every figure is selectable but unmarked: the sheet stays a clean form; hover and focus show it. */
+.planner .navlog-front .fig { text-decoration: none; border-radius: 2px; }
+.planner .navlog-front .fig:hover, .planner .navlog-front .fig:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.planner .navlog-front tr.nl-on > td { background: color-mix(in oklch, var(--accent) 9%, transparent); }
+
+/* Runway diagram: runways draw in along their length, the wind drifts across, the pattern flows. */
+.rwy-grow { transform-box: fill-box; transform-origin: center; animation: rwy-grow 0.7s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes rwy-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.rwy-wind { animation: rwy-wind 3s linear infinite; opacity: 0; }
+@keyframes rwy-wind { 0% { transform: translateX(-60px); opacity: 0; } 25% { opacity: 1; } 75% { opacity: 1; } 100% { transform: translateX(90px); opacity: 0; } }
+.rwy-pattern { animation: rwy-pattern 1.6s linear infinite; }
+@keyframes rwy-pattern { to { stroke-dashoffset: -16; } }
+@media (prefers-reduced-motion: reduce) { .rwy-grow, .rwy-pattern { animation: none; } .rwy-wind { animation: none; opacity: 0.6; } }
+@media print { .rwy-grow, .rwy-pattern, .rwy-wind { animation: none; opacity: 1; } }
+
+@media print { :root { color-scheme: light; } html { background: #fff !important; } }

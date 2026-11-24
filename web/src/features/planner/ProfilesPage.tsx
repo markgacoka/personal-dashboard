@@ -74,7 +74,7 @@ export default function ProfilesPage() {
   const add = (key: string) => { setDraft(key); pick(tab, key) }
   return (
     <div className="planner">
-      <PageHeader title="Profiles" description="The pilots, aircraft and airports your plans load. Aircraft and airport profiles apply to every plan when it opens; a plan keeps the seat weights it was given."
+      <PageHeader title="Profiles"
         actions={<Button asChild variant="ghost"><Link to="/flying/plan"><ChevronLeft />Flight planner</Link></Button>} />
       <Segmented value={tab} onChange={t => pick(t)} options={[
         { value: 'pilots', label: 'People', count: lists.pilots.filter(i => !i.draft).length },
@@ -95,7 +95,7 @@ export default function ProfilesPage() {
                 </button>
               </li>
             ))}
-            {!items.length && <li className="px-3 py-3 text-[13px] text-fg-3">{tab === 'airports' ? 'No airport profiles yet. Add one for a field where you know something the Chart Supplement doesn\'t say: your school\'s pattern altitude, the usual pattern side, where to call the tower.' : 'None yet.'}</li>}
+            {!items.length && <li className="px-3 py-3 text-[13px] text-fg-3">None yet.</li>}
           </ul>
         </Card>
 
@@ -108,7 +108,7 @@ export default function ProfilesPage() {
               onSave={async p => { await people.upsert(p); toast.success(`${p.name} saved`); setDraft(null); pick('pilots', p.id) }}
               onDelete={async p => { await people.remove(p.id); toast.success(`${p.name} deleted`); pick('pilots') }} />)}
           {current && tab === 'aircraft' && !(aircraft.data ?? []).some(a => a.tail === current) && (draft === current || lists.aircraft.some(i => i.id === current && i.draft))
-            ? <div><Lead title={<>New aircraft{current ? <> · <span className="num">{current}</span></> : ''}</>}>Asked once and kept in its profile: the registry entry, the POH and what was read from it, its weights, equipment, inspections and checklist.</Lead>
+            ? <div><Lead title={<>New aircraft{current ? <> · <span className="num">{current}</span></> : ''}</>} />
                 <AircraftSetup key={current} initialTail={current} onCancel={() => { setDraft(null); pick('aircraft') }} onDone={t => { setDraft(null); pick('aircraft', t) }} /></div>
             : current && tab === 'aircraft' && <AircraftProfileView key={current} tail={current} used={usedBy('aircraft', current)} saved={(aircraft.data ?? []).some(a => a.tail === current)}
             onDelete={async () => { await aircraft.remove.mutateAsync(current); toast.success(`${current} profile deleted`); pick('aircraft') }} />}
@@ -149,8 +149,8 @@ function DeleteRow({ what, used, onDelete, note, after }: { what: string; used: 
   )
 }
 
-function Lead({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
-  return <div className="mb-6"><h2 className="text-lg font-medium tracking-[-0.011em] text-fg">{title}</h2><p className="mt-1 text-[13px] text-fg-3">{children}</p></div>
+function Lead({ title, children }: { title: React.ReactNode; children?: React.ReactNode }) {
+  return <div className="mb-6"><h2 className="text-lg font-medium tracking-[-0.011em] text-fg">{title}</h2>{children && <p className="mt-1 text-[13px] text-fg-3">{children}</p>}</div>
 }
 
 /* ── You ── */
@@ -164,7 +164,7 @@ function SelfProfile() {
   )
   return (
     <div>
-      <Lead title={info.data?.name || 'You'}>Your certificate and endorsements decide what this flight is allowed to be (Part 61), your minimums decide go or no-go, and your weight fills the pilot seat of every new plan.</Lead>
+      <Lead title={info.data?.name || 'You'} />
       <section>
         <SubHead right={<Synced at={info.data?.updatedAt} label="Saved" />}>Pilot</SubHead>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -183,7 +183,7 @@ function SelfProfile() {
         <CertificatesEditor certs={certs.data?.certificate ? certs.data : null} saving={certs.save.isPending} onSave={c => certs.save.mutate(c, { onSuccess: () => toast.success('Certificates saved'), onError: e => toast.error(e.message) })} />
         <MinimumsEditor minimums={{ ...DEFAULT_MINIMUMS, ...(mins.data || {}) }} savedAt={mins.data?.updatedAt} saving={mins.save.isPending} onSave={m => mins.save.mutate(m, { onSuccess: () => toast.success('Minimums saved') })} />
       </div>
-      <div className="mt-8"><RecordsList title="Your documents" records={PILOT_RECORDS.filter(r => !r.when || !certs.data?.certificate || (r.when === 'student') === (certs.data.certificate === 'student'))} /></div>
+      <div className="mt-8"><RecordsList title="Documents" person={SELF} records={PILOT_RECORDS.filter(r => !r.when || !certs.data?.certificate || (r.when === 'student') === (certs.data.certificate === 'student'))} /></div>
     </div>
   )
 }
@@ -196,7 +196,7 @@ function PersonProfile({ person, exists, used, saving, onSave, onDelete }: { per
   const valid = p.name.trim().length > 0 && (p.weightLb == null || (p.weightLb > 20 && p.weightLb < 400))
   return (
     <div>
-      <Lead title={p.name || 'New person'}>{p.role === 'pilot' ? 'Load them as the pilot of a flight: their certificate, medical and endorsements decide which FAA rules it\'s checked against, and their weight fills the pilot seat.' : p.role === 'instructor' ? 'Seat them front right and the flight becomes dual with them as pilot in command; their weight goes into the weight and balance.' : 'Their weight fills whichever seat you put them in.'}</Lead>
+      <Lead title={p.name || 'New person'} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Name</span><Input value={p.name} onChange={e => setP({ ...p, name: e.target.value.slice(0, 60) })} placeholder="Full name" autoFocus={!p.name} /></label>
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Role</span>
@@ -207,6 +207,7 @@ function PersonProfile({ person, exists, used, saving, onSave, onDelete }: { per
         <label className="block min-w-0 sm:col-span-2 xl:col-span-4"><span className="mb-1 block text-sm text-fg-2">Notes</span><Textarea rows={2} value={p.notes ?? ''} onChange={e => setP({ ...p, notes: e.target.value.slice(0, 500) })} placeholder="Optional" /></label>
       </div>
       {p.weightLb != null && !(p.weightLb > 20 && p.weightLb < 400) && <p className="mt-2 text-[13px] text-bad">Enter a weight between 20 and 400 lb.</p>}
+      {p.role === 'pilot' && exists && <div className="mt-6"><RecordsList title="Documents" person={p.id} records={PILOT_RECORDS.filter(r => !r.when || (r.when === 'student') === ((p.certs?.certificate ?? 'student') === 'student'))} /></div>}
       {p.role === 'pilot' && <div className="mt-6"><CertificatesEditor title="Certificate, medical and endorsements" certs={p.certs ?? null} saving={saving} onSave={c => { const x = { ...p, certs: c }; setP(x); if (exists) onSave(x) }} /></div>}
       <div className="mt-3 flex gap-2">
         <Button size="sm" variant="primary" disabled={!valid || (!isNew && JSON.stringify(p) === JSON.stringify(person))} loading={saving} onClick={() => onSave({ ...p, name: p.name.trim() })}>{isNew ? 'Create profile' : 'Save'}</Button>
@@ -229,7 +230,7 @@ function AircraftProfileView({ tail, used, saved, onDelete }: { tail: string; us
   const name = [ident.make && titleCase(ident.make), ident.model, ident.year].filter(Boolean).join(' ')
   return (
     <div>
-      <Lead title={<span className="num">{tail}</span>}>{name || (registry.isLoading ? 'Looking up the FAA registry…' : 'Not in the FAA registry: enter make and model under "Your values" below.')}{name ? '. Its empty weight drives the weight and balance; inspection dates the airworthiness checks; your values replace the POH\'s in every calculation.' : ''}</Lead>
+      <Lead title={<span className="num">{tail}</span>}>{name || (registry.isLoading ? 'Looking up the FAA registry…' : 'Not in the FAA registry: enter make and model under "Your values" below.')}</Lead>
       {!saved && <p className="-mt-3 mb-6 text-[13px] text-fg-3">No profile yet: saving any value below creates it.</p>}
       {registry.data && <KV className="mb-8" items={[['Registry', registry.data.status], ['Engine', registry.data.engine_type ? `${registry.data.engine_type}${registry.data.engine_hp ? `, ${registry.data.engine_hp} hp` : ''}` : null], ['Seats', registry.data.seats], ]} />}
       <section className="mb-8"><SubHead>POH and what was read from it</SubHead><PohReport match={poh.data?.match} doc={poh.data?.doc} uploaded={poh.data?.uploaded} loading={poh.isLoading} model={ident.model} /></section>
@@ -245,7 +246,7 @@ function AircraftProfileView({ tail, used, saved, onDelete }: { tail: string; us
       </div>
       <div className="mt-8"><EquipmentForm eq={planning.equipment ?? {}} setEq={x => save({ ...planning, equipment: { ...planning.equipment, ...x } })} /></div>
       <section className="mt-8">
-        <SubHead right={<span className="text-[13px] text-fg-3">In every brief for {tail}; prints after the NavLog</span>}>Checklist</SubHead>
+        <SubHead>Checklist</SubHead>
         <ChecklistEditor tail={tail} value={planning.checklist} saving={planningQ.save.isPending} onSave={c => save({ ...planning, checklist: c })} />
       </section>
       <div className="mt-8"><ProfileEditor tail={tail} planning={planning} save={save} saving={planningQ.save.isPending} registry={{ make: registry.data?.make, model: registry.data?.model, year: registry.data?.year }} /></div>
@@ -262,7 +263,7 @@ function AirportProfileView({ id, profile, used, saving, onSave }: { id: string;
   if (!a) return <p className="text-sm text-fg-3"><span className="num">{id}</span> isn't in the FAA airport data (NASR). Check the identifier: US airports use their FAA ident or the K-prefixed ICAO code.</p>
   return (
     <div>
-      <Lead title={<><span className="num">{a.icao || a.id}</span> · {titleCase(a.name)}</>}>Your pattern altitude and pattern sides replace the Chart Supplement's in the climb, descent and NavLog; your notes print on the NavLog.</Lead>
+      <Lead title={<><span className="num">{a.icao || a.id}</span> · {titleCase(a.name)}</>} />
       <KV className="mb-6" items={[
         ['Elevation', `${Math.round(a.elev).toLocaleString()} ft`],
         ['Published pattern', a.tpaAgl ? `${Math.round(a.elev + a.tpaAgl).toLocaleString()} ft MSL` : 'None published (1,000 ft AGL assumed)'],

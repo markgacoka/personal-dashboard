@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { titleCase } from '@/lib/format'
+import { RunwayDiagram, RunwayFacts } from './RunwayDiagram'
 import { cn } from '@/lib/utils'
 import { useDatis, useNearby } from './api'
 import { notamHighlights, type NotamSet } from './brief'
@@ -168,13 +169,16 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
         {wx?.category && <Cat cat={wx.category} />}
       </div>
 
-      <div className="mt-3 rounded-lg bg-accent-soft/40 px-3 py-2.5 text-sm ring-1 ring-inset ring-accent/20">
-        {inUse.length > 0 ? (
-          <span><span className="font-medium text-fg">In use: RWY {inUse.join(', ')}</span> <span className="text-fg-3">· D-ATIS {atis!.code} {atis!.time ? `${atis!.time}Z` : ''}</span></span>
-        ) : best ? (
-          <span><span className="font-medium text-fg">Favored: RWY {best.end.id}</span> <span className="text-fg-3">· {best.end.right ? 'right' : 'left'} traffic · wind {wx!.wind.dir == null ? (wx!.wind.spd ? 'variable' : 'calm') : `${deg3(wx!.wind.dir)}°`}{wx!.wind.spd ? ` ${wx!.wind.spd}${wx!.wind.gust ? `G${wx!.wind.gust}` : ''} kt` : ''} ({wx!.wind.from === 'taf' ? `TAF ${wx!.tafStation}` : wx!.metarStation ? `METAR ${wx!.metarStation}` : 'no report'}) · {best.head >= 0 ? `${best.head} kt head` : `${-best.head} kt tail`}, {Math.abs(best.cross)} kt cross</span></span>
-        ) : <span className="text-fg-3">No wind report near {id}; listen to the ATIS/AWOS.</span>}
-        {atis && <details className="mt-1"><summary className="cursor-pointer text-xs text-accent">D-ATIS text</summary><p className="num mt-1 text-xs text-fg-2">{atis.text}</p></details>}
+      <div className="mt-4 grid items-center gap-x-6 gap-y-4 @xl:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+        <RunwayDiagram airport={a} wind={wx?.wind.from ? wx.wind : null} active={inUse.length ? inUse : best ? [best.end.id] : []} className="mx-auto max-w-[19rem]" />
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="font-medium text-fg">{inUse.length ? `In use: RWY ${inUse.join(', ')}` : best ? `Favored: RWY ${best.end.id}` : 'No wind report'}</span>
+            <span className="text-[13px] text-fg-3">{inUse.length ? `D-ATIS ${atis!.code}${atis!.time ? ` ${atis!.time}Z` : ''}` : wx?.wind.from === 'taf' ? `TAF ${wx.tafStation}` : wx?.metarStation ? `METAR ${wx.metarStation}` : 'listen to the ATIS/AWOS'}</span>
+          </div>
+          <RunwayFacts airport={a} wind={wx?.wind.from ? wx.wind : null} end={(inUse.length ? ends.find(x => inUse.includes(x.e.id))?.e : best?.end) ?? null} />
+          {atis && <details><summary className="cursor-pointer text-[13px] text-accent">D-ATIS text</summary><p className="num mt-1 text-xs text-fg-2">{atis.text}</p></details>}
+        </div>
       </div>
 
       <div className="mt-3 overflow-x-auto"><table className="num w-full text-sm text-fg-2 sm:min-w-[30rem] [&_td+td]:whitespace-nowrap [&_td+td]:pl-2 [&_th+th]:pl-2">
@@ -221,7 +225,7 @@ function AirportCard({ a, role, wx, minimums, notams, nasr, profile, save, savin
 
       {a.notes && !editing && <div className="mt-3 rounded-lg bg-accent-soft/40 px-3 py-2 text-sm ring-1 ring-inset ring-accent/20"><span className="font-medium text-fg">Your notes</span><p className="whitespace-pre-wrap text-fg-2">{a.notes}</p></div>}
       {editing ? <AirportProfileForm a={nasr} profile={profile} saving={saving} onCancel={() => setEditing(false)} onSave={p => { save(p); setEditing(false) }} />
-        : <button className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:underline" onClick={() => setEditing(true)}><Pencil className="size-3.5" />{profile ? `Edit your ${id} profile` : `Save a ${id} profile (pattern altitude, pattern sides, notes)`}</button>}
+        : <button className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:underline" onClick={() => setEditing(true)}><Pencil className="size-3.5" />{profile ? `Edit ${id} profile` : `Add ${id} profile`}</button>}
 
       {a.remarks.length > 0 && (
         <div className="mt-3">

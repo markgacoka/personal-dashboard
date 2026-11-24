@@ -81,7 +81,6 @@ function Inputs({ plan, set, d, u, profile, certs, step }: Props) {
             })}
           </ol>
         )}
-        {!tokenize(arr).length && tokenize(dep).length > 0 && <p className="mt-3 text-[13px] text-fg-3">Add the arrival airport (the departure again for a local flight).</p>}
       </Group>
       )}
 
@@ -121,13 +120,12 @@ function Inputs({ plan, set, d, u, profile, certs, step }: Props) {
 // One input group: what it is on the left, its fields on the right (stacked when narrow).
 // In the new-flight setup the step supplies the heading, so the group is just its fields.
 const Bare = createContext(false)
-function Group({ title, hint, aside, children }: { title: string; hint?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
+function Group({ title, aside, children }: { title: string; hint?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
   if (useContext(Bare)) return <section className="py-3 first:pt-0">{children}{aside && <div className="mt-1">{aside}</div>}</section>
   return (
     <section className="grid gap-4 py-7 first:pt-1 last:pb-1 @3xl:grid-cols-[12rem_minmax(0,1fr)] @3xl:gap-10">
       <div>
         <h3 className="text-[15px] font-medium text-fg">{title}</h3>
-        {hint && <p className="mt-1 text-[13px] leading-snug text-fg-3">{hint}</p>}
         {aside}
       </div>
       <div className="min-w-0">{children}</div>

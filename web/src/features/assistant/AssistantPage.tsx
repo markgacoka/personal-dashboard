@@ -129,6 +129,16 @@ export default function AssistantPage() {
               ? `Ranked by probe score, then speed. Budget ${models.data.speedBudget}s. Providers: ${models.data.providers.join(', ') || 'none'}.`
               : 'Ranked by probe score, then speed'} />
             <CardBody className="px-3 sm:px-4">
+              {Object.entries(models.data?.budgets ?? {}).map(([name, b]) => (
+                <div key={name} className="mb-3 px-2">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="capitalize">{name} credit used</span>
+                    <span className="num text-fg-2">${b.spent.toFixed(2)} of ${b.cap.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-sunken"><div className={cn('h-full rounded-full', b.spent / b.cap > 0.8 ? 'bg-warn' : 'bg-accent')} style={{ width: `${Math.min(100, (b.spent / b.cap) * 100)}%` }} /></div>
+                  <p className="mt-1 text-xs text-fg-3">Stops using {name} at the cap. Spend is estimated high, so the real charge stays below it.</p>
+                </div>
+              ))}
               {models.isLoading ? <Skeleton className="h-40" /> : !models.data?.ranked.length ? <p className="px-2 text-sm text-fg-3">No model data yet.</p> : (
                 <ul>
                   {models.data.ranked.filter(m => m.usable).map((m, i) => (

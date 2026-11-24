@@ -297,4 +297,7 @@ export interface AssistantSummary {
 }
 export interface AssistantLog { exchanges: AssistantExchange[]; summary: AssistantSummary }
 export interface AssistantModel { model: string; latency: number; score: number; tools: boolean; failures: number; usable: boolean }
-export interface AssistantModels { ranked: AssistantModel[]; speech: string[]; providers: string[]; speedBudget: number }
+export interface AssistantModels {
+  ranked: AssistantModel[]; speech: string[]; providers: string[]; speedBudget: number
+  budgets?: Record<string, { spent: number; cap: number }>
+}

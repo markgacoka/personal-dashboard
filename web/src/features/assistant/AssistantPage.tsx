@@ -88,8 +88,12 @@ export default function AssistantPage() {
         <CardBody className="grid grid-cols-2 gap-5 pt-5 md:grid-cols-4">
           <Stat label="Today" value={summary?.today} sub="requests" />
           <Stat label="Last 7 days" value={summary?.week} sub={summary ? `${summary.total.toLocaleString()} all time` : undefined} />
-          <Stat label="Typical answer" value={seconds(summary?.medianMs)} unit="s" sub="median, last 200" />
-          <Stat label="Slow answers" value={seconds(summary?.p90Ms)} unit="s" sub="90th percentile" />
+          <Stat label="Stop to answer" value={seconds(summary?.watchMedianMs ?? summary?.medianMs)} unit="s"
+            hint="Measured on the watch: from when you stop talking until the answer is on screen. Median of recent requests."
+            sub={summary?.watchP90Ms != null ? `90% under ${seconds(summary.watchP90Ms)}s` : `server ${seconds(summary?.medianMs)}s`} />
+          <Stat label="Stop to voice" value={seconds(summary?.audioMedianMs)} unit="s"
+            hint="Measured on the watch: from when you stop talking until the spoken reply starts."
+            sub={`server answer ${seconds(summary?.medianMs)}s median`} />
         </CardBody>
       </Card>
 

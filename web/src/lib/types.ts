@@ -292,6 +292,7 @@ export interface AssistantExchange {
 }
 export interface AssistantSummary {
   today: number; week: number; total: number; medianMs: number | null; p90Ms: number | null
+  watchMedianMs?: number | null; watchP90Ms?: number | null; audioMedianMs?: number | null
   models: { model: string; count: number }[]
 }
 export interface AssistantLog { exchanges: AssistantExchange[]; summary: AssistantSummary }

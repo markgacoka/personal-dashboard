@@ -1,10 +1,11 @@
-import { AlertTriangle, Check, X } from 'lucide-react'
+import { AlertTriangle, Check, ExternalLink, Globe, Scale, User, X } from 'lucide-react'
 import { Dot } from '@/components/ui/badge'
 import { Tooltip } from '@/components/ui/misc'
 import { relTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { inEnvelope } from './calc'
-import type { Expl, InputSource, Tier } from './explain'
+import type { Expl, InputSource, Ref, Tier } from './explain'
+import { PohLink } from './RefPanel'
 import { TIER_LABEL } from './explain'
 import type { Derived, RowOverride } from './model'
 
@@ -74,6 +75,7 @@ export function ExplCard({ e, ov, onEdit, className }: { e: Expl; ov?: RowOverri
           <span className="min-w-0 flex-1 text-fg-2">{e.source.used}{e.source.at && <span className="text-fg-3"> · {relTime(new Date(e.source.at))}</span>}</span>
           <TierTag tier={e.source.tier} />
         </div>
+        {e.refs && e.refs.length > 0 && <div className="flex gap-3"><span className="w-[7.5rem] shrink-0 text-fg-3">Look it up</span><span className="min-w-0 flex-1"><RefList refs={e.refs} /></span></div>}
         {e.source.backup && <div className="flex gap-3"><span className="w-[7.5rem] shrink-0 text-fg-3">Backup</span><span className="min-w-0 flex-1 text-fg-3">{e.source.backup}</span></div>}
         {e.assumes.length > 0 && (
           <div className="flex gap-3"><span className="w-[7.5rem] shrink-0 text-fg-3">Assumes</span>
@@ -149,4 +151,22 @@ export function CgChart({ d, focus, onFocus }: { d: Derived; focus: number | nul
       </figcaption>
     </figure>
   )
+}
+
+// Where each input came from: an API (opens its documentation, with when it
+// answered), a POH page (opens the book at that page), a regulation, or you.
+const REF_ICON = { api: Globe, rule: Scale, yours: User } as const
+export function RefLink({ r }: { r: Ref }) {
+  if (r.kind === 'poh') return r.fig ? <PohLink fig={r.fig}>{r.label}</PohLink> : <span className="text-fg-2">{r.label}</span>
+  const I = REF_ICON[r.kind]
+  const at = r.at ? ` · ${relTime(new Date(r.at))}` : ''
+  return r.href
+    ? <a href={r.href} target="_blank" rel="noreferrer" className="inline-flex items-baseline gap-1 text-accent hover:underline"><I className="size-3.5 shrink-0 translate-y-0.5" />{r.label}<ExternalLink className="size-3 shrink-0 translate-y-0.5" /><span className="text-fg-3">{at}</span></a>
+    : <span className="inline-flex items-baseline gap-1 text-fg-2"><I className="size-3.5 shrink-0 translate-y-0.5" />{r.label}<span className="text-fg-3">{at}</span></span>
+}
+export function RefList({ refs, inline }: { refs: Ref[]; inline?: boolean }) {
+  const seen = new Set<string>(), list = refs.filter(r => (seen.has(r.label) ? false : (seen.add(r.label), true)))
+  return inline
+    ? <span className="inline-flex flex-wrap gap-x-3 gap-y-0.5">{list.map((r, i) => <RefLink key={i} r={r} />)}</span>
+    : <ul className="space-y-0.5">{list.map((r, i) => <li key={i}><RefLink r={r} /></li>)}</ul>
 }

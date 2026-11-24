@@ -133,7 +133,7 @@ const A_GROUP: Record<string, string> = {
 const A_ORDER = ['Stand-ins for missing data', 'Time and fuel', 'Performance', 'Route', 'Weather', 'Pilot', 'Other']
 const isStandIn = (a: Assumption) => a.value === 'Calm' || /sample/i.test(a.value) || a.label === 'Pilot certificate'
 const LABEL_SECTION = Object.fromEntries((Object.entries(SECTION_LABEL) as [SectionKey, string][]).map(([k, v]) => [v.toLowerCase(), k]))
-// "Pilot → minimums" → pilot; "Weight and performance → fuel and taxi" → loading.
+// "Pilot → minimums" → pilot; "Weight and balance → fuel and taxi" → loading.
 function changeTarget(change: string): SectionKey | null {
   return LABEL_SECTION[change.split('→')[0].trim().toLowerCase()] ?? null
 }

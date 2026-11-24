@@ -3,6 +3,31 @@
 How the planner at `/flying/plan` is organised and why. `flight-planner.md`
 covers what it calculates.
 
+## Flights, outputs and profiles (current)
+
+- **Flights** (`/flying/plan`, `FlightsPage.tsx`): every flight is its own
+  saved plan at `/flying/plan/:id`, so several can be open at once. You can
+  create one, open it, copy it as a new flight, or delete it (two presses).
+  Edits save themselves about a second after you stop typing, and any change
+  not yet sent is sent when you leave the page. A browser-only draft from
+  before is offered once to keep or discard.
+- **Outputs**: NavLog, Weight and balance, and Weather briefing. Each one prints
+  on its own, and More → "Print all three" prints them together.
+  - Under each checkpoint, the NavLog shows how every figure was worked out:
+    the steps, the assumptions, and its sources (`explain.ts` `refs`).
+  - Each source is the API used, with a link and the time it was fetched, or
+    the POH figure, which opens the book at that page. A table standing in for
+    another book is named without a link.
+- **Pilots are profiles** (`useCrew` in `profiles.ts`):
+  - Pilot, instructor and passenger profiles are loaded into a flight, or
+    created in place.
+  - Your earlier saved details appear as the pilot "self".
+  - The Part 61 checks read the loaded pilot's certificate, medical and
+    endorsements.
+- **Checklist input**: upload a photo or PDF (it is read into lines for you to
+  check), or add each line by hand in order: a section title, then each item
+  and its value.
+
 ## The model: a flight file that ends in a NavLog
 
 A flight is one file, read front to back in the order a pilot briefs:

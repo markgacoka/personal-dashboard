@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { del, get, put } from '@/lib/api'
+import { useCertificates, usePilotInfo } from './api'
+import type { PilotCerts } from './pilot'
 import type { AircraftPlanning, AirportProfile, Plan } from './model'
 
 // Profiles (docs/planner-ux.md, "Profiles"): the people, aircraft and airports
@@ -22,8 +24,11 @@ export type Seat = 'pilot' | 'front' | 'rearL' | 'rearR'
 export const SEATS: { key: Seat; label: string }[] = [{ key: 'pilot', label: 'Pilot' }, { key: 'front', label: 'Front right' }, { key: 'rearL', label: 'Rear left' }, { key: 'rearR', label: 'Rear right' }]
 export const SELF = 'self'
 
-export type PersonRole = 'instructor' | 'passenger'
-export interface Person { id: string; name: string; role: PersonRole; weightLb: number | null; phone?: string; notes?: string; cfi?: string }
+// pilot: flies the airplane (student, private and up), with the certificate,
+// medical and endorsements the Part 61 checks read; instructor: a CFI for dual;
+// passenger: a weight in a seat.
+export type PersonRole = 'pilot' | 'instructor' | 'passenger'
+export interface Person { id: string; name: string; role: PersonRole; weightLb: number | null; phone?: string; notes?: string; cfi?: string; address?: string; base?: string; certs?: PilotCerts }
 export interface SelfInfo { name?: string; phone?: string; address?: string; base?: string; weightLb?: number | null; updatedAt?: string }
 
 const MIN = 60_000
@@ -86,4 +91,26 @@ export function seatPerson(plan: Pick<Plan, 'seats' | 'seatPeople' | 'crew'>, se
   // An instructor in the right seat is the CFI of a dual flight.
   if (seat === 'front' && who.role === 'instructor') out.crew = { ...plan.crew, role: 'dual', instructor: who.name }
   return out
+}
+
+// Everyone who can be loaded into a flight. Your own details (settings 'pilot'
+// and 'certificates', saved before pilots were profiles) are the pilot "self";
+// everyone else is in 'people'. Saving routes each to where it's kept.
+export function useCrew() {
+  const info = usePilotInfo(), certs = useCertificates(), people = usePeople()
+  const i = info.data, c = certs.data
+  const self: Person | null = i?.name || i?.weightLb || c?.certificate
+    ? { id: SELF, name: i?.name || 'You', role: 'pilot', weightLb: i?.weightLb ?? null, phone: i?.phone, address: i?.address, base: i?.base, certs: c?.certificate ? c : undefined }
+    : null
+  const list = [...(self ? [self] : []), ...people.list]
+  const save = async (p: Person) => {
+    if (p.id !== SELF) return people.upsert(p)
+    await info.save.mutateAsync({ ...i, name: p.name, weightLb: p.weightLb, phone: p.phone, address: p.address, base: p.base })
+    if (p.certs) await certs.save.mutateAsync(p.certs)
+  }
+  return {
+    list, pilots: list.filter(p => p.role === 'pilot'), instructors: list.filter(p => p.role === 'instructor'), passengers: list.filter(p => p.role === 'passenger'),
+    save, remove: (id: string) => (id === SELF ? Promise.resolve() : people.remove(id)),
+    isLoading: info.isLoading || certs.isLoading || people.isLoading, saving: info.save.isPending || certs.save.isPending || people.save.isPending,
+  }
 }

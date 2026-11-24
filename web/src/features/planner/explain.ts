@@ -10,10 +10,16 @@ import type { Line } from './workings'
 // primary: the intended source, current · backup: a fallback or an old copy of
 // the primary · yours: a value you entered · standin: a default for missing data.
 export type Tier = 'primary' | 'backup' | 'yours' | 'standin'
+// Where an input came from, so the pilot can go back to it: an API (named, with
+// its address and when it answered), a page of the POH (fig is the page-map key
+// the POH viewer opens at; none when the book shown isn't the one used), a
+// regulation, or something you entered.
+export interface Ref { kind: 'api' | 'poh' | 'rule' | 'yours'; label: string; href?: string; fig?: string; at?: string | null }
 export interface Expl {
   key: string; title: string; value: string
   steps: Line[]
   source: { used: string; tier: Tier; backup?: string; at?: string | null }
+  refs?: Ref[]
   assumes: string[]
   expect: { text: string; ok: boolean | null }
   // The row inputs you can replace here (E6B style).
@@ -40,6 +46,30 @@ function windSource(r: NavRow, x: ExplainInput) {
   const used = r.windSrc === 'row' ? 'Typed into this row' : r.windSrc === 'yours' ? 'Your briefing winds for this flight'
     : r.windSrc === 'calm' ? 'None: calm wind, standard temperature' : `${model}${r.windWindow ? `, ${r.windWindow}` : ''}${r.windSrc === 'stale' ? ' (old copy)' : ''}`
   return { used, tier: WIND_TIER[r.windSrc], backup: WIND_BACKUP, at: r.windSrc === 'forecast' || r.windSrc === 'stale' ? entry?.fetchedAt ?? null : undefined }
+}
+
+const NASR: Ref = { kind: 'api', label: 'FAA NASR (airport and navaid positions)', href: 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/' }
+const WMM: Ref = { kind: 'api', label: 'World Magnetic Model 2025 (NOAA NCEI)', href: 'https://www.ncei.noaa.gov/products/world-magnetic-model' }
+const RESERVE: Ref = { kind: 'rule', label: '14 CFR 91.151 fuel requirements', href: 'https://www.ecfr.gov/current/title-14/section-91.151' }
+function windRefs(r: NavRow, x: ExplainInput): Ref[] {
+  if (r.windSrc === 'yours' || r.windSrc === 'row') return [{ kind: 'yours', label: r.windSrc === 'row' ? 'Typed into this row' : 'Your briefing winds for this flight' }]
+  if (r.windSrc === 'calm') return [{ kind: 'api', label: 'None: no winds-aloft forecast reached the planner, so calm wind and standard temperature are used' }]
+  const entry = x.weather?.winds?.find(w => w.data?.length)
+  const src = x.d.fb?.product.source
+  return [src
+    ? { kind: 'api', label: `Open-Meteo forecast API, ${src}${r.windSrc === 'stale' ? ' (last good copy)' : ''}`, href: 'https://open-meteo.com/en/docs', at: entry?.fetchedAt }
+    : { kind: 'api', label: 'aviationweather.gov winds and temperatures aloft (FB)', href: 'https://aviationweather.gov/data/api/', at: entry?.fetchedAt }]
+}
+function metarRef(x: ExplainInput): Ref { return { kind: 'api', label: 'aviationweather.gov METAR (altimeter setting)', href: 'https://aviationweather.gov/data/api/', at: x.weather?.metars?.fetchedAt } }
+// The POH page a table came from: a link to that page when it's this airplane's
+// book; named without a link when another book's table stands in.
+export function pohRef(x: ExplainInput, fig: string | undefined, what: string): Ref {
+  const p = x.d.profile!
+  if (what === 'cruise' && (p.cruiseFixed?.ktas || p.cruiseFixed?.gph)) return { kind: 'yours', label: 'Your aircraft profile\'s cruise numbers' }
+  const read = p.read
+  if (read?.sections.includes(what as TableSection)) return { kind: 'poh', label: `${read.book}, ${fig ?? what}`, fig: what }
+  if (read) return { kind: 'poh', label: `1982 Cessna 172P POH, ${fig ?? what} (standing in: the ${read.book} table couldn't be read)` }
+  return x.pohClosest ? { kind: 'poh', label: `1982 Cessna 172P POH, ${fig ?? what} (closest book)` } : { kind: 'poh', label: `${p.model} POH, ${fig ?? what}`, fig: what }
 }
 
 function pohSource(x: ExplainInput, fig: string | undefined, what: string) {
@@ -72,6 +102,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'Magnetic course', v: `${deg(r.tc)} ${r.varEast >= 0 ? '−' : '+'} ${Math.abs(r.varEast).toFixed(1)} = ${deg(r.mc)}` },
     ],
     source: { used: 'FAA NASR positions; World Magnetic Model 2025 on the flight date', tier: 'primary', backup: 'NASR\'s per-airport variation (decades old)' },
+    refs: [NASR, WMM],
     assumes: ['Great-circle line from the row\'s start to its end.', 'East variation is subtracted ("east is least").'],
     expect: { text: 'Matches the isogonic line on the sectional (about 13° E around the Bay Area).', ok: Math.abs(r.varEast) < 25 },
   })
@@ -91,6 +122,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'Deviation from ISA', v: `${Math.round(r.oat)} − ${n1(isa)} = ${sgn(tDev)} °C` },
     ],
     source: windSource(r, x),
+    refs: windRefs(r, x),
     assumes: [
       'The wind at the row\'s midpoint holds for the whole row.',
       ...(r.windSrc === 'calm' ? ['No forecast: calm wind and standard temperature.'] : []),
@@ -118,6 +150,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'CAS', v: `TAS × √σ = ${Math.round(r.cas)} kt` },
     ],
     source: casSet ? { used: 'Typed into this row', tier: 'yours', backup: 'POH cruise table' } : pohSource(x, r.phase === 'climb' ? p.figures.climb : p.figures.cruise, r.phase === 'climb' ? 'climb' : 'cruise'),
+    refs: casSet ? [{ kind: 'yours', label: 'CAS typed into this row' }] : [pohRef(x, r.phase === 'climb' ? p.figures.climb : p.figures.cruise, r.phase === 'climb' ? 'climb' : 'cruise'), ...(r.phase === 'climb' ? [] : [metarRef(x)]), ...windRefs(r, x).slice(0, 1).map(z => ({ ...z, label: `${z.label} (temperature)` }))],
     assumes: r.phase === 'climb' ? ['POH climb speed, converted to TAS at the forecast temperature.'] : r.phase === 'descent' ? ['Descent at cruise TAS, power back to the cruise table\'s lowest RPM (the POH has no descent table).'] : ['Cruise at the chosen RPM, leaned as the POH recommends.'],
     expect: { text: `Between Vy and Vne: ${p.vspeeds.vy}–${p.vspeeds.vne} KIAS for the ${p.model}.`, ok: r.cas >= p.vspeeds.vy - 5 && r.cas <= p.vspeeds.vne },
     edit: ['cas'],
@@ -134,6 +167,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'Compass heading', v: 'MH + deviation from the compass card (you enter it on the NavLog)' },
     ],
     source: { used: 'Course, wind and airspeed above', tier: WIND_TIER[r.windSrc], backup: 'Calm wind: WCA 0, TH = TC' },
+    refs: [NASR, ...windRefs(r, x), WMM],
     assumes: ['Steady wind through the row.'],
     expect: { text: `|WCA| ≤ ${maxWca.toFixed(1)}° (asin of wind ÷ TAS), pointing into the wind.`, ok: Number.isNaN(r.wca) ? false : Math.abs(r.wca) <= maxWca + 0.1 },
   })
@@ -147,6 +181,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'ETA', v: `${hm(legStart)} + ${n1(r.eteMin)} min = ${hm(r.eta)}` },
     ],
     source: r.phase === 'climb' ? pohSource(x, p.figures.climb, 'climb') : { used: 'Wind triangle', tier: WIND_TIER[r.windSrc], backup: 'TAS alone when the wind is calm' },
+    refs: r.phase === 'climb' ? [pohRef(x, p.figures.climb, 'climb')] : [...windRefs(r, x), NASR],
     assumes: [`Takeoff ${plan.taxiMin ?? 10} min after engine start (start, taxi and run-up).`, ...(r.phase === 'descent' ? ['Descent at 500 fpm from cruise to pattern altitude.'] : [])],
     expect: { text: `${Math.round(r.tas - wSpd)}–${Math.round(r.tas + wSpd)} kt (TAS ± wind).`, ok: r.gs >= r.tas - wSpd - 1 && r.gs <= r.tas + wSpd + 1 },
   })
@@ -160,6 +195,7 @@ export function explainRow(x: ExplainInput, r: NavRow): Expl[] {
       { k: 'Reserve', v: `${n1(d.totals.reserveFuel)} gal (${reserveMinutes(night)} min, §91.151)` },
     ],
     source: r.phase === 'climb' ? pohSource(x, p.figures.climb, 'climb') : pohSource(x, p.figures.cruise, 'cruise'),
+    refs: [pohRef(x, r.phase === 'climb' ? p.figures.climb : p.figures.cruise, r.phase === 'climb' ? 'climb' : 'cruise'), RESERVE],
     assumes: [`${p.climbStartFuelGal} gal for start, taxi and takeoff per takeoff (POH).`, '6 lb per gallon (100LL).'],
     expect: { text: 'Fuel remaining stays above the reserve.', ok: r.fuelRem >= d.totals.reserveFuel },
   })
@@ -186,6 +222,7 @@ export function explainWb(x: ExplainInput, s: WbStep, i: number): Expl {
         { k: 'Maximum', v: `${n0(s.max ?? 0)} lb` },
       ],
       source: { used: `${p.model} POH Section 2 limits and the CG envelope`, tier: x.pohClosest ? 'backup' : 'primary', backup: 'Limits in your aircraft profile' },
+      refs: [{ kind: 'poh', label: `${p.model} POH Section 2, weight and CG limits${x.pohClosest ? ' (TCDS 3A12 values for this model)' : ''}`, fig: 'limits' }, { kind: 'poh', label: `${p.model} POH Section 6, CG envelope`, fig: 'wb' }],
       assumes: ['Normal category envelope.', 'Fuel burned comes off at the fuel arm.'],
       expect: { text: `At most ${n0(s.max ?? 0)} lb, CG inside the envelope at this weight.`, ok: !s.over && inside },
     }
@@ -204,6 +241,9 @@ export function explainWb(x: ExplainInput, s: WbStep, i: number): Expl {
       ? (d.wb.emptySample ? { used: 'POH sample airplane', tier: 'standin', backup: `${plan.tail ?? 'This tail'}'s W&B record (Aircraft → Profile and records)` } : { used: `${plan.tail}'s W&B record`, tier: 'yours' })
       : isFuel ? { used: s.label.startsWith('Fuel ') ? (plan.fuelGal == null ? 'Full usable fuel for the tanks' : 'Your fuel entry') : s.label === 'Flight burn' ? 'NavLog fuel × 6 lb/gal' : `POH (${p.climbStartFuelGal} gal)`, tier: s.label.startsWith('Fuel ') && plan.fuelGal != null ? 'yours' : 'primary' }
         : { used: 'Your seat and baggage weights', tier: 'yours' },
+    refs: isEmpty
+      ? [d.wb.emptySample ? { kind: 'poh', label: `${p.model} POH Section 6, sample loading problem`, fig: 'wb' } : { kind: 'yours', label: `${plan.tail}'s weight and balance record (aircraft profile)` }]
+      : [...(isFuel && /Start|taxi/i.test(s.label) ? [pohRef(x, p.figures.climb, 'climb')] : []), { kind: 'poh', label: `${p.model} POH Section 6, loading arms`, fig: 'wb' }, ...(!isFuel ? [{ kind: 'yours' as const, label: 'Your seat and baggage entries' }] : [])],
     assumes: isEmpty ? ['Includes unusable fuel and full oil, per the weighing record.'] : isFuel ? ['6 lb per gallon (100LL).', `Fuel arm ${p.fuelArm} in.`] : ['Weights include clothing and headsets.', ...(stn?.range ? [`Arm range ${stn.range}.`] : [])],
     expect: isEmpty
       ? { text: 'A 172 weighs about 1,400–1,700 lb empty, CG about 38–40 in.', ok: d.wb.emptySample ? null : s.weight >= 1200 && s.weight <= 1900 }

@@ -119,8 +119,6 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 export function AircraftDocs({ tail, model, poh, pohUploaded }: { tail: string; model: string | null; poh: PlannerDoc | null | undefined; pohUploaded: boolean }) {
   const docs = useDocuments()
   const refs = useRefs()
-  const checklist = (docs.data ?? []).filter(d => d.kind === 'checklist' && (d.tail_number === tail || (!d.tail_number && model && d.model === model.toUpperCase())))
-    .sort((a, b) => Number(b.tail_number === tail) - Number(a.tail_number === tail) || b.created_at.localeCompare(a.created_at))[0]
   const row = (kind: 'poh' | 'checklist', doc: PlannerDoc | null | undefined, note: string) => (
     <DocRow key={kind} kind={kind} doc={doc} note={note} uploading={docs.upload.isPending && docs.upload.variables?.kind === kind}
       onOpen={() => refs?.show(kind)} onUpload={f => docs.upload.mutate({ file: f, kind, tail, model: model ?? undefined, title: `${tail} ${kind === 'poh' ? 'POH' : 'checklist'} (${f.name.replace(/\.(pdf|png|jpe?g)$/i, '')})` },
@@ -134,9 +132,9 @@ export function AircraftDocs({ tail, model, poh, pohUploaded }: { tail: string; 
       <SubHead>Documents · <span className="num">{tail}</span></SubHead>
       <div className="divide-y divide-border rounded-lg ring-1 ring-inset ring-border">
         {row('poh', poh, poh ? (pohUploaded ? 'Your upload, used for this tail' : 'Public copy for the model; upload this airplane\'s own to replace it') : 'None found; upload this airplane\'s POH')}
-        {row('checklist', checklist, checklist ? `Uploaded ${new Date(checklist.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${docs.extract.isPending ? 'reading steps…' : checklist.steps ? `${stepCount(checklist.steps)} steps in ${checklist.steps.length} sections` : 'steps not read yet: Open → Extract steps'}` : 'Upload the checklist you fly with (PDF or photo); its steps are read out automatically')}
+        <p className="px-3 py-2.5 text-[13px] text-fg-3">The checklist is added under Checklist: upload a photo or PDF of it, or add its lines by hand.</p>
       </div>
-      <p className="mt-1.5 text-xs text-fg-3">The newest upload is the one used. Uploads open beside the plan, and their takeoff, climb, cruise and landing tables are read when the PDF has text; your aircraft profile's numbers win over both.</p>
+      <p className="mt-1.5 text-xs text-fg-3">The newest POH upload is the one used. Its takeoff, climb, cruise and landing tables and spec sheet are read when the PDF has text; your aircraft profile's numbers win over both.</p>
     </div>
   )
 }

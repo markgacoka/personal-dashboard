@@ -103,7 +103,7 @@ export function AircraftStep({ plan, set, d, registry, match, poh, pohDoc, pohUp
         {p && <PohSummary d={d} profile={p} plan={plan} planning={planning} u={u} />}
       </Block>
 
-      <Block id="checklist" title={`${plan.tail} checklist`} lead={list.length ? 'The checklist you fly this airplane with, from its profile. Tap a step to tick it; it prints after the NavLog.' : 'Write out the checklist you fly this airplane with, or paste it from the POH. It becomes part of every brief for this airplane and prints after the NavLog.'}
+      <Block id="checklist" title={`${plan.tail} checklist`} lead={list.length ? 'The checklist you fly this airplane with, from its profile. Tap a step to tick it; it prints after the NavLog.' : 'Upload a photo or PDF of the checklist you fly this airplane with, or add its lines by hand in order: a section title, then each item and its value. It becomes part of every brief for this airplane and prints after the NavLog.'}
         right={list.length > 0 && !editList ? <Button size="sm" variant="ghost" onClick={() => setEditList(true)}>Edit checklist</Button> : null}>
         {editList || !list.length
           ? <ChecklistEditor tail={plan.tail} value={list} saving={savingPlanning} onCancel={list.length ? () => setEditList(false) : undefined} onSave={c => { savePlanning({ ...planning, checklist: c }); setEditList(false) }} />

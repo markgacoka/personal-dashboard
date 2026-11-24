@@ -7,14 +7,14 @@ import { Switch } from '@/components/ui/misc'
 import { useRegistry } from '@/lib/queries'
 import { titleCase } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useCertificates, useDocuments, usePilotInfo, usePohFind, type PlannerDoc, type PohMatch } from './api'
+import { useDocuments, usePohFind, type PlannerDoc, type PohMatch } from './api'
 import { ChecklistEditor } from './AircraftChecklist'
 import { InspectionDates } from './AircraftStep'
 import { EmptyWeight, OptNum } from './FlightInputs'
 import type { AircraftPlanning } from './model'
 import { CERTIFICATES, type Certificate } from './pilot'
 import { SECTION_LABEL, profileFor, withSpecs, withTables } from './poh'
-import { newId, useAircraftProfiles, usePeople, type Person, type PersonRole } from './profiles'
+import { newId, useAircraftProfiles, useCrew, type Person, type PersonRole } from './profiles'
 import { hasSpecs, type PohSpecs } from './specs'
 import { unitsForTail } from './units'
 
@@ -25,51 +25,25 @@ import { unitsForTail } from './units'
 const Label = ({ children, className }: { children: React.ReactNode; className?: string }) => <span className={cn('mb-1 block text-sm text-fg-2', className)}>{children}</span>
 const Hint = ({ children }: { children: React.ReactNode }) => <p className="mt-1 text-[13px] text-fg-3">{children}</p>
 
-/* ── You ── */
-// Asked once, before the first plan: what the Part 61 checks and the pilot
-// seat need. Medical and endorsements follow under Pilot, where they're checked.
-export function PilotSetup({ onDone }: { onDone: () => void }) {
-  const info = usePilotInfo(), certs = useCertificates()
-  const [name, setName] = useState(info.data?.name ?? '')
-  const [weight, setWeight] = useState<number | null>(info.data?.weightLb ?? null)
-  const [cert, setCert] = useState<Certificate>(certs.data?.certificate ?? 'student')
-  const ok = name.trim() && weight && weight > 50 && weight < 400
-  const save = async () => {
-    try {
-      await info.save.mutateAsync({ ...info.data, name: name.trim(), weightLb: weight })
-      await certs.save.mutateAsync({ ...certs.data, certificate: cert })
-      toast.success('Your pilot profile is saved'); onDone()
-    } catch (e) { toast.error((e as Error).message) }
-  }
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block"><Label>Your name</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="As on your certificate" autoFocus /></label>
-        <label className="block"><Label>Your weight</Label><OptNum value={weight} placeholder="lb, dressed" unit="lb" onChange={setWeight} label="Your weight" /></label>
-        <label className="block"><Label>Certificate</Label><Select value={cert} onChange={e => setCert(e.target.value as Certificate)}>{CERTIFICATES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</Select></label>
-      </div>
-      <Hint>Your certificate decides the rules each flight is checked against; your weight fills the pilot seat. Medical, endorsements and minimums are asked under Pilot, where they're checked.</Hint>
-      <Button variant="primary" disabled={!ok} loading={info.save.isPending || certs.save.isPending} onClick={save}>Save and continue</Button>
-    </div>
-  )
-}
-
 /* ── Instructors and passengers ── */
+// A pilot, instructor or passenger, created where they're first needed. A
+// pilot's medical and endorsements are completed under Pilot, where they're checked.
 export function PersonForm({ role, initial, onDone, onCancel }: { role: PersonRole; initial?: Partial<Person>; onDone: (p: Person) => void; onCancel: () => void }) {
-  const people = usePeople()
-  const [p, setP] = useState<Person>({ id: initial?.id ?? newId(), name: initial?.name ?? '', role, weightLb: initial?.weightLb ?? null, cfi: initial?.cfi, phone: initial?.phone })
+  const crew = useCrew()
+  const [p, setP] = useState<Person>({ id: initial?.id ?? newId(), name: initial?.name ?? '', role, weightLb: initial?.weightLb ?? null, cfi: initial?.cfi, phone: initial?.phone, certs: initial?.certs ?? (role === 'pilot' ? { certificate: 'student' } : undefined) })
   const ok = p.name.trim() && (p.weightLb == null || (p.weightLb > 20 && p.weightLb < 400))
   return (
     <div className="space-y-3 rounded-lg p-3 ring-1 ring-inset ring-border">
-      <div className="text-sm font-medium text-fg">{initial?.id ? 'Edit' : 'New'} {role === 'instructor' ? 'instructor' : 'passenger'}</div>
+      <div className="text-sm font-medium text-fg">{initial?.id ? 'Edit' : 'New'} {role}</div>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block"><Label>Name</Label><Input value={p.name} onChange={e => setP({ ...p, name: e.target.value.slice(0, 60) })} autoFocus placeholder="Full name" /></label>
         <label className="block"><Label>Weight</Label><OptNum value={p.weightLb} placeholder="lb, dressed" unit="lb" onChange={v => setP({ ...p, weightLb: v })} label="Weight" /></label>
+        {role === 'pilot' && <label className="block"><Label>Certificate</Label><Select value={p.certs?.certificate ?? 'student'} onChange={e => setP({ ...p, certs: { ...p.certs, certificate: e.target.value as Certificate } })}>{CERTIFICATES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</Select></label>}
         {role === 'instructor' && <label className="block"><Label>CFI certificate number</Label><Input value={p.cfi ?? ''} onChange={e => setP({ ...p, cfi: e.target.value.slice(0, 20) })} placeholder="Optional" className="num" /></label>}
       </div>
       {p.weightLb != null && !(p.weightLb > 20 && p.weightLb < 400) && <p className="text-[13px] text-bad">Enter a weight between 20 and 400 lb.</p>}
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" disabled={!ok} loading={people.save.isPending} onClick={async () => { const x = { ...p, name: p.name.trim() }; await people.upsert(x); toast.success(`${x.name} saved`); onDone(x) }}>Save {role}</Button>
+        <Button size="sm" variant="primary" disabled={!ok} loading={crew.saving} onClick={async () => { const x = { ...p, name: p.name.trim() }; await crew.save(x); toast.success(`${x.name} saved`); onDone(x) }}>Save {role}</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </div>
@@ -194,7 +168,7 @@ export function AircraftSetup({ initialTail, onDone, onCancel }: { initialTail?:
 
       {step === 4 && tail && (
         <div>
-          <Hint>Write out the checklist you fly {tail} with, or paste it. It's part of every brief for {tail} and prints after the NavLog. You can skip this and add it later.</Hint>
+          <Hint>Upload a photo or PDF of the checklist you fly {tail} with, or add its lines by hand in order. It's part of every brief for {tail} and prints after the NavLog. You can skip this and add it later.</Hint>
           <div className="mt-3"><ChecklistEditor tail={tail} value={draft.checklist} onSave={c => { setDraft(d => ({ ...d, checklist: c })); toast.success(`${c.reduce((n, s) => n + s.items.length, 0)} steps kept; Finish saves them`) }} /></div>
         </div>
       )}

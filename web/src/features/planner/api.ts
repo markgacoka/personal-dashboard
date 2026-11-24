@@ -82,6 +82,24 @@ export function usePlans() {
   return { ...q, create, update, remove }
 }
 
+// One flight by id (from the list when it's there), and saving it as you edit.
+export function usePlan(id: number | null) {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ['planner', 'plan', id], enabled: id != null, staleTime: Infinity, retry: 1,
+    initialData: () => qc.getQueryData<SavedPlan[]>(['planner', 'plans'])?.find(p => p.id === id),
+    queryFn: () => get<SavedPlan>(`/api/planner/plans/${id}`),
+  })
+  const save = useMutation({
+    mutationFn: (plan: Plan) => put<SavedPlan>(`/api/planner/plans/${id}`, { name: plan.name, data: plan }),
+    onSuccess: r => {
+      qc.setQueryData(['planner', 'plan', id], r)
+      qc.setQueryData<SavedPlan[]>(['planner', 'plans'], xs => xs ? [r, ...xs.filter(x => x.id !== r.id)] : xs)
+    },
+  })
+  return { ...q, save }
+}
+
 // Your airport profiles (pattern altitude, pattern sides, notes) by airport id.
 export function useAirportProfiles(ids: string[]) {
   const qc = useQueryClient()

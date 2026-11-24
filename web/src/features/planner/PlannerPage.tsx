@@ -1,112 +1,173 @@
-import { useState } from 'react'
-import { Link } from 'react-router'
-import { Calculator, Check, ChevronDown, ChevronRight, FilePlus2, Loader2, MoreHorizontal, Pencil, Printer, Save, Trash2, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
+import { Calculator, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FilePlus2, Loader2, MoreHorizontal, Pencil, Printer, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Menu, MenuContent, MenuItem, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlay'
 import { relTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { SavedPlan } from './api'
+import { usePlan, type SavedPlan } from './api'
 import { FlightInputs } from './FlightInputs'
-import { parseRouteItem, type Plan, type Status } from './model'
-import { AircraftPicker, CrewPicker, NeedsPilotProfile } from './Pickers'
+import { parseRouteItem, type Status } from './model'
+import { AircraftPicker, CrewPicker } from './Pickers'
 import { SECTIONS, SECTION_LABEL, sectionState, type SectionKey, type TaskKind } from './readiness'
 import { RefProvider } from './RefPanel'
-import { AircraftSection, AirportsSection, LoadingSection, NavlogSection, PilotSection, RouteSection, TaskRow, WeatherSectionView } from './Sections'
+import { AircraftSection, AirportsSection, NavlogDoc, NavlogSection, PilotSection, RouteSection, TaskRow, WbDoc, WbSection, WeatherBriefSection, WxDoc } from './Sections'
 import { VerdictIcon, fmtMin, fmtTime } from './ui'
-import { FlightCtx, useFlight, useFlightState } from './useFlight'
+import { FlightCtx, useFlight, useFlightActions, useFlightState } from './useFlight'
 import { WorkSheet } from './WorkSheet'
 
-// The flight file (docs/planner-ux.md): a new flight asks four things, then
-// the sections in the order a pilot briefs (pilot, aircraft, weather, airports,
-// route and fuel, weight and performance) lead to the NavLog. The rail shows
-// what's still open in each; the work sheet explains any figure.
+// One flight (docs/planner-ux.md), at its own address: a new flight asks
+// where and when, the aircraft and who's flying; then the brief (pilot,
+// aircraft, airports, route and fuel) produces three outputs: the NavLog, the
+// weight and balance and the weather briefing. It saves itself as you edit.
 export default function PlannerPage() {
-  return <RefProvider><Shell /></RefProvider>
+  const { id } = useParams()
+  const n = Number(id)
+  const q = usePlan(Number.isInteger(n) ? n : null)
+  if (q.isLoading) return <p className="flex items-center gap-2 text-sm text-fg-3"><Loader2 className="size-4 animate-spin" />Opening the flight…</p>
+  if (!q.data) return (
+    <div className="rounded-xl bg-card px-6 py-10 text-center ring-1 ring-inset ring-white/[0.04]">
+      <p className="text-[15px] font-medium text-fg">This flight doesn't exist</p>
+      <p className="mt-1 text-sm text-fg-3">It may have been deleted.</p>
+      <Button asChild className="mt-4" variant="secondary"><Link to="/flying/plan">All flights</Link></Button>
+    </div>
+  )
+  return <RefProvider key={n}><Shell saved={q.data} /></RefProvider>
 }
 
-function Shell() {
-  const f = useFlightState()
+function Shell({ saved }: { saved: SavedPlan }) {
+  const [params, setParams] = useSearchParams()
+  const s = params.get('s')
+  const section = (SECTIONS.some(x => x.key === s) ? s : 'overview') as SectionKey
+  const f = useFlightState({ saved, section, setSection: k => setParams(k === 'overview' ? {} : { s: k }) })
   const sheet = f.refs.state.open
+  // Print all three outputs: render them together for the print, then go back.
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => { if (!printing) return; const t = setTimeout(() => window.print(), 400); const done = () => setPrinting(false); window.addEventListener('afterprint', done); return () => { clearTimeout(t); window.removeEventListener('afterprint', done) } }, [printing])
+  const printAll = () => setPrinting(true)
   return (
     <FlightCtx.Provider value={f}>
       <div className="planner">
-        <Header />
-        {f.state.setup ? <NewFlight /> : (
-          <div className={cn('grid gap-6 lg:grid-cols-[14.5rem_minmax(0,1fr)]', sheet && (f.refs.state.wide ? '2xl:grid-cols-[14.5rem_minmax(0,1fr)_minmax(28rem,42%)]' : '2xl:grid-cols-[14.5rem_minmax(0,1fr)_28rem] min-[2200px]:grid-cols-[14.5rem_minmax(0,1fr)_34rem]'))}>
-            <Rail />
-            <main className="min-w-0">
-              <Status />
-              {f.state.section === 'overview' && <Overview />}
-              {f.state.section === 'pilot' && <PilotSection />}
-              {f.state.section === 'aircraft' && <AircraftSection />}
-              {f.state.section === 'weather' && <WeatherSectionView />}
-              {f.state.section === 'airports' && <AirportsSection />}
-              {f.state.section === 'route' && <RouteSection />}
-              {f.state.section === 'loading' && <LoadingSection />}
-              {f.state.section === 'navlog' && <NavlogSection />}
-              <Pager />
-            </main>
-            <WorkSheet />
-          </div>
-        )}
+        <div className={cn(printing && 'print:hidden')}>
+          <Header printAll={printAll} />
+          {f.setup ? <NewFlight /> : (
+            <div className={cn('grid gap-6 lg:grid-cols-[14.5rem_minmax(0,1fr)]', sheet && (f.refs.state.wide ? '2xl:grid-cols-[14.5rem_minmax(0,1fr)_minmax(28rem,42%)]' : '2xl:grid-cols-[14.5rem_minmax(0,1fr)_28rem] min-[2200px]:grid-cols-[14.5rem_minmax(0,1fr)_34rem]'))}>
+              <Rail />
+              <main className="min-w-0">
+                <Status />
+                {section === 'overview' && <Overview printAll={printAll} />}
+                {section === 'pilot' && <PilotSection />}
+                {section === 'aircraft' && <AircraftSection />}
+                {section === 'airports' && <AirportsSection />}
+                {section === 'route' && <RouteSection />}
+                {section === 'navlog' && <NavlogSection />}
+                {section === 'loading' && <WbSection />}
+                {section === 'weather' && <WeatherBriefSection />}
+                <Pager />
+              </main>
+              <WorkSheet />
+            </div>
+          )}
+        </div>
+        {printing && <div className="hidden space-y-8 print:block"><NavlogDoc /><WbDoc /><WxDoc /></div>}
       </div>
     </FlightCtx.Provider>
   )
 }
 
 /* ── Header ── */
-function Header() {
+function Header({ printAll }: { printAll: () => void }) {
   const f = useFlight()
-  const [plansOpen, setPlansOpen] = useState(false)
+  const a = useFlightActions()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { plan, d } = f
   const when = d.departAt?.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-  const crew = f.role === 'dual' ? `dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : (f.certs?.certificate ?? 'student') === 'student' ? 'solo' : 'you as PIC'
+  const crew = [f.pilot?.name, f.role === 'dual' ? `dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : f.pilot ? ((f.certs?.certificate ?? 'student') === 'student' ? 'solo' : 'PIC') : null].filter(Boolean).join(' ')
   return (
-    <header className="mb-6 flex flex-wrap items-start gap-x-6 gap-y-3 print:hidden">
-      <div className="min-w-0 flex-1 basis-80">
-        <label className="group flex min-w-0 items-center gap-2">
-          <input value={plan.name} onChange={e => f.set({ name: e.target.value })} aria-label="Flight name" placeholder="Name this flight" size={Math.max(10, plan.name.length + 1)}
-            className="field-sizing-content min-w-0 max-w-full bg-transparent text-2xl font-medium tracking-[-0.02em] text-fg outline-none placeholder:text-fg-3 focus:underline" />
-          <Pencil className="size-4 shrink-0 text-fg-3 group-hover:text-fg" aria-hidden />
-        </label>
-        {!f.state.setup && (
-          <p className="mt-1 text-sm text-fg-3">
-            <span className="num text-fg-2">{f.routeText}</span>{when && <> · {when}</>}{plan.tail && <> · <span className="num">{plan.tail}</span></>} · {crew}
-            {d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)}</span></>}
-          </p>
-        )}
+    <header className="mb-6 print:hidden">
+      <Link to="/flying/plan" className="mb-1 inline-flex items-center gap-1 text-[13px] text-fg-3 hover:text-fg"><ChevronLeft className="size-3.5" />All flights</Link>
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-80">
+          <label className="group flex min-w-0 items-center gap-2">
+            <input value={plan.name} onChange={e => f.set({ name: e.target.value })} aria-label="Flight name" placeholder="Name this flight" size={Math.max(10, plan.name.length + 1)}
+              className="field-sizing-content min-w-0 max-w-full bg-transparent text-2xl font-medium tracking-[-0.02em] text-fg outline-none placeholder:text-fg-3 focus:underline" />
+            <Pencil className="size-4 shrink-0 text-fg-3 group-hover:text-fg" aria-hidden />
+          </label>
+          {!f.setup && (
+            <p className="mt-1 text-sm text-fg-3">
+              <span className="num text-fg-2">{f.routeText}</span>{when && <> · {when}</>}{plan.tail && <> · <span className="num">{plan.tail}</span></>}{crew && <> · {crew}</>}
+              {d.legs.length > 0 && <> · <span className="num">{Math.round(d.totals.distNm)} nm · {fmtMin(d.totals.eteMin)}</span></>}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!f.setup && <Verdict onClick={() => f.go('overview')} />}
+          <SaveStatus />
+          <Switcher />
+          <Menu>
+            <MenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><MoreHorizontal /></Button></MenuTrigger>
+            <MenuContent>
+              <MenuItem onSelect={printAll}><Printer />Print all three outputs</MenuItem>
+              <MenuItem onSelect={() => a.duplicate(plan)}><Copy />Copy as a new flight</MenuItem>
+              <MenuItem onSelect={() => f.refs.show('workings')}><Calculator />All workings and sources</MenuItem>
+              <MenuItem asChild><Link to="/flying/plan/profiles"><Users />Profiles</Link></MenuItem>
+              <MenuItem danger onSelect={() => setConfirmDelete(true)}><Trash2 />Delete flight</MenuItem>
+            </MenuContent>
+          </Menu>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {!f.state.setup && <Verdict onClick={() => f.go('overview')} />}
-        <Popover open={plansOpen} onOpenChange={setPlansOpen}>
-          <PopoverTrigger asChild><Button variant="ghost">Plans<ChevronDown /></Button></PopoverTrigger>
-          <PopoverContent align="end" className="max-h-[70dvh] w-80 overflow-hidden p-2">
-            <PlanList plans={f.plans.data} loading={f.plans.isLoading} currentId={f.state.id} draft={f.state.id ? null : plan} unsaved={f.dirty && (f.state.id != null || plan.route.length > 1) ? plan.name : null}
-              onSave={f.save} onOpen={p => { setPlansOpen(false); f.open(p) }} onNew={() => { setPlansOpen(false); f.startNew() }} />
-          </PopoverContent>
-        </Popover>
-        {f.dirty || !f.state.id
-          ? <Button variant="primary" onClick={f.save} loading={f.plans.create.isPending || f.plans.update.isPending}><Save />{f.state.id ? 'Save changes' : 'Save'}</Button>
-          : <span role="status" className="inline-flex h-9 items-center gap-1.5 px-1 text-[13px] text-fg-3"><Check className="size-4" />Saved {f.state.savedAt ? relTime(f.state.savedAt) : ''}</span>}
-        <Menu>
-          <MenuTrigger asChild><Button variant="ghost" size="icon" aria-label="More"><MoreHorizontal /></Button></MenuTrigger>
-          <MenuContent>
-            <MenuItem onSelect={() => { f.go('navlog'); setTimeout(() => window.print(), 300) }}><Printer />Print NavLog</MenuItem>
-            <MenuItem onSelect={() => f.refs.show('workings')}><Calculator />All workings</MenuItem>
-            <MenuItem asChild><Link to="/flying/plan/profiles"><Users />Profiles</Link></MenuItem>
-            {f.state.id && <MenuItem danger onSelect={() => setConfirmDelete(true)}><Trash2 />Delete flight</MenuItem>}
-          </MenuContent>
-        </Menu>
-      </div>
-      {confirmDelete && f.state.id && (
-        <div role="alertdialog" aria-label="Delete this flight?" className="flex w-full items-center justify-end gap-2 text-[13px]">
-          <span className="text-fg-2">Delete "{plan.name}" for good?</span>
-          <Button size="sm" variant="danger" onClick={() => { f.remove(); setConfirmDelete(false) }}>Delete</Button>
+      {confirmDelete && (
+        <div role="alertdialog" aria-label="Delete this flight?" className="mt-3 flex flex-wrap items-center justify-end gap-2 text-[13px]">
+          <span className="text-fg-2">Delete "{plan.name}" and everything in it for good?</span>
+          <Button size="sm" variant="danger" onClick={() => a.remove(f.id, () => window.location.assign('/flying/plan'))}>Delete</Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Keep</Button>
         </div>
       )}
     </header>
+  )
+}
+
+// Saving happens on its own; this says where it's at, and offers a retry when it failed.
+function SaveStatus() {
+  const f = useFlight()
+  const st = f.saveState
+  return (
+    <span role="status" aria-live="polite" className={cn('inline-flex h-9 items-center gap-1.5 px-1 text-[13px]', st === 'error' ? 'text-bad' : 'text-fg-3')}>
+      {st === 'saved' && <><Check className="size-4" />Saved {relTime(f.savedAt)}</>}
+      {(st === 'pending' || st === 'saving') && <><Loader2 className="size-3.5 animate-spin" />Saving…</>}
+      {st === 'error' && <>Couldn't save<button className="text-accent hover:underline" onClick={f.retrySave}>Retry</button></>}
+    </span>
+  )
+}
+
+// The other flights, to switch to (each opens at its own address) or start a new one.
+function Switcher() {
+  const f = useFlight()
+  const a = useFlightActions()
+  const [open, setOpen] = useState(false)
+  const list = (a.plans.data ?? []).filter(p => p.id !== f.id).slice(0, 12)
+  const routeOf = (p: SavedPlan) => p.data.route.map(r => parseRouteItem(r).id).join(' → ')
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild><Button variant="ghost">Flights<ChevronDown /></Button></PopoverTrigger>
+      <PopoverContent align="end" className="max-h-[70dvh] w-80 overflow-y-auto p-2">
+        <div className="flex items-center justify-between gap-2 pb-2">
+          <Link to="/flying/plan" className="px-2 text-sm font-medium text-fg hover:underline" onClick={() => setOpen(false)}>All flights</Link>
+          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); a.newFlight() }}><FilePlus2 />New flight</Button>
+        </div>
+        <ul className="space-y-0.5">
+          {list.map(p => (
+            <li key={p.id}>
+              <Link to={`/flying/plan/${p.id}`} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 hover:bg-hover">
+                <div className="truncate text-sm text-fg">{p.name}</div>
+                <div className="num truncate text-xs text-fg-3">{routeOf(p)} · {new Date(p.data.departLocal).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+              </Link>
+            </li>
+          ))}
+          {!list.length && <li className="px-3 py-2 text-sm text-fg-3">No other flights yet.</li>}
+        </ul>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -120,7 +181,7 @@ function Verdict({ onClick }: { onClick: () => void }) {
   )
 }
 
-/* ── Rail: the sections and what's open in each ── */
+/* ── Rail: the brief, then the outputs, and what's open in each ── */
 const MARK: Record<TaskKind | 'done', React.ReactNode> = {
   nogo: <span aria-label="Something rules the flight out" className="size-2 rounded-full bg-bad" />,
   caution: <span aria-label="A decision to make" className="size-2 rounded-full bg-warn" />,
@@ -131,25 +192,28 @@ const MARK: Record<TaskKind | 'done', React.ReactNode> = {
 function Rail() {
   const f = useFlight()
   const open = (k: SectionKey) => f.tasks.filter(t => t.section === k && t.kind !== 'recommended').length
+  const item = (s: (typeof SECTIONS)[number]) => {
+    const on = f.section === s.key
+    const st = s.key === 'overview' ? null : s.key === 'navlog' ? (f.d.flights.length ? 'done' : 'todo') : sectionState(f.tasks, s.key)
+    const n = s.key === 'overview' || s.key === 'navlog' ? 0 : open(s.key)
+    return (
+      <li key={s.key}>
+        <button onClick={() => f.go(s.key)} aria-current={on ? 'page' : undefined} aria-label={`${s.label}${n ? `, ${n} open` : st === 'done' ? ', done' : ''}`}
+          className={cn('flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm max-lg:whitespace-nowrap max-lg:ring-1 max-lg:ring-inset', on ? 'bg-pill font-medium text-fg max-lg:ring-border-strong' : 'text-fg-2 hover:bg-hover hover:text-fg max-lg:ring-border')}>
+          <span className="min-w-0 flex-1 leading-snug"><span className="lg:hidden">{s.short}</span><span className="max-lg:hidden">{s.label}</span></span>
+          {n > 0 && <span className="num text-[12px] text-fg-3">{n}</span>}
+          {st && <span className="grid w-3.5 shrink-0 place-items-center">{MARK[st]}</span>}
+        </button>
+      </li>
+    )
+  }
   return (
-    <nav aria-label="Flight file" className="print:hidden max-lg:-mx-4 max-lg:overflow-x-auto max-lg:px-4 max-lg:scrollbar-none lg:sticky lg:top-20 lg:self-start">
-      <ol className="flex gap-1 max-lg:pb-1 lg:flex-col">
-        {SECTIONS.map((s, i) => {
-          const on = f.state.section === s.key, st = s.key === 'overview' ? null : s.key === 'navlog' ? (f.d.flights.length ? 'done' : 'todo') : sectionState(f.tasks, s.key)
-          const n = s.key === 'overview' || s.key === 'navlog' ? 0 : open(s.key)
-          return (
-            <li key={s.key} className={cn(s.key === 'navlog' && 'lg:mt-2 lg:border-t lg:border-border lg:pt-2')}>
-              <button onClick={() => f.go(s.key)} aria-current={on ? 'page' : undefined} aria-label={`${s.label}${n ? `, ${n} open` : st === 'done' ? ', done' : ''}`}
-                className={cn('flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm max-lg:whitespace-nowrap max-lg:ring-1 max-lg:ring-inset', on ? 'bg-pill font-medium text-fg max-lg:ring-border-strong' : 'text-fg-2 hover:bg-hover hover:text-fg max-lg:ring-border')}>
-                <span className="num w-3 shrink-0 text-[12px] text-fg-3 max-lg:hidden">{i || ''}</span>
-                <span className="min-w-0 flex-1 leading-snug"><span className="lg:hidden">{s.short}</span><span className="max-lg:hidden">{s.rail ?? s.label}</span></span>
-                {n > 0 && <span className="num text-[12px] text-fg-3">{n}</span>}
-                {st && <span className="grid w-3.5 shrink-0 place-items-center">{MARK[st]}</span>}
-              </button>
-            </li>
-          )
-        })}
-      </ol>
+    <nav aria-label="Flight" className="print:hidden max-lg:-mx-4 max-lg:overflow-x-auto max-lg:px-4 max-lg:scrollbar-none lg:sticky lg:top-20 lg:self-start">
+      <div className="flex gap-1 max-lg:pb-1 lg:flex-col">
+        <ol className="contents lg:flex lg:flex-col lg:gap-1">{SECTIONS.filter(s => s.group === 'brief').map(item)}</ol>
+        <div className="mx-3 mt-3 mb-1 text-[12px] font-medium uppercase tracking-wide text-fg-3 max-lg:hidden">Outputs</div>
+        <ol className="contents lg:flex lg:flex-col lg:gap-1">{SECTIONS.filter(s => s.group === 'output').map(item)}</ol>
+      </div>
       <div className="mt-4 hidden space-y-0.5 border-t border-border pt-3 lg:block">
         <button onClick={() => f.refs.show('workings')} className="flex h-8 w-full items-center gap-2 rounded-lg px-3 text-[13px] text-fg-3 hover:bg-hover hover:text-fg"><Calculator className="size-3.5" />Workings and sources</button>
         <Link to="/flying/plan/profiles" className="flex h-8 w-full items-center gap-2 rounded-lg px-3 text-[13px] text-fg-3 hover:bg-hover hover:text-fg"><Users className="size-3.5" />Profiles</Link>
@@ -169,10 +233,9 @@ function Status() {
   )
 }
 
-// Next and previous section at the foot of each one: the file reads front to back.
 function Pager() {
   const f = useFlight()
-  const i = SECTIONS.findIndex(s => s.key === f.state.section)
+  const i = SECTIONS.findIndex(s => s.key === f.section)
   const next = SECTIONS[i + 1], prev = SECTIONS[i - 1]
   return (
     <div className="mt-10 flex items-center gap-2 border-t border-border pt-4 print:hidden">
@@ -183,7 +246,7 @@ function Pager() {
 }
 
 /* ── Overview ── */
-function Overview() {
+function Overview({ printAll }: { printAll: () => void }) {
   const f = useFlight()
   const { d, plan } = f
   const t = d.totals
@@ -195,13 +258,29 @@ function Overview() {
   const code = (a: { icao: string | null; id: string }) => a.icao || a.id
   const dep = d.perf.find(p => p.kind === 'takeoff'), arr = [...d.perf].reverse().find(p => p.kind === 'landing' && p.wx.role !== 'alternate')
   const areas: [SectionKey, React.ReactNode][] = [
-    ['pilot', [f.role === 'dual' ? `Dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : 'You as pilot in command', f.certs?.certificate ? null : 'certificate not saved'].filter(Boolean).join(' · ')],
+    ['pilot', f.pilot ? [f.pilot.name, f.role === 'dual' ? `dual with ${plan.crew?.instructor?.trim() || 'an instructor'}` : 'pilot in command', f.certs?.certificate ? null : 'certificate not entered'].filter(Boolean).join(' · ') : 'No pilot loaded yet'],
     ['aircraft', plan.tail ? `${plan.tail} · ${f.acName}${d.profile ? ` · ${d.profile.engine.split(',')[0]}` : ''}` : 'Not chosen yet'],
-    ['weather', d.wx.length ? d.wx.filter(w => w.role !== 'alternate').map(w => `${code(w.airport)} ${w.category ?? 'no report'} at ${fmtTime(w.at)}`).join(' · ') : 'Once the route is set'],
     ['airports', [dep?.runway && `${code(dep.airport)} RWY ${dep.runway.end.id}`, arr?.runway && `${code(arr.airport)} RWY ${arr.runway.end.id}`, f.effAlt ? `alternate ${f.effAlt}` : plan.alternate === false && 'no alternate'].filter(Boolean).join(' · ') || 'Once the route is set'],
     ['route', d.legs.length ? `${d.flights.map(x => `${x.alt.toLocaleString()} ft`).join(' / ')} · ${Math.round(t.distNm)} nm · ${t.requiredFuel.toFixed(1)} of ${t.usableFuel.toFixed(1)} gal needed` : 'Once the route resolves'],
-    ['loading', to ? `Takeoff ${Math.round(to.weight).toLocaleString()} lb, CG ${to.arm?.toFixed(1)} in${dep?.dist && dep.runway ? ` · ${dep.dist.total.toLocaleString()} of ${dep.runway.toraFt.toLocaleString()} ft to clear 50 ft` : ''}` : 'Once the aircraft is chosen'],
   ]
+  const outputs: [SectionKey, React.ReactNode][] = [
+    ['navlog', d.flights.length ? `${d.flights.reduce((n, x) => n + x.rows.length, 0)} checkpoints · ${fmtMin(t.eteMin)} · ${t.tripFuel.toFixed(1)} gal` : 'Once the route and aircraft are set'],
+    ['loading', to ? `Takeoff ${Math.round(to.weight).toLocaleString()} lb, CG ${to.arm?.toFixed(1)} in${dep?.dist && dep.runway ? ` · ${dep.dist.total.toLocaleString()} of ${dep.runway.toraFt.toLocaleString()} ft to clear 50 ft` : ''}` : 'Once the aircraft is chosen'],
+    ['weather', d.wx.length ? d.wx.filter(w => w.role !== 'alternate').map(w => `${code(w.airport)} ${w.category ?? 'no report'} at ${fmtTime(w.at)}`).join(' · ') : 'Once the route is set'],
+  ]
+  const Cards = ({ list }: { list: [SectionKey, React.ReactNode][] }) => (
+    <ul className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+      {list.map(([k, v]) => (
+        <li key={k}>
+          <button onClick={() => f.go(k)} className="flex h-full w-full items-start gap-3 rounded-xl bg-card px-4 py-3.5 text-left ring-1 ring-inset ring-white/[0.04] hover:bg-hover">
+            <span className="mt-1.5 grid w-3.5 shrink-0 place-items-center">{MARK[k === 'navlog' ? (d.flights.length ? 'done' : 'todo') : sectionState(f.tasks, k)]}</span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-fg">{SECTION_LABEL[k]}</span><span className="mt-0.5 block text-[13px] text-fg-3">{v}</span></span>
+            <ChevronRight className="mt-0.5 size-4 shrink-0 text-fg-3" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
   return (
     <div className="space-y-8">
       <section className="rounded-xl bg-card px-4 py-5 ring-1 ring-inset ring-white/[0.04] sm:px-6">
@@ -232,29 +311,14 @@ function Overview() {
 
       {!must.length && plan.route.length > 1 && (
         <section className="rounded-xl px-4 py-4 ring-1 ring-inset ring-border sm:px-5">
-          <h3 className="text-[15px] font-medium text-fg">Ready for the NavLog</h3>
-          <p className="mt-1 text-sm text-fg-2">Print it with the weather log, flight plan and {plan.tail}'s checklist, file the flight plan with Flight Service if you want one, and preflight with the checklist.</p>
-          <div className="mt-3 flex flex-wrap gap-2"><Button variant="primary" onClick={() => f.go('navlog')}><Printer />NavLog</Button><Button variant="ghost" onClick={() => f.refs.show('checklist')}>Checklist</Button></div>
+          <h3 className="text-[15px] font-medium text-fg">Ready to print</h3>
+          <p className="mt-1 text-sm text-fg-2">The NavLog (with the flight plan and {plan.tail}'s checklist), the weight and balance and the weather briefing. File the flight plan with Flight Service if you want one, and preflight with the checklist.</p>
+          <div className="mt-3 flex flex-wrap gap-2"><Button variant="primary" onClick={printAll}><Printer />Print all three</Button><Button variant="ghost" onClick={() => f.refs.show('checklist')}>Checklist</Button></div>
         </section>
       )}
 
-      <section>
-        <h3 className="mb-2 text-[15px] font-medium text-fg">The brief</h3>
-        <ul className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
-          {areas.map(([k, v]) => {
-            const st = sectionState(f.tasks, k)
-            return (
-              <li key={k}>
-                <button onClick={() => f.go(k)} className="flex h-full w-full items-start gap-3 rounded-xl bg-card px-4 py-3.5 text-left ring-1 ring-inset ring-white/[0.04] hover:bg-hover">
-                  <span className="mt-1.5 grid w-3.5 shrink-0 place-items-center">{MARK[st]}</span>
-                  <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-fg">{SECTION_LABEL[k]}</span><span className="mt-0.5 block text-[13px] text-fg-3">{v}</span></span>
-                  <ChevronRight className="mt-0.5 size-4 shrink-0 text-fg-3" />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+      <section><h3 className="mb-2 text-[15px] font-medium text-fg">The brief</h3><Cards list={areas} /></section>
+      <section><h3 className="mb-2 text-[15px] font-medium text-fg">The outputs</h3><Cards list={outputs} /></section>
 
       {rec.length > 0 && (
         <section>
@@ -269,24 +333,21 @@ function Overview() {
 }
 
 /* ── New flight ── */
-// Four things make a flight: when and where, the airplane, and who's flying.
-// Everything else is asked in its section, and the overview lists what's left.
+// Three things make a flight: where and when, the airplane, and who's flying
+// (loaded from profiles, or created here). Everything else is asked in its section.
 function NewFlight() {
   const f = useFlight()
   const { plan } = f
-  const ready = plan.route.length > 1 && !!plan.tail
+  const ready = plan.route.length > 1 && !!plan.tail && !!f.pilot
   const inputs = { plan, set: f.set, d: f.d, u: f.u, profile: f.d.profile, certs: f.certs ?? null }
   return (
-    <div className="space-y-6">
-      <NeedsPilotProfile />
-      <div className="rounded-xl bg-card px-4 py-6 ring-1 ring-inset ring-white/[0.04] sm:px-7">
-        <Step n={1} title="Where and when" lead="Departure, any points to fly over, and the arrival (the departure again for a local flight). The engine-start time sets the weather and winds."><FlightInputs bare step={2} {...inputs} /><FlightInputs bare step={3} {...inputs} /></Step>
-        <Step n={2} title="Aircraft" lead="One of your aircraft, or a new one: its registry, POH, weights and checklist are set up once and kept."><AircraftPicker /></Step>
-        <Step n={3} title="Who's flying" lead="Solo or as pilot in command, or dual with one of your instructors. It decides which FAA rules apply."><CrewPicker /></Step>
-        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
-          {!ready && <span className="text-[13px] text-fg-3">{plan.route.length < 2 ? 'Add the arrival airport.' : 'Choose the aircraft.'}</span>}
-          <Button variant="primary" className="ml-auto" disabled={!ready} onClick={f.finishSetup}>Brief this flight<ChevronRight /></Button>
-        </div>
+    <div className="rounded-xl bg-card px-4 py-6 ring-1 ring-inset ring-white/[0.04] sm:px-7">
+      <Step n={1} title="Where and when" lead="Departure, any points to fly over, and the arrival (the departure again for a local flight). The engine-start time sets the weather and winds."><FlightInputs bare step={2} {...inputs} /><FlightInputs bare step={3} {...inputs} /></Step>
+      <Step n={2} title="Aircraft" lead="One of your aircraft, or a new one: its registry, POH, weights and checklist are set up once and kept."><AircraftPicker /></Step>
+      <Step n={3} title="Who's flying" lead="Load a pilot profile, and an instructor's for a dual flight, or add one. Their certificates decide which FAA rules apply."><CrewPicker /></Step>
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
+        {!ready && <span className="text-[13px] text-fg-3">{plan.route.length < 2 ? 'Add the arrival airport.' : !plan.tail ? 'Choose the aircraft.' : 'Choose who\'s flying.'}</span>}
+        <Button variant="primary" className="ml-auto" disabled={!ready} onClick={f.finishSetup}>Brief this flight<ChevronRight /></Button>
       </div>
     </div>
   )
@@ -301,63 +362,3 @@ function Step({ n, title, lead, children }: { n: number; title: string; lead: st
   )
 }
 
-/* ── Saved plans ── */
-const routeOf = (p: Plan) => p.route.map(r => { const id = parseRouteItem(r).id; return p.labels?.[id]?.name ?? id }).join(' → ') || 'No route'
-const whenOf = (p: Plan) => { const d = new Date(p.departLocal); return Number.isNaN(+d) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric', hour: 'numeric', minute: '2-digit' }) }
-
-function PlanList({ plans, loading, currentId, draft, unsaved, onSave, onOpen, onNew }: {
-  plans: SavedPlan[] | undefined; loading: boolean; currentId: number | null; draft: Plan | null
-  // The open plan's name when leaving it would lose changes: opening another or starting new asks first.
-  unsaved: string | null; onSave: () => Promise<void>; onOpen: (p: SavedPlan) => void; onNew: () => void
-}) {
-  const [leave, setLeave] = useState<(() => void) | null>(null)
-  const guard = (go: () => void) => (unsaved ? setLeave(() => go) : go())
-  if (leave) return (
-    <div className="p-2">
-      <p className="text-sm text-fg">"{unsaved}" has unsaved changes.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="primary" onClick={async () => { await onSave(); leave(); setLeave(null) }}>Save and continue</Button>
-        <Button size="sm" variant="ghost" onClick={() => { leave(); setLeave(null) }}>Discard changes</Button>
-        <Button size="sm" variant="ghost" onClick={() => setLeave(null)}>Cancel</Button>
-      </div>
-    </div>
-  )
-  const now = Date.now()
-  const at = (p: SavedPlan) => +new Date(p.data.departLocal) || 0
-  const upcoming = (plans ?? []).filter(p => at(p) >= now - 3 * 3600_000).sort((a, b) => at(a) - at(b))
-  const past = (plans ?? []).filter(p => at(p) < now - 3 * 3600_000).sort((a, b) => at(b) - at(a))
-  const Item = ({ p }: { p: SavedPlan }) => (
-    <li>
-      <button onClick={() => (p.id === currentId ? undefined : guard(() => onOpen(p)))} aria-current={p.id === currentId ? 'true' : undefined}
-        className={cn('w-full rounded-lg px-3 py-2 text-left ring-1 ring-inset', p.id === currentId ? 'bg-accent-soft ring-accent/40' : 'ring-transparent hover:bg-hover')}>
-        <div className={cn('truncate text-sm', p.id === currentId ? 'font-medium text-accent' : 'text-fg')}>{p.name}</div>
-        <div className="num truncate text-xs text-fg-3">{routeOf(p.data)}</div>
-        <div className="text-xs text-fg-3">{whenOf(p.data)}{p.data.tail ? ` · ${p.data.tail}` : ''}</div>
-      </button>
-    </li>
-  )
-  const Group = ({ title, list }: { title: string; list: SavedPlan[] }) => list.length ? (
-    <div><div className="px-3 pb-1 pt-3 text-xs font-medium text-fg-3">{title}</div><ul className="space-y-0.5">{list.map(p => <Item key={p.id} p={p} />)}</ul></div>
-  ) : null
-  return (
-    <div className="flex max-h-[inherit] flex-col">
-      <div className="flex items-center justify-between gap-2 pb-2">
-        <span className="text-sm font-medium text-fg">Flights</span>
-        <Button variant="ghost" size="sm" onClick={() => guard(onNew)}><FilePlus2 />New flight</Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {draft && (
-          <div className="mb-1 rounded-lg bg-accent-soft px-3 py-2 ring-1 ring-inset ring-accent/40">
-            <div className="truncate text-sm font-medium text-accent">{draft.name}</div>
-            <div className="num truncate text-xs text-fg-3">{routeOf(draft)}</div>
-            <div className="text-xs text-fg-3">Not saved yet</div>
-          </div>
-        )}
-        {loading && <p className="flex items-center gap-2 px-3 py-2 text-sm text-fg-3"><Loader2 className="size-4 animate-spin" />Loading…</p>}
-        {!loading && !plans?.length && <p className="px-3 py-2 text-sm text-fg-3">No saved flights yet.</p>}
-        <Group title="Upcoming" list={upcoming} />
-        <Group title="Past" list={past} />
-      </div>
-    </div>
-  )
-}

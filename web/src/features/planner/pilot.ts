@@ -33,7 +33,8 @@ export interface PilotCerts {
 }
 
 export type Role = 'pic' | 'dual'
-export interface Crew { role?: Role; instructor?: string }
+// pilotId / instructorId: the profiles loaded for this flight (instructor is their name, for the NavLog).
+export interface Crew { role?: Role; instructor?: string; pilotId?: string; instructorId?: string }
 // Unset: a student flies dual, anyone else as PIC.
 export const roleOf = (crew: Crew | undefined, certs: PilotCerts | null | undefined): Role => crew?.role ?? (certs?.certificate && certs.certificate !== 'student' ? 'pic' : 'dual')
 

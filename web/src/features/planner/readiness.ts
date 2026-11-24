@@ -1,17 +1,19 @@
 import type { Check, Derived, Plan } from './model'
 
-// The flight file's sections, in the order a pilot works through them (PAVE,
-// then the numbers), ending with the NavLog that goes into the cockpit.
+// The flight file's sections: the brief in the order a pilot works through it,
+// then the outputs that go into the cockpit.
 export type SectionKey = 'overview' | 'pilot' | 'aircraft' | 'weather' | 'airports' | 'route' | 'loading' | 'navlog'
-export const SECTIONS: { key: SectionKey; label: string; short: string; rail?: string }[] = [
-  { key: 'overview', label: 'Overview', short: 'Overview' },
-  { key: 'pilot', label: 'Pilot', short: 'Pilot' },
-  { key: 'aircraft', label: 'Aircraft', short: 'Aircraft' },
-  { key: 'weather', label: 'Weather', short: 'Weather' },
-  { key: 'airports', label: 'Airports', short: 'Airports' },
-  { key: 'route', label: 'Route and fuel', short: 'Route' },
-  { key: 'loading', label: 'Weight and performance', short: 'Weight', rail: 'Weight & performance' },
-  { key: 'navlog', label: 'NavLog', short: 'NavLog' },
+// brief: where you work through the flight; output: the three documents it
+// produces (each printable on its own or together).
+export const SECTIONS: { key: SectionKey; label: string; short: string; group: 'brief' | 'output' }[] = [
+  { key: 'overview', label: 'Overview', short: 'Overview', group: 'brief' },
+  { key: 'pilot', label: 'Pilot', short: 'Pilot', group: 'brief' },
+  { key: 'aircraft', label: 'Aircraft', short: 'Aircraft', group: 'brief' },
+  { key: 'airports', label: 'Airports', short: 'Airports', group: 'brief' },
+  { key: 'route', label: 'Route and fuel', short: 'Route', group: 'brief' },
+  { key: 'navlog', label: 'NavLog', short: 'NavLog', group: 'output' },
+  { key: 'loading', label: 'Weight and balance', short: 'W&B', group: 'output' },
+  { key: 'weather', label: 'Weather briefing', short: 'Weather', group: 'output' },
 ]
 export const SECTION_LABEL = Object.fromEntries(SECTIONS.map(s => [s.key, s.label])) as Record<SectionKey, string>
 
@@ -38,7 +40,7 @@ export function readiness(d: Derived, plan: Plan, x: ReadinessCtx): Task[] {
   const rec = (section: SectionKey, id: string, title: string, detail: string) => out.push({ id, section, kind: 'recommended', title, detail })
   if (x.tail) {
     if (!x.pohExact) rec('aircraft', 'poh', `Upload ${x.tail}'s own POH`, 'The numbers come from the closest public book until this airplane\'s own is uploaded.')
-    if (!x.checklistSteps) rec('aircraft', 'checklist', `Write ${x.tail}'s checklist`, 'Type or paste it once; it\'s part of every brief and prints with the NavLog.')
+    if (!x.checklistSteps) rec('aircraft', 'checklist', `Add ${x.tail}'s checklist`, 'Upload a photo or PDF of it, or add its lines by hand; it\'s part of every brief and prints with the NavLog.')
     if (!x.inspections) rec('aircraft', 'inspections', `Enter ${x.tail}'s inspection dates`, 'Annual, transponder, ELT and 100-hour: the airworthiness checks need them.')
   }
   if (plan.route.length > 1 && !x.briefed) rec('weather', 'briefing', 'Get a standard briefing', '1800wxbrief.com or 1-800-WX-BRIEF (§91.103), then tick it here.')

@@ -27,6 +27,8 @@ export interface Plan {
   seats?: { pilot: number; front: number; rearL: number; rearR: number }
   // Who sits where (a person's profile id, or 'self'): their weight was copied into seats.
   seatPeople?: Partial<Record<'pilot' | 'front' | 'rearL' | 'rearR', string>>
+  // Still in the new-flight questions (where and when, aircraft, who's flying).
+  setup?: boolean
   loads: { front: number; rear: number; bag1: number; bag2: number }
   // null: full usable fuel for the tanks.
   fuelGal: number | null

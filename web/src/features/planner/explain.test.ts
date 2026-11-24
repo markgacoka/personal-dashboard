@@ -32,6 +32,19 @@ describe('explainRow', () => {
   test('the expected ranges hold for a sane row', () => {
     for (const c of cards) expect(c.expect.ok).not.toBe(false)
   })
+  test('every quantity names where its inputs came from: the API or the POH page', () => {
+    const withWx = explainRow({ ...x, weather: { winds } as unknown as WeatherBundle }, cruise)
+    const ref = (k: string) => withWx.find(c => c.key === k)!.refs ?? []
+    expect(ref('course').map(r => r.label)).toEqual(expect.arrayContaining([expect.stringContaining('FAA NASR'), expect.stringContaining('World Magnetic Model')]))
+    expect(ref('wind')[0]).toMatchObject({ kind: 'api', href: 'https://open-meteo.com/en/docs', at: '2026-11-04T19:50:00Z' })
+    // The 172P's own book: a link to the cruise-table page of the POH shown.
+    expect(ref('tas')[0]).toMatchObject({ kind: 'poh', fig: 'cruise' })
+    expect(ref('fuel').some(r => r.kind === 'rule' && r.href?.includes('91.151'))).toBe(true)
+  })
+  test('a table standing in for another book is named, without a link into the wrong book', () => {
+    const tas = explainRow({ ...x, pohClosest: true }, cruise).find(c => c.key === 'tas')!.refs![0]
+    expect(tas.kind).toBe('poh'); expect(tas.fig).toBeUndefined(); expect(tas.label).toMatch(/172P POH.*closest book/)
+  })
 })
 
 describe('explainWb and inputSources', () => {

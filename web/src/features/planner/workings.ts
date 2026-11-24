@@ -32,7 +32,7 @@ export function assumptions(x: WorkingsInput): Assumption[] {
   const p = d.profile
   const night = plan.night ?? false
   const out: Assumption[] = [
-    { label: 'Engine start to takeoff', value: `${plan.taxiMin ?? 10} min`, basis: 'Start, taxi and run-up before the takeoff time used for every ETA.', change: 'Weight and performance → fuel and taxi' },
+    { label: 'Engine start to takeoff', value: `${plan.taxiMin ?? 10} min`, basis: 'Start, taxi and run-up before the takeoff time used for every ETA.', change: 'Weight and balance → fuel and taxi' },
     { label: 'Fuel weight', value: '6 lb/gal', basis: '100LL avgas, the POH loading figure.' },
   ]
   if (p) out.push(

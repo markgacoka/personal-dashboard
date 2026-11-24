@@ -49,9 +49,9 @@ export function minimumsRows(d: Derived, m: Minimums): MinRow[] {
 }
 
 // Step 7: you — IMSAFE, your minimums against this flight, and recency from the logbook.
-export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts }: {
+export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinimums, saving, certs, saveCerts, savingCerts, pilotName }: {
   plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; currency: CurrencyItem[]; minimums: Minimums; savedAt?: string; saveMinimums: (m: Minimums) => void; saving: boolean
-  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean
+  certs: PilotCerts | null; saveCerts: (c: PilotCerts) => void; savingCerts: boolean; pilotName?: string
 }) {
   const dual = roleOf(plan.crew, certs) === 'dual'
   const rows = minimumsRows(d, minimums).map(r => (dual && r.status === 'nogo' ? { ...r, status: 'caution' as const } : r))
@@ -60,9 +60,9 @@ export function PilotStep({ plan, set, d, currency, minimums, savedAt, saveMinim
   return (
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="space-y-8">
-        <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} />
+        <CertificatesEditor certs={certs} onSave={saveCerts} saving={savingCerts} title={pilotName ? `${pilotName}: certificates, medical and endorsements` : undefined} />
         <RoleRules current={dual ? 'dual' : (certs?.certificate ?? 'student') === 'student' ? 'solo' : 'private'} />
-        <RecordsList title={<>Your documents <span className="font-normal text-fg-3">· kept for every plan</span></>} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
+        <RecordsList title={<>Pilot documents <span className="font-normal text-fg-3">· kept for every plan</span></>} records={PILOT_RECORDS.filter(r => !r.when || !certs?.certificate || (r.when === 'student') === (certs.certificate === 'student'))} />
         <div>
           <SubHead right={<span className="text-xs text-fg-3">14 CFR Part 61 · change the role under Who's flying above</span>}>This flight under the FAA rules</SubHead>
           {rules.length ? <CheckRows checks={rules} /> : <p className="text-sm text-fg-3">Add a route to check this flight against your certificate.</p>}

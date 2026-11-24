@@ -46,7 +46,7 @@ export default function ProfilesPage() {
   // What each saved plan loads, so deleting says what keeps its copy.
   const usedBy = (kind: Kind, key: string) => (plans.data ?? []).filter(p => kind === 'aircraft' ? p.data.tail === key
     : kind === 'airports' ? p.data.route.some(r => parseRouteItem(r).id === key) || p.data.alternate === key
-      : Object.values(p.data.seatPeople ?? {}).includes(key)).length
+      : Object.values(p.data.seatPeople ?? {}).includes(key) || p.data.crew?.pilotId === key || p.data.crew?.instructorId === key).length
 
   const [draft, setDraft] = useState<string | null>(null) // a new profile's key until it's saved
   const lists: Record<Kind, Item[]> = useMemo(() => {
@@ -56,7 +56,7 @@ export default function ProfilesPage() {
     return {
       pilots: [
         { id: SELF, title: self.data?.name || 'You', sub: [certs.data?.certificate ? CERTIFICATES.find(c => c.key === certs.data!.certificate)?.label : 'Certificate not saved', self.data?.weightLb ? `${self.data.weightLb} lb` : null].filter(Boolean).join(' · ') },
-        ...ppl.map(p => ({ id: p.id, title: p.name || 'Unnamed', sub: [p.role === 'instructor' ? 'Instructor' : 'Passenger', p.weightLb ? `${p.weightLb} lb` : 'no weight'].join(' · ') })),
+        ...ppl.map(p => ({ id: p.id, title: p.name || 'Unnamed', sub: [p.role === 'pilot' ? (CERTIFICATES.find(c => c.key === p.certs?.certificate)?.label ?? 'Pilot') : p.role === 'instructor' ? 'Instructor' : 'Passenger', p.weightLb ? `${p.weightLb} lb` : 'no weight'].join(' · ') })),
         ...fromLog.map(c => ({ id: `log:${c.name}`, title: c.name, sub: 'Instructor in your logbook · no profile yet', draft: true })),
       ],
       aircraft: [
@@ -77,7 +77,7 @@ export default function ProfilesPage() {
       <PageHeader title="Profiles" description="The pilots, aircraft and airports your plans load. Aircraft and airport profiles apply to every plan when it opens; a plan keeps the seat weights it was given."
         actions={<Button asChild variant="ghost"><Link to="/flying/plan"><ChevronLeft />Flight planner</Link></Button>} />
       <Segmented value={tab} onChange={t => pick(t)} options={[
-        { value: 'pilots', label: 'Pilots', count: lists.pilots.filter(i => !i.draft).length },
+        { value: 'pilots', label: 'People', count: lists.pilots.filter(i => !i.draft).length },
         { value: 'aircraft', label: 'Aircraft', count: (aircraft.data ?? []).length },
         { value: 'airports', label: 'Airports', count: lists.airports.length },
       ]} />
@@ -124,7 +124,7 @@ export default function ProfilesPage() {
 function NewItem({ kind, onAdd, existing }: { kind: Kind; onAdd: (key: string) => void; existing: string[] }) {
   const [v, setV] = useState('')
   useEffect(() => setV(''), [kind])
-  if (kind === 'pilots') return <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => onAdd(newId())}><Plus />Add an instructor or passenger</Button>
+  if (kind === 'pilots') return <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => onAdd(newId())}><Plus />Add a pilot, instructor or passenger</Button>
   const ok = kind === 'aircraft' ? /^N?[0-9][0-9A-Z]{0,4}$/.test(v) : /^[A-Z0-9]{3,4}$/.test(v)
   const key = kind === 'aircraft' && ok && !v.startsWith('N') ? `N${v}` : v
   const submit = () => { if (ok) { onAdd(key); setV('') } }
@@ -196,17 +196,18 @@ function PersonProfile({ person, exists, used, saving, onSave, onDelete }: { per
   const valid = p.name.trim().length > 0 && (p.weightLb == null || (p.weightLb > 20 && p.weightLb < 400))
   return (
     <div>
-      <Lead title={p.name || 'New person'}>{p.role === 'instructor' ? 'Seat them front right and the flight becomes dual with them as pilot in command; their weight goes into the weight and balance.' : 'Their weight fills whichever seat you put them in.'}</Lead>
+      <Lead title={p.name || 'New person'}>{p.role === 'pilot' ? 'Load them as the pilot of a flight: their certificate, medical and endorsements decide which FAA rules it\'s checked against, and their weight fills the pilot seat.' : p.role === 'instructor' ? 'Seat them front right and the flight becomes dual with them as pilot in command; their weight goes into the weight and balance.' : 'Their weight fills whichever seat you put them in.'}</Lead>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Name</span><Input value={p.name} onChange={e => setP({ ...p, name: e.target.value.slice(0, 60) })} placeholder="Full name" autoFocus={!p.name} /></label>
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Role</span>
-          <Select value={p.role} onChange={e => setP({ ...p, role: e.target.value as Person['role'] })}><option value="instructor">Instructor (CFI)</option><option value="passenger">Passenger</option></Select></label>
+          <Select value={p.role} onChange={e => setP({ ...p, role: e.target.value as Person['role'] })}><option value="pilot">Pilot (student, private and up)</option><option value="instructor">Instructor (CFI)</option><option value="passenger">Passenger</option></Select></label>
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Weight</span><OptNum value={p.weightLb} placeholder="lb, dressed" unit="lb" onChange={v => setP({ ...p, weightLb: v })} label="Weight" /></label>
         <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">Phone</span><Input value={p.phone ?? ''} onChange={e => setP({ ...p, phone: e.target.value.slice(0, 30) })} placeholder="Optional" /></label>
         {p.role === 'instructor' && <label className="block min-w-0"><span className="mb-1 block text-sm text-fg-2">CFI certificate number</span><Input value={p.cfi ?? ''} onChange={e => setP({ ...p, cfi: e.target.value.slice(0, 20) })} placeholder="Optional" className="num" /></label>}
         <label className="block min-w-0 sm:col-span-2 xl:col-span-4"><span className="mb-1 block text-sm text-fg-2">Notes</span><Textarea rows={2} value={p.notes ?? ''} onChange={e => setP({ ...p, notes: e.target.value.slice(0, 500) })} placeholder="Optional" /></label>
       </div>
       {p.weightLb != null && !(p.weightLb > 20 && p.weightLb < 400) && <p className="mt-2 text-[13px] text-bad">Enter a weight between 20 and 400 lb.</p>}
+      {p.role === 'pilot' && <div className="mt-6"><CertificatesEditor title="Certificate, medical and endorsements" certs={p.certs ?? null} saving={saving} onSave={c => { const x = { ...p, certs: c }; setP(x); if (exists) onSave(x) }} /></div>}
       <div className="mt-3 flex gap-2">
         <Button size="sm" variant="primary" disabled={!valid || (!isNew && JSON.stringify(p) === JSON.stringify(person))} loading={saving} onClick={() => onSave({ ...p, name: p.name.trim() })}>{isNew ? 'Create profile' : 'Save'}</Button>
         {!isNew && person && JSON.stringify(p) !== JSON.stringify(person) && <Button size="sm" variant="ghost" onClick={() => setP(person)}>Discard</Button>}

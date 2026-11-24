@@ -1,12 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useNavigate } from 'react-router'
 import { useAircraftList, useFlights, useRegistry } from '@/lib/queries'
 import { get } from '@/lib/api'
 import { homeAirport, notamBody } from '@/lib/weather'
 import type { NotamResponse } from '@/lib/types'
 import { computeCurrency } from '@/lib/flying'
-import { bboxOf, useAirportProfiles, useAirports, useAirspace, useCertificates, useCorridor, useLandmarks, useMinimums, useNearby, usePilotInfo, usePlanning, usePlans, usePohFind, useRadar, useResolve, useTerrain, useWeather, type SavedPlan } from './api'
+import { bboxOf, useAirportProfiles, useAirports, useAirspace, useCorridor, useLandmarks, useMinimums, useNearby, usePlan, usePlanning, usePlans, usePohFind, useRadar, useResolve, useTerrain, useWeather, type SavedPlan } from './api'
 import type { NotamSet } from './brief'
 import { sampleRoute } from './calc'
 import { explainRow, explainWb, inputSources, type Expl } from './explain'
@@ -14,7 +15,7 @@ import { DEFAULT_MINIMUMS, applyAirportProfile, derive, isWaypoint, makeResolver
 import type { EditPoint, MapNotams, RouteEdit } from './PlannerMap'
 import { applyEdits, profileFor, withSpecs, withTables } from './poh'
 import { roleOf } from './pilot'
-import { SELF } from './profiles'
+import { useCrew, type Person } from './profiles'
 import { bestInsert, insertAt, removeAt, replaceAt } from './route'
 import { readiness, type SectionKey } from './readiness'
 import { unitsForTail } from './units'
@@ -24,35 +25,53 @@ import { assumptions, calculations, sources } from './workings'
 // Everything one flight needs, fetched and derived in one place: the shell and
 // every section read it from FlightContext instead of passing props down.
 
-const DRAFT_KEY = 'planner-draft-v4'
 const pad = (n: number) => String(n).padStart(2, '0')
 const nextHourLocal = () => { const d = new Date(Date.now() + 60 * 60_000); d.setMinutes(0, 0, 0); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00` }
 export const blankPlan = (tail: string | null): Plan => ({
   name: 'New flight', route: [homeAirport()], alternate: null, departLocal: nextHourLocal(), rpm: 2400, tail,
-  seats: { pilot: 0, front: 0, rearL: 0, rearR: 0 }, loads: { front: 0, rear: 0, bag1: 0, bag2: 0 }, fuelGal: null, stopMinutes: 30, night: null, actuals: {},
+  seats: { pilot: 0, front: 0, rearL: 0, rearR: 0 }, loads: { front: 0, rear: 0, bag1: 0, bag2: 0 }, fuelGal: null, stopMinutes: 30, night: null, actuals: {}, setup: true,
 })
 
-// saved: the plan as last saved (JSON), to tell unsaved changes apart; setup: the
-// new-flight questions are showing.
-export interface Draft { plan: Plan; id: number | null; section: SectionKey; saved: string | null; savedAt: string | null; setup: boolean }
-function readDraft(): Draft | null {
-  try {
-    const s = localStorage.getItem(DRAFT_KEY)
-    if (s) return JSON.parse(s) as Draft
-    // Drafts from the three-stage layout.
-    const old = localStorage.getItem('planner-draft-v3')
-    if (!old) return null
-    const d = JSON.parse(old) as { plan: Plan; id?: number | null; stage?: string; saved?: string | null; savedAt?: string | null }
-    return { plan: d.plan, id: d.id ?? null, section: d.stage === 'navlog' ? 'navlog' : 'overview', saved: d.saved ?? null, savedAt: d.savedAt ?? null, setup: false }
-  } catch { return null }
+// Creating, copying and deleting whole flights; each is its own page (/flying/plan/:id).
+export function useFlightActions() {
+  const plans = usePlans()
+  const nav = useNavigate()
+  const { data: flights = [] } = useFlights()
+  const recentTail = [...flights].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]?.aircraft?.tail_number ?? null
+  const create = async (p: Plan) => { try { const r = await plans.create.mutateAsync(p); nav(`/flying/plan/${r.id}`) } catch (e) { toast.error((e as Error).message) } }
+  return {
+    plans,
+    newFlight: () => create(blankPlan(recentTail)),
+    // A copy keeps the route, aircraft, crew and loading; the time moves to the next hour and the ticks are cleared.
+    duplicate: (p: Plan) => create({ ...p, name: `${p.name} (copy)`, departLocal: nextHourLocal(), checklist: {}, actuals: {}, overrides: {}, setup: false }),
+    restore: (p: Plan) => create({ ...p, setup: false }),
+    remove: async (id: number, then?: () => void) => { try { await plans.remove.mutateAsync(id); toast.success('Flight deleted'); then?.() } catch (e) { toast.error((e as Error).message) } },
+    creating: plans.create.isPending,
+  }
 }
+
+// A flight left in this browser by the single-draft planner (never saved to
+// the server): offered on the flights list to keep or discard.
+export function legacyDraft(): Plan | null {
+  try {
+    for (const k of ['planner-draft-v4', 'planner-draft-v3']) {
+      const raw = localStorage.getItem(k)
+      if (!raw) continue
+      const d = JSON.parse(raw) as { plan?: Plan; id?: number | null }
+      if (d.plan && d.id == null && d.plan.route?.length > 1) return d.plan
+    }
+  } catch { /* unreadable: nothing to offer */ }
+  return null
+}
+export const clearLegacyDraft = () => { try { localStorage.removeItem('planner-draft-v4'); localStorage.removeItem('planner-draft-v3') } catch { /* private mode */ } }
+export const autoName = (p: Plan) => (p.route.length > 1 ? `${parseRouteItem(p.route[0]).id} → ${parseRouteItem(p.route.at(-1)!).id}` : 'New flight')
 
 // What the work sheet explains: a NavLog row (opened at one of its figures), a
 // W&B line, or one topic of the workings.
 export type Focus = { kind: 'nav'; key: string; card?: string } | { kind: 'wb'; i: number } | { kind: 'topic'; key: string }
 export interface FocusView { title: string; subtitle: string; items: Expl[]; card?: string; ov?: RowOverride; onEdit?: (f: keyof RowOverride, v: number | null) => void }
 
-export function useFlightState() {
+export function useFlightState({ saved, section, setSection }: { saved: SavedPlan; section: SectionKey; setSection: (k: SectionKey) => void }) {
   const { data: flights = [] } = useFlights()
   const { data: fleetRaw = [] } = useAircraftList()
   const recentTail = useMemo(() => [...flights].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]?.aircraft?.tail_number ?? null, [flights])
@@ -62,16 +81,43 @@ export function useFlightState() {
     return [...fleetRaw].sort((a, b) => (used.get(b.tail_number) ?? '').localeCompare(used.get(a.tail_number) ?? '') || a.tail_number.localeCompare(b.tail_number))
   }, [fleetRaw, flights])
 
-  const [state, setState] = useState<Draft>(() => readDraft() ?? { plan: blankPlan(null), id: null, section: 'overview', saved: null, savedAt: null, setup: true })
-  const plan = state.plan
-  const set = (p: Partial<Plan>) => setState(s => ({ ...s, plan: { ...s.plan, ...p } }))
-  useEffect(() => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(state)) } catch { /* private mode */ } }, [state])
-  // Your profile's weight fills an empty pilot seat.
-  const pilotQ = usePilotInfo()
+  const id = saved.id
+  const [plan, setPlan] = useState<Plan>(saved.data)
+  const set = (p: Partial<Plan>) => setPlan(x => ({ ...x, ...p }))
+
+  // ── Saving: every change is saved a moment after you stop typing ──
+  const planQ = usePlan(id)
+  const lastSaved = useRef(JSON.stringify(saved.data))
+  const latest = useRef(plan); latest.current = plan
+  const [saveState, setSaveState] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
+  const [savedAt, setSavedAt] = useState(saved.updated_at)
+  const persist = async (p: Plan) => {
+    const named = !p.name.trim() || p.name === 'New flight' ? { ...p, name: autoName(p) } : p
+    const j = JSON.stringify(p)
+    setSaveState('saving')
+    try { const r = await planQ.save.mutateAsync(named); lastSaved.current = j; setSavedAt(r.updated_at); setSaveState(JSON.stringify(latest.current) === j ? 'saved' : 'pending'); if (named.name !== p.name && latest.current.name === p.name) set({ name: named.name }) } catch { setSaveState('error') }
+  }
   useEffect(() => {
-    const wt = pilotQ.data?.weightLb
-    if (wt && !(plan.seats?.pilot) && !plan.seatPeople?.pilot) set({ seats: { ...(plan.seats ?? { pilot: 0, front: 0, rearL: 0, rearR: 0 }), pilot: wt }, seatPeople: { ...plan.seatPeople, pilot: SELF } })
-  }, [pilotQ.data?.weightLb, plan.seats?.pilot]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (JSON.stringify(plan) === lastSaved.current) return
+    setSaveState('pending')
+    const t = setTimeout(() => persist(plan), 800)
+    return () => clearTimeout(t)
+  }, [plan]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Leaving the flight (another flight, another page, closing the tab) with a change not yet sent: send it.
+  useEffect(() => {
+    const flush = () => { if (JSON.stringify(latest.current) !== lastSaved.current) fetch(`/api/planner/plans/${id}`, { method: 'PUT', keepalive: true, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: latest.current.name || 'Flight', data: latest.current }) }).catch(() => {}) }
+    window.addEventListener('pagehide', flush)
+    return () => { window.removeEventListener('pagehide', flush); flush() }
+  }, [id])
+
+  // ── Who's flying: the pilot and instructor profiles loaded into this flight ──
+  const crew = useCrew()
+  const pilot = crew.list.find(p => p.id === plan.crew?.pilotId) ?? (plan.crew?.pilotId ? null : crew.pilots[0] ?? null)
+  const instructor = crew.list.find(p => p.id === plan.crew?.instructorId) ?? null
+  // The pilot's weight fills an empty pilot seat.
+  useEffect(() => {
+    if (pilot?.weightLb && !(plan.seats?.pilot) && !plan.seatPeople?.pilot) set({ seats: { ...(plan.seats ?? { pilot: 0, front: 0, rearL: 0, rearR: 0 }), pilot: pilot.weightLb }, seatPeople: { ...plan.seatPeople, pilot: pilot.id } })
+  }, [pilot?.id, pilot?.weightLb, plan.seats?.pilot]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Route and airports ──
   const tokens = useMemo(() => plan.route.map(r => parseRouteItem(r).id), [plan.route])
@@ -127,8 +173,8 @@ export function useFlightState() {
   const planningQ = usePlanning(plan.tail)
   const planning = useMemo(() => planningQ.data ?? {}, [planningQ.data])
   const minQ = useMinimums()
-  const certsQ = useCertificates()
-  const certs = certsQ.isLoading ? undefined : (certsQ.data?.certificate ? certsQ.data : null)
+  // The Part 61 checks read the loaded pilot's certificate, medical and endorsements.
+  const certs = crew.isLoading ? undefined : (pilot?.certs?.certificate ? pilot.certs : null)
   const minimums = useMemo(() => ({ ...DEFAULT_MINIMUMS, ...(minQ.data || {}) }), [minQ.data])
   const fleetRef = fleet.find(a => a.tail_number === plan.tail)
   const edits = planning.profile
@@ -142,7 +188,6 @@ export function useFlightState() {
   const match = useMemo(() => (plan.tail ? applyEdits(withSpecs(withTables(profileFor(aircraft.model), pohDoc?.tables, pohDoc?.title), pohDoc?.specs, pohDoc?.title), edits) : null), [plan.tail, aircraft.model, edits, pohDoc])
   const u = useMemo(() => unitsForTail(plan.tail), [plan.tail])
   const currency = useMemo(() => computeCurrency(flights), [flights])
-  const plans = usePlans()
 
   const destApt = routePts.length >= 2 && !isWaypoint(routePts[routePts.length - 1]) ? routePts[routePts.length - 1] : null
   const nearby = useNearby(destApt ? { lat: destApt.lat, lon: destApt.lon } : null)
@@ -215,33 +260,21 @@ export function useFlightState() {
     return st ? { title: st.label, subtitle: 'Weight and balance', items: [explainWb(xIn, st, f.i)] } : null
   }, [focus, d, plan.overrides, wx.data, match]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Plans ──
-  const dirty = state.saved !== JSON.stringify(plan)
-  const go = (section: SectionKey) => { setState(s => ({ ...s, section })); setFocus(null); window.scrollTo({ top: 0 }) }
-  const startNew = () => setState({ plan: blankPlan(recentTail), id: null, section: 'overview', saved: null, savedAt: null, setup: true })
-  const open = (p: SavedPlan) => setState({ plan: p.data, id: p.id, section: 'overview', saved: JSON.stringify(p.data), savedAt: p.updated_at, setup: false })
-  const save = async () => {
-    try {
-      const named = !plan.name.trim() || plan.name === 'New flight' ? { ...plan, name: plan.route.length > 1 ? `${parseRouteItem(plan.route[0]).id} → ${parseRouteItem(plan.route.at(-1)!).id}` : 'Flight plan' } : plan
-      let id = state.id
-      if (id) await plans.update.mutateAsync({ id, plan: named })
-      else id = (await plans.create.mutateAsync(named)).id
-      setState(s => ({ ...s, id, plan: named, saved: JSON.stringify(named), savedAt: new Date().toISOString() }))
-      toast.success(`Saved "${named.name}"`)
-    } catch (e) { toast.error((e as Error).message) }
-  }
-  const remove = () => { if (state.id) plans.remove.mutate(state.id); startNew() }
+  // ── This flight ──
+  const go = (k: SectionKey) => { setSection(k); setFocus(null); window.scrollTo({ top: 0 }) }
+  const savePilot = (p: Partial<Person>) => pilot && crew.save({ ...pilot, ...p })
   const savePlanning = (p: typeof planning) => planningQ.save.mutate(p, { onSuccess: () => toast.success(`${plan.tail} saved`), onError: e => toast.error(e.message) })
   const altAirport = effAlt ? airports.find(a => a.icao === effAlt || a.id === effAlt) ?? null : null
   const acName = [aircraft.make && aircraft.make.replace(/\b\w+/g, w => w[0] + w.slice(1).toLowerCase()), aircraft.model].filter(Boolean).join(' ') || d.profile?.model || 'Aircraft'
   const routeText = plan.route.map(r => { const id = parseRouteItem(r).id; return plan.labels?.[id]?.name ?? id }).join(' → ') || 'No route yet'
 
   return {
-    state, setState, plan, planEff, set, d, verdict, verdictLabel, role, tasks, dirty, go, startNew, open, save, remove,
-    finishSetup: () => setState(s => ({ ...s, setup: false, section: 'overview' })),
+    id, section, setup: !!plan.setup, saveState, savedAt, retrySave: () => persist(plan), plan, planEff, set, d, verdict, verdictLabel, role, tasks, go,
+    finishSetup: () => { set({ setup: false }); go('overview') },
+    crew, pilot, instructor, savePilot,
     fleet, recentTail, routePts, edit, airports, altAirport, autoAlt, effAlt, notams, notamSets, radar: radar.data, airspace: airspace.data, corridor: corridor.data ?? [], landmarks: landmarks.data ?? null, landmarksLoading: landmarks.isFetching,
     weather: wx.data ?? null, wxQ: wx, cycle: apts.data?.cycle ?? null, nasr: apts.data?.airports ?? [], aptProfiles,
-    registry, planningQ, planning, savePlanning, certsQ, certs, minQ, minimums, aircraft, acName, pohQ, pohDoc, match, u, currency, plans, pilotQ,
+    registry, planningQ, planning, savePlanning, certs, minQ, minimums, aircraft, acName, pohQ, pohDoc, match, u, currency, xIn,
     loading, failed, topics, assumed, srcs, inputs, pohStatus, routeText,
     refs, focus, setFocus, explain, focusView,
   }

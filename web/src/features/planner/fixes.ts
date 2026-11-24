@@ -47,7 +47,7 @@ const FIXES: [RegExp, string][] = [
   [/^Maintenance and documents/, 'Check the logbooks or the dispatch board, then tick each item under Aircraft → Airworthiness.'],
   [/^Required equipment:/, 'Check each item at preflight and tick it under Aircraft → Airworthiness.'],
   [/^Not airworthy|^Required equipment inoperative/, 'Don\'t fly it until it\'s fixed or deferred under §91.213.'],
-  [/^Enter the pilot's weight/, 'Enter the pilot\'s weight under Weight and performance, or in your pilot profile.'],
+  [/^Enter the pilot's weight/, 'Enter the pilot\'s weight under Weight and balance, or in your pilot profile.'],
   [/^Enter \S+'s empty weight/, 'Enter the basic empty weight and moment from the airplane\'s W&B record under Aircraft → Profile and records.'],
   [/weight .*over the|^Ramp weight/, 'Remove baggage, passengers or fuel.'],
   [/^Baggage over/, 'Move or leave baggage.'],

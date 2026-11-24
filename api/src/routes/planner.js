@@ -409,8 +409,13 @@ export default async function plannerRoutes(fastify) {
   })
 
   fastify.get('/api/planner/plans', async () => {
-    const { rows } = await pool.query('SELECT id, name, data, updated_at FROM planner_plans ORDER BY updated_at DESC LIMIT 50')
+    const { rows } = await pool.query('SELECT id, name, data, updated_at FROM planner_plans ORDER BY updated_at DESC LIMIT 200')
     return rows
+  })
+  fastify.get('/api/planner/plans/:id', async (req, reply) => {
+    const { rows } = await pool.query('SELECT id, name, data, updated_at FROM planner_plans WHERE id = $1', [Number(req.params.id)])
+    if (!rows.length) return reply.status(404).send({ error: 'No such plan' })
+    return rows[0]
   })
   fastify.post('/api/planner/plans', async (req, reply) => {
     const { name, data } = req.body || {}

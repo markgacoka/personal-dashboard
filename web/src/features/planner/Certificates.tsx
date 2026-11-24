@@ -13,7 +13,7 @@ const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'n
 
 // Your certificate, ratings, medical and endorsements, saved once and applied to
 // every plan: the Pilot step and Review hold each flight against them.
-export function CertificatesEditor({ certs, onSave, saving }: { certs: PilotCerts | null; onSave: (c: PilotCerts) => void; saving: boolean }) {
+export function CertificatesEditor({ certs, onSave, saving, title = 'Your certificates' }: { certs: PilotCerts | null; onSave: (c: PilotCerts) => void; saving: boolean; title?: string }) {
   const [open, setOpen] = useState(false)
   const [c, setC] = useState<PilotCerts>(certs ?? {})
   useEffect(() => { if (!open) setC(certs ?? {}) }, [certs, open])
@@ -42,7 +42,7 @@ export function CertificatesEditor({ certs, onSave, saving }: { certs: PilotCert
 
   return (
     <div>
-      <SubHead right={certs?.updatedAt ? <Synced at={certs.updatedAt} label="Saved" /> : null}>Your certificates</SubHead>
+      <SubHead right={certs?.updatedAt ? <Synced at={certs.updatedAt} label="Saved" /> : null}>{title}</SubHead>
       {!open ? (
         <div className="flex flex-wrap items-center gap-3 rounded-lg px-3 py-2.5 text-sm ring-1 ring-inset ring-border">
           <span className="min-w-0 flex-1 text-fg-2">{summary}</span>

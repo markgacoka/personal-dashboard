@@ -48,11 +48,33 @@ shows its flight category and surface wind. The runway in use is drawn with
 the departure climb-out and, at the arrival, the recommended pattern entry
 (AIM 4-3-3: a 45° entry to downwind from the pattern side, a midfield crossing
 500 ft above pattern altitude from the other side; towered fields defer to
-ATC; `patternEntry`). Hovering or tapping an airport shows its weather at the
+ATC). Both come from `procedures.ts`, built on the pattern trainer's geometry
+(`features/pattern/geo.ts`): the arrival entry follows the direction you come
+from (previous waypoint), and the departure follows the course to the next
+waypoint: straight out (within 35° of the runway), a 45° turn-out toward the
+pattern side, straight out past the pattern then turning (course on the other
+side), or a downwind departure (course behind). The en-route line runs from
+the departure's exit to the arrival's entry point. In light wind (4 kt or
+less) the runway in use is the Chart Supplement's calm-wind runway, or the
+longest when calm. Hovering or tapping an airport shows its weather at the
 departure or arrival time, the runway in use with a to-scale diagram, wind
 components, pattern side and altitude, distances and frequencies; a leg shows
 its courses, heading, altitude, wind aloft, distance, ground speed, time, fuel
 and terrain.
+
+## Route points
+
+The NavLog holds only the points you chose, plus TOC and TOD: nothing is
+added automatically. Add points from the suggestions (airports, VFR
+waypoints, towns, roads, rivers, peaks, towers; RNAV fixes are off by
+default), by typing an ident, or by clicking anywhere on the Route and fuel
+map and naming the spot. Your points are filled, numbered pins; suggestions
+are hollow rings. Rename a point from its chip or its map popup; remove it
+from the chip, the popup or its NavLog row.
+
+Aircraft from the logbook that you don't plan with can be removed from the
+aircraft lists (settings `aircraft-hidden`; the logbook keeps them); deleting
+an aircraft with a profile deletes the profile too.
 
 ## Layout rules
 

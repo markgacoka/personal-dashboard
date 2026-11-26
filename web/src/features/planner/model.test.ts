@@ -88,16 +88,10 @@ describe('derive: what turns it into a no-go', () => {
 })
 
 describe('derive: navlog rows', () => {
-  const CVH = { id: 'CVH', icao: 'KCVH', name: 'Hollister', lat: 36.893, lon: -121.41, elev: 230, magVar: 13, freq: '123.05', towered: false }
-  const MID = { id: 'MID', icao: null, name: 'Mid-line field', lat: 36.998, lon: -121.713, elev: 200, magVar: 13, freq: '122.9', towered: false }
-  const E16 = { id: 'E16', icao: null, name: 'San Martin', lat: 37.0816, lon: -121.597, elev: 281, magVar: 13, freq: '122.7', towered: false }
-  test('departure → TOC → checkpoint → TOD → destination, distances add up, ETAs and fuel run in order', () => {
-    const d = derive(plan({ route: ['KRHV', 'KSNS'] }), inputs({ checkpoints: [MID, E16, CVH] }))
+  test('departure → TOC → TOD → destination, distances add up, ETAs and fuel run in order', () => {
+    const d = derive(plan({ route: ['KRHV', 'KSNS'] }), inputs())
     const kinds = d.navlog.map(r => r.to.kind)
-    expect(kinds[0]).toBe('toc'); expect(kinds.at(-2)).toBe('tod'); expect(kinds.at(-1)).toBe('airport')
-    expect(d.navlog.map(r => r.to.label)).toContain('MID') // on the RHV–SNS line
-    expect(d.navlog.map(r => r.to.label)).not.toContain('E16') // ~7 nm off
-    expect(d.navlog.map(r => r.to.label)).not.toContain('KCVH') // ~16 nm off
+    expect(kinds).toEqual(['toc', 'tod', 'airport'])
     const sum = d.navlog.reduce((s, r) => s + r.distNm, 0)
     expect(sum).toBeCloseTo(d.legs[0].distNm, 0)
     for (let i = 1; i < d.navlog.length; i++) {
@@ -208,13 +202,9 @@ describe('derive: wizard automation', () => {
     expect(b.legs[0].arriveAt.getTime() - a.legs[0].arriveAt.getTime()).toBe(12 * 60_000)
     expect(derive(plan(), inputs()).takeoffAt!.getTime() - Date.parse('2026-11-04T21:00:00Z')).toBe(10 * 60_000)
   })
-  test('checkpoints: a VFR waypoint beats an RNAV fix nearby; far fixes and dropped points are left out', () => {
-    const mid = { lat: (RHV.lat + SNS.lat) / 2, lon: (RHV.lon + SNS.lon) / 2 }
-    const cp = (id: string, kind: 'vfr' | 'fix', dLat = 0, dLon = 0) => ({ id, icao: null, name: id, lat: mid.lat + dLat, lon: mid.lon + dLon, elev: null, magVar: null, freq: null, towered: false, kind })
-    const cps = [cp('ANDER', 'fix', 0.01), cp('VPXYZ', 'vfr', 0.02, 0.03), cp('FARFX', 'fix', 0.2, 0.2)]
-    const ids = (p: Plan) => derive(p, inputs({ checkpoints: cps })).navlog.filter(r => r.to.kind === 'checkpoint').map(r => r.to.id)
-    expect(ids(plan())).toEqual(['VPXYZ'])
-    expect(ids(plan({ skipFixes: ['VPXYZ'] }))).toEqual(['ANDER'])
+  test('no automatic checkpoints: the NavLog has only your points, TOC and TOD', () => {
+    const kinds = derive(plan(), inputs()).navlog.map(r => r.to.kind)
+    expect(kinds.every(k => k === 'toc' || k === 'tod' || k === 'airport' || k === 'waypoint' || k === 'overfly')).toBe(true)
   })
   test('checklists: unanswered is to do, a "not fit" is a no-go, all answered passes', () => {
     const open = derive(plan(), inputs())

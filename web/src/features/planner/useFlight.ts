@@ -212,7 +212,7 @@ export function useFlightState({ saved, section, setSection }: { saved: SavedPla
 
   const d = useMemo(() => derive(planEff, {
     airports, weather: wx.data ?? null, match, planning, minimums, terrain: terrain.data?.elevations ?? null,
-    currency, airspace: airspace.data ?? null, checkpoints: corridor.data ?? [], points, certs,
+    currency, airspace: airspace.data ?? null, points, certs,
   }), [planEff, airports, wx.data, match, planning, minimums, terrain.data, currency, airspace.data, corridor.data, points, certs])
   const nightAuto = d.wx.some(w => w.night)
   useEffect(() => { if (plan.night === null && nightAuto) set({ night: true }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [nightAuto])

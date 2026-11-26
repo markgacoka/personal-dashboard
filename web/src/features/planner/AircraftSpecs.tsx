@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { AircraftPlanning, Derived } from './model'
 import type { AircraftProfile } from './poh'
@@ -15,31 +16,50 @@ export function AirspeedTape({ vs, arcs }: { vs: VS; arcs?: PohSpecs['arcs'] }) 
   const yellow: [number, number] = arcs?.yellow ?? [vs.vno, vs.vne]
   const red = arcs?.red ?? vs.vne
   const lo = Math.floor((white[0] - 10) / 10) * 10, hi = Math.ceil((red + 10) / 10) * 10
-  const x = (v: number) => `${((v - lo) / (hi - lo)) * 100}%`
+  const f = (v: number) => (v - lo) / (hi - lo)
+  const x = (v: number) => `${f(v) * 100}%`
   const span = (a: number, b: number) => ({ left: x(a), width: `calc(${x(b)} - ${x(a)})` })
   const vfeTop = Number(String(vs.vfe).match(/\d+/)?.[0] ?? white[1])
   const marks = ([['Vso', vs.vso], ['Vs1', vs.vs1], ['Vx', vs.vx], ['Vy', vs.vy], ['Vfe', vfeTop], ['Va', vs.va[0]?.[1] ?? 0], ['Vno', vs.vno], ['Vne', vs.vne]] as [string, number][])
     .filter(([, v]) => v > 0).sort((a, b) => a[1] - b[1])
-  const ticks = Array.from({ length: (hi - lo) / 20 + 1 }, (_, i) => lo + i * 20)
+  const ticks = Array.from({ length: (hi - lo) / 10 + 1 }, (_, i) => lo + i * 10)
+  // Labels go above the tape, each in the first row where it doesn't touch its neighbour at this width.
+  const ref = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(600)
+  useEffect(() => { const el = ref.current; if (!el) return; const ro = new ResizeObserver(() => setW(el.clientWidth)); ro.observe(el); setW(el.clientWidth); return () => ro.disconnect() }, [])
+  const rowEnds: number[] = []
+  const placed = marks.map(([k, v]) => {
+    const half = ((k.length + String(v).length + 1) * 7.2 + 6) / 2, c = f(v) * w
+    let row = rowEnds.findIndex(end => c - half > end + 6)
+    if (row < 0) { row = rowEnds.length; rowEnds.push(-Infinity) }
+    rowEnds[row] = c + half
+    return { k, v, row }
+  })
+  const rows = Math.max(1, rowEnds.length), ROW = 20, top = rows * ROW + 8
   return (
     <figure>
-      <div className="relative h-[6rem]" role="img" aria-label={`Airspeed indicator: white arc ${white[0]}–${white[1]}, green ${green[0]}–${green[1]}, yellow ${yellow[0]}–${yellow[1]}, red line ${red} KIAS`}>
-        <div className="absolute inset-x-0 top-0 h-2 rounded-full bg-border" />
-        <div className="absolute top-0 h-2 rounded-full bg-fg-2" style={span(white[0], white[1])} />
-        <div className="absolute inset-x-0 top-3 h-2.5 rounded-full bg-border" />
-        <div className="absolute top-3 h-2.5 rounded-l-full bg-good" style={span(green[0], green[1])} />
-        <div className="absolute top-3 h-2.5 rounded-r-full bg-warn" style={span(yellow[0], yellow[1])} />
-        <div className="absolute -top-0.5 h-7 w-[3px] -translate-x-1/2 rounded-full bg-bad" style={{ left: x(red) }} />
-        {ticks.map(t => <span key={t} className="num absolute top-[1.375rem] -translate-x-1/2 text-[11px] leading-none text-fg-3" style={{ left: x(t) }}>{t}</span>)}
-        {marks.map(([k, v], i) => (
-          <div key={k} className="absolute -translate-x-1/2 text-center" style={{ left: x(v), top: i % 2 ? '4.25rem' : '2.75rem' }}>
-            <div className="mx-auto h-1.5 w-px bg-fg-3" />
-            <div className="num whitespace-nowrap text-[13px] leading-tight text-fg"><span className="text-fg-3">{k}</span> {v}</div>
+      <div ref={ref} className="relative" style={{ height: top + 40 }} role="img" aria-label={`Airspeed indicator: white arc ${white[0]}–${white[1]}, green ${green[0]}–${green[1]}, yellow ${yellow[0]}–${yellow[1]}, red line ${red} KIAS`}>
+        {placed.map(({ k, v, row }) => (
+          <div key={k} className="absolute -translate-x-1/2" style={{ left: x(v), top: (rows - 1 - row) * ROW }}>
+            <div className="num whitespace-nowrap text-[13px] leading-[18px] text-fg"><span className="text-fg-3">{k}</span> {v}</div>
+            <div className="absolute left-1/2 w-px -translate-x-1/2 bg-fg-3/60" style={{ top: 18, height: row * ROW + 8 }} />
+          </div>
+        ))}
+        {/* The tape: green and yellow arcs, the white (flap) arc along its top edge, the red line. */}
+        <div className="absolute inset-x-0 h-3 rounded-full bg-border" style={{ top }} />
+        <div className="absolute h-3 rounded-l-full bg-good" style={{ top, ...span(green[0], green[1]) }} />
+        <div className="absolute h-3 rounded-r-full bg-warn" style={{ top, ...span(yellow[0], yellow[1]) }} />
+        <div className="absolute h-1.5 rounded-full bg-fg ring-1 ring-card" style={{ top: top - 3, ...span(white[0], white[1]) }} />
+        <div className="absolute w-[3px] -translate-x-1/2 rounded-full bg-bad" style={{ top: top - 5, height: 22, left: x(red) }} />
+        {ticks.map(t => (
+          <div key={t} className="absolute -translate-x-1/2" style={{ left: x(t), top: top + 14 }}>
+            <div className={cn('mx-auto w-px bg-fg-3', t % 20 === 0 ? 'h-2' : 'h-1')} />
+            {t % 20 === 0 && <div className="num mt-0.5 text-[11px] leading-none text-fg-3">{t}</div>}
           </div>
         ))}
       </div>
-      <figcaption className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-fg-3">
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-fg-2" />Flaps {white[0]}–{white[1]}</span>
+      <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-fg-3">
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-1.5 w-4 rounded-full bg-fg" />Flaps {white[0]}–{white[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-good" />Normal {green[0]}–{green[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2 w-4 rounded-full bg-warn" />Smooth air only {yellow[0]}–{yellow[1]}</span>
         <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-[3px] rounded-full bg-bad" />Never exceed {red}</span>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GraduationCap, MapPin, Pencil, Plane, Plus, Trash2 } from 'lucide-react'
+import { GraduationCap, MapPin, Pencil, Plane, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Segmented } from '@/components/ui/misc'
 import { Dialog, DialogContent, useConfirm } from '@/components/ui/overlay'
@@ -10,14 +10,14 @@ import { usePlans } from './api'
 import { AirportProfileForm } from './AirportsStep'
 import { isWaypoint, type Airport, type Plan } from './model'
 import { AircraftDialog, PersonDialog } from './ProfileForms'
-import { SELF, seatPerson, useAircraftProfiles, usedBy, type Person, type PersonRole } from './profiles'
+import { SELF, seatPerson, useAircraftProfiles, useHiddenAircraft, usedBy, type Person, type PersonRole } from './profiles'
 import { CERTIFICATES } from './pilot'
 import { useFlight } from './useFlight'
 
 // One profile as a card: what it is at a glance, selected or not, and its own
 // edit and delete (delete asks first and says how many flights use it).
-function Tile({ on, onPick, visual, title, sub, onEdit, onDelete, label }: {
-  on: boolean; onPick: () => void; visual: React.ReactNode; title: React.ReactNode; sub: React.ReactNode; onEdit?: () => void; onDelete?: () => void; label: string
+function Tile({ on, onPick, visual, title, sub, onEdit, onDelete, onRestore, label }: {
+  on: boolean; onPick: () => void; visual: React.ReactNode; title: React.ReactNode; sub: React.ReactNode; onEdit?: () => void; onDelete?: () => void; onRestore?: () => void; label: string
 }) {
   return (
     <div className={cn('group relative flex min-w-0 items-center gap-3 rounded-xl p-2.5 pr-2 ring-1 ring-inset transition-colors', on ? 'bg-accent-soft ring-accent/50' : 'ring-border hover:bg-hover')}>
@@ -27,10 +27,11 @@ function Tile({ on, onPick, visual, title, sub, onEdit, onDelete, label }: {
         <span className={cn('num block truncate text-sm', on ? 'font-medium text-accent' : 'text-fg')}>{title}</span>
         <span className="block truncate text-[13px] text-fg-3">{sub}</span>
       </span>
-      {(onEdit || onDelete) && (
+      {(onEdit || onDelete || onRestore) && (
         <span className="relative flex shrink-0 gap-0.5 rounded-full [@media(hover:hover)]:absolute [@media(hover:hover)]:right-1.5 [@media(hover:hover)]:top-1/2 [@media(hover:hover)]:-translate-y-1/2 [@media(hover:hover)]:bg-card [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:shadow-pop group-hover:opacity-100 group-focus-within:opacity-100">
           {onEdit && <button type="button" onClick={onEdit} aria-label={`Edit ${label}`} title="Edit" className="grid size-8 place-items-center rounded-full text-fg-3 hover:bg-pill hover:text-fg"><Pencil className="size-3.5" /></button>}
           {onDelete && <button type="button" onClick={onDelete} aria-label={`Delete ${label}`} title="Delete" className="grid size-8 place-items-center rounded-full text-fg-3 hover:bg-bad-soft hover:text-bad"><Trash2 className="size-3.5" /></button>}
+          {onRestore && <button type="button" onClick={onRestore} aria-label={`Show ${label} again`} title="Show again" className="grid size-8 place-items-center rounded-full text-fg-3 hover:bg-pill hover:text-fg"><RotateCcw className="size-3.5" /></button>}
         </span>
       )}
     </div>
@@ -61,16 +62,33 @@ function AircraftThumb({ tail }: { tail: string }) {
 export function AircraftPicker() {
   const f = useFlight()
   const ac = useAircraftProfiles()
+  const hidden = useHiddenAircraft()
   const plans = usePlans()
   const confirm = useConfirm()
   const [dialog, setDialog] = useState<{ tail?: string } | null>(null)
+  const [showHidden, setShowHidden] = useState(false)
   const saved = ac.data ?? []
-  const tails = [...saved.map(a => a.tail), ...f.fleet.map(a => a.tail_number).filter(t => !saved.some(a => a.tail === t))]
+  const all = [...saved.map(a => a.tail), ...f.fleet.map(a => a.tail_number).filter(t => !saved.some(a => a.tail === t))]
+  // The flight's own aircraft always shows, hidden or not.
+  const isHidden = (t: string) => hidden.tails.includes(t) && t !== f.plan.tail
+  const tails = all.filter(t => showHidden || !isHidden(t))
+  const nHidden = all.filter(isHidden).length
   const pick = (t: string) => f.set({ tail: t, aircraft: undefined })
+  // Delete: a profile is deleted; a logbook tail is only taken off this list (the logbook keeps it).
   const remove = async (t: string) => {
-    const n = usedBy(plans.data, 'aircraft', t)
-    if (!await confirm({ title: `Delete ${t}'s profile?`, body: `Its empty weight, equipment, inspections and checklist are removed. ${n ? `${n} flight${n > 1 ? 's use' : ' uses'} it and will use the POH sample airplane.` : ''} The registry entry, POH and records stay.`, confirm: 'Delete', danger: true })) return
-    ac.remove.mutate(t, { onSuccess: () => toast.success(`${t} profile deleted`), onError: e => toast.error(e.message) })
+    const s = saved.find(a => a.tail === t), n = usedBy(plans.data, 'aircraft', t)
+    const ok = await confirm({
+      title: s ? `Delete ${t}?` : `Remove ${t} from this list?`,
+      body: s ? `Its profile (empty weight, equipment, inspections, checklist) is deleted and it leaves this list. ${n ? `${n} flight${n > 1 ? 's use' : ' uses'} it and will use the POH sample airplane.` : ''} Your logbook keeps its flights.`
+        : `${t} comes from your logbook and stays there; it just won't be offered here. You can show it again below the list.`,
+      confirm: s ? 'Delete' : 'Remove', danger: true,
+    })
+    if (!ok) return
+    try {
+      if (s) await ac.remove.mutateAsync(t)
+      if (f.fleet.some(x => x.tail_number === t)) await hidden.hide(t)
+      toast.success(s ? `${t} deleted` : `${t} removed from the list`)
+    } catch (e) { toast.error((e as Error).message) }
   }
   return (
     <>
@@ -78,12 +96,17 @@ export function AircraftPicker() {
         {tails.map(t => {
           const s = saved.find(a => a.tail === t), fl = f.fleet.find(a => a.tail_number === t)
           return <Tile key={t} label={t} on={t === f.plan.tail} onPick={() => pick(t)} visual={<AircraftThumb tail={t} />} title={t}
-            sub={[s?.profile?.model || fl?.model, s ? (s.emptyWeight ? `${Math.round(s.emptyWeight).toLocaleString()} lb` : 'no empty weight') : 'no profile'].filter(Boolean).join(' · ')}
-            onEdit={() => setDialog({ tail: t })} onDelete={s ? () => remove(t) : undefined} />
+            sub={isHidden(t) ? 'hidden' : [s?.profile?.model || fl?.model, s ? (s.emptyWeight ? `${Math.round(s.emptyWeight).toLocaleString()} lb` : 'no empty weight') : 'no profile'].filter(Boolean).join(' · ')}
+            onEdit={() => setDialog({ tail: t })} onDelete={isHidden(t) ? undefined : () => remove(t)} onRestore={isHidden(t) ? () => hidden.show(t) : undefined} />
         })}
         <AddTile onClick={() => setDialog({})}>Add an aircraft</AddTile>
       </div>
-      <AircraftDialog open={!!dialog} onOpenChange={o => !o && setDialog(null)} initialTail={dialog?.tail} onDone={pick} />
+      {nHidden > 0 && (
+        <button type="button" onClick={() => setShowHidden(v => !v)} className="mt-2 text-[13px] text-fg-3 hover:text-fg">
+          {showHidden ? 'Hide removed aircraft' : `${nHidden} removed from this list · show`}
+        </button>
+      )}
+      <AircraftDialog open={!!dialog} onOpenChange={o => !o && setDialog(null)} initialTail={dialog?.tail} onDone={t => { pick(t); hidden.show(t).catch(() => {}) }} />
     </>
   )
 }

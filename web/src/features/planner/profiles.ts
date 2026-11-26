@@ -121,3 +121,13 @@ export function usedBy(plans: { data: Plan }[] | undefined, kind: 'pilots' | 'ai
     : kind === 'airports' ? p.route.some(r => parseRouteItem(r).id === key) || p.alternate === key
       : Object.values(p.seatPeople ?? {}).includes(key) || p.crew?.pilotId === key || p.crew?.instructorId === key).length
 }
+
+// Logbook tails you don't plan with, hidden from the aircraft lists (settings 'aircraft-hidden').
+export function useHiddenAircraft() {
+  const qc = useQueryClient()
+  const key = ['planner', 'settings', 'aircraft-hidden']
+  const q = useQuery({ queryKey: key, staleTime: Infinity, queryFn: () => get<{ tails?: string[] }>('/api/planner/settings/aircraft-hidden') })
+  const save = useMutation({ mutationFn: (tails: string[]) => put<{ tails: string[] }>('/api/planner/settings/aircraft-hidden', { tails }), onSuccess: d => qc.setQueryData(key, d) })
+  const tails = q.data?.tails ?? []
+  return { tails, hide: (t: string) => save.mutateAsync([...new Set([...tails, t])]), show: (t?: string) => save.mutateAsync(t ? tails.filter(x => x !== t) : []) }
+}

@@ -126,7 +126,8 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['case', ['get', 'alt'], fg3, accent], 'line-width': 3, 'line-dasharray': ['case', ['get', 'alt'], ['literal', [2, 2]], ['literal', [1, 0]]] } })
     map.addLayer({ id: 'route-hit', type: 'line', source: 'route', filter: ['!', ['get', 'alt']], paint: { 'line-color': '#000', 'line-width': 16, 'line-opacity': 0.001 } })
     map.addLayer({ id: 'drag', type: 'line', source: 'drag', paint: { 'line-color': accent, 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
-    map.addLayer({ id: 'cands', type: 'circle', source: 'cands', filter: ['any', ['get', 'near'], ['>=', ['zoom'], 10]], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 2.5, 11, 5], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.2 } })
+    // Suggestions are hollow rings in their kind's colour; your route points are filled, numbered pins.
+    map.addLayer({ id: 'cands', type: 'circle', source: 'cands', filter: ['any', ['get', 'near'], ['>=', ['zoom'], 10]], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 3.5, 11, 6], 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': 2, 'circle-stroke-opacity': 0.9 } })
     map.addLayer({ id: 'cand-labels', type: 'symbol', source: 'cands', minzoom: 9.5, filter: ['any', ['get', 'near'], ['>=', ['zoom'], 10]], layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-optional': true }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } })
     map.addLayer({ id: 'metars', type: 'circle', source: 'metars', paint: { 'circle-radius': 5, 'circle-color': ['get', 'color'], 'circle-stroke-color': card, 'circle-stroke-width': 1.5 } })
     map.addLayer({ id: 'pireps', type: 'circle', source: 'pireps', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } })
@@ -136,7 +137,8 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       'icon-image': 'wind-arrow', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['get', 'spd'], 0, 0.55, 30, 1.1],
       'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true,
     }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5, 'icon-opacity': ['case', ['get', 'aloft'], 0.95, 0.8] } })
-    map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'wp'], 5, 8], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': ['case', ['get', 'wp'], 2, 2.5] } })
+    map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'mid'], 9, 8], 'circle-color': ['case', ['get', 'mid'], accent, ['get', 'color']], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } })
+    map.addLayer({ id: 'route-num', type: 'symbol', source: 'airports', filter: ['get', 'mid'], layout: { 'text-field': ['to-string', ['get', 'idx']], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': '#fff' } })
     map.addLayer({ id: 'airport-labels', type: 'symbol', source: 'airports', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 13, 'text-offset': [0, 1.4], 'text-anchor': 'top' }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5 } })
     // A popup, optionally with one action button (add / remove a route point)
     // and, for a point on the route, a field to name it.
@@ -183,6 +185,29 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer' })
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = '' })
     }
+
+    // A click on empty map: add a point there, named as you like (blank keeps its coordinates).
+    const interactive = ['airports', 'route-num', 'metars', 'pireps', 'adv-fill', 'cwa-fill', 'tfr-fill', 'notams', 'cands', 'winds', 'route-hit']
+    map.on('click', e => {
+      const ed = editRef.current
+      if (!ed || dragged || map.queryRenderedFeatures(e.point, { layers: interactive.filter(l => map.getLayer(l)) }).length) return
+      const ll = { lat: e.lngLat.lat, lon: e.lngLat.lng }
+      const el = document.createElement('form')
+      el.style.cssText = 'font-size:13px;line-height:1.45;display:grid;gap:8px;min-width:15rem'
+      const head = document.createElement('div')
+      head.innerHTML = `<b>Add a point here</b><br><span style="opacity:.7">${ll.lat.toFixed(4)}, ${ll.lon.toFixed(4)}</span>`
+      const i = document.createElement('input')
+      i.placeholder = 'Name it, e.g. Reservoir dam'; i.maxLength = 40; i.setAttribute('aria-label', 'Point name')
+      i.style.cssText = 'padding:5px 8px;border-radius:6px;border:1px solid #8886;background:transparent;color:inherit;font-size:13px'
+      const b = document.createElement('button')
+      b.type = 'submit'; b.textContent = 'Add to route'
+      b.style.cssText = `justify-self:start;padding:4px 12px;border-radius:999px;background:${accent};color:#fff;font-weight:600;font-size:12px`
+      el.onsubmit = ev => { ev.preventDefault(); ed.add({ token: coordToken(ll), label: i.value.trim() || undefined, lat: ll.lat, lon: ll.lon }); popup.current?.remove() }
+      el.append(head, i, b)
+      popup.current?.remove()
+      popup.current = new maplibregl.Popup({ closeButton: true, maxWidth: '22rem', className: 'planner-pop' }).setLngLat(e.lngLat).setDOMContent(el).addTo(map)
+      setTimeout(() => i.focus(), 0)
+    })
 
     // Dragging: pull the line to add a point on a leg, or move a point you added.
     // On release the point snaps to a candidate (airport, VFR waypoint, VOR,

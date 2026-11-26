@@ -3,7 +3,8 @@ import type * as maplibregl from 'maplibre-gl'
 import { MapView, mapColor } from '@/components/data/MapView'
 import { cn } from '@/lib/utils'
 import { titleCase } from '@/lib/format'
-import { isWaypoint, type Airport, type Derived, type Leg, type PerfAt, type RunwayCalc, type WxAt } from './model'
+import { isWaypoint, type Airport, type Derived, type Leg, type PerfAt, type WxAt } from './model'
+import { arrivalProcedure, departureProcedure, tpaOf, type Procedure } from './procedures'
 import { Cat, deg3, fmtMin, fmtTime } from './ui'
 import { RunwayDiagram } from './RunwayDiagram'
 
@@ -15,48 +16,10 @@ import { RunwayDiagram } from './RunwayDiagram'
 // other side). Hover or tap an airport or a leg for the details.
 
 type LL = { lat: number; lon: number }
-const R = Math.PI / 180
-const off = (p: LL, brg: number, nm: number): LL => ({ lat: p.lat + (nm * Math.cos(brg * R)) / 60, lon: p.lon + (nm * Math.sin(brg * R)) / (60 * Math.cos(p.lat * R)) })
-const bearing = (a: LL, b: LL) => (Math.atan2((b.lon - a.lon) * Math.cos(a.lat * R), b.lat - a.lat) / R + 360) % 360
-const angleDiff = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
 const xy = (p: LL): [number, number] => [p.lon, p.lat]
 const code = (a: Airport) => a.icao || a.id
-const tpaOf = (a: Airport) => Math.round((a.elev + (a.tpaAgl || 1000)) / 10) * 10
 
-// The runway in use as a line: its threshold and far end, and the landing/takeoff direction.
-function runwayLine(rc: RunwayCalc) {
-  const t = rc.end, f = rc.runway.ends.find(e => e !== t)
-  if (t.lat == null || t.lon == null || f?.lat == null || f.lon == null) return null
-  const a = { lat: t.lat, lon: t.lon }, b = { lat: f.lat, lon: f.lon }
-  return { t: a, f: b, h: bearing(a, b), mid: { lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2 } }
-}
-
-export interface Entry { kind: '45' | 'crossover'; text: string; path: LL[] }
-// The arrival: a 45° entry to downwind from the pattern side, or crossing
-// midfield 500 ft above pattern altitude from the other side and turning back
-// to the 45°. Then downwind, base and final to the threshold.
-export function patternEntry(a: Airport, rc: RunwayCalc, from: LL | null): Entry | null {
-  const r = runwayLine(rc)
-  if (!r) return null
-  const s = rc.end.right ? 1 : -1, ps = r.h + 90 * s, D = 0.75
-  const M = off(r.mid, ps, D), B = off(off(r.t, r.h + 180, 0.6), ps, D), F0 = off(r.t, r.h + 180, 0.6)
-  const S = off(M, r.h + 180 + 45 * s + 180, 2)
-  const side = rc.end.right ? 'right' : 'left', tpa = tpaOf(a)
-  const onSide = !from || angleDiff(bearing(r.mid, from), ps) < 90
-  const atc = a.towered ? 'Towered: expect ATC instructions. ' : ''
-  if (onSide) return { kind: '45', text: `${atc}45° entry to ${side} downwind for RWY ${rc.end.id} at ${tpa.toLocaleString()} ft`, path: [S, M, B, F0, r.t] }
-  const C0 = off(r.mid, ps + 180, 2), X = off(r.mid, ps, 2.4)
-  return { kind: 'crossover', text: `${atc}Cross midfield at ${(tpa + 500).toLocaleString()} ft, turn back to a 45° entry to ${side} downwind for RWY ${rc.end.id}, descend to ${tpa.toLocaleString()} ft`, path: [C0, r.mid, X, S, M, B, F0, r.t] }
-}
-// The departure: climb straight out to pattern altitude, then turn on course.
-function departure(a: Airport, rc: RunwayCalc, courseTrue: number | null, courseMag: number | null) {
-  const r = runwayLine(rc)
-  if (!r) return null
-  const up = off(r.f, r.h, 1.5)
-  return { path: [r.t, r.f, up, ...(courseTrue != null ? [off(up, courseTrue, 2.5)] : [])], text: `Take off RWY ${rc.end.id}, climb straight out to ${tpaOf(a).toLocaleString()} ft, then turn on course${courseMag != null ? ` ${deg3(courseMag)}°` : ''}${a.towered ? ' as the tower clears you' : ''}` }
-}
-
-interface Pt { a: Airport; role: 'Departure' | 'Arrival' | 'Flown over' | 'Waypoint' | 'Alternate'; wx: WxAt | null; perf: PerfAt | null; entry: Entry | null; dep: ReturnType<typeof departure> }
+interface Pt { a: Airport; role: 'Departure' | 'Arrival' | 'Flown over' | 'Waypoint' | 'Alternate'; wx: WxAt | null; perf: PerfAt | null; entry: Procedure | null; dep: Procedure | null }
 type Hover = { kind: 'pt'; i: number; x: number; y: number } | { kind: 'leg'; i: number; x: number; y: number } | null
 
 export function RouteOverview({ route, alternate, d, className }: { route: Airport[]; alternate: Airport | null; d: Derived; className?: string }) {
@@ -67,9 +30,9 @@ export function RouteOverview({ route, alternate, d, className }: { route: Airpo
       const wx = d.wx.find(w => w.airport.id === a.id && (i === 0 ? w.role === 'departure' : i === n - 1 ? w.role === 'destination' : true)) ?? null
       const perf = i === 0 ? d.perf.find(p => p.airport.id === a.id && p.kind === 'takeoff') ?? null
         : i === n - 1 ? [...d.perf].reverse().find(p => p.airport.id === a.id && p.kind === 'landing' && p.wx.role !== 'alternate') ?? null : null
-      const prev = i > 0 ? route[i - 1] : null
-      const entry = i === n - 1 && perf?.runway ? patternEntry(a, perf.runway, prev) : null
-      const dep = i === 0 && perf?.runway ? departure(a, perf.runway, d.legs[0]?.tc ?? null, d.legs[0]?.mc ?? null) : null
+      // Leave toward the next waypoint; join from the previous one.
+      const entry = i === n - 1 && n > 1 && perf?.runway ? arrivalProcedure(a, perf.runway, route[i - 1]) : null
+      const dep = i === 0 && n > 1 && perf?.runway ? departureProcedure(a, perf.runway, route[1]) : null
       return { a, role, wx, perf, entry, dep }
     })
     if (alternate && !route.some(a => a.id === alternate.id)) {
@@ -91,14 +54,16 @@ export function RouteOverview({ route, alternate, d, className }: { route: Airpo
     const accent = mapColor('--accent'), muted = mapColor('--fg-3'), good = mapColor('--good')
     const line = (c: LL[]) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: c.map(xy) } })
     const fc = (features: GeoJSON.Feature[]) => ({ type: 'FeatureCollection' as const, features })
-    map.addSource('legs', { type: 'geojson', data: fc(legs.map((l, i) => ({ ...line([l.from, l.to]), properties: { i } }))) })
+    // The en-route line starts where the departure leaves the pattern and ends where the arrival joins it.
+    const exitAt = pts.find(p => p.role === 'Departure')?.dep?.join, joinAt = pts.find(p => p.role === 'Arrival')?.entry?.join
+    map.addSource('legs', { type: 'geojson', data: fc(legs.map((l, i) => ({ ...line([i === 0 && exitAt ? exitAt : l.from, i === legs.length - 1 && joinAt ? joinAt : l.to]), properties: { i } }))) })
     map.addLayer({ id: 'legs-casing', type: 'line', source: 'legs', paint: { 'line-color': '#000', 'line-width': 6, 'line-opacity': 0.5 }, layout: { 'line-cap': 'round' } })
     map.addLayer({ id: 'legs', type: 'line', source: 'legs', paint: { 'line-color': accent, 'line-width': 3 }, layout: { 'line-cap': 'round' } })
     map.addLayer({ id: 'legs-hit', type: 'line', source: 'legs', paint: { 'line-color': '#000', 'line-width': 22, 'line-opacity': 0 } })
     const arr = pts.find(p => p.role === 'Arrival'), alt = pts.find(p => p.role === 'Alternate')
     map.addSource('alt', { type: 'geojson', data: fc(arr && alt ? [line([arr.a, alt.a])] : []) })
     map.addLayer({ id: 'alt', type: 'line', source: 'alt', paint: { 'line-color': muted, 'line-width': 2, 'line-dasharray': [2, 2] } })
-    const rwys = pts.flatMap(p => { const r = p.perf?.runway && runwayLine(p.perf.runway); return r ? [line([r.t, r.f])] : [] })
+    const rwys = pts.flatMap(p => { const rc = p.perf?.runway, o = rc?.runway.ends.find(e => e !== rc.end); return rc && rc.end.lat != null && rc.end.lon != null && o?.lat != null && o.lon != null ? [line([{ lat: rc.end.lat, lon: rc.end.lon }, { lat: o.lat, lon: o.lon }])] : [] })
     map.addSource('rwy', { type: 'geojson', data: fc(rwys) })
     map.addLayer({ id: 'rwy', type: 'line', source: 'rwy', paint: { 'line-color': '#f5f5f5', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 13, 8] } })
     map.addSource('procs', { type: 'geojson', data: fc(pts.flatMap(p => [p.entry ? line(p.entry.path) : null, p.dep ? line(p.dep.path) : null].filter(Boolean) as GeoJSON.Feature[])) })

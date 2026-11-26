@@ -39,8 +39,6 @@ export interface Plan {
   taxiMin?: number
   // Checklist answers: imsafe.*, mx.*, eq.* → true (done / fit), false (failed / not fit).
   checklist?: Record<string, boolean>
-  // Automatic checkpoints you dropped, by id.
-  skipFixes?: string[]
   // Cruise altitude per flight (stop to stop), by flight index; unset → automatic.
   altitudes?: Record<string, number>
   night: boolean | null
@@ -149,7 +147,6 @@ export interface Inputs {
   terrain: number[] | null // feet, along sampleRoute(route, 2)
   currency: { key: string; name: string; state: string; detail: string }[]
   airspace: { type: 'Feature'; geometry: { type: string; coordinates: unknown }; properties: { NAME: string; CLASS: string; LOWER_VAL: number | null; UPPER_VAL: number | null } }[] | null
-  checkpoints?: Checkpoint[]
   points?: RoutePoint[]
   // Your certificates (null: not saved yet; undefined: skip the pilot-privilege checks).
   certs?: PilotCerts | null
@@ -185,10 +182,6 @@ export interface Flight {
 export interface WbStep { label: string; source: string; weight: number; arm: number | null; moment: number; total?: boolean; max?: number; over?: boolean }
 
 export interface Checkpoint { id: string; icao: string | null; name: string; lat: number; lon: number; elev: number | null; magVar: number | null; freq: string | null; towered: boolean; kind?: 'airport' | 'vfr' | 'fix' | 'navaid'; type?: string | null }
-// Which points make good checkpoints: airports and VFR waypoints you can see,
-// then VORs, then RNAV fixes (on the GPS, not on the ground).
-const CP_RANK = { airport: 0, vfr: 0, navaid: 1, fix: 2 } as const
-const CP_OFF = { airport: 5, vfr: 5, navaid: 4, fix: 2 } as const
 export interface NavFix { id: string; label: string; kind: 'airport' | 'overfly' | 'checkpoint' | 'toc' | 'tod' | 'waypoint'; freq: string | null; navType?: string; cpKind?: Checkpoint['kind']; lat?: number; lon?: number }
 export type WindSrc = 'forecast' | 'stale' | 'yours' | 'row' | 'calm'
 export interface NavRow {
@@ -359,6 +352,16 @@ function weatherAt(a: Airport, at: Date, role: WxAt['role'], w: WeatherBundle | 
   }
 }
 
+// "RWY 31R IS CALM WIND RWY" in the Chart Supplement remarks → '31R'.
+export function calmWindRunway(remarks: string[]): string | null {
+  for (const r of remarks) {
+    const m = r.toUpperCase().match(/\b(?:RWY|RY)S?\s*(\d{1,2}[LRC]?):?\s+(?:PREF(?:ERRED)?\s+|DESIGNATED\s+)?CALM WIND/)
+    if (m) return m[1]
+  }
+  return null
+}
+const sameRwy = (a: string, b: string) => a.replace(/^0+/, '') === b.replace(/^0+/, '')
+
 export function bestRunway(a: Airport, wx: WxAt, minWidth: number): RunwayCalc[] {
   const out: RunwayCalc[] = []
   for (const r of a.runways) for (const e of r.ends) {
@@ -370,7 +373,17 @@ export function bestRunway(a: Airport, wx: WxAt, minWidth: number): RunwayCalc[]
   }
   // Most headwind, then least crosswind, then runways meeting your width minimum, then the longest.
   const wide = (r: RunwayCalc) => ((r.runway.wid ?? 0) >= minWidth ? 1 : 0)
-  return out.sort((x, y) => y.head - x.head || Math.abs(x.cross) - Math.abs(y.cross) || wide(y) - wide(x) || y.runway.len - x.runway.len)
+  const sorted = out.sort((x, y) => y.head - x.head || Math.abs(x.cross) - Math.abs(y.cross) || wide(y) - wide(x) || y.runway.len - x.runway.len)
+  // Light wind (4 kt or less): the published calm-wind runway (Chart Supplement
+  // remarks) when its tailwind is under 3 kt; with no wind at all and none
+  // published, the longest runway (as the pattern trainer chooses).
+  const spd = wx.wind.gust ?? wx.wind.spd
+  if (spd <= 4 && sorted.length) {
+    const calm = calmWindRunway(a.remarks)
+    const pick = calm ? sorted.find(r => sameRwy(r.end.id, calm) && r.head > -3) : !wx.wind.dir || spd <= 2 ? [...sorted].sort((x, y) => y.runway.len - x.runway.len || y.head - x.head)[0] : undefined
+    if (pick) return [pick, ...sorted.filter(r => r !== pick)]
+  }
+  return sorted
 }
 
 export function derive(plan: Plan, inp: Inputs): Derived {
@@ -498,23 +511,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
       let scale = 1
       if (climbNm + descNm > D * 0.98 && climbNm + descNm > 0) { scale = (D * 0.98) / (climbNm + descNm); climbNm *= scale; descNm *= scale }
       const tToc = climbNm / D, tTod = 1 - descNm / D
-      // Checkpoints on legs over 20 nm: airports and VFR waypoints within 5 nm of
-      // the line, VORs within 4, RNAV fixes within 2; at least 8 nm apart and
-      // clear of the climb and descent.
-      const picked: { t: number; a: Checkpoint }[] = []
-      const skip = new Set(plan.skipFixes || [])
-      const cands = (inp.checkpoints || []).filter(a => !skip.has(a.id) && !route.some(r => r.id === a.id)).map(a => {
-        const along = distanceNm(from, a), back = distanceNm(a, to)
-        const off = Math.sqrt(Math.max(0, along ** 2 - ((along ** 2 - back ** 2 + D ** 2) / (2 * D)) ** 2))
-        return { a, t: (along ** 2 - back ** 2 + D ** 2) / (2 * D * D), off, k: a.kind ?? 'airport' }
-      }).filter(c => D > 20 && c.t > tToc + 4 / D && c.t < tTod - 4 / D && c.off <= CP_OFF[c.k])
-        .sort((x, y) => CP_RANK[x.k] - CP_RANK[y.k] || x.off - y.off)
-      for (const c of cands) if (picked.every(p => Math.abs(p.t - c.t) * D >= 8) && picked.length < 8) picked.push(c)
-      picked.sort((x, y) => x.t - y.t)
       const fixes: { t: number; label: string; id: string; kind: NavFix['kind']; freq?: string | null; navType?: string; cpKind?: Checkpoint['kind']; pt: LatLon; varEast: number }[] = [
         { t: 0, label: from.label || from.icao || from.id, id: from.id, kind: 'airport', pt: from, varEast: from.magVar },
         ...(climbNm > 0.5 ? [{ t: tToc, label: 'TOC', id: 'TOC', kind: 'toc' as const, pt: intermediate(from, to, tToc), varEast: variationAt(intermediate(from, to, tToc), when) }] : []),
-        ...picked.map(p => ({ t: p.t, label: p.a.icao || p.a.id, id: p.a.id, kind: 'checkpoint' as const, freq: p.a.freq, navType: p.a.type ?? undefined, cpKind: p.a.kind ?? 'airport', pt: { lat: p.a.lat, lon: p.a.lon }, varEast: variationAt(p.a, when) })),
         ...(descNm > 0.5 ? [{ t: tTod, label: 'TOD', id: 'TOD', kind: 'tod' as const, pt: intermediate(from, to, tTod), varEast: variationAt(intermediate(from, to, tTod), when) }] : []),
         { t: 1, label: to.label || to.icao || to.id, id: to.id, kind: endsAtStop ? 'airport' as const : isWaypoint(to) ? 'waypoint' as const : 'overfly' as const, freq: isWaypoint(to) ? to.frequencies[0]?.freq ?? null : to.frequencies.find(f => f.use === 'CTAF' || f.use === 'LCL/P')?.freq ?? null, navType: to.navType, pt: to, varEast: to.magVar },
       ]

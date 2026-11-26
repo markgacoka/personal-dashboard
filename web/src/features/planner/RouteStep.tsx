@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, Loader2, Pencil, Plus, RotateCcw, X } from 'lucide-react'
+import { ArrowRight, Loader2, Pencil, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { OptNum } from './FlightInputs'
 import type { Airport, Checkpoint, Derived, NavFix, Plan, WeatherBundle } from './model'
@@ -30,12 +30,12 @@ export function fmtLatLon(lat?: number, lon?: number) {
 // line can be dragged like SkyVector's. Below: each flight's cruise altitude
 // and why, every navlog point (TOC, checkpoints, TOD) with position, magnetic
 // course, altitude, distance and terrain; airspace and TFRs on the line.
-// Automatic checkpoints can be dropped.
+// Only the points you chose are on the NavLog (plus TOC and TOD); a point you
+// added can be removed from its row.
 export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace, radar, notams, checkpoints, landmarks, landmarksLoading, edit, part, sources = [], focusKey = null, onFocus }: {
   part: 'chart' | 'table'; sources?: InputSource[]; focusKey?: string | null; onFocus?: (key: string) => void; plan: Plan; set: (p: Partial<Plan>) => void; d: Derived; routePts: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; airspace: unknown; radar?: MapRadar | null; notams: MapNotams[]
   checkpoints: Checkpoint[]; landmarks: Landmarks | null; landmarksLoading: boolean; edit: RouteEdit
 }) {
-  const skip = plan.skipFixes || []
   const sugg = useMemo(() => suggest(routePts, checkpoints, landmarks), [routePts, checkpoints, landmarks])
   // Kinds hidden in the list are hidden on the chart too.
   const [off, setOff] = useState<Set<SuggestKind>>(() => new Set(['fix', 'rail']))
@@ -51,7 +51,11 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
           <div className="grid gap-4 @5xl:grid-cols-[minmax(0,1fr)_26rem]">
             <div>
               <MapBoundary><PlannerMap className="h-[26rem] sm:h-[34rem] print:hidden" route={routePts} alternate={alternate} weather={weather} d={d} airspace={airspace} radar={radar} notams={notams} landmarks={lm} cands={cands} edit={edit} /></MapBoundary>
-              <p className="mt-2 text-[13px] text-fg-3">Drag the line to add a point, drag a point to move it, click it to remove it. Points snap to nearby landmarks.</p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-fg-3">
+                <span className="inline-flex items-center gap-1.5"><span className="grid size-4 place-items-center rounded-full bg-accent text-[9px] font-semibold text-white ring-2 ring-white">1</span>Your route points</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-full ring-2 ring-inset ring-fg-3" />Suggestions</span>
+                <span>Click anywhere to add a point and name it · drag the line or a point to move it · click a point to rename or remove it</span>
+              </p>
             </div>
             <Suggestions sugg={sugg} pts={routePts} edit={edit} loading={landmarksLoading} errors={landmarks?.errors ?? []} off={off} setOff={setOff} />
           </div>
@@ -86,11 +90,11 @@ export function RouteStep({ plan, set, d, routePts, alternate, weather, airspace
                 </div>
               </div>
             </div>
-            <NavTable rows={f.rows} from={f.from} focusKey={focusKey} onFocus={onFocus} onDrop={id => set({ skipFixes: [...skip, id] })} />
+            <NavTable rows={f.rows} from={f.from} focusKey={focusKey} onFocus={onFocus}
+              onRemove={id => { const i = routePts.findIndex((p, k) => k > 0 && k < routePts.length - 1 && p.id === id); if (i > 0) edit.remove(i) }} />
           </div>
         )
       })}
-      {skip.length > 0 && <p className="text-sm text-fg-3">Dropped checkpoints: <span className="num">{skip.join(', ')}</span> <button className="inline-flex items-center gap-1 text-accent hover:underline" onClick={() => set({ skipFixes: [] })}><RotateCcw className="size-3.5" />Restore</button></p>}
 
       {(d.crossings.length > 0 || (d.hazards.tfrs?.length ?? 0) > 0) && (
         <div className="flow [--flow-basis:min(100%,24rem)]">
@@ -218,7 +222,7 @@ const SRC_TIER = { forecast: 'primary', stale: 'backup', yours: 'yours', row: 'y
 
 // The NavLog as worked out: one row per point, every computed column, each row
 // selectable to show its workings in the sidebar.
-function NavTable({ rows, from, focusKey, onFocus, onDrop }: { rows: Derived['navlog']; from: Airport; focusKey: string | null; onFocus?: (key: string) => void; onDrop: (id: string) => void }) {
+function NavTable({ rows, from, focusKey, onFocus, onRemove }: { rows: Derived['navlog']; from: Airport; focusKey: string | null; onFocus?: (key: string) => void; onRemove: (id: string) => void }) {
   return (
     <div className="overflow-x-auto">
       <table className="num w-full text-sm text-fg-2 [&_td+td]:pl-3 [&_td]:whitespace-nowrap [&_th+th]:pl-3 [&_th]:whitespace-nowrap">
@@ -262,7 +266,7 @@ function NavTable({ rows, from, focusKey, onFocus, onDrop }: { rows: Derived['na
                 <td className="py-2 text-right">{r.eteMin.toFixed(1)}</td>
                 <td className="py-2 text-right max-lg:hidden">{fmtTime(r.eta)}</td>
                 <td className="py-2 text-right">{r.fuelRem.toFixed(1)}</td>
-                <td className="py-2 text-right">{r.to.kind === 'checkpoint' && <button className="text-fg-3 hover:text-bad" aria-label={`Drop ${r.to.label}`} title="Drop this checkpoint" onClick={e => { e.stopPropagation(); onDrop(r.to.id) }}><X className="size-4" /></button>}</td>
+                <td className="py-2 text-right">{(r.to.kind === 'waypoint' || r.to.kind === 'overfly') && <button className="text-fg-3 hover:text-bad" aria-label={`Remove ${r.to.label} from the route`} title="Remove from the route" onClick={e => { e.stopPropagation(); onRemove(r.to.id) }}><X className="size-4" /></button>}</td>
               </tr>
             )
           })}

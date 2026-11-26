@@ -69,7 +69,7 @@ export function densityAltitude(elev: number, altim: number, tempC: number) {
 
 export function calmWindRunway(rec: NasrAirport): string | null {
   for (const r of rec.remarks) {
-    const m = r.match(/\b(?:RWY|RY)S?\s*(\d{1,2}[LRC]?)\b[^.]*?CALM WIND/)
+    const m = r.match(/\b(?:RWY|RY)S?\s*(\d{1,2}[LRC]?):?\s+(?:PREF(?:ERRED)?\s+|DESIGNATED\s+)?CALM WIND/)
     if (m) return m[1]
   }
   return null

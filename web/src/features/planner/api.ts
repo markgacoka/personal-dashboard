@@ -45,7 +45,9 @@ export const useDatis = (icao: string | null, enabled: boolean) => useQuery({
 })
 
 export const useTerrain = (samples: LatLon[]) => useQuery({
-  queryKey: ['planner', 'terrain', samples.length, samples[0]?.lat, samples.at(-1)?.lon], enabled: samples.length > 1, staleTime: Infinity, retry: 1,
+  // Retried with backoff before it reports a failure (the elevation service sometimes stalls).
+  queryKey: ['planner', 'terrain', samples.length, samples[0]?.lat, samples.at(-1)?.lon], enabled: samples.length > 1, staleTime: Infinity,
+  retry: 3, retryDelay: n => Math.min(8000, 1000 * 2 ** n),
   queryFn: () => post<{ elevations: number[]; fetchedAt: string; source: string }>('/api/planner/terrain', { points: samples.map(s => [s.lat, s.lon]) }),
 })
 

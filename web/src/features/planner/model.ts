@@ -648,6 +648,9 @@ export function derive(plan: Plan, inp: Inputs): Derived {
     if (w.wind.spd > minimums.maxWind) add('weather', 'nogo', `${id}: wind ${w.wind.spd} kt above your ${minimums.maxWind} kt maximum`, undefined, id)
     if (w.wind.gust && w.wind.gust > minimums.maxGust) add('weather', 'nogo', `${id}: gusts ${w.wind.gust} kt above your ${minimums.maxGust} kt maximum`, undefined, id)
     if (w.metar && w.metarAgeMin != null && w.metarAgeMin > 90 && w.at.getTime() - now < 2 * 3_600_000) add('weather', 'caution', `${id}: latest METAR is ${w.metarAgeMin} min old`, undefined, id)
+    // An hour or more out, conditions should come from a forecast. With no TAF covering the ETA the
+    // latest METAR stands in, and that is said, not shown as if it were the forecast.
+    if (w.wind.from === 'metar' && w.at.getTime() - now >= 60 * 60_000) add('weather', 'note', `${id}: no TAF covers ${w.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`, `The latest METAR (${w.metarStation}) stands in for the wind and weather then. Check the area forecast (GFA) and get a standard briefing closer to departure.`, id)
     if (w.night && !minimums.nightAllowed) add('pilot', 'nogo', `${id}: ETA is after civil twilight`, 'Your minimums don\'t include night flight.', id)
   }
 

@@ -55,18 +55,29 @@ export const datis = icao => cached(`datis:${icao}`, 2 * MIN, async () => {
 })
 
 // Terrain along the route (Open-Meteo elevation, Copernicus 90 m DEM), in feet.
+// Elevations are kept per point, rounded to 0.01° (about 0.6 nm), so editing a
+// route re-asks only for the new ground; a slow answer is retried once with a
+// longer wait before giving up (Open-Meteo sometimes stalls for ~10 s).
+const ELEV = new Map()
 export async function elevations(points) {
-  const out = []
-  for (let i = 0; i < points.length; i += 100) {
-    const chunk = points.slice(i, i + 100)
-    const key = `elev:${chunk.map(([la, lo]) => `${la.toFixed(3)},${lo.toFixed(3)}`).join(';')}`
-    const { data } = await cached(key, 24 * 60 * MIN, async () => {
-      const q = `latitude=${chunk.map(p => p[0].toFixed(4)).join(',')}&longitude=${chunk.map(p => p[1].toFixed(4)).join(',')}`
-      const r = await fetchWithTimeout(`https://api.open-meteo.com/v1/elevation?${q}`, { ms: 12000 })
-      if (!r.ok) throw new Error(`elevation ${r.status}`)
-      return (await r.json()).elevation.map(m => Math.round(m * 3.28084))
-    })
-    out.push(...data)
+  const key = ([la, lo]) => `${la.toFixed(2)},${lo.toFixed(2)}`
+  const missing = [...new Set(points.map(key))].filter(k => !ELEV.has(k))
+  for (let i = 0; i < missing.length; i += 100) {
+    const chunk = missing.slice(i, i + 100)
+    const url = `https://api.open-meteo.com/v1/elevation?latitude=${chunk.map(k => k.split(',')[0]).join(',')}&longitude=${chunk.map(k => k.split(',')[1]).join(',')}`
+    let error = null
+    for (const ms of [8000, 15000]) {
+      try {
+        const r = await fetchWithTimeout(url, { ms })
+        if (!r.ok) throw new Error(`elevation ${r.status}`)
+        const el = (await r.json()).elevation
+        chunk.forEach((k, j) => ELEV.set(k, Math.round(el[j] * 3.28084)))
+        error = null
+        break
+      } catch (e) { error = e }
+    }
+    if (error) throw error
   }
-  return out
+  if (ELEV.size > 500_000) ELEV.clear()
+  return points.map(p => ELEV.get(key(p)))
 }

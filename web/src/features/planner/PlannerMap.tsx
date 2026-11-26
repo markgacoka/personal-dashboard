@@ -23,6 +23,7 @@ const CHARTS = [
   { key: 'satellite', label: 'Satellite', layers: ['satellite'], note: 'Esri World Imagery' },
   { key: 'topo', label: 'Topo', layers: ['topo'], note: 'Esri World Topographic' },
   { key: 'street', label: 'Street', layers: [], note: 'CARTO / OpenStreetMap' },
+  { key: 'plain', label: 'Plain', layers: [], note: 'CARTO / OpenStreetMap' },
 ] as const
 type ChartKey = (typeof CHARTS)[number]['key']
 const RASTERS: { id: string; tiles: string; minzoom?: number; maxzoom: number; attribution: string; opacity: number }[] = [
@@ -81,15 +82,24 @@ export interface RouteEdit {
 }
 export interface EditPoint { token: string; label?: string; kind?: string }
 
-export function PlannerMap({ route, alternate, weather, d, className, airspace, radar, notams, landmarks, cands, edit }: {
+// Two uses: 'route' (Route and fuel: every chart and layer, with TFRs, NOTAMs,
+// PIREPs and landmarks on to start) and 'weather' (the briefing: a plain dark
+// map with only the weather layers, all on: radar, METAR flight categories,
+// winds, PIREPs, SIGMETs / G-AIRMETs, CWAs and TFRs).
+const WEATHER_LAYERS: LayerKey[] = ['radar', 'wx', 'wind', 'pirep', 'adv', 'cwa', 'tfr']
+const START: Record<'route' | 'weather', Record<LayerKey, boolean>> = {
+  route: { radar: false, airspace: false, wx: false, wind: false, pirep: true, adv: false, cwa: false, tfr: true, notam: true, lm: true },
+  weather: { radar: true, airspace: false, wx: true, wind: true, pirep: true, adv: true, cwa: true, tfr: true, notam: false, lm: false },
+}
+export function PlannerMap({ route, alternate, weather, d, className, airspace, radar, notams, landmarks, cands, edit, mode = 'route' }: {
   route: Airport[]; alternate: Airport | null; weather: WeatherBundle | null; d: Derived; className?: string; airspace: unknown; radar?: MapRadar | null; notams?: MapNotams[]
-  landmarks?: Landmarks | null; cands?: (Candidate & { near?: boolean })[]; edit?: RouteEdit
+  landmarks?: Landmarks | null; cands?: (Candidate & { near?: boolean })[]; edit?: RouteEdit; mode?: 'route' | 'weather'
 }) {
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [ready, setReady] = useState(false)
   const [controls, setControls] = useState(false) // phones: chart and layer buttons behind one toggle
-  const [chart, setChart] = useState<ChartKey>(savedChart)
-  const [on, setOn] = useState<Record<LayerKey, boolean>>({ radar: true, airspace: false, wx: true, wind: true, pirep: true, adv: true, cwa: true, tfr: true, notam: true, lm: true })
+  const [chart, setChart] = useState<ChartKey>(() => (mode === 'weather' ? 'plain' : savedChart()))
+  const [on, setOn] = useState<Record<LayerKey, boolean>>(START[mode])
   const popup = useRef<maplibregl.Popup | null>(null)
   // Handlers are registered once on load; they read the latest props from refs.
   const editRef = useRef(edit); editRef.current = edit
@@ -131,14 +141,35 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     map.addLayer({ id: 'cand-labels', type: 'symbol', source: 'cands', minzoom: 9.5, filter: ['any', ['get', 'near'], ['>=', ['zoom'], 10]], layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-optional': true }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 } })
     map.addLayer({ id: 'metars', type: 'circle', source: 'metars', paint: { 'circle-radius': 5, 'circle-color': ['get', 'color'], 'circle-stroke-color': card, 'circle-stroke-width': 1.5 } })
     map.addLayer({ id: 'pireps', type: 'circle', source: 'pireps', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } })
-    map.addLayer({ id: 'notams', type: 'circle', source: 'notams', paint: { 'circle-radius': 9, 'circle-color': '#d99a00', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-translate': [14, -14] } })
-    map.addLayer({ id: 'notam-count', type: 'symbol', source: 'notams', layout: { 'text-field': ['to-string', ['get', 'count']], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-allow-overlap': true }, paint: { 'text-color': '#fff', 'text-translate': [14, -14] } })
+    // NOTAMs: an amber square with the count (a different shape from the round route pins).
+    map.addLayer({ id: 'notams', type: 'symbol', source: 'notams', layout: { 'icon-image': ['concat', 'notam-', ['to-string', ['get', 'count']]], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-offset': [16, -16] } })
     map.addLayer({ id: 'winds', type: 'symbol', source: 'winds', layout: {
       'icon-image': 'wind-arrow', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['get', 'spd'], 0, 0.55, 30, 1.1],
       'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true,
     }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5, 'icon-opacity': ['case', ['get', 'aloft'], 0.95, 0.8] } })
-    map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'mid'], 9, 8], 'circle-color': ['case', ['get', 'mid'], accent, ['get', 'color']], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } })
-    map.addLayer({ id: 'route-num', type: 'symbol', source: 'airports', filter: ['get', 'mid'], layout: { 'text-field': ['to-string', ['get', 'idx']], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': '#fff' } })
+    // Departure, arrival and alternate are circles in their flight-category colour; your route points are
+    // numbered pins (an image, so the number is centred exactly); the circle under a pin is its hit area.
+    map.addLayer({ id: 'airports', type: 'circle', source: 'airports', paint: { 'circle-radius': ['case', ['get', 'mid'], 11, 8], 'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'mid'], 0, 1], 'circle-stroke-color': '#fff', 'circle-stroke-width': ['case', ['get', 'mid'], 0, 2.5] } })
+    map.addLayer({ id: 'route-num', type: 'symbol', source: 'airports', filter: ['get', 'mid'], layout: { 'icon-image': ['concat', 'pin-', ['to-string', ['get', 'idx']]], 'icon-allow-overlap': true, 'icon-ignore-placement': true } })
+    map.on('styleimagemissing', e => {
+      const m = /^(pin|notam)-(\d+)$/.exec(e.id)
+      if (!m || map.hasImage(e.id)) return
+      const r = window.devicePixelRatio || 1, size = 24, c = document.createElement('canvas')
+      c.width = c.height = size * r
+      const g = c.getContext('2d')!
+      g.scale(r, r)
+      if (m[1] === 'pin') {
+        g.beginPath(); g.arc(12, 12, 10.5, 0, Math.PI * 2); g.fillStyle = accent; g.fill(); g.lineWidth = 2.5; g.strokeStyle = '#fff'; g.stroke()
+      } else {
+        g.beginPath(); g.roundRect(2, 2, 20, 20, 5); g.fillStyle = '#d99a00'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke()
+      }
+      g.fillStyle = m[1] === 'pin' ? '#fff' : '#111'
+      g.font = `600 ${m[2].length > 1 ? 10 : 12}px Inter, system-ui, sans-serif`
+      g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+      const t = g.measureText(m[2])
+      g.fillText(m[2], 12, 12 + (t.actualBoundingBoxAscent - t.actualBoundingBoxDescent) / 2)
+      map.addImage(e.id, g.getImageData(0, 0, c.width, c.height), { pixelRatio: r })
+    })
     map.addLayer({ id: 'airport-labels', type: 'symbol', source: 'airports', layout: { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Semibold', 'Noto Sans Regular'], 'text-size': 13, 'text-offset': [0, 1.4], 'text-anchor': 'top' }, paint: { 'text-color': fg, 'text-halo-color': card, 'text-halo-width': 1.5 } })
     // A popup, optionally with one action button (add / remove a route point)
     // and, for a point on the route, a field to name it.
@@ -388,7 +419,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     const base = CHARTS.find(c => c.key === chart)!.layers as readonly string[]
     for (const r of RASTERS) vis([r.id], base.includes(r.id))
     vis(['radar'], on.radar); vis(['aspc-fill', 'aspc-line'], on.airspace); vis(['metars'], on.wx); vis(['winds'], on.wind); vis(['pireps'], on.pirep)
-    vis(['adv-fill', 'adv-line'], on.adv); vis(['cwa-fill', 'cwa-line'], on.cwa); vis(['tfr-fill', 'tfr-line'], on.tfr); vis(['notams', 'notam-count'], on.notam)
+    vis(['adv-fill', 'adv-line'], on.adv); vis(['cwa-fill', 'cwa-line'], on.cwa); vis(['tfr-fill', 'tfr-line'], on.tfr); vis(['notams'], on.notam)
     vis(['lm-lines', 'lm-line-labels', 'cands', 'cand-labels'], on.lm)
   }, [on, chart, ready])
 
@@ -396,16 +427,16 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
     <div className={cn('@container relative overflow-hidden rounded-lg ring-1 ring-inset ring-border', className)}>
       <MapView className="h-full w-full" onLoad={onLoad} zoom={8} fullscreen />
       <button onClick={() => setControls(v => !v)} aria-expanded={controls} className="absolute left-2 top-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-card/90 px-3 text-sm font-medium text-fg ring-1 ring-border backdrop-blur @xl:hidden">
-        <Layers className="size-4" />{controls ? 'Done' : CHARTS.find(c => c.key === chart)!.label}
+        <Layers className="size-4" />{controls ? 'Done' : mode === 'weather' ? 'Layers' : CHARTS.find(c => c.key === chart)!.label}
       </button>
       <div className={cn('absolute left-2 top-12 max-w-[calc(100%-4rem)] flex-wrap gap-1 @xl:top-2 @xl:flex', controls ? 'flex' : 'hidden')}>
-        <div role="radiogroup" aria-label="Base chart" className="flex flex-wrap gap-0.5 rounded-2xl bg-card/90 p-0.5 @xl:rounded-full ring-1 ring-border backdrop-blur">
-          {CHARTS.map(c => (
+        {mode === 'route' && <div role="radiogroup" aria-label="Base chart" className="flex flex-wrap gap-0.5 rounded-2xl bg-card/90 p-0.5 @xl:rounded-full ring-1 ring-border backdrop-blur">
+          {CHARTS.filter(c => c.key !== 'plain').map(c => (
             <button key={c.key} role="radio" aria-checked={chart === c.key} onClick={() => { setChart(c.key); try { localStorage.setItem(CHART_KEY, c.key) } catch { /* private mode */ } }}
               className={cn('h-8 rounded-full px-3 text-sm font-medium @xl:h-6 @xl:px-2.5 @xl:text-xs', chart === c.key ? 'bg-accent text-bg' : 'text-fg-2 hover:text-fg')}>{c.label}</button>
           ))}
-        </div>
-        {LAYERS.filter(l => l.key !== 'lm' || landmarks || cands?.length).map(l => (
+        </div>}
+        {LAYERS.filter(l => (mode === 'weather' ? WEATHER_LAYERS.includes(l.key) : l.key !== 'lm' || landmarks || cands?.length)).map(l => (
           <button key={l.key} onClick={() => setOn(s => ({ ...s, [l.key]: !s[l.key] }))} aria-pressed={on[l.key]}
             className={cn('h-8 rounded-full px-3 text-sm font-medium backdrop-blur @xl:h-7 @xl:px-2.5 @xl:text-xs', on[l.key] ? 'bg-card/90 text-fg ring-1 ring-border' : 'bg-card/60 text-fg-3')}>{l.label}</button>
         ))}
@@ -413,7 +444,7 @@ export function PlannerMap({ route, alternate, weather, d, className, airspace, 
       <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-x-2 gap-y-0.5 rounded-md bg-card/85 px-2 py-1 text-xs text-fg-2 backdrop-blur">
         {(['VFR', 'MVFR', 'IFR', 'LIFR'] as const).map(c => <span key={c} className="inline-flex items-center gap-1"><span className="size-2 rounded-full" style={{ background: `var(${catVar(c)})` }} />{c}</span>)}
         {on.radar && radar?.valid && <span>· Radar {fmtTime(new Date(radar.valid))}</span>}
-        <span className="hidden @xl:inline">· {CHARTS.find(c => c.key === chart)!.note}</span>
+        <span className="hidden @xl:inline">· {mode === 'weather' ? 'aviationweather.gov (NWS AWC) · tfr.faa.gov · NEXRAD' : CHARTS.find(c => c.key === chart)!.note}</span>
       </div>
     </div>
   )

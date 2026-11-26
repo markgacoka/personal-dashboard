@@ -74,13 +74,13 @@ export function AircraftPicker() {
   const tails = all.filter(t => showHidden || !isHidden(t))
   const nHidden = all.filter(isHidden).length
   const pick = (t: string) => f.set({ tail: t, aircraft: undefined })
-  // Delete: a profile is deleted; a logbook tail is only taken off this list (the logbook keeps it).
+  // Delete: a profile is deleted; a tail without one is only taken off this list.
   const remove = async (t: string) => {
     const s = saved.find(a => a.tail === t), n = usedBy(plans.data, 'aircraft', t)
     const ok = await confirm({
       title: s ? `Delete ${t}?` : `Remove ${t} from this list?`,
-      body: s ? `Its profile (empty weight, equipment, inspections, checklist) is deleted and it leaves this list. ${n ? `${n} flight${n > 1 ? 's use' : ' uses'} it and will use the POH sample airplane.` : ''} Your logbook keeps its flights.`
-        : `${t} comes from your logbook and stays there; it just won't be offered here. You can show it again below the list.`,
+      body: s ? `Its profile (empty weight, equipment, inspections, checklist) is deleted and it leaves this list. ${n ? `${n} flight${n > 1 ? 's use' : ' uses'} it and will use the POH sample airplane.` : ''}`
+        : `${t} won't be offered when you choose an aircraft. You can show it again below the list.`,
       confirm: s ? 'Delete' : 'Remove', danger: true,
     })
     if (!ok) return

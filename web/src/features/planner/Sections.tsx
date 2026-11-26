@@ -248,7 +248,7 @@ export function WeatherBriefSection() {
     <div>
       <OutputHead k="weather" />
       <div className="mb-8 space-y-4 print:hidden">
-        {f.routePts.length > 1 && <MapBoundary><PlannerMap className="h-[24rem] rounded-xl" route={f.routePts} alternate={f.altAirport} weather={f.weather} d={f.d} airspace={f.airspace} radar={f.radar} notams={f.notams} /></MapBoundary>}
+        {f.routePts.length > 1 && <MapBoundary><PlannerMap mode="weather" className="h-[30rem] rounded-xl sm:h-[38rem] @5xl:h-[44rem]" route={f.routePts} alternate={f.altAirport} weather={f.weather} d={f.d} airspace={f.airspace} radar={f.radar} notams={f.notams} /></MapBoundary>}
         <Panel>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-fg">Standard briefing <span className="font-normal text-fg-3">§91.103</span></span>

@@ -54,13 +54,32 @@ from (previous waypoint), and the departure follows the course to the next
 waypoint: straight out (within 35° of the runway), a 45° turn-out toward the
 pattern side, straight out past the pattern then turning (course on the other
 side), or a downwind departure (course behind). The en-route line runs from
-the departure's exit to the arrival's entry point. In light wind (4 kt or
+the departure's exit to the arrival's entry point; TOC is placed by walking
+the climb distance from the runway along the departure path, TOD by walking
+the descent distance back from the entry point. Markers are native MapLibre
+markers, so they move with the map without lag. In light wind (4 kt or
 less) the runway in use is the Chart Supplement's calm-wind runway, or the
 longest when calm. Hovering or tapping an airport shows its weather at the
 departure or arrival time, the runway in use with a to-scale diagram, wind
 components, pattern side and altitude, distances and frequencies; a leg shows
 its courses, heading, altitude, wind aloft, distance, ground speed, time, fuel
 and terrain.
+
+## Maps
+
+- Summary: a plain route map (above).
+- Route and fuel: every chart and layer; TFRs, NOTAMs, PIREPs and landmarks
+  start on. Route points are numbered pins drawn as images (the number is
+  centred); NOTAMs are amber squares with their count.
+- Weather briefing: a plain dark map, taller, with only weather layers, all
+  on: radar (NWS NEXRAD), METAR flight categories, winds, PIREPs, SIGMETs and
+  G-AIRMETs, CWAs (aviationweather.gov) and TFRs (tfr.faa.gov), plus the
+  route, its points and the alternate.
+- Weather at a time in the future: within an hour of now, the latest METAR;
+  later, the TAF period in force at that time (the airport's own TAF or the
+  nearest within 25 nm). With no TAF covering the time, the latest METAR
+  stands in and a note says so. Winds aloft are the NOAA HRRR/GFS model
+  forecast (Open-Meteo) for the flight's time and altitude.
 
 ## Route points
 

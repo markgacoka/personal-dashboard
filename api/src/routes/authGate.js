@@ -8,7 +8,9 @@ import { auth } from '../auth.js'
 
 // Exact paths only (no prefixes, no normalization): an encoded or
 // non-canonical path can never match, so it falls through to the session check.
-const PUBLIC_PATHS = new Set(['/login', '/css/app.css', '/css/login.css', '/js/login.js', '/js/webauthn.js', '/favicon.svg', '/health', '/api/health'])
+// The public product portfolio: one static page and its images, nothing else.
+export const PORTFOLIO_PATHS = ['/portfolio', ...['icon', 'hero', 'fr970', 'fenix7', 'venu3', 'fr265s', 'epix2pro51mm'].map(n => `/portfolio/meridian-${n}.png`)]
+const PUBLIC_PATHS = new Set(['/login', '/css/app.css', '/css/login.css', '/js/login.js', '/js/webauthn.js', '/favicon.svg', '/health', '/api/health', ...PORTFOLIO_PATHS])
 const AUTH_PREFIX = '/api/auth/'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
@@ -96,6 +98,11 @@ async function authGate(fastify) {
       reply.header('Cache-Control', 'no-store')
       return reply.send(response.body ? await response.text() : null)
     },
+  })
+
+  fastify.get('/portfolio', (req, reply) => {
+    reply.header('Cache-Control', 'public, max-age=300')
+    return reply.sendFile('portfolio.html')
   })
 
   fastify.get('/login', (req, reply) => {

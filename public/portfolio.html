@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Products · Gacoka Mbui</title>
+  <meta name="description" content="Products designed, built and shipped by Gacoka Mbui, starting with Meridian, a Garmin watch face.">
+  <meta property="og:title" content="Meridian · a Garmin watch face by Gacoka Mbui">
+  <meta property="og:description" content="Time, weather and wind, heart rate, steps, Body Battery, sunrise and sunset. One calm face, large type.">
+  <meta property="og:image" content="https://gacoka.com/portfolio/meridian-hero.png">
+  <meta property="og:type" content="website">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000; --card: #0f0f10; --sunken: #161618; --border: rgba(255,255,255,.09); --border-strong: rgba(255,255,255,.16);
+      --fg: #f4f4f5; --fg-2: #c4c4c8; --fg-3: #8b8b92;
+      --accent: #4ade9b; --accent-soft: rgba(74,222,155,.12); --blue: #5aa9f0; --warn: #f5b04c; --warn-soft: rgba(245,176,76,.12);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    body { font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; }
+    .wrap { max-width: 72rem; margin: 0 auto; padding: 0 16px; }
+    @media (min-width: 640px) { .wrap { padding: 0 32px; } }
+
+    header.site { border-bottom: 1px solid var(--border); }
+    header.site .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+    .brand { font-weight: 600; letter-spacing: -.01em; text-decoration: none; }
+    .site nav { color: var(--fg-3); font-size: 14px; }
+
+    .intro { padding: 56px 0 32px; }
+    .intro h1 { margin: 0; font-size: clamp(2rem, 1.6rem + 1.6vw, 2.75rem); font-weight: 600; letter-spacing: -.03em; line-height: 1.1; }
+    .intro p { margin: 10px 0 0; color: var(--fg-3); max-width: 36rem; }
+
+    .product { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; display: grid; gap: 32px; margin-bottom: 64px; }
+    @media (min-width: 640px) { .product { padding: 32px; } }
+    @media (min-width: 960px) { .product { grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); gap: 48px; padding: 40px; } }
+
+    .head { display: flex; gap: 16px; align-items: center; }
+    .head img { width: 64px; height: 64px; border-radius: 50%; flex: none; }
+    .kicker { font-size: 13px; color: var(--fg-3); display: flex; align-items: center; gap: 6px; }
+    .kicker svg { width: 14px; height: 14px; }
+    .product h2 { margin: 2px 0 0; font-size: 2rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.1; }
+    .tagline { margin: 20px 0 0; font-size: 17px; color: var(--fg-2); max-width: 34rem; }
+    .tagline strong { color: var(--accent); font-weight: 500; }
+
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 24px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 999px; background: var(--fg); color: #000; font-weight: 500; text-decoration: none; }
+    .btn:hover { background: #fff; }
+    .btn svg { width: 16px; height: 16px; }
+    .status { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 13px; font-weight: 500; }
+    .status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .note { font-size: 13px; color: var(--fg-3); margin: 8px 0 0; }
+
+    .features { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 12px 24px; }
+    .info { container-type: inline-size; min-width: 0; }
+    @container (min-width: 32rem) { .features { grid-template-columns: 1fr 1fr; } }
+    .features li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--fg-2); }
+    .features svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--fg-3); }
+    .features b { color: var(--fg); font-weight: 500; display: block; }
+
+    .facts { margin: 28px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    @media (min-width: 480px) { .facts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .facts div { background: var(--card); padding: 12px 14px; }
+    .facts dt { font-size: 12px; color: var(--fg-3); }
+    .facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+    .showcase { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    .watch { position: relative; width: min(100%, 22rem); aspect-ratio: 1; border-radius: 50%; padding: 14px; background: radial-gradient(circle at 30% 25%, #2a2a2e, #0b0b0c 70%); box-shadow: 0 0 0 1px var(--border-strong), 0 30px 80px -20px rgba(74,222,155,.18); }
+    .watch img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; transition: opacity .25s ease; }
+    .device { font-size: 13px; color: var(--fg-3); text-align: center; min-height: 1.5em; }
+    .thumbs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    @media (min-width: 640px) { .thumbs { gap: 10px; } .thumbs button { width: 56px; height: 56px; } }
+    .thumbs button { all: unset; box-sizing: border-box; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; padding: 3px; box-shadow: 0 0 0 1px var(--border-strong); transition: box-shadow .15s; }
+    .thumbs button img { width: 100%; height: 100%; border-radius: 50%; }
+    .thumbs button:hover { box-shadow: 0 0 0 1px var(--fg-3); }
+    .thumbs button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+    .thumbs button:focus-visible { box-shadow: 0 0 0 2px var(--fg); }
+    .families { font-size: 13px; color: var(--fg-3); text-align: center; max-width: 24rem; margin: 0; }
+
+    footer { border-top: 1px solid var(--border); color: var(--fg-3); font-size: 13px; }
+    footer .wrap { padding-top: 24px; padding-bottom: 40px; }
+    @media (prefers-reduced-motion: reduce) { .status::before { animation: none; } .watch img { transition: none; } }
+  </style>
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="/portfolio">Gacoka Mbui</a>
+      <nav aria-label="Site">Products</nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="intro">
+      <h1>Products</h1>
+      <p>Things I've designed, built and shipped.</p>
+    </section>
+
+    <article class="product" id="meridian" aria-labelledby="meridian-title">
+      <div class="info">
+        <div class="head">
+          <img src="/portfolio/meridian-icon.png" alt="" width="64" height="64">
+          <div>
+            <div class="kicker">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 10v2l1 1M9 6.5 9.5 2h5l.5 4.5M9 17.5l.5 4.5h5l.5-4.5"/></svg>
+              Garmin Connect IQ · Watch face
+            </div>
+            <h2 id="meridian-title">Meridian</h2>
+          </div>
+        </div>
+
+        <p class="tagline">Time, weather and wind, heart rate, steps, Body Battery, sunrise and sunset. <strong>One calm face, in large type you can read at a glance.</strong></p>
+
+        <div class="actions">
+          <a class="btn" href="https://apps.garmin.com/apps/a7caecac-a61d-4d86-92e1-f256d694beaa" target="_blank" rel="noopener">
+            Connect IQ Store
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </a>
+          <span class="status">In review at Garmin</span>
+        </div>
+        <p class="note">Free. The store listing opens once Garmin approves it, usually within 3 days.</p>
+
+        <ul class="features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>Time and date</b>Large digits in your 12- or 24-hour setting; day and date along the bezel.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/></svg><span><b>Weather and wind</b>Conditions, temperature, wind direction and speed in knots, mph or km/h.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 8.6a5 5 0 0 0-8.8-3.2 5 5 0 0 0-8.8 3.2c0 5.4 8.8 10.4 8.8 10.4s8.8-5 8.8-10.4Z"/></svg><span><b>Heart rate and steps</b>A dot that moves from red to green as your heart rate settles and your steps near your goal.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 12a9 9 0 0 0-9-9" opacity=".4"/></svg><span><b>Two rings</b>Body Battery on the left, progress toward your step goal on the right.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M5.6 7.6 7 9M3 15h18M17 9l1.4-1.4M8 15a4 4 0 0 1 8 0M5 19h14"/></svg><span><b>Sun and recovery</b>Next sunrise or sunset, and recovery time after a workout.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 10v4"/></svg><span><b>Always-on</b>On AMOLED watches the same face dims and shifts each minute to protect the screen.</span></li>
+        </ul>
+
+        <dl class="facts">
+          <div><dt>Price</dt><dd>Free</dd></div>
+          <div><dt>Watches</dt><dd>69 models</dd></div>
+          <div><dt>Version</dt><dd>1.0.0</dd></div>
+          <div><dt>Released</dt><dd>Nov 25, 2026</dd></div>
+          <div><dt>Size</dt><dd>28 KB</dd></div>
+          <div><dt>Your data</dt><dd>Stays on the watch</dd></div>
+        </dl>
+      </div>
+
+      <div class="showcase">
+        <div class="watch"><img id="shot" src="/portfolio/meridian-fr970.png" alt="Meridian on a Forerunner 970" width="454" height="454"></div>
+        <div class="device" id="device" aria-live="polite">Forerunner 970</div>
+        <div class="thumbs" role="group" aria-label="Meridian on other watches">
+          <button type="button" aria-pressed="true" data-src="/portfolio/meridian-fr970.png" data-name="Forerunner 970"><img src="/portfolio/meridian-fr970.png" alt="Forerunner 970" width="50" height="50"></button>
+          <button type="button" aria-pressed="false" data-src="/portfolio/meridian-fenix7.png" data-name="fēnix 7"><img src="/portfolio/meridian-fenix7.png" alt="fēnix 7" width="50" height="50" loading="lazy"></button>
+          <button type="button" aria-pressed="false" data-src="/portfolio/meridian-venu3.png" data-name="Venu 3"><img src="/portfolio/meridian-venu3.png" alt="Venu 3" width="50" height="50" loading="lazy"></button>
+          <button type="button" aria-pressed="false" data-src="/portfolio/meridian-fr265s.png" data-name="Forerunner 265S"><img src="/portfolio/meridian-fr265s.png" alt="Forerunner 265S" width="50" height="50" loading="lazy"></button>
+          <button type="button" aria-pressed="false" data-src="/portfolio/meridian-epix2pro51mm.png" data-name="epix Pro 51 mm"><img src="/portfolio/meridian-epix2pro51mm.png" alt="epix Pro 51 mm" width="50" height="50" loading="lazy"></button>
+        </div>
+        <p class="families">Forerunner, fēnix, epix, Enduro, Venu, vívoactive, Instinct 3 AMOLED, MARQ, Approach, Descent and D2.</p>
+      </div>
+    </article>
+  </main>
+
+  <footer><div class="wrap">© 2026 Gacoka Mbui</div></footer>
+
+  <script>
+    document.querySelectorAll('.thumbs button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.thumbs button').forEach(x => x.setAttribute('aria-pressed', String(x === b)))
+      const img = document.getElementById('shot')
+      img.src = b.dataset.src
+      img.alt = 'Meridian on a ' + b.dataset.name
+      document.getElementById('device').textContent = b.dataset.name
+    }))
+  </script>
+</body>
+</html>

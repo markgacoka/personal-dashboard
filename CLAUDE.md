@@ -29,7 +29,8 @@ tracks, finances (Plaid), and chess (chess.com).
 ## Authentication
 
 Every page, file, and API route requires a signed-in session except `/login`,
-its assets, `/health`, `/api/health`, and Better Auth's own `/api/auth/*`
+its assets, `/health`, `/api/health`, the public product portfolio (`/portfolio`,
+`public/portfolio.html`, and its images listed one by one in `PORTFOLIO_PATHS`), and Better Auth's own `/api/auth/*`
 (see `api/src/routes/authGate.js`; `api/src/auth.js` holds the config). One
 owner account. The password is always required; with two-factor on (Account
 view), sign-in then asks for a second step: Touch ID (a passkey added from the

@@ -503,19 +503,10 @@ describe('Live security checks (signed out)', { skip: SKIP_SMOKE ? 'SKIP_SMOKE=1
 
   test('sign-in page is public; the dashboard redirects to it', async () => {
     assert.equal((await raw('/login')).status, 200);
-    for (const path of ['/', '/index.html', '/assets/index.js', '/flying/12', '/some/deep/link']) {
+    for (const path of ['/', '/index.html', '/assets/index.js', '/flying/12', '/portfolio', '/some/deep/link']) {
       const r = await raw(path);
       assert.equal(r.status, 302, path);
       assert.match(r.headers.get('location'), /\/login\?next=/, path);
-    }
-  });
-
-  test('the portfolio page and its listed images are public; nothing else under it is', async () => {
-    assert.equal((await raw('/portfolio')).status, 200);
-    assert.equal((await raw('/portfolio/meridian-icon.png')).status, 200);
-    for (const path of ['/portfolio.html', '/portfolio/', '/portfolio/other.png', '/portfolio/../index.html', '/Portfolio']) {
-      const r = await raw(path);
-      assert.ok([302, 404, 400].includes(r.status) && r.status !== 200, `${path} → ${r.status}`);
     }
   });
 
@@ -801,7 +792,7 @@ describe('Authentication — every route requires a session (DB integration)', {
   const EMAIL = 'auth-test@example.invalid', PASSWORD = 'auth-test-password-123';
   const ORIGIN_URL = 'http://localhost:3000';
   // Paths that are public on purpose.
-  const PUBLIC = new Set(['/health', '/api/health', '/login', '/portfolio']);
+  const PUBLIC = new Set(['/health', '/api/health', '/login']);
 
   test('setup: build the full app and a temporary account', async () => {
     process.env.BETTER_AUTH_URL ||= ORIGIN_URL;

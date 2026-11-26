@@ -1,4 +1,4 @@
-import { Activity, BedDouble, BookOpen, Crown, Home, IdCard, Inbox, Landmark, PlaneLanding, PlugZap, Route, UserRound, Watch, type LucideIcon } from 'lucide-react'
+import { Activity, BedDouble, BookOpen, BriefcaseBusiness, Crown, Home, IdCard, Inbox, Landmark, PlaneLanding, PlugZap, Route, UserRound, Watch, type LucideIcon } from 'lucide-react'
 
 export interface NavItem { to: string; label: string; icon: LucideIcon; end?: boolean; keywords?: string }
 export interface NavGroup { label?: string; items: NavItem[] }
@@ -18,6 +18,9 @@ export const NAV: NavGroup[] = [
   { label: 'Money', items: [
     { to: '/money', label: 'Net worth', icon: Landmark, end: true, keywords: 'finance accounts holdings' },
     { to: '/money/connections', label: 'Connections', icon: PlugZap, keywords: 'plaid link accounts institutions' },
+  ] },
+  { label: 'Work', items: [
+    { to: '/portfolio', label: 'Portfolio', icon: BriefcaseBusiness, keywords: 'products apps watch face garmin connect iq meridian downloads users revenue' },
   ] },
   { label: 'Play', items: [{ to: '/chess', label: 'Chess', icon: Crown, keywords: 'rating games chess.com' }] },
   { label: 'Communicate', items: [

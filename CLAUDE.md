@@ -29,8 +29,7 @@ tracks, finances (Plaid), and chess (chess.com).
 ## Authentication
 
 Every page, file, and API route requires a signed-in session except `/login`,
-its assets, `/health`, `/api/health`, the public product portfolio (`/portfolio`,
-`public/portfolio.html`, and its images listed one by one in `PORTFOLIO_PATHS`), and Better Auth's own `/api/auth/*`
+its assets, `/health`, `/api/health`, and Better Auth's own `/api/auth/*`
 (see `api/src/routes/authGate.js`; `api/src/auth.js` holds the config). One
 owner account. The password is always required; with two-factor on (Account
 view), sign-in then asks for a second step: Touch ID (a passkey added from the
@@ -137,6 +136,16 @@ workings, source tier and expected range (`explain.ts`; method in
 `docs/navlog-method.md`). The route chart
 suggests points and lets you drag the line (`suggest.ts`, `services/landmarks.js`:
 OpenFreeMap/OSM, HIFLD power lines, FAA obstacles).
+
+## Portfolio
+
+`/portfolio` (signed in, like the rest): the products I've built. Each product
+is one entry in `web/src/features/portfolio/products.ts` (status, summary,
+gallery, features, facts, links and a `metrics` list); images live beside it
+in `assets/`. The page shows a totals strip once there are two or more
+products, a sideways carousel of product cards, and the selected product
+(`?p=<id>`) with its metrics. A metric with `value: null` reads "Not tracked
+yet"; `series` draws a trend line; live sources can be merged in by `key`.
 
 ## Mail
 

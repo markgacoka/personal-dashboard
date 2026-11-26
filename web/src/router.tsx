@@ -36,6 +36,7 @@ export const router = createBrowserRouter([
       { path: 'chess', element: page(() => import('@/features/chess/ChessPage')) },
       { path: 'mail/settings/:tab?', element: page(() => import('@/features/mail/MailSettingsPage')) },
       { path: 'mail/:folder?/:threadId?', element: page(() => import('@/features/mail/MailPage')) },
+      { path: 'portfolio', element: page(() => import('@/features/portfolio/PortfolioPage')) },
       { path: 'assistant', element: page(() => import('@/features/assistant/AssistantPage')) },
       { path: 'account', element: page(() => import('@/features/account/AccountPage')) },
       { path: '*', element: <Navigate to="/" replace /> },

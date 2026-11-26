@@ -172,27 +172,70 @@ async function setMailboxPassword(c = null) {
 }
 
 async function dns() {
+  // The first mailbox's domain, or another one given: `dns flightpad.io`.
+  const name = (process.argv[3] || DOMAIN).toLowerCase()
   const c = await adminClient()
-  const zone = (await c.call([['x:Domain/get', { ids: null, properties: ['name', 'dnsZoneFile'] }, 'd']])).d.list.find(d => d.name === DOMAIN)?.dnsZoneFile || ''
+  const zone = (await c.call([['x:Domain/get', { ids: null, properties: ['name', 'dnsZoneFile'] }, 'd']])).d.list.find(d => d.name === name)?.dnsZoneFile || ''
+  if (!zone) throw new Error(`${name} is not a domain on the mail server`)
   const ip = env.MAIL_PUBLIC_IP || '89.116.157.98'
+  const own = name === DOMAIN
   const rows = [
-    ['A', HOST_LABEL, ip],
+    ...(own ? [['A', HOST_LABEL, ip]] : []),
+    // Another domain's mail is received by the same server name.
     ['MX', '@', `${HOSTNAME} (priority 10)`],
-    ['TXT', '@', 'v=spf1 mx ~all'],
-    ...dkimRecordsFromZone(zone).map(r => ['TXT', r.name.replace('.' + DOMAIN, ''), r.value]),
+    ['TXT', '@', own ? 'v=spf1 mx ~all' : `v=spf1 a:${HOSTNAME} ~all`],
+    ...dkimRecordsFromZone(zone).map(r => ['TXT', r.name.replace('.' + name, ''), r.value]),
     ['TXT', '_dmarc', 'v=DMARC1; p=quarantine'],
   ]
-  console.log(`DNS records for ${DOMAIN} (replace any existing MX, SPF and DMARC records):\n`)
+  console.log(`DNS records for ${name} (replace any existing MX, SPF and DMARC records):\n`)
   for (const [type, name, value] of rows) console.log(`${type.padEnd(4)} ${name.padEnd(34)} ${value}`)
-  console.log(`\nAlso keep the relay's own records for ${DOMAIN} (for Resend: resend._domainkey TXT and the send/rsend CNAMEs),`)
+  console.log(`\nAlso keep the relay's own records for ${name} (for Resend: resend._domainkey TXT and the send/rsend CNAMEs),`)
   console.log('but not its receiving MX record: mail for this domain must only point at the server above.')
   console.log(`Reverse DNS (optional): set the PTR of ${ip} to ${HOSTNAME} in Hostinger hPanel.`)
 }
 
-const commands = { bootstrap, configure, dns, 'set-password': () => setMailboxPassword() }
+// A further mailbox (MAIL_USER_n / MAIL_PASSWORD_n), on its own domain if need
+// be: the domain is created with the same automatic DKIM keys as the first one,
+// mail for any unknown address there goes to this mailbox, and its password is
+// (re)set from the environment. Idempotent.
+async function addMailbox() {
+  const n = [2, 3, 4, 5, 6, 7, 8, 9].find(i => (env[`MAIL_USER_${i}`] || '').toLowerCase() === String(process.argv[3] || '').toLowerCase())
+  if (!n) throw new Error('Usage: add-mailbox <address>, where the address is MAIL_USER_n in .env (with MAIL_PASSWORD_n)')
+  const address = env[`MAIL_USER_${n}`].toLowerCase(), secret = need(`MAIL_PASSWORD_${n}`)
+  if (secret.length < 16) throw new Error(`MAIL_PASSWORD_${n} must be at least 16 characters`)
+  const [local, domainName] = address.split('@')
+  const c = await adminClient()
+  const domains = await get(c, 'Domain')
+  let domain = domains.find(d => d.name === domainName)
+  if (!domain) {
+    const first = domains.find(d => d.name === DOMAIN)
+    const r = await set(c, 'Domain', { create: { d: { name: domainName, isEnabled: true, subAddressing: { '@type': 'Enabled' },
+      ...(first?.dkimManagement ? { dkimManagement: first.dkimManagement } : {}) } } }, `Could not create ${domainName}`)
+    domain = { id: r.created.d.id, name: domainName }
+    console.log(`✓ domain ${domainName} created (DKIM keys generated automatically)`)
+  } else console.log(`✓ domain ${domainName} exists`)
+  const account = (await get(c, 'Account')).find(a => a.emailAddress?.toLowerCase() === address)
+  const credentials = { 0: { '@type': 'Password', secret } }
+  if (account) {
+    await set(c, 'Account', { update: { [account.id]: { credentials } } }, 'Could not set the password')
+    console.log(`✓ mailbox ${address} exists; password set from MAIL_PASSWORD_${n}`)
+  } else {
+    await set(c, 'Account', { create: { u: {
+      '@type': 'User', name: local, domainId: domain.id, aliases: {}, credentials,
+      encryptionAtRest: { '@type': 'Disabled' }, memberGroupIds: {}, permissions: { '@type': 'Inherit' }, quotas: {}, roles: { '@type': 'User' },
+    } } }, 'Could not create the mailbox')
+    console.log(`✓ mailbox ${address} created`)
+  }
+  await set(c, 'Domain', { update: { [domain.id]: { catchAllAddress: address } } }, 'Could not set the catch-all')
+  console.log(`✓ mail to any other ${domainName} address goes to ${address}`)
+  await set(c, 'Action', { create: { x: { '@type': 'ReloadSettings' } } }, 'Reload failed')
+  console.log(`\nNext: node src/cli/mail.mjs dns ${domainName}`)
+}
+
+const commands = { bootstrap, configure, dns, 'add-mailbox': addMailbox, 'set-password': () => setMailboxPassword() }
 const cmd = process.argv[2]
 if (!commands[cmd]) {
-  console.error('Usage: node src/cli/mail.mjs <bootstrap|configure|dns|set-password>')
+  console.error('Usage: node src/cli/mail.mjs <bootstrap|configure|dns [domain]|add-mailbox <address>|set-password>')
   process.exit(2)
 }
 try {

@@ -8,7 +8,7 @@ import { EmptyState, Skeleton, Tooltip } from '@/components/ui/misc'
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, useConfirm } from '@/components/ui/overlay'
 import { bytes, mailDate, mailDateLong } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { mail, mailPost, labelColor, type MailBoot, type Message, type Thread, type Addr } from './api'
+import { mail, mailPost, labelColor, type MailBoot, type Message, type Thread, type Addr, accountQuery } from './api'
 import { useMailAction, type MailAction } from './actions'
 import { useComposer } from './Composer'
 
@@ -163,7 +163,7 @@ function MessageCard({ m, threadId, initiallyOpen }: { m: Message; threadId: str
           {m.attachments.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {m.attachments.map(a => {
-                const q = `name=${encodeURIComponent(a.name)}&type=${encodeURIComponent(a.type)}`
+                const q = `name=${encodeURIComponent(a.name)}&type=${encodeURIComponent(a.type)}${accountQuery()}`
                 const img = /^image\/(png|jpe?g|gif|webp|avif)$/.test(a.type)
                 return (
                   <a key={a.blobId} href={`/api/mail/blobs/${encodeURIComponent(a.blobId)}?${q}`} download={a.name} className="flex w-56 items-center gap-2.5 rounded-lg border border-border p-2 hover:border-border-strong hover:bg-hover">

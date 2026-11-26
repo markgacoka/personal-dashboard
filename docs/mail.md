@@ -53,6 +53,39 @@ Design decisions:
   download instead of opening, because they would otherwise run on the
   gacoka.com origin.
 
+## More than one mailbox
+
+The Mail section can hold several mailboxes, for example `hello@gacoka.com`
+and `hello@flightpad.io`. A switcher at the top of the folder list moves
+between them. Each mailbox is its own Stalwart account, with its own inbox,
+folders, labels, filters, templates, contacts, signatures and settings.
+
+- **The first mailbox** (`MAIL_USER`) keeps the original `mail_*` tables.
+- **Each further mailbox** (`MAIL_USER_2`/`MAIL_PASSWORD_2`, up to `_9`) gets
+  the same tables in its own Postgres schema (`mbox_<address>`, for example
+  `mbox_hello_flightpad_io`). The API creates the schema on start
+  (`services/mailAccounts.js`).
+- **Choosing the mailbox:** a request picks it with the `X-Mail-Account`
+  header or `?account=`, and defaults to the first. `GET /api/mail/accounts`
+  lists the mailboxes with their unread counts.
+- **Sending:** all mailboxes send through the same Resend relay. Its free plan
+  allows three domains, and the 100-a-day limit is shared.
+
+To add a mailbox:
+
+1. Add `MAIL_USER_2=hello@flightpad.io` and `MAIL_PASSWORD_2` (16 or more
+   characters) to `.env`, then run `docker compose up -d api`.
+2. Run `docker exec current-api-1 node src/cli/mail.mjs add-mailbox hello@flightpad.io`.
+   This creates the domain with automatic DKIM keys, creates the mailbox,
+   catches every other address on the domain, and sets the password. You can
+   run it again safely.
+3. Run `docker exec current-api-1 node src/cli/mail.mjs dns flightpad.io` and
+   publish those records at the domain's DNS host. Its MX points at
+   `mail.gacoka.com`. If the DNS is at Cloudflare, set these records to
+   DNS only (grey cloud).
+4. Add the domain in Resend and publish Resend's records, so mail sent from
+   it is authenticated.
+
 ## Environment (`/var/www/app/.env`)
 
 | Variable | Used by | Value |

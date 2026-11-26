@@ -49,7 +49,20 @@ export interface MailFilter {
 export interface Template { id: number; name: string; subject?: string; html: string }
 export interface Health { sentToday?: number; dailyLimit: number; sentThisMonth?: number; monthlyLimit: number; checks: { id: string; label: string; ok: boolean; detail: string; fix?: string }[]; error?: string }
 
-export const mail = <T,>(path: string, init: RequestInit & { json?: unknown } = {}) => api<T>('/api/mail' + path, init)
+// The mailbox in view (one of /api/mail/accounts); empty means the first one.
+// Kept per browser; every mail request names it.
+let account = (() => { try { return localStorage.getItem('mail-account') || '' } catch { return '' } })()
+export const currentMailAccount = () => account
+export function setMailAccount(a: string) {
+  account = a
+  try { localStorage.setItem('mail-account', a) } catch { /* per-browser convenience */ }
+}
+export const accountHeader = (): Record<string, string> => (account ? { 'X-Mail-Account': account } : {})
+// For URLs the browser fetches itself (attachments, images).
+export const accountQuery = () => (account ? `&account=${encodeURIComponent(account)}` : '')
+
+export const mail = <T,>(path: string, init: RequestInit & { json?: unknown } = {}) =>
+  api<T>('/api/mail' + path, { ...init, headers: { ...accountHeader(), ...(init.headers as Record<string, string> | undefined) } })
 export const mailPost = <T,>(path: string, json?: unknown) => mail<T>(path, { method: 'POST', json: json ?? {} })
 
 export const ROLE_NAMES: Record<string, string> = { inbox: 'Inbox', drafts: 'Drafts', sent: 'Sent', archive: 'Archive', junk: 'Spam', trash: 'Trash' }
@@ -57,6 +70,22 @@ export const LABEL_COLORS: Record<string, string> = {
   patina: 'var(--c3)', gold: 'var(--c4)', success: 'var(--c6)', warning: 'var(--c2)', danger: 'var(--c8)', severe: 'var(--c5)', info: 'var(--c1)', muted: 'var(--fg-3)',
 }
 export const labelColor = (c?: string) => LABEL_COLORS[c || ''] || 'var(--c3)'
+
+export interface MailAccount { address: string; primary: boolean; unread: number | null }
+export function useMailAccounts() {
+  return useQuery({ queryKey: ['mail-accounts'], queryFn: () => api<{ accounts: MailAccount[] }>('/api/mail/accounts').then(r => r.accounts), staleTime: 60_000, refetchInterval: 120_000 })
+}
+
+// Switch mailbox: drop everything loaded for the previous one (in-flight requests included).
+export function useSwitchMailAccount() {
+  const qc = useQueryClient()
+  return async (a: string) => {
+    await qc.cancelQueries({ queryKey: ['mail'] })
+    setMailAccount(a)
+    qc.removeQueries({ queryKey: ['mail'] })
+    qc.invalidateQueries({ queryKey: ['mail-accounts'] })
+  }
+}
 
 export function useMailBoot() {
   return useQuery({ queryKey: ['mail', 'boot'], queryFn: () => mail<MailBoot>('/bootstrap'), staleTime: 60_000, retry: 1 })

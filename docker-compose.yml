@@ -33,6 +33,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
       - /var/www/app/acme.json:/acme.json
+    environment:
+      # Cloudflare DNS API token for the `cloudflare` certificate resolver (traefik/traefik.yml).
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
     networks:
       - web
 

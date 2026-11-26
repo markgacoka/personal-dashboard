@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Drawer } from 'vaul'
-import { Archive, Bell, CheckCircle2, Clock, FileText, Folder, FolderPlus, Inbox, Mail, MailOpen, Menu as MenuIcon, Newspaper, Paperclip, PenSquare, Plus, RefreshCw, Search, Send, Settings, ShieldAlert, Star, Tag, Trash2, X, ShieldCheck, Plug } from 'lucide-react'
+import { Archive, Bell, Check, CheckCircle2, ChevronsUpDown, Clock, FileText, Folder, FolderPlus, Inbox, Mail, MailOpen, Menu as MenuIcon, Newspaper, Paperclip, PenSquare, Plus, RefreshCw, Search, Send, Settings, ShieldAlert, Star, Tag, Trash2, X, ShieldCheck, Plug } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import { EmptyState, Kbd, Segmented, Skeleton, Tooltip } from '@/components/ui/m
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, useConfirm } from '@/components/ui/overlay'
 import { mailDate, mailDateLong } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { labelColor, mail, mailPost, ROLE_NAMES, unreadCount, useMailBoot, type Followup, type MailBoot, type Scheduled, type ThreadRow } from './api'
+import { labelColor, mail, mailPost, ROLE_NAMES, unreadCount, useMailAccounts, useMailBoot, useSwitchMailAccount, type Followup, type MailBoot, type Scheduled, type ThreadRow } from './api'
 import { removesFromView, useMailAction, type MailAction } from './actions'
 import { ComposerProvider, useComposer } from './Composer'
 import { Reader, ReaderEmpty } from './Reader'
@@ -77,6 +77,39 @@ function MailClient() {
   )
 }
 
+// ── Mailbox switcher: each address is its own mailbox (inbox, labels, filters, settings) ──
+function AccountSwitcher({ current }: { current: string }) {
+  const { data: accounts = [] } = useMailAccounts()
+  const switchTo = useSwitchMailAccount()
+  const navigate = useNavigate()
+  if (accounts.length < 2) return null
+  const pick = async (address: string) => {
+    if (address === current) return
+    await switchTo(address)
+    navigate('/mail/inbox')
+  }
+  const others = accounts.filter(a => a.address !== current).reduce((n, a) => n + (a.unread || 0), 0)
+  return (
+    <Menu>
+      <MenuTrigger className="mb-3 flex h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left ring-1 ring-inset ring-border hover:bg-hover" aria-label={`Mailbox: ${current}. Switch mailbox`}>
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-semibold uppercase text-accent">{current[0]}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-fg">{current}</span>{others > 0 && <span className="block text-xs text-fg-3">{others} unread in other mailboxes</span>}</span>
+        <ChevronsUpDown className="size-4 shrink-0 text-fg-3" />
+      </MenuTrigger>
+      <MenuContent align="start" className="w-64">
+        {accounts.map(a => (
+          <MenuItem key={a.address} onSelect={() => pick(a.address)} className="gap-2.5">
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-2xs font-semibold uppercase text-accent">{a.address[0]}</span>
+            <span className="min-w-0 flex-1 truncate">{a.address}</span>
+            {a.unread ? <span className="num text-xs text-fg-3">{a.unread}</span> : null}
+            {a.address === current && <Check className="size-4 text-accent" aria-label="Current mailbox" />}
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
+  )
+}
+
 // ── Folder rail ──────────────────────────────────────────────────────────────
 function Rail({ boot, folder, onPick, onCompose }: { boot: MailBoot; folder: string; onPick: (f: string) => void; onCompose: () => void }) {
   const qc = useQueryClient()
@@ -112,6 +145,7 @@ function Rail({ boot, folder, onPick, onCompose }: { boot: MailBoot; folder: str
   )
   return (
     <div>
+      <AccountSwitcher current={boot.address} />
       <Button variant="primary" className="mb-4 w-full" onClick={onCompose}><PenSquare />Compose<Kbd className="ml-auto border-accent-fg/30 bg-transparent text-accent-fg/80">C</Kbd></Button>
       <div className="space-y-0.5">
         <Item k="inbox" icon={Inbox} label="Inbox" n={unreadCount(boot)} strong />

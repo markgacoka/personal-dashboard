@@ -148,7 +148,7 @@ yet"; `series` draws a trend line; live sources can be merged in by `key`.
 
 ## Mail
 
-`#mail` is a mail client for hello@gacoka.com backed by a self-hosted
+`#mail` is a mail client for hello@gacoka.com (and further mailboxes such as hello@flightpad.io via `MAIL_USER_n`, switched at the top of the folder list; each has its own Postgres schema for labels/filters/settings, `services/mailAccounts.js`) backed by a self-hosted
 Stalwart server (compose service `stalwart`; JMAP at http://stalwart:8080 on
 the docker network) with outgoing mail relayed through Resend. Setup, env
 vars, DNS and maintenance: `docs/mail.md`. Server setup and repair:

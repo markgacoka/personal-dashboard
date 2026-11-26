@@ -9,7 +9,7 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Popover, Popov
 import { bytes, mailDateLong } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { parseToken, schedulePresets } from './compose-utils'
-import { mail, mailPost, useMailBoot, type Addr, type Attachment, type ComposeCtx, type MailBoot, type Template } from './api'
+import { accountHeader, mail, mailPost, useMailBoot, type Addr, type Attachment, type ComposeCtx, type MailBoot, type Template } from './api'
 
 export interface OpenOpts { mode?: 'new' | 'reply' | 'replyAll' | 'forward' | 'draft'; emailId?: string; threadId?: string; to?: Addr[] }
 const Ctx = createContext<(o?: OpenOpts) => void>(() => {})
@@ -158,7 +158,7 @@ function ComposerWindow({ s, boot, register, onClosed, reopen }: { s: State; boo
       const entry = { name: file.name, size: file.size, type: file.type || 'application/octet-stream', pending: true }
       setAtts(a => [...a, entry])
       try {
-        const r = await fetch('/api/mail/upload', { method: 'POST', credentials: 'same-origin', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name), 'X-File-Type': entry.type } })
+        const r = await fetch('/api/mail/upload', { method: 'POST', credentials: 'same-origin', body: file, headers: { ...accountHeader(), 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name), 'X-File-Type': entry.type } })
         const d = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(d.error || `Upload failed (${r.status})`)
         setAtts(a => a.map(x => x === entry ? { ...x, blobId: d.blobId, size: d.size, pending: false } : x))

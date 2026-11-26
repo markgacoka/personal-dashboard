@@ -5,7 +5,7 @@ import { fetchWithTimeout } from '../lib/http.js'
 
 const BASE = (process.env.ASSISTANT_URL || 'http://watch-assistant:8000').replace(/\/+$/, '')
 const TOKEN = process.env.ASSISTANT_LOG_TOKEN
-const LOG_PARAMS = ['limit', 'before', 'mode', 'q']
+const LOG_PARAMS = ['limit', 'before', 'mode', 'q', 'route', 'model', 'since', 'until']
 
 async function fromAssistant(path, reply) {
   if (!TOKEN) return reply.code(503).send({ error: 'The watch assistant log is not configured' })

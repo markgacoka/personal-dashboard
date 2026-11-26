@@ -295,7 +295,9 @@ export interface AssistantSummary {
   watchMedianMs?: number | null; watchP90Ms?: number | null; audioMedianMs?: number | null
   models: { model: string; count: number }[]
 }
-export interface AssistantLog { exchanges: AssistantExchange[]; summary: AssistantSummary }
+export interface AssistantFacet { value: string; count: number }
+// matches and facets come with the first page only (no `before`).
+export interface AssistantLog { exchanges: AssistantExchange[]; summary: AssistantSummary; matches?: number; facets?: { routes: AssistantFacet[]; models: AssistantFacet[]; modes: AssistantFacet[] } }
 export interface AssistantModel { model: string; latency: number; score: number; tools: boolean; failures: number; usable: boolean }
 export interface AssistantModels {
   ranked: AssistantModel[]; speech: string[]; providers: string[]; speedBudget: number

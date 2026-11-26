@@ -220,7 +220,7 @@ export function useFlightState({ saved, section, setSection }: { saved: SavedPla
   // The verdict: any no-go rules it out; open items mean it isn't decided yet.
   const statuses = d.checks.map(c => c.status)
   const verdict: Status = statuses.includes('nogo') ? 'nogo' : statuses.includes('todo') || plan.route.length < 2 ? 'todo' : statuses.includes('caution') ? 'caution' : 'ok'
-  const verdictLabel = verdict === 'nogo' ? 'No-go as planned' : verdict === 'caution' ? 'Go with caution' : verdict === 'todo' ? 'Not ready yet' : 'Go'
+  const verdictLabel = verdict === 'nogo' ? 'No-go as planned' : verdict === 'caution' ? 'Go with caution' : verdict === 'todo' ? 'Brief incomplete' : 'Ready to fly'
   const role = roleOf(plan.crew, certs)
 
   // What's still needed for a complete brief and NavLog.

@@ -1,19 +1,18 @@
 import { useState } from 'react'
-import { ArrowRight, ChevronDown, CloudSun, Fuel, Navigation, Printer, Scale } from 'lucide-react'
+import { ArrowRight, ChevronDown, Fuel, Navigation, Printer, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { PerfAt } from './model'
 import type { SectionKey } from './readiness'
-import { RunwayDiagram, RunwayFacts } from './RunwayDiagram'
+import { MapBoundary } from './MapBoundary'
+import { RouteOverview } from './RouteOverview'
 import { TaskRow } from './Sections'
-import { Cat, VerdictIcon, deg3, fmtMin, fmtTime } from './ui'
+import { VerdictIcon, fmtMin, fmtTime } from './ui'
 import { useFlight } from './useFlight'
 
-// The flight at a glance: the verdict, what's left to do, and one tile per
-// thing a pilot checks before going (route, fuel, weight and CG, each runway,
-// the weather). Each tile opens the section that holds it.
+// The flight at a glance: the verdict and what's left to resolve, then route,
+// fuel and weight and balance tiles (each opens its section), then the whole
+// route on a map with each airport's weather, runway and pattern entry.
 
-const code = (a: { icao: string | null; id: string }) => a.icao || a.id
 
 function Tile({ title, icon: I, go, className, children }: { title: React.ReactNode; icon?: typeof Fuel; go: () => void; className?: string; children: React.ReactNode }) {
   return (
@@ -81,22 +80,6 @@ function WbGauge({ weight, max, cg, env }: { weight: number; max: number; cg: nu
   )
 }
 
-function RunwayTile({ p, label, go }: { p: PerfAt; label: string; go: () => void }) {
-  const a = p.airport, w = p.wx.wind
-  const wind = p.wx.wind.from ? { dir: w.dir, spd: w.spd, gust: w.gust } : null
-  return (
-    <Tile title={<>{label} · <span className="num text-fg-2">{code(a)}</span> {fmtTime(p.wx.at)}</>} go={go}>
-      <div className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] items-center gap-4">
-        <RunwayDiagram compact airport={a} wind={wind} active={p.runway ? [p.runway.end.id] : []} />
-        <RunwayFacts compact airport={a} wind={wind} end={p.runway?.end ?? null} />
-      </div>
-      {p.dist && p.runway && (
-        <div className="num mt-3 text-[13px] text-fg-3">{p.kind === 'takeoff' ? 'Over 50 ft in' : 'Landing over 50 ft'} <span className="text-fg-2">{p.dist.total.toLocaleString()} ft</span> of {(p.kind === 'takeoff' ? p.runway.toraFt : p.runway.ldaFt).toLocaleString()}</div>
-      )}
-    </Tile>
-  )
-}
-
 // Column counts that divide the tiles evenly at each width (6 → 1, 2, 3 or 6
 // across; 4 → 2 or 4), so no row is left with a hole; five put the last one
 // across two columns.
@@ -119,59 +102,23 @@ export function Summary({ printAll }: { printAll: () => void }) {
   const [showRec, setShowRec] = useState(false)
   const must = f.tasks.filter(x => x.kind !== 'recommended'), rec = f.tasks.filter(x => x.kind === 'recommended')
   const to = d.wb.steps.find(x => x.total && x.label.startsWith('Takeoff'))
-  const dep = d.perf.find(p => p.kind === 'takeoff'), arr = [...d.perf].reverse().find(p => p.kind === 'landing' && p.wx.role !== 'alternate')
   const go = (k: SectionKey) => () => f.go(k)
   const ready = !must.length && plan.route.length > 1
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <VerdictIcon status={f.verdict} className="size-6" />
-        <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{f.verdictLabel}</h2>
-        {must.length > 0 && <span className="text-sm text-fg-3">{must.length} to resolve</span>}
-        {ready && <Button className="ml-auto" variant="primary" onClick={printAll}><Printer />Print all three</Button>}
-      </section>
-
-      {d.legs.length > 0 ? (
-        <div className="@container">
-          <TileGrid>{[
-            <Tile key="route" title="Route" icon={Navigation} go={go('route')}>
-              <div className="num truncate text-lg font-medium text-fg">{f.routeText}</div>
-              <dl className="num mt-3 grid grid-cols-3 gap-2 text-[13px]">
-                <div><dt className="text-fg-3">Distance</dt><dd className="text-fg">{Math.round(t.distNm)} nm</dd></div>
-                <div><dt className="text-fg-3">Time</dt><dd className="text-fg">{fmtMin(t.eteMin)}</dd></div>
-                <div><dt className="text-fg-3">Cruise</dt><dd className="truncate text-fg">{d.flights.map(x => `${(x.alt / 1000).toFixed(1)}k`).join(' / ')} ft</dd></div>
-              </dl>
-              <div className="num mt-3 text-[13px] text-fg-3">Off {fmtTime(d.takeoffAt)} · on {fmtTime(d.legs.at(-1)!.arriveAt)}{d.flights[0]?.cruise ? ` · ${d.flights[0].cruise.ktas} KTAS` : ''}</div>
-            </Tile>,
-            <Tile key="fuel" title={<>Fuel · <span className="num text-fg-2">{t.requiredFuel.toFixed(1)} of {t.usableFuel.toFixed(1)} gal</span></>} icon={Fuel} go={() => f.explain({ kind: 'topic', key: 'fuel' })}>
-              <FuelBar taxi={t.taxiFuel} trip={t.tripFuel} reserve={t.reserveFuel} usable={t.usableFuel} />
-            </Tile>,
-            to && d.profile && (
-              <Tile key="wb" title="Weight and balance" icon={Scale} go={go('loading')}>
-                <WbGauge weight={to.weight} max={d.profile.limits.maxTakeoff} cg={to.arm} env={d.profile.envelope.normal} />
-              </Tile>
-            ),
-            dep && <RunwayTile key="dep" p={dep} label="Departure" go={go('airports')} />,
-            arr && <RunwayTile key="arr" p={arr} label="Arrival" go={go('airports')} />,
-            <Tile key="wx" title="Weather" icon={CloudSun} go={go('weather')}>
-              <ul className="space-y-2">
-                {d.wx.map(w => (
-                  <li key={`${w.role}-${code(w.airport)}`} className="num flex items-center gap-2 text-[13px]">
-                    <span className="w-12 font-medium text-fg">{code(w.airport)}</span>
-                    {w.category ? <Cat cat={w.category} /> : <span className="text-fg-3">no report</span>}
-                    <span className="ml-auto truncate text-fg-2">{w.wind.from ? (!w.wind.spd ? 'calm' : w.wind.dir == null ? `VRB${w.wind.spd}` : `${deg3(w.wind.dir)}/${w.wind.spd}${w.wind.gust ? `G${w.wind.gust}` : ''}`) : '—'}</span>
-                    <span className="w-16 text-right text-fg-3">{fmtTime(w.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            </Tile>,
-          ]}</TileGrid>
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <VerdictIcon status={f.verdict} className="size-6" />
+          <h2 className="text-xl font-medium tracking-[-0.015em] text-fg">{f.verdictLabel}</h2>
+          {must.length > 0 && <span className="text-sm text-fg-3">{must.length} item{must.length > 1 ? 's' : ''} to resolve before you fly</span>}
+          {ready && <Button className="ml-auto" variant="primary" onClick={printAll}><Printer />Print all three</Button>}
         </div>
-      ) : <p className="text-sm text-fg-3">Tiles appear once the route resolves.</p>}
-
-      {must.length > 0 && (
-        <section><h3 className="mb-2 text-[15px] font-medium text-fg">To resolve</h3><ul className="grid gap-x-8 rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5 @5xl:grid-cols-2 [&>li]:border-b [&>li]:border-border [&>li:last-child]:border-0 2xl:[&>li:nth-last-child(2):nth-child(odd)]:border-0">{must.map(x => <TaskRow key={x.id} t={x} compact onGo={() => f.go(x.section)} />)}</ul></section>
-      )}
+        {must.length > 0 && (
+          <div className="@container">
+            <ul className="grid gap-x-8 rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5 @5xl:grid-cols-2 [&>li]:border-b [&>li]:border-border [&>li:last-child]:border-0 @5xl:[&>li:nth-last-child(2):nth-child(odd)]:border-0">{must.map(x => <TaskRow key={x.id} t={x} compact onGo={() => f.go(x.section)} />)}</ul>
+          </div>
+        )}
+      </section>
 
       {rec.length > 0 && (
         <section>
@@ -181,6 +128,35 @@ export function Summary({ printAll }: { printAll: () => void }) {
           {showRec && <ul className="mt-2 divide-y divide-border rounded-xl px-4 ring-1 ring-inset ring-border sm:px-5">{rec.map(x => <TaskRow key={x.id} t={x} onGo={() => f.go(x.section)} />)}</ul>}
         </section>
       )}
+
+      {d.legs.length > 0 ? (
+        <>
+          <div className="@container">
+            <TileGrid>{[
+              <Tile key="route" title="Route" icon={Navigation} go={go('route')}>
+                <div className="num truncate text-lg font-medium text-fg">{f.routeText}</div>
+                <dl className="num mt-3 grid grid-cols-3 gap-2 text-[13px]">
+                  <div><dt className="text-fg-3">Distance</dt><dd className="text-fg">{Math.round(t.distNm)} nm</dd></div>
+                  <div><dt className="text-fg-3">Time</dt><dd className="text-fg">{fmtMin(t.eteMin)}</dd></div>
+                  <div><dt className="text-fg-3">Cruise</dt><dd className="truncate text-fg">{d.flights.map(x => `${(x.alt / 1000).toFixed(1)}k`).join(' / ')} ft</dd></div>
+                </dl>
+                <div className="num mt-3 text-[13px] text-fg-3">Off {fmtTime(d.takeoffAt)} · on {fmtTime(d.legs.at(-1)!.arriveAt)}{d.flights[0]?.cruise ? ` · ${d.flights[0].cruise.ktas} KTAS` : ''}</div>
+              </Tile>,
+              <Tile key="fuel" title={<>Fuel · <span className="num text-fg-2">{t.requiredFuel.toFixed(1)} of {t.usableFuel.toFixed(1)} gal</span></>} icon={Fuel} go={() => f.explain({ kind: 'topic', key: 'fuel' })}>
+                <FuelBar taxi={t.taxiFuel} trip={t.tripFuel} reserve={t.reserveFuel} usable={t.usableFuel} />
+              </Tile>,
+              to && d.profile && (
+                <Tile key="wb" title="Weight and balance" icon={Scale} go={go('loading')}>
+                  <WbGauge weight={to.weight} max={d.profile.limits.maxTakeoff} cg={to.arm} env={d.profile.envelope.normal} />
+                </Tile>
+              ),
+            ]}</TileGrid>
+          </div>
+          <div className="@container"><MapBoundary>
+            <RouteOverview route={f.routePts} alternate={f.altAirport} d={d} className="h-[26rem] sm:h-[32rem] @5xl:h-[38rem]" />
+          </MapBoundary></div>
+        </>
+      ) : <p className="text-sm text-fg-3">The route, fuel, weight and balance and the route map appear once the route resolves.</p>}
     </div>
   )
 }

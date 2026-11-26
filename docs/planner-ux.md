@@ -37,6 +37,23 @@ covers what it calculates.
 - **Less text**: section and panel subtitles and input-group hints are gone;
   task rows inside a section show titles only.
 
+## Summary
+
+Top to bottom: the verdict (No-go as planned, Go with caution, Brief
+incomplete, Ready to fly) with what's left to resolve; the route, fuel and
+weight and balance tiles; then the route map (`RouteOverview.tsx`). The map
+fits the departure, points flown over, arrival and alternate in view. Each leg
+shows its magnetic course and altitude; TOC and TOD are marked; each airport
+shows its flight category and surface wind. The runway in use is drawn with
+the departure climb-out and, at the arrival, the recommended pattern entry
+(AIM 4-3-3: a 45° entry to downwind from the pattern side, a midfield crossing
+500 ft above pattern altitude from the other side; towered fields defer to
+ATC; `patternEntry`). Hovering or tapping an airport shows its weather at the
+departure or arrival time, the runway in use with a to-scale diagram, wind
+components, pattern side and altitude, distances and frequencies; a leg shows
+its courses, heading, altitude, wind aloft, distance, ground speed, time, fuel
+and terrain.
+
 ## Layout rules
 
 - Sections lay out against the width of the content column (`<main>` is a
@@ -144,7 +161,7 @@ and the briefing PDF.
 |---------|-------|------|-----------------|
 | No-go   | Rules the flight out as planned | red ✕ / red dot | yes, to No-go |
 | Decide  | A risk to weigh, or to talk through with the instructor | amber dot | yes, to Go with caution |
-| Finish  | An entry or tick the plan still needs | hollow ring | yes, to Not ready yet |
+| Finish  | An entry or tick the plan still needs | hollow ring | yes, to Brief incomplete |
 | Recommended | Context that replaces a stand-in (own POH, checklist, inspection dates, standard briefing) | small dot | no |
 | Assumed | Data was missing or stale; what was used instead | muted ⓘ | no |
 | Passed  | Checked and fine | muted tick | no |

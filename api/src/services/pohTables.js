@@ -11,15 +11,36 @@
 // in a plausible range. A row that fails is dropped (the planner interpolates
 // across the gap), and a table with too few good rows is not used at all.
 import { pool } from '../db/client.js'
+import { ocrStatus, ocrText, readLater } from './docOcr.js'
 import { pdfPages } from './pohPages.js'
 
-export const TABLES_VERSION = 2
+export const TABLES_VERSION = 3
 
 const num = s => (/^-?\d{1,2},\d{3}$/.test(s) ? Number(s.replace(',', '')) : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN)
 const isSL = s => /^S\.?L\.?$/i.test(s)
 const isNull = s => /^-{2,}$/.test(s) || s === '—'
 const isPa = s => isSL(s) || (Number.isFinite(num(s)) && num(s) % 1000 === 0 && num(s) >= 1000 && num(s) <= 16000)
 const paOf = s => (isSL(s) ? 0 : num(s))
+
+// OCR'd table text, tidied without moving anything (every fix keeps the length,
+// so columns stay where they were): table rules read as | [ ] { } become spaces;
+// in a row of numbers, OCR words for empty cells ("cee", "ite") between its numbers become dashes;
+// an RPM with a rule glued to it ("24004", "12600") loses the extra digit; a
+// distance read as "1.290" gets its comma back.
+export function ocrClean(text) {
+  return text.split('\n').map(line => {
+    let l = line.replace(/[|[\]{}]/g, ' ')
+    if ((l.match(/\b\d{2,5}\b/g) ?? []).length < 4) return l
+    // Only between the first and last number: words in the margins are specks, not empty cells.
+    const nums = [...l.matchAll(/\b\d{2,5}\b/g)], lo = nums[0].index, hi = nums.at(-1).index
+    l = l.replace(/(^|\s)([a-z]{2,5}|-{2,})(?=\s|$)/g, (m, sp, w, at) => (at > lo && at < hi ? sp + '-'.repeat(w.length) : m))
+    const rpm = v => v >= 1800 && v <= 2900 && v % 50 === 0
+    l = l.replace(/\b\d{5}\b/g, m => (rpm(Number(m.slice(0, 4))) ? `${m.slice(0, 4)} ` : rpm(Number(m.slice(1))) ? ` ${m.slice(1)}` : m))
+    // "2100," (a speck after a number) → "2100 "; "10,000" keeps its comma.
+    l = l.replace(/(\d)[,;](?=\s|$)/g, '$1 ')
+    return l.replace(/\b(\d)[.](\d{3})\b/g, '$1,$2')
+  }).join('\n')
+}
 
 // Tokens with their column centre. "7. 5" (an OCR gap) → "7.5"; "S. L." → "S.L."; lone punctuation dropped.
 export function tokens(line) {
@@ -82,7 +103,8 @@ function distanceSheet(text, header, speeds) {
       out.push(cur)
     }
     if (!cur) continue
-    let cells = place(r.data, centres, gap / 2)
+    // A complete row is read in order (OCR spacing varies line to line); positions only place a row with gaps.
+    let cells = vals(r).length === nT * 2 ? vals(r).map(v => v.s) : place(r.data, centres, gap / 2)
     // A row OCR split over lines: fill its empty columns from unlabelled number-only lines next to it.
     if (cells.some(c => c === undefined)) {
       for (const j of [r.i - 1, r.i + 1, r.i - 2, r.i + 2]) {
@@ -180,9 +202,11 @@ export function cruiseTable(pageTexts) {
   const out = []
   let dropped = 0
   for (const r of rows) {
-    const raw = place(r.data, centres, gap / 2)
+    const raw = r.data.length === 9 ? r.data.map(t => t.s) : place(r.data, centres, gap / 2)
     // Fuel flow is printed with a decimal ("6.0"); a bare "6" is a misread.
-    const cells = raw.map((v, c) => (v === undefined || (c % 3 === 2 && !v.includes('.')) ? NaN : num(v)))
+    // OCR sometimes drops the point ("79" for 7.9): a two-digit flow is read as tenths; the checks below catch a wrong guess.
+    const flow = v => (v.includes('.') ? num(v) : /^\d{2}$/.test(v) && Number(v) >= 20 ? Number(v) / 10 : NaN)
+    const cells = raw.map((v, c) => (v === undefined ? NaN : c % 3 === 2 ? flow(v) : num(v)))
     const cols = [0, 1, 2].map(g => {
       const [bhp, ktas, gph] = cells.slice(g * 3, g * 3 + 3)
       return bhp >= 20 && bhp <= 100 && ktas >= 50 && ktas <= 200 && gph >= 2 && gph <= 20 ? [bhp, ktas, gph] : null
@@ -287,21 +311,31 @@ export function tablesFromText(pages, pageMap = {}) {
   }, units)
 }
 
-// From the PDF: text-layer books only (a scan without one gets { v, none: true }).
+// From the PDF's text layer (a scan without one gets { v, none }).
 export async function pohTables(bytes, pageMap) {
   const pages = await pdfPages(bytes)
   if (!pages) return { v: TABLES_VERSION, none: 'no text layer' }
   return tablesFromText(pages, pageMap ?? {})
 }
 
-// A stored POH's tables, read once per parser version and saved with it.
+// A stored POH's tables, read once per parser version and saved with it. A
+// scan's come from its OCR'd pages (pohScan.js); while it is being read they
+// are reported as 'reading', not saved.
 export async function ensureTables(doc, log) {
   if (!doc?.id) return null
   const { rows: [r] } = await pool.query('SELECT tables, page_map FROM planner_documents WHERE id = $1', [doc.id])
   if (r?.tables?.v === TABLES_VERSION) return r.tables
-  const { rows: [b] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [doc.id])
-  const t = await pohTables(b.bytes, r?.page_map ?? doc.page_map)
+  const st = await ocrStatus(doc.id)
+  if (st?.state === 'running') { await readLater(doc.id, log); return { v: TABLES_VERSION, none: 'reading' } }
+  const ocr = st?.state === 'done' ? await ocrText(doc.id) : null
+  let t
+  if (ocr) t = { ...tablesFromText(ocr.map(ocrClean), r?.page_map ?? doc.page_map ?? {}), ocr: true }
+  else {
+    const { rows: [b] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [doc.id])
+    t = await pohTables(b.bytes, r?.page_map ?? doc.page_map)
+    if (t.none) { await readLater(doc.id, log); return { v: TABLES_VERSION, none: 'reading' } }
+  }
   await pool.query('UPDATE planner_documents SET tables = $2 WHERE id = $1', [doc.id, JSON.stringify(t)])
-  log?.info({ id: doc.id, takeoff: t.takeoff?.length ?? 0, landing: t.landing?.length ?? 0, climb: t.climb?.length ?? 0, cruise: t.cruise?.length ?? 0, none: t.none }, 'POH tables read')
+  log?.info({ id: doc.id, takeoff: t.takeoff?.length ?? 0, landing: t.landing?.length ?? 0, climb: t.climb?.length ?? 0, cruise: t.cruise?.length ?? 0, ocr: !!ocr }, 'POH tables read')
   return t
 }

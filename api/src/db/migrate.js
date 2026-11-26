@@ -1153,6 +1153,12 @@ async function migrateV35() {
 // Planner: a POH's spec sheet (engine, oil, fuel, gear, electrical, speeds…) read from its text (pohSpecs.js), versioned.
 // Planner: a pilot record (certificate, medical, ID…) belongs to one pilot
 // profile; existing rows (person_id NULL) stay with the "self" pilot.
+// Planner: a scanned document's OCR'd page text, kept (and saved as it is read,
+// so a restart resumes rather than starting over).
+async function migrateV43() {
+  await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS ocr JSONB')
+}
+
 async function migrateV42() {
   await pool.query('ALTER TABLE planner_documents ADD COLUMN IF NOT EXISTS person_id TEXT')
 }
@@ -1229,7 +1235,7 @@ const MIGRATIONS = [
   ['024', migrateV24], ['025', migrateV25], ['026', migrateV26], ['027', migrateV27], ['028', migrateV28],
   ['029', migrateV29], ['030', migrateV30], ['031', migrateV31], ['032', migrateV32], ['033', migrateV33],
   ['034', migrateV34], ['035', migrateV35], ['036', migrateV36], ['037', migrateV37], ['038', migrateV38],
-  ['039', migrateV39], ['040', migrateV40], ['041', migrateV41], ['042', migrateV42],
+  ['039', migrateV39], ['040', migrateV40], ['041', migrateV41], ['042', migrateV42], ['043', migrateV43],
 ]
 
 // Every migration in MIGRATIONS up to this one had already run (repeatedly) on

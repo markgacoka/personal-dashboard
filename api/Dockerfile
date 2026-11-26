@@ -14,8 +14,8 @@ WORKDIR /app
 COPY api/package.json api/package-lock.json* ./
 RUN npm ci --omit=dev
 
-# Checklist text extraction: PDF text layer (poppler) and OCR for scans and photos.
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
+# Document text: PDF text layer (poppler), OCR for scans and photos (tesseract), HEIC photos (libheif).
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-eng libheif-examples && rm -rf /var/lib/apt/lists/*
 
 # Install Chromium + system deps for the exact playwright version in node_modules
 RUN npx playwright install chromium --with-deps

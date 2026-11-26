@@ -136,7 +136,7 @@ export function useDocuments() {
   const upload = useMutation({
     mutationFn: async ({ file, kind, model, route, tail, title, person }: { file: File; kind: PlannerDoc['kind']; model?: string; route?: string; tail?: string; title?: string; person?: string }) => {
       const qs = new URLSearchParams({ kind, title: title || file.name.replace(/\.pdf$/i, ''), filename: file.name, ...(model ? { model } : {}), ...(route ? { route } : {}), ...(tail ? { tail } : {}), ...(person ? { person } : {}) })
-      const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': /^image\/(png|jpeg)$/.test(file.type) ? file.type : 'application/pdf' }, body: file, credentials: 'same-origin' })
+      const r = await fetch(`/api/planner/documents?${qs}`, { method: 'POST', headers: { 'Content-Type': /^image\/(png|jpeg|heic|heif)$/.test(file.type) ? file.type : 'application/pdf' }, body: file, credentials: 'same-origin' })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Upload failed (${r.status})`)
       return r.json() as Promise<PlannerDoc>
     },
@@ -150,7 +150,7 @@ export function useDocuments() {
       const { text, method } = await post<{ text: string; method: 'text' | 'ocr' }>(`/api/planner/documents/${id}/text`)
       const steps = parseChecklist(text)
       const doc = await patch<PlannerDoc>(`/api/planner/documents/${id}`, { steps })
-      return { doc, method }
+      return { doc, method, text }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
@@ -172,7 +172,8 @@ export const usePohFind = (a: { make?: string | null; model?: string | null; yea
   return useQuery({
     queryKey: ['planner', 'poh-find', a?.make, a?.model, a?.year, a?.tail], enabled: !!a?.model || !!a?.tail, staleTime: Infinity, retry: 1,
     // A scanned book's spec sheet is read by OCR in the background: look again until it's there.
-    refetchInterval: q => (q.state.data?.doc?.specs?.pending ? 30_000 : false),
+    // While a scan is being read, check every 15 s for progress and the result.
+    refetchInterval: q => (q.state.data?.doc?.specs?.pending || q.state.data?.doc?.tables?.none === 'reading' ? 15_000 : false),
     queryFn: async () => {
       const r = await post<{ match: PohMatch | null; doc: PlannerDoc | null; uploaded?: boolean }>('/api/planner/poh/find', a)
       if (r.doc) qc.invalidateQueries({ queryKey: ['planner', 'documents'] })

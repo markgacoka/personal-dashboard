@@ -5,7 +5,8 @@
 // "Label: value" lines and fixed phrases, so each is a pattern over the
 // whitespace-collapsed text; anything not found is left out rather than guessed.
 import { pool } from '../db/client.js'
-import { ocrPages, pdfPages } from './pohPages.js'
+import { pdfPages } from './pohPages.js'
+import { ocrMessage, ocrStatus, ocrText, readLater } from './docOcr.js'
 import { speedUnit } from './pohTables.js'
 
 export const SPECS_VERSION = 2
@@ -308,29 +309,23 @@ export function specsFromText(pages) {
   return out
 }
 
-// A stored POH's specs, read once per parser version: from the text layer now,
-// or for a scan from an OCR pass in the background (saved when it finishes).
-const ocring = new Set()
+// A stored POH's specs, read once per parser version: from the text layer, or
+// for a scan from its OCR'd pages (docOcr.js reads the book once, in the
+// background, and survives restarts; pohScan.js fills these in when it's done).
 export async function ensureSpecs(doc, log) {
   if (!doc?.id) return null
   const { rows: [r] } = await pool.query('SELECT specs FROM planner_documents WHERE id = $1', [doc.id])
   if (r?.specs?.v === SPECS_VERSION && !r.specs.pending) return r.specs
-  if (r?.specs?.pending && ocring.has(doc.id)) return r.specs
-  const { rows: [b] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [doc.id])
-  const pages = await pdfPages(b.bytes)
+  const st = await ocrStatus(doc.id)
+  if (st?.state === 'running') { await readLater(doc.id, log); return { v: SPECS_VERSION, pending: ocrMessage(st) } }
+  const ocr = st?.state === 'done' ? await ocrText(doc.id) : null
+  const pages = ocr ?? (await pdfPages((await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [doc.id])).rows[0].bytes))
   if (pages) {
-    const s = specsFromText(pages)
+    const s = { ...specsFromText(pages), ...(ocr ? { ocr: true } : {}) }
     await pool.query('UPDATE planner_documents SET specs = $2 WHERE id = $1', [doc.id, JSON.stringify(s)])
-    log?.info({ id: doc.id, found: s.found }, 'POH specs read')
+    log?.info({ id: doc.id, found: s.found, ocr: !!ocr }, 'POH specs read')
     return s
   }
-  const pending = { v: SPECS_VERSION, pending: 'Reading the scanned book (OCR); a few minutes' }
-  await pool.query('UPDATE planner_documents SET specs = $2 WHERE id = $1', [doc.id, JSON.stringify(pending)])
-  ocring.add(doc.id)
-  ocrPages(b.bytes).then(async ocr => {
-    const s = { ...specsFromText(ocr), ocr: true }
-    await pool.query('UPDATE planner_documents SET specs = $2 WHERE id = $1', [doc.id, JSON.stringify(s)])
-    log?.info({ id: doc.id, found: s.found }, 'POH specs read by OCR')
-  }).catch(e => log?.warn({ id: doc.id, err: e.message }, 'POH specs OCR failed')).finally(() => ocring.delete(doc.id))
-  return pending
+  await readLater(doc.id, log)
+  return { v: SPECS_VERSION, pending: ocrMessage(await ocrStatus(doc.id)) }
 }

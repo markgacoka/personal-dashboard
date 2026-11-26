@@ -98,11 +98,12 @@ export function PohReport({ match, doc, uploaded, loading, model }: { match: Poh
       <dt className="text-fg-3">Performance tables</dt>
       <dd className="text-fg-2">{read?.sections.length ? <>Read: {read.sections.map(k => SECTION_LABEL[k]).join(', ')}.{read.missing.length ? <span className="text-fg-3"> Not readable, the 172P's used: {read.missing.map(k => SECTION_LABEL[k]).join(', ')}.</span> : ''}</>
         : base.exact && !base.note ? `Hand-checked tables for the ${base.profile.model}.`
-        : read?.reason === 'no text layer' ? 'A scan without text: its tables couldn\'t be read, so the 172P\'s are used and named in the workings.'
+        : read?.reason === 'reading' ? 'Being read from the scan (OCR); the 172P\'s stand in until it finishes.'
+        : read?.reason === 'no text layer' ? 'A scan its tables couldn\'t be read from, so the 172P\'s are used and named in the workings.'
         : `This book's takeoff, climb, cruise and landing tables couldn't be read, so the ${base.profile.model}'s are used and named in the workings. Upload a clearer copy to replace them.`}</dd>
       {units.length > 0 && <><dt className="text-fg-3">Units</dt><dd className="text-fg-2">{units.join('; ')}</dd></>}
       <dt className="text-fg-3">Spec sheet</dt>
-      <dd className="text-fg-2">{specs?.pending ? <span className="inline-flex items-center gap-2"><Loader2 className="size-3.5 animate-spin" />{specs.pending}</span> : hasSpecs(specs) ? <>Read: {got.map(([, l]) => l).join(', ')}.{missing.length ? <span className="text-fg-3"> Not found in the text (left blank, never guessed): {missing.map(([, l]) => l).join(', ')}.</span> : ''}</> : 'Not readable from this copy.'}</dd>
+      <dd className="text-fg-2">{specs?.pending ? <span className="inline-flex items-center gap-2"><Loader2 className="size-3.5 animate-spin" />{specs.pending}</span> : hasSpecs(specs) ? <>Read{specs.ocr ? ' (by OCR)' : ''}: {got.map(([, l]) => l).join(', ')}.{missing.length ? <span className="text-fg-3"> Not found in the text (left blank, never guessed): {missing.map(([, l]) => l).join(', ')}.</span> : ''}</> : doc?.specs?.failed ?? 'Not readable from this copy.'}</dd>
     </dl>
   )
 }

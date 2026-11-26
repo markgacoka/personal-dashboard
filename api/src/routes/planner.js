@@ -8,7 +8,7 @@ import { sunEvent } from '../services/twilight.js'
 import { importBriefings } from '../services/briefings.js'
 import { resolveRoute } from '../services/waypoints.js'
 import { CATALOG, ensurePoh, matchPoh } from '../services/pohCatalog.js'
-import { mapScanLater, pohPageMap } from '../services/pohPages.js'
+import { readIfScan, pohPageMap } from '../services/pohPages.js'
 import { findLibraryPoh, savePageMap } from '../services/pohFinder.js'
 import { ensureTables } from '../services/pohTables.js'
 import { ensureSpecs } from '../services/pohSpecs.js'
@@ -16,7 +16,8 @@ import { modelWinds, routeGrid } from '../services/modelWinds.js'
 import { airspaceIn } from '../services/faaAirspace.js'
 import { landmarks } from '../services/landmarks.js'
 import { fetchWithTimeout } from '../lib/http.js'
-import { documentText, imageType, isPdf } from '../services/docText.js'
+import { documentText, heicToJpeg, imageType, isPdf } from '../services/docText.js'
+import '../services/pohScan.js' // reads a scanned POH's specs and tables when its OCR finishes
 
 const ID = /^[A-Z0-9]{2,4}$/
 const TAIL = /^[A-Z0-9][A-Z0-9-]{1,7}$/
@@ -77,7 +78,7 @@ const PHOTO_OK = new Set(['checklist', ...PILOT_DOCS, ...AIRCRAFT_DOCS])
 const MAX_PDF = 80 * 1024 * 1024
 
 export default async function plannerRoutes(fastify) {
-  for (const t of ['application/pdf', 'image/png', 'image/jpeg']) fastify.addContentTypeParser(t, { parseAs: 'buffer', bodyLimit: MAX_PDF }, (req, body, done) => done(null, body))
+  for (const t of ['application/pdf', 'image/png', 'image/jpeg', 'image/heic', 'image/heif']) fastify.addContentTypeParser(t, { parseAs: 'buffer', bodyLimit: MAX_PDF }, (req, body, done) => done(null, body))
 
   // GET /api/planner/airports?ids=RHV,KSNS&date=2026-11-04
   fastify.get('/api/planner/airports', async req => {
@@ -231,8 +232,12 @@ export default async function plannerRoutes(fastify) {
   // POST /api/planner/documents?kind=poh&title=…&model=172P  (body: the PDF; a checklist may be a PNG or JPEG photo)
   fastify.post('/api/planner/documents', async (req, reply) => {
     const kind = DOC_KINDS.includes(req.query.kind) ? req.query.kind : null
-    const type = Buffer.isBuffer(req.body) ? (isPdf(req.body) ? 'application/pdf' : PHOTO_OK.has(kind) ? imageType(req.body) : null) : null
-    if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${PHOTO_OK.has(kind) ? ', PNG or JPEG' : ''} with ?kind=${DOC_KINDS.join('|')}` })
+    let type = Buffer.isBuffer(req.body) ? (isPdf(req.body) ? 'application/pdf' : PHOTO_OK.has(kind) ? imageType(req.body) : null) : null
+    if (!kind || !type) return reply.status(400).send({ error: `Send a PDF${PHOTO_OK.has(kind) ? ', PNG, JPEG or HEIC' : ''} with ?kind=${DOC_KINDS.join('|')}` })
+    // A phone's HEIC photo is kept as a JPEG.
+    if (type === 'image/heic') {
+      try { req.body = await heicToJpeg(req.body); type = 'image/jpeg' } catch (e) { return reply.status(e.statusCode || 500).send({ error: e.message }) }
+    }
     if (AIRCRAFT_DOCS.includes(kind) && !req.query.tail) return reply.status(400).send({ error: 'An aircraft document needs ?tail=' })
     const title = String(req.query.title || req.query.filename || 'Document').slice(0, 200)
     const { rows } = await pool.query(
@@ -245,14 +250,22 @@ export default async function plannerRoutes(fastify) {
         kind === 'poh' && type === 'application/pdf' ? JSON.stringify(await pohPageMap(req.body)) : null,
         // A pilot record names the pilot profile it belongs to ('self' is stored as NULL, like the records before profiles).
         req.query.person && req.query.person !== 'self' && /^[\w-]{1,40}$/.test(String(req.query.person)) ? String(req.query.person) : null])
-    if (kind === 'poh' && type === 'application/pdf' && !Object.keys(rows[0].page_map ?? {}).length) mapScanLater(rows[0].id, req.body, savePageMap, req.log)
+    if (kind === 'poh' && type === 'application/pdf' && !Object.keys(rows[0].page_map ?? {}).length) readIfScan(rows[0].id, req.body, req.log)
     return rows[0]
   })
   // The document's text (PDF text layer, or OCR of a scan or photo) for the client to turn into checklist steps.
   fastify.post('/api/planner/documents/:id/text', async (req, reply) => {
-    const { rows: [d] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [Number(req.params.id)])
+    const id = Number(req.params.id)
+    const { rows: [d] } = await pool.query("SELECT bytes, ocr->>'method' AS method, ocr->'pages' AS pages, ocr->>'state' AS state FROM planner_documents WHERE id = $1", [id])
     if (!d) return reply.status(404).send({ error: 'No such document' })
-    try { return await documentText(d.bytes) } catch (e) { return reply.status(e.statusCode || 500).send({ error: e.message }) }
+    // Read once: the text is kept with the document, so extracting again is instant.
+    if (d.state === 'done' && Array.isArray(d.pages)) return { text: d.pages.join('\f'), method: d.method || 'ocr' }
+    try {
+      const r = await documentText(d.bytes)
+      const pages = r.text.split('\f')
+      await pool.query("UPDATE planner_documents SET ocr = jsonb_build_object('v', 1, 'state', 'done', 'method', $2::text, 'done', $3::int, 'total', $3::int, 'pages', $4::jsonb) WHERE id = $1", [id, r.method, pages.length, JSON.stringify(pages)])
+      return r
+    } catch (e) { req.log.warn({ id, err: e.message }, 'Document text failed'); return reply.status(e.statusCode || 500).send({ error: e.message }) }
   })
   fastify.patch('/api/planner/documents/:id', async (req, reply) => {
     const { title, page_map: pageMap, steps } = req.body || {}

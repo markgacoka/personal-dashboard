@@ -3,7 +3,7 @@
 // the planner can show it beside every step and serve it for download.
 import { pool } from '../db/client.js'
 import { fetchWithTimeout } from '../lib/http.js'
-import { mapScanLater, pohPageMap } from './pohPages.js'
+import { readIfScan, pohPageMap } from './pohPages.js'
 import { savePageMap } from './pohFinder.js'
 
 // near: other variants this book is the closest stand-in for (same engine and airframe family).
@@ -64,7 +64,7 @@ export async function ensurePoh(entry, log) {
     const { rows: [b] } = await pool.query('SELECT bytes FROM planner_documents WHERE id = $1', [rows[0].id])
     const map = await pohPageMap(b.bytes)
     await savePageMap(rows[0].id, map)
-    if (!Object.keys(map).length) mapScanLater(rows[0].id, b.bytes, savePageMap, log)
+    if (!Object.keys(map).length) readIfScan(rows[0].id, b.bytes, log)
     return { ...rows[0], page_map: map }
   }
   if (rows[0]) return rows[0]
@@ -82,7 +82,7 @@ export async function ensurePoh(entry, log) {
        ON CONFLICT (source, source_ref) WHERE source_ref IS NOT NULL DO UPDATE SET title = EXCLUDED.title
        RETURNING ${COLS}`,
       [entry.title, entry.variant, filename, buf, buf.length, JSON.stringify(entry.pageMap ?? await pohPageMap(buf)), entry.url])
-    if (!Object.keys(doc.page_map ?? {}).length) mapScanLater(doc.id, buf, savePageMap, log)
+    if (!Object.keys(doc.page_map ?? {}).length) readIfScan(doc.id, buf, log)
     return doc
   })().finally(() => inflight.delete(entry.url))
   inflight.set(entry.url, p)

@@ -17,6 +17,7 @@ import { useRefs } from './RefPanel'
 export function ChecklistEditor({ tail, value, onSave, saving, onCancel }: { tail: string; value: ChecklistSection[] | undefined; onSave: (s: ChecklistSection[]) => void; saving?: boolean; onCancel?: () => void }) {
   const [secs, setSecs] = useState<ChecklistSection[]>(value ?? [])
   const [read, setRead] = useState<{ title: string; method: 'text' | 'ocr'; n: number } | null>(null)
+  const [unread, setUnread] = useState<string | null>(null) // text that was read but held no checklist lines
   useEffect(() => setSecs(value ?? []), [value])
   const docs = useDocuments()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -30,8 +31,8 @@ export function ChecklistEditor({ tail, value, onSave, saving, onCancel }: { tai
     onSuccess: d => docs.extract.mutate(d.id, {
       onSuccess: r => {
         const steps = r.doc.steps ?? []
-        if (!steps.length) { toast.error('No checklist lines could be read from that file. Try a sharper photo, or add the lines by hand.'); return }
-        setSecs(steps); setRead({ title: d.title, method: r.method, n: stepCount(steps) })
+        if (!steps.length) { setUnread(r.text.trim() || '(no text found)'); return }
+        setUnread(null); setSecs(steps); setRead({ title: d.title, method: r.method, n: stepCount(steps) })
       },
       onError: e => toast.error(e.message),
     }),
@@ -40,12 +41,19 @@ export function ChecklistEditor({ tail, value, onSave, saving, onCancel }: { tai
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <input ref={fileRef} type="file" accept="image/png,image/jpeg,application/pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/heic,image/heif,application/pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
         <Button size="sm" variant="secondary" loading={busy} onClick={() => fileRef.current?.click()}><Upload />Upload a photo or PDF</Button>
         <span className="text-[13px] text-fg-3">or add each line below, in the order you fly it.</span>
         <span className="num ml-auto text-[13px] text-fg-3">{stepCount(secs)} lines in {secs.length} sections</span>
       </div>
-      {busy && <p className="flex items-center gap-2 text-[13px] text-fg-3"><Loader2 className="size-3.5 animate-spin" />{docs.upload.isPending ? 'Uploading…' : 'Reading the checklist…'}</p>}
+      {busy && <p className="flex items-center gap-2 text-[13px] text-fg-3"><Loader2 className="size-3.5 animate-spin" />{docs.upload.isPending ? 'Uploading…' : 'Reading the checklist (a scan or photo takes up to a minute)…'}</p>}
+      {unread != null && (
+        <div className="rounded-lg px-3 py-2 text-[13px] ring-1 ring-inset ring-warn/40">
+          <p className="text-fg-2">No checklist lines were recognised in that file. Here is the text that was read; a sharper, straight-on photo or the PDF usually works, or add the lines below.</p>
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-sunken p-2 font-mono text-[12px] text-fg-3">{unread}</pre>
+          <button className="mt-1 text-accent hover:underline" onClick={() => setUnread(null)}>Dismiss</button>
+        </div>
+      )}
       {read && (
         <p className="rounded-lg px-3 py-2 text-[13px] text-fg-2 ring-1 ring-inset ring-border">
           Read {read.n} lines from "{read.title}"{read.method === 'ocr' ? ' by text recognition' : ''}. Check each against the original, correct anything misread, then save.{' '}

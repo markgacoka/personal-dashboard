@@ -6,6 +6,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { readLater } from './docOcr.js'
 
 const run = promisify(execFile)
 const opts = { timeout: 120_000, maxBuffer: 64 * 1024 * 1024 }
@@ -113,33 +114,8 @@ export async function firstPagesText(bytes, n = 6) {
   }
 }
 
-// Every page OCR'd (a scanned book): slow, so run once per book in the background.
-export async function ocrPages(bytes, { maxPages = 200, dpi = 150 } = {}) {
-  const dir = await mkdtemp(join(tmpdir(), 'pohocr-'))
-  try {
-    const pdf = join(dir, 'in.pdf')
-    await writeFile(pdf, bytes)
-    const out = []
-    for (let i = 1; i <= maxPages; i++) {
-      const base = join(dir, `p${i}`)
-      try { await run('pdftoppm', ['-r', String(dpi), '-gray', '-png', '-singlefile', '-f', String(i), '-l', String(i), pdf, base], opts) } catch { break }
-      try { out.push((await run('tesseract', [`${base}.png`, '-', '--psm', '3'], opts)).stdout) } catch { out.push('') }
-      await rm(`${base}.png`, { force: true })
-    }
-    return out
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-}
-
-// A scanned book's page map, OCR'd in the background (minutes) and saved; one book at a time.
-let queue = Promise.resolve()
-export function mapScanLater(id, bytes, save, log) {
-  queue = queue.then(async () => {
-    const t = Date.now()
-    const map = pageMapFromText(await ocrPages(bytes))
-    await save(id, map)
-    log?.info({ id, sections: Object.keys(map).length, s: Math.round((Date.now() - t) / 1000) }, 'POH page map from OCR')
-  }).catch(e => log?.warn({ id, err: e.message }, 'POH OCR page map failed'))
-  return queue
+// A book without a text layer is read by OCR in the background (docOcr.js),
+// once, resumably; its page map, specs and tables follow when it's done.
+export async function readIfScan(id, bytes, log) {
+  if (!(await pdfPages(bytes, { first: 1, last: 10 }))) await readLater(id, log)
 }

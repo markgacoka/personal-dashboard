@@ -7,7 +7,7 @@
 // read from its headings.
 import { pool } from '../db/client.js'
 import { fetchWithTimeout } from '../lib/http.js'
-import { firstPagesText, mapScanLater, pohPageMap } from './pohPages.js'
+import { firstPagesText, pohPageMap, readIfScan } from './pohPages.js'
 
 const BASE = 'https://sprinkle.com'
 const DAY = 86_400_000
@@ -134,7 +134,7 @@ export async function findLibraryPoh({ make, model, year }, log) {
            ON CONFLICT (source, source_ref) WHERE source_ref IS NOT NULL DO UPDATE SET model = EXCLUDED.model
            RETURNING ${COLS}`,
           [title, String(model).toUpperCase(), `${alnum(model)}-poh.pdf`, bytes, bytes.length, JSON.stringify(pageMap), c.url])
-        if (!Object.keys(pageMap).length) mapScanLater(doc.id, bytes, savePageMap, log)
+        if (!Object.keys(pageMap).length) readIfScan(doc.id, bytes, log)
         return doc
       }
       misses.set(key, Date.now())

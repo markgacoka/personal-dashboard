@@ -9,7 +9,7 @@ export interface StallRow { flaps: string; aft: number[]; fwd: number[] } // KIA
 export interface LoadFactor { weight: N; flapsUp: string | null; flapsDown: string | null }
 export interface Tank { key: string; label: string; total: number; each: number; usable: number; unusable: number }
 export interface PohSpecs {
-  v: number; pending?: string; ocr?: boolean; found?: number
+  v: number; pending?: string; failed?: string; ocr?: boolean; found?: number
   engine?: { make: string | null; model: string | null; hp: N; rpm: N; type: string | null; displacement: string | null } | null
   propeller?: { make: string | null; model: string | null; blades: N; diameterIn: [number, number] | null; type: string | null; groundClearance: string | null } | null
   oil?: { sumpQt: N; totalQt: N; minQt: N; extendedQt: N; pressurePsi: { min: N; green: [number, number] | null; max: N } | null; maxTempF: N; spec: string | null; viscosity: string[] } | null

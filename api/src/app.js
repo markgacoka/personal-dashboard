@@ -28,6 +28,7 @@ import plannerRoutes from './routes/planner.js'
 import { scheduleNightSync } from './services/schedules.js'
 import { scheduleAutoLog } from './services/autolog.js'
 import { scheduleNiceAirPortalSync } from './services/niceAirPortal.js'
+import { resumeReading } from './services/docOcr.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Docker sets PUBLIC_DIR=/app/public; locally falls back relative to src/
@@ -89,6 +90,7 @@ export async function buildApp({ logger = true, background = true, onRoute } = {
         scheduleNasrRefresh(fastify.log)        // every US airport for the pattern trainer, per NASR cycle
         scheduleNightSync(fastify.log)          // block times from Gmail: first boot, then every 6 h
         scheduleAutoLog(fastify.log)            // NICE AIR bookings → logbook entries, every 20 min
+        resumeReading(fastify.log).catch(e => fastify.log.warn({ err: e.message }, 'OCR resume failed')) // scanned books being read before a restart
         scheduleNiceAirPortalSync(fastify.log)  // NICE AIR charges and Hobbs: every 12 h, hourly while a flight awaits its bill
 
         // Seed the FAA ACFTREF table (~8K rows) on first boot, in the background.
